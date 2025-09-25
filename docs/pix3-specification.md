@@ -27,7 +27,7 @@ Pix3 is a browser-based editor, similar to Figma and Unity, designed for rapid a
 
 | Category           | Technology                  | Justification |
 |-------------------:|:---------------------------|:--------------|
-| UI Components      | Lit                        | A lightweight library for creating fast, native, and encapsulated web components.
+| UI Components      | Lit + fw utilities         | A lightweight library for creating fast, native, and encapsulated web components. Use the project `fw` helpers (`ComponentBase`, `inject`, and related exports) as the default building blocks for UI components instead of raw LitElement to simplify configuration (light vs shadow DOM), dependency injection, and consistency across the codebase.
 | State Management   | Valtio                     | An ultra-lightweight, high-performance state manager based on proxies. Ensures reactivity and is easy to use.
 | 2D Rendering       | PixiJS                     | A high-performance 2D renderer that automatically uses WebGL.
 | 3D Rendering       | Three.js                   | The most popular and flexible library for 3D graphics on the web.
@@ -44,7 +44,31 @@ The application will be built on the principles of unidirectional data flow and 
 - Commands (Operations): Small, isolated classes containing all business logic. Only they are allowed to modify the State. This pattern is the foundation for the Undo/Redo system.
 - Core Managers: Classes that manage the main aspects of the editor (HistoryManager, SceneManager, PluginManager). They orchestrate the execution of commands.
 - Services: An infrastructure layer for interacting with the outside world (FileSystemAPIService). They do not contain business logic.
-- UI Components: "Dumb" Lit components that only display the State and trigger Commands in response to user actions.
+- UI Components: "Dumb" components built on top of the project's fw helpers. Prefer extending `ComponentBase` (which wraps LitElement and provides a configurable render root) and use the `inject` decorator from `fw/di` for services instead of wiring dependencies manually. This ensures consistent DOM mode (light vs shadow), simpler service wiring, and a single recommended pattern across the project.
+
+### Recommended component pattern
+
+Use the `fw` utilities exported from `docs/fw/index.ts` when creating UI components. Example:
+
+```typescript
+import { customElement, html, css, property, ComponentBase, inject } from 'docs/fw';
+
+@customElement('my-inspector')
+export class MyInspector extends ComponentBase {
+  @property({ type: String }) title = 'Inspector';
+
+  @inject()
+  dataService!: DataService; // resolved from fw/di container
+
+  render() {
+    return html`<div class="inspector"><h3>${this.title}</h3></div>`;
+  }
+}
+```
+
+Notes:
+- `ComponentBase` defaults to light DOM but allows opting into shadow DOM via a static `useShadowDom` flag.
+- The `inject` decorator automatically resolves services registered with the `fw/di` container. Services can be registered using the `@injectable()` helper in `fw/di`.
 - Plugins: An extensible mechanism that allows adding new functionality (tools, panels, commands) without modifying the core editor.
 
 ## 5. Scene File Format (*.pix3scene)

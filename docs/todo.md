@@ -42,6 +42,9 @@ This document outlines the steps to create the initial project structure and imp
   - [ ] Create `src/components/scene/scene-tree.ts`
   - [ ] Create `src/components/inspector/inspector-panel.ts`
   - [ ] Create basic asset browser component
+  - [ ] Prefer `ComponentBase` and `fw/di` for new components
+    - [ ] Use `ComponentBase` instead of `LitElement` to opt into the project's default DOM mode and lifecycle tweaks
+    - [ ] Use `inject` from `fw/di` to resolve services in components
 
 ## Rendering System
 
@@ -108,6 +111,13 @@ This document outlines the steps to create the initial project structure and imp
   - [ ] Create basic README.md with setup instructions
   - [ ] Document development workflow
   - [ ] Add inline code comments
+
+## Migration tasks
+
+- [ ] Migrate existing raw `LitElement` components to use `ComponentBase` and `fw/di` where appropriate
+  - [ ] Identify components that rely on light DOM or require injected services
+  - [ ] Replace `extends LitElement` with `extends ComponentBase` and swap manual wiring for `@inject()` when possible
+  - [ ] Run visual tests to ensure no regressions in styles or behavior
 
 ## Next Steps (Post-MVP)
 
