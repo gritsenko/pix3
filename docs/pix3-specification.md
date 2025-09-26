@@ -54,8 +54,8 @@ This specification covers the MVP scope and foundation architecture. Changes are
 |-------------------:|:---------------------------|:--------------|
 | UI Components      | Lit + fw utilities         | A lightweight library for creating fast, native, and encapsulated web components. Use the project `fw` helpers (`ComponentBase`, `inject`, and related exports) as the default building blocks for UI components instead of raw LitElement to simplify configuration (light vs shadow DOM), dependency injection, and consistency across the codebase.
 | State Management   | Valtio                     | An ultra-lightweight, high-performance state manager based on proxies. Ensures reactivity and is easy to use.
-| 2D Rendering       | PixiJS                     | A high-performance 2D renderer that automatically uses WebGL.
-| 3D Rendering       | Three.js                   | The most popular and flexible library for 3D graphics on the web.
+| Rendering (MVP)    | Three.js                   | Single engine for both 3D (perspective) and 2D (orthographic) layers to minimize bundle size for playable ads.
+| Future 2D Module   | PixiJS (optional)          | Planned add-on for pixel-perfect overlays once advanced 2D UI fidelity is required.
 | Panel Layout       | Golden Layout              | A ready-made solution for creating complex, customizable, and persistent panel layouts.
 | Language           | TypeScript                 | Strong typing to increase reliability, improve autocompletion, and simplify work with AI agents.
 | Build Tool         | Vite                       | A modern and extremely fast build tool, perfectly suited for development with native web technologies.
@@ -79,6 +79,7 @@ The application will be built on the principles of unidirectional data flow and 
 - Services: An infrastructure layer for interacting with the outside world (FileSystemAPIService). They do not contain business logic.
 - UI Components: "Dumb" components built on top of the project's fw helpers. Prefer extending `ComponentBase` (which wraps LitElement and provides a configurable render root) and use the `inject` decorator from `fw/di` for services instead of wiring dependencies manually. This ensures consistent DOM mode (light vs shadow), simpler service wiring, and a single recommended pattern across the project.
 - Message Bus: A lightweight pub/sub bus to bridge state updates, commands, and plugins without coupling. Commands emit events describing mutations; UI components subscribe via typed channels.
+- Rendering Layer: Three.js drives both the perspective 3D view and orthographic 2D overlays in MVP. Rendering facades (`ViewportRenderer`, `OverlayRenderer`) hide engine specifics so that a PixiJS-backed overlay can be attached later without refactoring UI or scene logic.
 
 ### Recommended component pattern
 
@@ -129,6 +130,14 @@ Notes:
 - **Operation Factories:** Context-specific factories (e.g., drawing, selection) create operations with injected services and automatically push them through `OperationService`.
 - **Telemetry Hooks:** Every invocation funnels through `OperationService`, making it the ideal point to emit analytics, autosave triggers, and cross-device sync messages.
 - **Tool/Command Integration:** Tools cancel active operations via the service; command handlers can call `invokeAndPush()` to perform and enqueue operations in one step.
+
+### 4.4 Rendering Extensibility Plan
+
+- **Renderer Facades:** Define `IRenderLayer` interfaces that describe lifecycle hooks (`init`, `render`, `resize`, `dispose`). MVP ships with `ThreeViewportLayer` (perspective) and `ThreeOverlayLayer` (orthographic) implementations.
+- **Dependency Injection:** Register render layers through the DI container so alternative implementations (e.g., `PixiOverlayLayer`) can be swapped without touching SceneManager or UI panels.
+- **Conditional Bundling:** Keep the PixiJS adapter in a separate optional module loaded via dynamic import. When projects opt into pixel-perfect overlays, the adapter and PixiJS dependency are pulled in; otherwise the bundle remains Three-only.
+- **Shared Scene Contracts:** Scene node definitions for 2D sprites expose engine-agnostic properties (texture, anchors, nine-slice). The layer implementation decides how to realize them in Three.js today and in PixiJS later.
+- **Testing Path:** Establish renderer integration tests that run against the `IRenderLayer` contract so new engines can be validated with the same suite.
 
 ## 5. Scene File Format (*.pix3scene)
 
@@ -194,7 +203,7 @@ root:
 - Implement the basic architecture: AppState with Valtio, Command pattern contracts, and DI container wiring.
 - Integrate FileSystemAPIService to open a project folder, list assets, and load `.pix3scene` files.
 - Integrate Golden Layout to create a basic layout: Scene Tree, Viewport, Inspector, Asset Browser. Provide persona presets.
-- Implement rendering of a simple 3D scene in the viewport using Three.js. Provide a 2D overlay via PixiJS for UI.
+- Implement rendering of a simple 3D scene in the viewport using Three.js, including an orthographic pass for 2D overlays. Keep the rendering bridge extensible so PixiJS can be plugged in later for pixel-perfect UI.
 - Create SceneManager to parse and display the scene structure (`*.pix3scene`) and expose diff events.
 - Implement the `pix3-basic-tools-plugin` to add a tool for creating primitives (e.g., a cube) with undoable commands.
 - Implement a basic Undo/Redo system using HistoryManager, wired to keyboard shortcuts and UI controls.
@@ -262,7 +271,7 @@ root:
 │   │   ├── AppState.ts       # State definition (with Valtio)
 │   │   └── index.ts          # Exports the state proxy
 │   
-│   ├── rendering/            # Rendering logic (bridge to Three.js/PixiJS)
+│   ├── rendering/            # Rendering logic (Three.js core + optional PixiJS adapters)
 │   │   ├── WebGLRenderer.ts
 │   │   └── Canvas2DRenderer.ts
 │   │
