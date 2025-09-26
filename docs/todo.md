@@ -2,6 +2,13 @@
 
 This document outlines the steps to create the initial project structure and implement the Minimum Viable Product (MVP) for Pix3, based on the technical specification.
 
+## Prerequisites
+
+- Target Chromium-based browsers (Chrome, Edge, Arc, Brave) — keep the last two stable versions installed for QA.
+- Work on Windows 11+, macOS 13+, or Ubuntu 22.04+ hardware with at least an Intel Iris Xe / AMD Vega GPU and 8 GB RAM.
+- Ensure TypeScript `experimentalDecorators` and `emitDecoratorMetadata` are enabled to support the DI utilities.
+- Install tooling: Node.js 18+, npm 9+, Git, AJV CLI (or equivalent) for YAML validation.
+
 ## Project Setup
 
 - [ ] Initialize project with Vite, TypeScript, and Lit
@@ -21,6 +28,7 @@ This document outlines the steps to create the initial project structure and imp
   - [ ] Create `src/core/commands/command.ts` (base class/interface)
   - [ ] Create basic command classes for scene operations
   - [ ] Set up command execution system
+  - [ ] Emit telemetry events and undo payloads from each command implementation
 
 ## Services Layer
 
@@ -45,6 +53,7 @@ This document outlines the steps to create the initial project structure and imp
   - [ ] Prefer `ComponentBase` and `fw/di` for new components
     - [ ] Use `ComponentBase` instead of `LitElement` to opt into the project's default DOM mode and lifecycle tweaks
     - [ ] Use `inject` from `fw/di` to resolve services in components
+    - [ ] Ship workspace layout presets (Playable Ad, 3D Scene Authoring, UI Overlay) and allow switching via settings
 
 ## Rendering System
 
@@ -63,6 +72,7 @@ This document outlines the steps to create the initial project structure and imp
   - [ ] Create `src/core/scene/SceneManager.ts`
   - [ ] Implement scene parsing from YAML (*.pix3scene files)
   - [ ] Create node hierarchy management
+  - [ ] Validate `.pix3scene` files against JSON Schema during CI
 
 - [ ] Implement node types
   - [ ] Create `src/core/scene/nodes/NodeBase.ts`
@@ -75,6 +85,7 @@ This document outlines the steps to create the initial project structure and imp
 - [ ] Implement basic plugin architecture
   - [ ] Create `src/core/plugins/PluginManager.ts`
   - [ ] Define plugin interface and loading mechanism
+  - [ ] Parse plugin `manifest.json` with declared capabilities and permission prompts
 
 - [ ] Create pix3-basic-tools-plugin
   - [ ] Create `src/plugins/pix3-basic-tools-plugin/` directory
@@ -106,11 +117,13 @@ This document outlines the steps to create the initial project structure and imp
   - [ ] Test File System API integration
   - [ ] Validate 3D scene rendering
   - [ ] Test basic scene loading
+  - [ ] Measure viewport FPS to ensure ≥ 85 on baseline hardware
 
 - [ ] Documentation
   - [ ] Create basic README.md with setup instructions
   - [ ] Document development workflow
   - [ ] Add inline code comments
+  - [ ] Draft persona-specific onboarding checklists (TA, GE, PAP)
 
 ## Migration tasks
 
@@ -122,9 +135,9 @@ This document outlines the steps to create the initial project structure and imp
 ## Next Steps (Post-MVP)
 
 - [ ] Implement advanced features (multi-tab interface, drag-and-drop, etc.)
-- [ ] Add comprehensive error handling
+- [ ] Add comprehensive error handling and telemetry reporting for commands
 - [ ] Implement collaboration features
 - [ ] Add unit and integration tests
-- [ ] Performance optimization
-- [ ] User documentation and tutorials</content>
+- [ ] Performance optimization focused on frame budget and asset streaming
+- [ ] User documentation and tutorials (персоны TA/GE/PAP)
 <parameter name="filePath">/Users/igor.gritsenko/Projects/pix3/todo.md

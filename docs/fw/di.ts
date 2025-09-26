@@ -1,16 +1,15 @@
 // Service lifetime types
 export const ServiceLifetime = {
-    Singleton: 0,
-    Scoped: 1,
-    Transient: 2
+    Singleton: 'singleton',
+    Transient: 'transient'
 } as const;
-type ServiceLifetime = typeof ServiceLifetime[keyof typeof ServiceLifetime];
+export type ServiceLifetimeOption = (typeof ServiceLifetime)[keyof typeof ServiceLifetime];
 
 // Service descriptor interface
 interface ServiceDescriptor {
     token: symbol;
-    implementation: any;
-    lifetime: ServiceLifetime;
+    implementation: new () => any;
+    lifetime: ServiceLifetimeOption;
 }
 
 // Main container class
@@ -28,19 +27,21 @@ export class ServiceContainer {
     }
 
     // Register a service
-    addService(token: symbol, implementation: any, lifetime: ServiceLifetime) {
+    addService(token: symbol, implementation: new () => any, lifetime: ServiceLifetimeOption) {
         this.services.set(token, { token, implementation, lifetime });
-        // Eagerly instantiate singleton
-        if (lifetime === ServiceLifetime.Singleton) {
-            if (!this.singletonInstances.has(token)) {
-                this.singletonInstances.set(token, new implementation());
-            }
-        }
     }
 
     // Retrieve an existing token or create a new one
     getOrCreateToken(service: any): symbol {
-        const serviceName = service.name;
+        if (typeof service === 'symbol') {
+            return service;
+        }
+
+        const serviceName = typeof service === 'string' ? service : service?.name;
+        if (!serviceName) {
+            throw new Error('Cannot derive service name for DI token. Provide a class, string, or symbol.');
+        }
+
         if (!this.tokenRegistry.has(serviceName)) {
             this.tokenRegistry.set(serviceName, Symbol(serviceName));
         }
@@ -55,14 +56,15 @@ export class ServiceContainer {
             throw new Error(`Service not registered for token: ${token.toString()}`);
         }
 
-        switch (descriptor.lifetime) {
-            case ServiceLifetime.Singleton:
-                return this.getSingletonInstance(descriptor);
-            case ServiceLifetime.Transient:
-                return new descriptor.implementation();
-            default:
-                throw new Error(`Unsupported lifetime: ${descriptor.lifetime}`);
+        if (descriptor.lifetime === ServiceLifetime.Singleton) {
+            return this.getSingletonInstance(descriptor);
         }
+
+        if (descriptor.lifetime === ServiceLifetime.Transient) {
+            return new descriptor.implementation();
+        }
+
+        throw new Error(`Unsupported lifetime: ${descriptor.lifetime}`);
     }
 
     private getSingletonInstance(descriptor: ServiceDescriptor): any {
@@ -74,7 +76,7 @@ export class ServiceContainer {
 }
 
 // Service decorator (similar to @Injectable in Blazor)
-export function injectable(lifetime: ServiceLifetime = ServiceLifetime.Singleton) {
+export function injectable(lifetime: ServiceLifetimeOption = ServiceLifetime.Singleton) {
     return function (target: any) {
         const container = ServiceContainer.getInstance();
         const token = container.getOrCreateToken(target);
@@ -89,7 +91,7 @@ import "reflect-metadata";
 export function inject(serviceType?: any) {
     return function (target: any, propertyKey: string) {
         // If no explicit type, use reflect-metadata to get the property type
-        const type = serviceType || Reflect.getMetadata("design:type", target, propertyKey);
+    const type = serviceType || (Reflect as any).getMetadata("design:type", target, propertyKey);
         if (!type) {
             throw new Error(`Cannot resolve type for property '${propertyKey}'. Make sure emitDecoratorMetadata is enabled.`);
         }
