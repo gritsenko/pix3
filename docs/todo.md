@@ -8,14 +8,14 @@ This tracker summarizes the execution status derived from `pix3-specification.md
 
 ## 🧭 Work Breakdown
 
-### Milestone 0 — Foundation (Not started)
-- [ ] Bootstrap Vite + TypeScript + Lit workspace via `npm create vite@latest pix3 -- --template lit-ts`
-- [ ] Install baseline dependencies: Valtio, Three.js, PixiJS (optional), Golden Layout, reflect-metadata
-- [ ] Configure strict TypeScript (`experimentalDecorators`, `emitDecoratorMetadata`, path aliases)
-- [ ] Scaffold repo structure per spec (src/components, src/core, src/plugins, src/rendering, src/services, src/state, src/styles)
-- [ ] Implement `fw` helpers (`ComponentBase`, DI container, injectables) and export barrel in `docs/fw`
-- [ ] Establish CI pipeline (lint, type-check, test) and add ESLint + Prettier configuration
-- [ ] Author initial README with setup workflow and persona overview
+### Milestone 0 — Foundation (Completed)
+- [x] Bootstrap Vite + TypeScript + Lit workspace via `npm create vite@latest pix3 -- --template lit-ts`
+- [x] Install baseline dependencies: Valtio, Three.js, PixiJS (optional), Golden Layout, reflect-metadata
+- [x] Configure strict TypeScript (`experimentalDecorators`, `emitDecoratorMetadata`, path aliases)
+- [x] Scaffold repo structure per spec (src/components, src/core, src/plugins, src/rendering, src/services, src/state, src/styles)
+- [x] Implement `fw` helpers (`ComponentBase`, DI container, injectables) and export barrel in `docs/fw`
+- [x] Establish CI pipeline (lint, type-check, test) and add ESLint + Prettier configuration
+- [x] Author initial README with setup workflow and persona overview
 
 ### Milestone 1 — Scene Authoring (Not started)
 - [ ] Implement Valtio-based `AppState` and expose proxy via `src/state/index.ts`
