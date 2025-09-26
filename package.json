@@ -1,0 +1,41 @@
+{
+  "name": "pix3",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "lint": "eslint src --ext .ts,.js",
+    "lint:fix": "eslint src --ext .ts,.js --fix",
+    "format": "prettier --write src/**/*.{ts,js,json,css,md}",
+    "format:check": "prettier --check src/**/*.{ts,js,json,css,md}",
+    "type-check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@types/three": "^0.180.0",
+    "golden-layout": "^2.6.0",
+    "lit": "^3.3.1",
+    "pixi.js": "^8.13.2",
+    "reflect-metadata": "^0.2.2",
+    "three": "^0.180.0",
+    "valtio": "^2.1.8"
+  },
+  "devDependencies": {
+    "@types/node": "^24.5.2",
+    "@typescript-eslint/eslint-plugin": "^8.44.1",
+    "@typescript-eslint/parser": "^8.44.1",
+    "eslint": "^9.36.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-lit": "^2.1.1",
+    "eslint-plugin-lit-a11y": "^5.1.1",
+    "eslint-plugin-prettier": "^5.5.4",
+    "prettier": "^3.6.2",
+    "typescript": "~5.8.3",
+    "vite": "npm:rolldown-vite@7.1.12"
+  },
+  "overrides": {
+    "vite": "npm:rolldown-vite@7.1.12"
+  }
+}
