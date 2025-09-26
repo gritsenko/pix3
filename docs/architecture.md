@@ -22,21 +22,22 @@ flowchart LR
     I["HistoryManager"]
     J["SceneManager"]
     K["PluginManager"]
+    L["Plugin State Management"]
   end
 
   subgraph Services
-    L["FileSystemAPIService"]
-    M["Telemetry / Analytics Stub"]
+    M["FileSystemAPIService"]
+    N["Telemetry / Analytics Stub"]
   end
 
   subgraph Rendering
-    N["Three.js Viewport Layer"]
-    O["Overlay Layer (Three / Pixi adapter)"]
+    O["Three.js Viewport Layer"]
+    P["Overlay Layer (Three / Pixi adapter)"]
   end
 
   A ---|renders| D
-  D ---|uses| N
-  D ---|overlays| O
+  D ---|uses| O
+  D ---|overlays| P
 
   C -->|interacts| G
   E -->|inspects| G
@@ -44,13 +45,14 @@ flowchart LR
   I -->|tracks| H
   J -->|loads/parses| G
   K -->|registers commands| H
+  L -->|manages plugin state| G
 
-  G -->|persists layout| L
-  H -->|emits| M
-  J -->|loads scenes| L
+  G -->|persists layout| M
+  H -->|emits| N
+  J -->|loads scenes| M
 
-  N -->|reads scene nodes| J
-  O -->|renders 2D nodes| J
+  O -->|reads scene nodes| J
+  P -->|renders 2D nodes| J
 ```
 
 ### How to view

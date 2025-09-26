@@ -299,3 +299,42 @@ root:
 ## 10. Change Log
 
 - **1.5 (2025-09-26):** Added personas, target platforms, non-functional requirements, detailed architecture contracts, validation rules, and roadmap updates. Synced guidance on `fw` helpers.
+
+## 11. Plugin State Management
+
+Plugins in Pix3 can manage their own state, separate from the core application state. This allows for greater flexibility and encapsulation of functionality. Each plugin can define its own state structure and management logic, using Valtio or any other preferred state management solution.
+
+### 11.1 Plugin State Lifecycle
+
+- **Initialization:** Plugins can initialize their state when they are loaded. This is the ideal time to set up default values and prepare any necessary data structures.
+- **Updates:** Plugins should respond to relevant events or commands to update their state. This can include external events (e.g., file changes) or internal events (e.g., user actions).
+- **Persistence:** Plugins can persist their state to local storage or other storage solutions as needed. This allows users to maintain their settings and data across sessions.
+- **Disposal:** When a plugin is unloaded, it should clean up any resources, listeners, or intervals it has created. This prevents memory leaks and ensures that the application remains performant.
+
+### 11.2 Example Plugin State Management
+
+```typescript
+import { proxy, subscribe } from 'valtio';
+
+// Define the plugin state
+const pluginState = proxy({
+  count: 0,
+  text: 'Hello Pix3',
+});
+
+// Subscribe to state changes
+subscribe(pluginState, () => {
+  console.log('Plugin state updated:', pluginState);
+});
+
+// Update the state
+pluginState.count += 1;
+pluginState.text = 'Updated text';
+```
+
+### 11.3 Best Practices
+
+- Keep the plugin state isolated from the core application state to avoid unintended side effects.
+- Use descriptive and consistent naming for state properties to ensure clarity and maintainability.
+- Document the state structure and any important logic to assist other developers (and your future self).
+- Consider performance implications when designing the state management logic, especially for large or complex states.
