@@ -1,8 +1,8 @@
 import { customElement, property, state } from 'lit/decorators.js';
 import { inject } from './di';
-import { html, css } from 'lit';
+import { css, html } from 'lit';
 
-import {fromQuery} from './from-query';
+import { fromQuery } from './from-query';
 
 export * from './component-base';
 export * from './di';

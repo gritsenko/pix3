@@ -18,9 +18,9 @@ This tracker summarizes the execution status derived from `pix3-specification.md
 - [x] Author initial README with setup workflow and persona overview
 
 ### Milestone 1 — Scene Authoring (Not started)
-- [ ] Implement Valtio-based `AppState` and expose proxy via `src/state/index.ts`
-- [ ] Define command contracts (`src/core/commands/command.ts`) and telemetry hooks
-- [ ] Build `HistoryManager`, `OperationService`, and supporting operation abstractions (bulk, undo payloads)
+- [x] Implement Valtio-based `AppState` and expose proxy via `src/state/index.ts`
+- [x] Define command contracts (`src/core/commands/command.ts`) and telemetry hooks
+- [x] Build `HistoryManager`, `OperationService`, and supporting operation abstractions (bulk, undo payloads)
 - [ ] Implement FileSystemAPIService for project folder access, YAML loading, and error handling
 - [ ] Integrate Golden Layout shell with Scene Tree, Viewport, Inspector, Asset Browser panels and persona presets
 - [ ] Create foundational UI components extending `ComponentBase` with DI usage and keyboard-accessible chrome
