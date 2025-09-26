@@ -121,6 +121,15 @@ Notes:
 - **Preset:** Saved layout configuration tailored to a persona’s workflow.
 - **Command:** Unit of business logic that mutates the state and can be undone/redone.
 
+### 4.3 Operation Pipeline Blueprint (Legacy Inspiration)
+
+- **OperationService:** Central undo/redo manager inspired by the Pix2d `OperationService`. Maintains bounded stacks (default 100 items), clears redo history on new pushes, prevents duplicate operations, and emits typed events to the message bus (`OperationInvokedEvent`) for UI updates.
+- **Operation Base Class:** `EditOperationBase`-style abstraction with `perform()`, `undo()` and `getEditedNodes()` hooks. Operations declare `affectsNodeStructure` to help scene diffing.
+- **BulkOperation Aggregator:** Allows tools to bundle multiple granular operations into a single undo step (mirroring Pix2d’s `BulkEditOperation`). Useful for drag gestures or batched property changes.
+- **Operation Factories:** Context-specific factories (e.g., drawing, selection) create operations with injected services and automatically push them through `OperationService`.
+- **Telemetry Hooks:** Every invocation funnels through `OperationService`, making it the ideal point to emit analytics, autosave triggers, and cross-device sync messages.
+- **Tool/Command Integration:** Tools cancel active operations via the service; command handlers can call `invokeAndPush()` to perform and enqueue operations in one step.
+
 ## 5. Scene File Format (*.pix3scene)
 
 The scene file will use the YAML format to ensure readability for both humans and machines (including AI agents).
@@ -217,6 +226,12 @@ root:
 │   ├── core/                 # Application core (main business logic)
 │   │   ├── commands/         # Command pattern for all actions
 │   │   │   └── command.ts    # Base class/interface for commands
+│   │   ├── operations/       # Undoable operations and manager
+│   │   │   ├── operation-base.ts
+│   │   │   ├── bulk-operation.ts
+│   │   │   ├── operation-service.ts
+│   │   │   ├── operation-events.ts
+│   │   │   └── index.ts
 │   │   ├── history/
 │   │   │   └── HistoryManager.ts # Undo/Redo Manager
 │   │   ├── layout/

@@ -80,6 +80,15 @@ This document outlines the steps to create the initial project structure and imp
   - [ ] Create `src/core/scene/nodes/Sprite2D.ts`
   - [ ] Create `src/core/scene/types.ts` for exports
 
+## Operations System
+
+- [ ] Implement `src/core/operations/operation-base.ts` mirroring Pix2d `EditOperationBase`
+- [ ] Implement `src/core/operations/bulk-operation.ts` for grouped edits
+- [ ] Implement `src/core/operations/operation-service.ts` with undo/redo stacks (bounded to 100 entries) and duplicate protection
+- [ ] Emit `OperationInvokedEvent` through the message bus from `OperationService`
+- [ ] Provide factory helpers (e.g., `src/core/operations/operation-factory.ts`) used by tools and services
+- [ ] Write unit tests covering single operation, bulk operation, undo/redo limits, and duplicate prevention
+
 ## Plugin System
 
 - [ ] Implement basic plugin architecture
