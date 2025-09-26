@@ -22,7 +22,9 @@ This tracker summarizes the execution status derived from `pix3-specification.md
 - [x] Define command contracts (`src/core/commands/command.ts`) and telemetry hooks
 - [x] Build `HistoryManager`, `OperationService`, and supporting operation abstractions (bulk, undo payloads)
 - [x] Implement FileSystemAPIService for project folder access, YAML loading, and error handling
-- [ ] Integrate Golden Layout shell with Scene Tree, Viewport, Inspector, Asset Browser panels and persona presets
+- [x] Integrate Golden Layout shell with Scene Tree, Viewport, Inspector, Asset Browser panels and persona presets
+	- Bootstrapped `LayoutManagerService` with persona-aware presets and registered panel components (`scene-tree`, `viewport`, `inspector`, `asset-browser`).
+	- Added `pix3-editor` shell with persona picker, loading overlay, and Golden Layout host wired through DI.
 - [ ] Create foundational UI components extending `ComponentBase` with DI usage and keyboard-accessible chrome
 - [ ] Stand up rendering pipeline: Three.js viewport + orthographic overlay stub, camera controls, lighting primitives
 - [ ] Build `SceneManager`, node classes (`NodeBase`, `Node3D`, `Sprite2D`), and YAML schema validation pipeline
