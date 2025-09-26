@@ -21,7 +21,8 @@
     "pixi.js": "^8.13.2",
     "reflect-metadata": "^0.2.2",
     "three": "^0.180.0",
-    "valtio": "^2.1.8"
+    "valtio": "^2.1.8",
+    "yaml": "^2.6.0"
   },
   "devDependencies": {
     "@types/node": "^24.5.2",

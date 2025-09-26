@@ -21,7 +21,7 @@ This tracker summarizes the execution status derived from `pix3-specification.md
 - [x] Implement Valtio-based `AppState` and expose proxy via `src/state/index.ts`
 - [x] Define command contracts (`src/core/commands/command.ts`) and telemetry hooks
 - [x] Build `HistoryManager`, `OperationService`, and supporting operation abstractions (bulk, undo payloads)
-- [ ] Implement FileSystemAPIService for project folder access, YAML loading, and error handling
+- [x] Implement FileSystemAPIService for project folder access, YAML loading, and error handling
 - [ ] Integrate Golden Layout shell with Scene Tree, Viewport, Inspector, Asset Browser panels and persona presets
 - [ ] Create foundational UI components extending `ComponentBase` with DI usage and keyboard-accessible chrome
 - [ ] Stand up rendering pipeline: Three.js viewport + orthographic overlay stub, camera controls, lighting primitives
