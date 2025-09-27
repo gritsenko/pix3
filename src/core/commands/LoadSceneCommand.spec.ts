@@ -32,5 +32,11 @@ describe('LoadSceneCommand', () => {
     const graph = sceneManager.getActiveSceneGraph();
     expect(graph).not.toBeNull();
     expect(graph?.rootNodes.length ?? 0).toBeGreaterThan(0);
+
+    const demoNode = graph?.nodeMap.get('demo-box');
+    expect(demoNode).toBeDefined();
+    const properties = demoNode?.properties as Record<string, unknown> | undefined;
+    expect(properties?.material).toBeDefined();
+    expect((properties?.material as Record<string, unknown>).color).toBe('#ff0000');
   });
 });

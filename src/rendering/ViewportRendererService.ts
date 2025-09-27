@@ -223,11 +223,12 @@ export class ViewportRendererService {
     }
 
     const geometry = new BoxGeometry(1.2, 1.2, 1.2);
-    const material = new MeshStandardMaterial({
-      color: 0x4e8df5,
-      roughness: 0.35,
-      metalness: 0.25,
-    });
+      const fallbackColor = new Color('#ff00ff').convertSRGBToLinear();
+      const material = new MeshStandardMaterial({
+        color: fallbackColor,
+        roughness: 0.35,
+        metalness: 0.25,
+      });
     const mesh = new Mesh(geometry, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -496,7 +497,7 @@ export class ViewportRendererService {
 
   private parseColor(value: unknown, fallback: string): Color {
     const colorString = this.asString(value) ?? fallback;
-    return new Color(colorString);
+      return new Color(colorString).convertSRGBToLinear();
   }
 
   dispose(): void {
