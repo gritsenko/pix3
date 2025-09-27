@@ -30,6 +30,12 @@ export class SceneTreePanel extends ComponentBase {
   @state()
   private collapsedNodeIds: Set<string> = new Set();
 
+  @state()
+  private loadState = appState.scenes.loadState;
+
+  @state()
+  private loadError: string | null = appState.scenes.loadError;
+
   private disposeSceneSubscription?: () => void;
   private disposeSelectionSubscription?: () => void;
 
@@ -86,6 +92,8 @@ export class SceneTreePanel extends ComponentBase {
     this.activeSceneId = nextSceneId;
     this.activeScene = this.resolveActiveSceneDescriptor();
     this.hierarchy = this.cloneNodesForRender(this.resolveActiveHierarchyNodes());
+    this.loadState = appState.scenes.loadState;
+    this.loadError = appState.scenes.loadError;
 
     if (sceneChanged) {
       this.collapsedNodeIds = new Set();
@@ -208,6 +216,12 @@ export class SceneTreePanel extends ComponentBase {
   }
 
   private getPlaceholderMessage(): string {
+    if (this.loadState === 'loading') {
+      return 'Loading scene…';
+    }
+    if (this.loadState === 'error') {
+      return this.loadError ?? 'Failed to load scene.';
+    }
     if (this.activeSceneId && !this.hierarchy.length) {
       return 'The active scene has no nodes yet.';
     }

@@ -136,13 +136,12 @@ export const createInitialAppState = (): AppState => ({
     descriptors: {
       [SAMPLE_SCENE_DESCRIPTOR.id]: SAMPLE_SCENE_DESCRIPTOR,
     },
-    hierarchies: {
-      [SAMPLE_SCENE_DESCRIPTOR.id]: SAMPLE_SCENE_HIERARCHY,
-    },
-    loadState: 'ready',
+    // Hierarchies will be populated dynamically by LoadSceneCommand at startup
+    hierarchies: {},
+    loadState: 'loading',
     loadError: null,
     lastLoadedAt: null,
-    pendingScenePaths: [],
+    pendingScenePaths: [SAMPLE_SCENE_DESCRIPTOR.filePath],
   },
   selection: {
     nodeIds: [],
@@ -182,81 +181,4 @@ const SAMPLE_SCENE_DESCRIPTOR: SceneDescriptor = {
   version: '1.0.0',
   isDirty: false,
   lastSavedAt: null,
-};
-
-const SAMPLE_SCENE_HIERARCHY: SceneHierarchyState = {
-  version: '1.0.0',
-  description: 'Demonstration hierarchy rendered in the Scene Tree panel.',
-  metadata: {
-    author: 'Pix3 Team',
-  },
-  nodes: [
-    {
-      id: 'root-environment',
-      name: 'Environment Root',
-      type: 'Node3D',
-      instancePath: null,
-      children: [
-        {
-          id: 'hero-ship',
-          name: 'Hero Ship',
-          type: 'Node3D',
-          instancePath: null,
-          children: [
-            {
-              id: 'hero-thruster-left',
-              name: 'Left Thruster',
-              type: 'Sprite2D',
-              instancePath: null,
-              children: [],
-            },
-            {
-              id: 'hero-thruster-right',
-              name: 'Right Thruster',
-              type: 'Sprite2D',
-              instancePath: null,
-              children: [],
-            },
-          ],
-        },
-        {
-          id: 'orbitals',
-          name: 'Orbital Debris',
-          type: 'Group',
-          instancePath: null,
-          children: [
-            {
-              id: 'asteroid-a',
-              name: 'Asteroid A',
-              type: 'Node3D',
-              instancePath: null,
-              children: [],
-            },
-            {
-              id: 'asteroid-b',
-              name: 'Asteroid B',
-              type: 'Node3D',
-              instancePath: null,
-              children: [],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      id: 'ui-root',
-      name: 'UI Layer',
-      type: 'Instance',
-      instancePath: 'res://ui/hud.pix3scene',
-      children: [
-        {
-          id: 'score-label',
-          name: 'Score Label',
-          type: 'Sprite2D',
-          instancePath: null,
-          children: [],
-        },
-      ],
-    },
-  ],
 };

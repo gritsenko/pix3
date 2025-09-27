@@ -1,6 +1,7 @@
 import { ComponentBase, css, customElement, html, inject } from '../../fw';
-
+import { subscribe } from 'valtio/vanilla';
 import { ViewportRendererService } from '../../rendering';
+import { appState } from '../../state';
 
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
@@ -8,7 +9,6 @@ export class ViewportPanel extends ComponentBase {
 
   @inject(ViewportRendererService)
   private readonly viewportRenderer!: ViewportRendererService;
-
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
     if (!entry) {
@@ -22,10 +22,18 @@ export class ViewportPanel extends ComponentBase {
   });
 
   private canvas?: HTMLCanvasElement;
+  private disposeSceneSubscription?: () => void;
 
   connectedCallback() {
     super.connectedCallback();
     // ResizeObserver will be set up in firstUpdated when canvas is available
+    this.disposeSceneSubscription = subscribe(appState.scenes, () => {
+      if (appState.scenes.loadState === 'ready') {
+        // For now, just log that scene is ready; integration with rendering pipeline is future work.
+        // A future enhancement would translate hierarchy to actual render nodes.
+        console.info('[ViewportPanel] Scene loaded:', appState.scenes.activeSceneId);
+      }
+    });
   }
 
   disconnectedCallback() {
@@ -33,6 +41,8 @@ export class ViewportPanel extends ComponentBase {
     this.canvas = undefined;
     super.disconnectedCallback();
     this.resizeObserver.disconnect();
+    this.disposeSceneSubscription?.();
+    this.disposeSceneSubscription = undefined;
   }
 
   protected firstUpdated(): void {

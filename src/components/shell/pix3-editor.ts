@@ -2,6 +2,7 @@ import { subscribe } from 'valtio/vanilla';
 
 import { ComponentBase, css, customElement, html, inject, property, state } from '../../fw';
 import { LayoutManagerService } from '../../core/layout';
+import { LoadSceneCommand } from '../../core/commands/LoadSceneCommand';
 import { appState, PERSONA_IDS, type PersonaId } from '../../state';
 import '../ui/pix3-toolbar';
 import '../ui/pix3-toolbar-button';
@@ -10,6 +11,9 @@ import '../ui/pix3-toolbar-button';
 export class Pix3Editor extends ComponentBase {
   @inject(LayoutManagerService)
   private readonly layoutManager!: LayoutManagerService;
+
+  // Inject command used to load the startup scene
+  @inject(LoadSceneCommand) private readonly loadSceneCommand!: LoadSceneCommand;
 
   @state()
   private activePersona: PersonaId = appState.ui.persona;
@@ -46,6 +50,13 @@ export class Pix3Editor extends ComponentBase {
 
     await this.layoutManager.initialize(host);
     this.shellReady = true;
+
+    // Kick off loading of the pending startup scene (first in queue) if any
+    const pending = appState.scenes.pendingScenePaths[0];
+    if (pending) {
+      // Ensure FileSystemAPIService resource prefix logic is available
+      await this.loadSceneCommand.execute({ filePath: pending });
+    }
   }
 
   protected render() {
