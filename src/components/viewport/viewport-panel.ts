@@ -1,16 +1,27 @@
-import { ComponentBase, css, customElement, html } from '../../fw';
+import { ComponentBase, css, customElement, html, inject } from '../../fw';
+
+import { ViewportRendererService } from '../../rendering';
 
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
     protected static useShadowDom = true;
 
-    private readonly resizeObserver = new ResizeObserver(() => {
-        this.dispatchEvent(new CustomEvent('pix3-viewport-resize', {
-            bubbles: true,
-            composed: true,
-            detail: { width: this.offsetWidth, height: this.offsetHeight }
-        }));
+    @inject(ViewportRendererService)
+    private readonly viewportRenderer!: ViewportRendererService;
+
+    private readonly resizeObserver = new ResizeObserver((entries) => {
+        const entry = entries[0];
+        if (!entry) {
+            return;
+        }
+        const { width, height } = entry.contentRect;
+        if (width <= 0 || height <= 0) {
+            return;
+        }
+        this.viewportRenderer.resize(width, height);
     });
+
+    private canvas?: HTMLCanvasElement;
 
     connectedCallback() {
         super.connectedCallback();
@@ -18,16 +29,39 @@ export class ViewportPanel extends ComponentBase {
     }
 
     disconnectedCallback() {
+        this.viewportRenderer.dispose();
+        this.canvas = undefined;
         super.disconnectedCallback();
         this.resizeObserver.disconnect();
+    }
+
+    protected firstUpdated(): void {
+        this.canvas = this.renderRoot.querySelector<HTMLCanvasElement>('.viewport-canvas') ?? undefined;
+        if (!this.canvas) {
+            console.warn('[ViewportPanel] Missing canvas element for renderer initialization.');
+            return;
+        }
+
+        this.viewportRenderer.initialize(this.canvas);
+        const rect = this.getBoundingClientRect();
+        if (rect.width > 0 && rect.height > 0) {
+            this.viewportRenderer.resize(rect.width, rect.height);
+        }
     }
 
     protected render() {
         return html`
             <section class="panel" role="region" aria-label="Scene viewport">
                 <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>
-                <div class="overlay" role="presentation">
-                    <p class="placeholder">Viewport renderer bootstrap pending</p>
+                <div class="overlay" aria-hidden="true">
+                    <div class="hud">
+                        <span class="hud__label">Viewport Online</span>
+                        <ul class="hud__controls">
+                            <li><kbd>Left Drag</kbd><span>Orbit</span></li>
+                            <li><kbd>Right Drag</kbd><span>Pan</span></li>
+                            <li><kbd>Scroll</kbd><span>Zoom</span></li>
+                        </ul>
+                    </div>
                 </div>
             </section>
         `;
@@ -57,24 +91,58 @@ export class ViewportPanel extends ComponentBase {
         .overlay {
             position: absolute;
             inset: 0;
-            display: grid;
-            place-items: center;
             pointer-events: none;
-            background: linear-gradient(
-                135deg,
-                rgba(255, 255, 255, 0.06) 0%,
-                rgba(255, 255, 255, 0) 55%
-            );
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-end;
+            padding: 1.25rem;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(10, 13, 18, 0) 55%);
         }
 
-        .placeholder {
+        .hud {
+            display: inline-flex;
+            flex-direction: column;
+            gap: 0.4rem;
+            padding: 0.65rem 0.85rem;
+            border-radius: 0.65rem;
+            background: rgba(12, 15, 22, 0.78);
+            backdrop-filter: blur(14px);
+            box-shadow: 0 18px 28px rgba(0, 0, 0, 0.28);
+            color: rgba(240, 244, 250, 0.9);
+        }
+
+        .hud__label {
+            font-size: 0.72rem;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: rgba(240, 244, 250, 0.58);
+        }
+
+        .hud__controls {
             margin: 0;
-            padding: 0.5rem 0.75rem;
-            border-radius: 0.5rem;
-            background: rgba(20, 23, 28, 0.85);
-            color: rgba(240, 240, 240, 0.82);
-            font-size: 0.875rem;
+            padding: 0;
+            list-style: none;
+            display: grid;
+            gap: 0.2rem;
+            font-size: 0.78rem;
+            color: rgba(240, 244, 250, 0.85);
+        }
+
+        .hud__controls li {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
             letter-spacing: 0.02em;
+        }
+
+        .hud__controls kbd {
+            padding: 0.18rem 0.45rem;
+            border-radius: 0.35rem;
+            background: rgba(42, 47, 58, 0.9);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: rgba(240, 244, 250, 0.85);
+            font-size: 0.7rem;
+            letter-spacing: 0.04em;
         }
     `;
 }

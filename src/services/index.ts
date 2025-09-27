@@ -7,3 +7,4 @@ export {
 	type ReadSceneResult,
 	resolveFileSystemAPIService,
 } from './FileSystemAPIService';
+export { FocusRingService, type FocusRingServiceOptions } from './FocusRingService';

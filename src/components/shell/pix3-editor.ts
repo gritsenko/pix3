@@ -11,6 +11,8 @@ import {
 } from '../../fw';
 import { LayoutManagerService } from '../../core/layout';
 import { appState, PERSONA_IDS, type PersonaId } from '../../state';
+import '../ui/pix3-toolbar';
+import '../ui/pix3-toolbar-button';
 
 @customElement('pix3-editor')
 export class Pix3Editor extends ComponentBase {
@@ -72,23 +74,57 @@ export class Pix3Editor extends ComponentBase {
 
     private renderToolbar() {
         return html`
-            <header class="toolbar" role="banner">
-                <span class="product-title" role="heading" aria-level="1">Pix3 Editor</span>
-                <div class="toolbar__spacer" aria-hidden="true"></div>
-                <label class="persona-picker">
-                    <span class="persona-picker__label">Persona preset</span>
-                    <select
-                        class="persona-picker__select"
-                        @change=${this.onPersonaChange}
-                        .value=${this.activePersona}
-                        aria-label="Select workspace persona preset"
-                    >
-                        ${PERSONA_IDS.map((persona) => html`<option value=${persona}>${this.describePersona(persona)}</option>`)}
-                    </select>
-                </label>
-            </header>
+            <pix3-toolbar aria-label="Editor toolbar">
+                <span slot="start" class="product-title" role="heading" aria-level="1">
+                    Pix3 Editor
+                </span>
+                <div class="toolbar-content">
+                    <label class="persona-picker">
+                        <span class="persona-picker__label">Persona preset</span>
+                        <select
+                            class="persona-picker__select"
+                            @change=${this.onPersonaChange}
+                            .value=${this.activePersona}
+                            aria-label="Select workspace persona preset"
+                        >
+                            ${PERSONA_IDS.map(
+                                (persona) => html`<option value=${persona}>${this.describePersona(persona)}</option>`,
+                            )}
+                        </select>
+                    </label>
+                </div>
+                <pix3-toolbar-button
+                    slot="actions"
+                    aria-label="Open command palette"
+                    @click=${this.onCommandPaletteRequest}
+                >
+                    Palette
+                </pix3-toolbar-button>
+                <pix3-toolbar-button
+                    slot="actions"
+                    aria-label="Reapply persona layout"
+                    ?disabled=${!this.isLayoutReady}
+                    @click=${this.onPersonaRefreshRequest}
+                >
+                    Layout
+                </pix3-toolbar-button>
+            </pix3-toolbar>
         `;
     }
+
+    private onCommandPaletteRequest = (): void => {
+        this.dispatchEvent(
+            new CustomEvent('pix3-command-palette-requested', {
+                bubbles: true,
+                composed: true,
+                detail: { source: 'shell-toolbar' },
+            }),
+        );
+    };
+
+    private onPersonaRefreshRequest = (): void => {
+        void this.layoutManager.applyPersonaPreset(this.activePersona);
+    };
 
     private onPersonaChange = (event: Event): void => {
         const select = event.currentTarget as HTMLSelectElement | null;
@@ -132,50 +168,56 @@ export class Pix3Editor extends ComponentBase {
             color: #f3f4f6;
         }
 
-        .toolbar {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            padding: 0.5rem 1.25rem;
+        pix3-toolbar {
+            --pix3-toolbar-background: rgba(19, 22, 27, 0.95);
+            --pix3-toolbar-foreground: rgba(243, 244, 246, 0.92);
+            inline-size: 100%;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-            background: rgba(19, 22, 27, 0.95);
             backdrop-filter: blur(18px);
         }
 
         .product-title {
             margin: 0;
-            font-size: 0.75rem;
+            font-size: 0.85rem;
             font-weight: 600;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.05em;
             text-transform: uppercase;
-            color: rgba(243, 244, 246, 0.7);
+            color: rgba(243, 244, 246, 0.72);
         }
 
-        .toolbar__spacer {
-            flex: 1;
+        .toolbar-content {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 1rem;
+            inline-size: 100%;
         }
 
         .persona-picker {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
+            display: grid;
+            grid-auto-flow: column;
+            grid-auto-columns: auto;
+            align-items: center;
+            gap: 0.65rem;
+            font-size: 0.85rem;
         }
 
         .persona-picker__label {
-            color: rgba(240, 240, 240, 0.65);
+            color: rgba(240, 240, 240, 0.8);
+            text-transform: none;
+            letter-spacing: 0.02em;
+            font-weight: 500;
         }
 
         .persona-picker__select {
-            min-width: 14rem;
-            background: rgba(39, 44, 53, 0.9);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            color: #f3f4f6;
-            padding: 0.35rem 0.65rem;
-            border-radius: 0.4rem;
-            font-size: 0.9rem;
+            min-width: 13rem;
+            background: rgba(39, 44, 53, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #f5f6f8;
+            padding: 0.4rem 0.75rem;
+            border-radius: 0.45rem;
+            font-size: 0.95rem;
+            line-height: 1.1;
         }
 
         .persona-picker__select:focus {
