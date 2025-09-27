@@ -24,11 +24,12 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-import { injectable, ServiceLifetime } from '../fw/di';
+import { injectable, ServiceLifetime, inject } from '../fw/di';
 import type { SceneGraph } from '../core/scene/types';
 import type { NodeBase } from '../core/scene/nodes/NodeBase';
 import { Node3D } from '../core/scene/nodes/Node3D';
 import { Sprite2D } from '../core/scene/nodes/Sprite2D';
+import { ViewportSelectionService, type TransformMode } from './ViewportSelectionService';
 
 @injectable(ServiceLifetime.Transient)
 export class ViewportRendererService {
@@ -38,6 +39,9 @@ export class ViewportRendererService {
   private perspectiveCamera: PerspectiveCamera | null = null;
   private overlayCamera: OrthographicCamera | null = null;
   private controls: OrbitControls | null = null;
+
+  @inject(ViewportSelectionService)
+  private readonly selectionService!: ViewportSelectionService;
   private animationHandle: number | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private lastDpr = 1;
@@ -89,6 +93,7 @@ export class ViewportRendererService {
     this.setupEnvironment();
     this.setupOverlayScene();
     this.setupControls();
+    this.setupSelection();
     this.syncSceneContent();
     this.startAnimationLoop();
   }
@@ -105,7 +110,30 @@ export class ViewportRendererService {
     this.activeSceneGraph = sceneGraph;
     if (this.sceneContentRoot) {
       this.syncSceneContent();
+      // Update selection after scene content changes
+      this.selectionService.updateSelection();
     }
+  }
+
+  /**
+   * Set the transform mode for the viewport gizmos
+   */
+  setTransformMode(mode: TransformMode): void {
+    this.selectionService.setTransformMode(mode);
+  }
+
+  /**
+   * Get the current transform mode
+   */
+  getTransformMode(): TransformMode {
+    return this.selectionService.getTransformMode();
+  }
+
+  /**
+   * Update the selection visualization after external selection changes
+   */
+  updateSelection(): void {
+    this.selectionService.updateSelection();
   }
 
   /**
@@ -272,23 +300,26 @@ export class ViewportRendererService {
   }
 
   private applyTransform(target: Object3D, node: NodeBase): void {
-    const basePosition: [number, number, number] = node instanceof Node3D
-      ? [node.position.x, node.position.y, node.position.z]
-      : node instanceof Sprite2D
-      ? [node.position.x, node.position.y, 0]
-      : [0, 0, 0];
+    const basePosition: [number, number, number] =
+      node instanceof Node3D
+        ? [node.position.x, node.position.y, node.position.z]
+        : node instanceof Sprite2D
+          ? [node.position.x, node.position.y, 0]
+          : [0, 0, 0];
 
-    const baseRotation: [number, number, number] = node instanceof Node3D
-      ? [node.rotation.x, node.rotation.y, node.rotation.z]
-      : node instanceof Sprite2D
-      ? [0, 0, node.rotation]
-      : [0, 0, 0];
+    const baseRotation: [number, number, number] =
+      node instanceof Node3D
+        ? [node.rotation.x, node.rotation.y, node.rotation.z]
+        : node instanceof Sprite2D
+          ? [0, 0, node.rotation]
+          : [0, 0, 0];
 
-    const baseScale: [number, number, number] = node instanceof Node3D
-      ? [node.scale.x, node.scale.y, node.scale.z]
-      : node instanceof Sprite2D
-      ? [node.scale.x, node.scale.y, 1]
-      : [1, 1, 1];
+    const baseScale: [number, number, number] =
+      node instanceof Node3D
+        ? [node.scale.x, node.scale.y, node.scale.z]
+        : node instanceof Sprite2D
+          ? [node.scale.x, node.scale.y, 1]
+          : [1, 1, 1];
 
     const props = this.asRecord(node.properties) ?? {};
     const transform = this.asRecord(props.transform);
@@ -380,10 +411,16 @@ export class ViewportRendererService {
     return light;
   }
 
-  private createSpritePlaceholder(props: Record<string, unknown>, sprite: Sprite2D): Object3D | null {
+  private createSpritePlaceholder(
+    props: Record<string, unknown>,
+    sprite: Sprite2D
+  ): Object3D | null {
     const baseSize: [number, number] = [sprite.scale.x, sprite.scale.y];
     const rawSize = this.extractVector2(props.size, baseSize);
-    const size: [number, number] = [Math.max(rawSize[0], 0.1) / 100, Math.max(rawSize[1], 0.1) / 100];
+    const size: [number, number] = [
+      Math.max(rawSize[0], 0.1) / 100,
+      Math.max(rawSize[1], 0.1) / 100,
+    ];
 
     const geometry = new PlaneGeometry(size[0], size[1]);
     const opacity = this.asNumber(props.opacity, 0.85);
@@ -402,7 +439,10 @@ export class ViewportRendererService {
     return mesh;
   }
 
-  private extractVector3(value: unknown, fallback: [number, number, number]): [number, number, number] {
+  private extractVector3(
+    value: unknown,
+    fallback: [number, number, number]
+  ): [number, number, number] {
     if (Array.isArray(value)) {
       return [
         this.asNumber(value[0], fallback[0]),
@@ -425,18 +465,12 @@ export class ViewportRendererService {
 
   private extractVector2(value: unknown, fallback: [number, number]): [number, number] {
     if (Array.isArray(value)) {
-      return [
-        this.asNumber(value[0], fallback[0]),
-        this.asNumber(value[1], fallback[1]),
-      ];
+      return [this.asNumber(value[0], fallback[0]), this.asNumber(value[1], fallback[1])];
     }
 
     if (value && typeof value === 'object') {
       const record = value as Record<string, unknown>;
-      return [
-        this.asNumber(record.x, fallback[0]),
-        this.asNumber(record.y, fallback[1]),
-      ];
+      return [this.asNumber(record.x, fallback[0]), this.asNumber(record.y, fallback[1])];
     }
 
     return [...fallback];
@@ -470,6 +504,9 @@ export class ViewportRendererService {
       cancelAnimationFrame(this.animationHandle);
     }
     this.animationHandle = null;
+
+    // Dispose selection service
+    this.selectionService.dispose();
 
     this.controls?.dispose();
     this.controls = null;
@@ -516,6 +553,41 @@ export class ViewportRendererService {
     this.controls.maxDistance = 50;
     this.controls.target.set(0, 0, 0);
     this.controls.update();
+
+    // Handle gizmo drag events to disable/enable orbit controls
+    if (this.canvas) {
+      this.canvas.addEventListener('viewport:gizmo-drag-start', () => {
+        if (this.controls) {
+          this.controls.enabled = false;
+        }
+      });
+
+      this.canvas.addEventListener('viewport:gizmo-drag-end', () => {
+        if (this.controls) {
+          this.controls.enabled = true;
+        }
+      });
+    }
+  }
+
+  private setupSelection(): void {
+    if (
+      !this.canvas ||
+      !this.perspectiveCamera ||
+      !this.renderer ||
+      !this.mainScene ||
+      !this.sceneContentRoot
+    ) {
+      return;
+    }
+
+    this.selectionService.initialize(
+      this.canvas,
+      this.perspectiveCamera,
+      this.renderer,
+      this.mainScene,
+      this.sceneContentRoot
+    );
   }
 
   private setupEnvironment(): void {

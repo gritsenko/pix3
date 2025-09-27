@@ -5,6 +5,7 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 
 import { ComponentBase, css, customElement, html, state } from '../../fw';
 import { appState, type SceneDescriptor, type SceneHierarchyNode } from '../../state';
+import { SelectObjectCommand } from '../../core/commands/SelectObjectCommand';
 
 import '../ui/pix3-panel';
 
@@ -187,6 +188,7 @@ export class SceneTreePanel extends ComponentBase {
           tabindex=${focusable ? '0' : '-1'}
           data-node-id=${node.id}
           title=${this.getNodeTooltip(node)}
+          @click=${(event: Event) => this.onSelectNode(event, node.id)}
         >
           ${expanderTemplate}
           <span class="tree-node__label">
@@ -264,6 +266,45 @@ export class SceneTreePanel extends ComponentBase {
       next.add(nodeId);
     }
     this.collapsedNodeIds = next;
+  }
+
+  private onSelectNode(event: Event, nodeId: string): void {
+    event.stopPropagation();
+
+    // Determine selection behavior based on modifier keys
+    const mouseEvent = event as MouseEvent;
+    const isAdditive = mouseEvent.ctrlKey || mouseEvent.metaKey;
+    const isRange = mouseEvent.shiftKey;
+
+    // Execute selection command
+    const command = new SelectObjectCommand({
+      nodeId,
+      additive: isAdditive,
+      range: isRange,
+    });
+
+    // TODO: Execute command through proper command dispatcher
+    // For now, execute directly (this should be replaced with proper command system)
+    try {
+      const context = {
+        state: appState,
+        snapshot: appState, // This is not correct, should be proper snapshot
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        container: null as any,
+        requestedAt: Date.now(),
+      };
+      const result = command.execute(context);
+      if (result.didMutate) {
+        // Selection state will be automatically updated via subscription
+        console.log(`Selected node: ${nodeId}`, {
+          additive: isAdditive,
+          range: isRange,
+          selectedCount: appState.selection.nodeIds.length,
+        });
+      }
+    } catch (error) {
+      console.error('[SceneTreePanel] Failed to execute selection command', error);
+    }
   }
 
   static styles = css`

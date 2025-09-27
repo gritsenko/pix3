@@ -1,10 +1,10 @@
 import { snapshot } from 'valtio/vanilla';
 import { appState } from '../../state';
-import { FileSystemAPIService } from '../../services/FileSystemAPIService';
 import { SceneManager, SceneValidationError } from '../scene/SceneManager';
 import { injectable, inject } from '../../fw/di';
 import type { SceneGraph } from '../scene/types';
 import type { NodeBase } from '../scene/nodes/NodeBase';
+import { ResourceManager } from '../../services/ResourceManager';
 
 export interface LoadSceneCommandParams {
   filePath: string; // res:// path
@@ -17,23 +17,18 @@ export interface CommandResult<TUndo = unknown> {
 
 @injectable()
 export class LoadSceneCommand {
-  @inject(FileSystemAPIService) private readonly fs!: FileSystemAPIService;
+  @inject(ResourceManager) private readonly resources!: ResourceManager;
   @inject(SceneManager) private readonly sceneManager!: SceneManager;
 
   async execute(params: LoadSceneCommandParams): Promise<CommandResult> {
     const { filePath } = params;
-    const normalized = this.fs.normalizeResourcePath(filePath);
 
     appState.scenes.loadState = 'loading';
     appState.scenes.loadError = null;
 
     try {
-      const response = await fetch(`/${normalized}`);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status} while fetching scene`);
-      }
-      const sceneText = await response.text();
-      const graph = this.sceneManager.parseScene(sceneText, { filePath: normalized });
+      const sceneText = await this.resources.readText(filePath);
+      const graph = this.sceneManager.parseScene(sceneText, { filePath });
 
       const hierarchy = this.toHierarchy(graph);
       const current = snapshot(appState.scenes);

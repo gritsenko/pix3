@@ -177,8 +177,8 @@ export const createInitialAppState = (): AppState => ({
 
 const SAMPLE_SCENE_DESCRIPTOR: SceneDescriptor = {
   id: 'sample-orbit-runner',
-  filePath: 'res://scenes/orbit-runner.pix3scene',
-  name: 'Orbit Runner',
+  filePath: 'templ://startup-scene',
+  name: 'Startup Scene',
   version: '1.0.0',
   isDirty: false,
   lastSavedAt: null,

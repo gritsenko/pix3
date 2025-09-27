@@ -1,5 +1,5 @@
-import { ComponentBase, css, customElement, html, inject, subscribe } from '../../fw';
-import { ViewportRendererService } from '../../rendering';
+import { ComponentBase, css, customElement, html, inject, subscribe, state } from '../../fw';
+import { ViewportRendererService, type TransformMode } from '../../rendering';
 import { SceneManager } from '../../core/scene';
 import { appState } from '../../state';
 
@@ -11,6 +11,9 @@ export class ViewportPanel extends ComponentBase {
   private readonly viewportRenderer!: ViewportRendererService;
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
+
+  @state()
+  private transformMode: TransformMode = 'translate';
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
     if (!entry) {
@@ -33,6 +36,9 @@ export class ViewportPanel extends ComponentBase {
       this.syncViewportScene();
     });
     this.syncViewportScene();
+
+    // Add keyboard shortcuts for transform modes
+    this.addEventListener('keydown', this.handleKeyDown);
   }
 
   disconnectedCallback() {
@@ -42,6 +48,7 @@ export class ViewportPanel extends ComponentBase {
     this.resizeObserver.disconnect();
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
+    this.removeEventListener('keydown', this.handleKeyDown);
   }
 
   protected firstUpdated(): void {
@@ -62,9 +69,13 @@ export class ViewportPanel extends ComponentBase {
 
   protected render() {
     return html`
-      <section class="panel" role="region" aria-label="Scene viewport">
+      <section class="panel" role="region" aria-label="Scene viewport" tabindex="0">
         <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>
         <div class="overlay" aria-hidden="true">
+          <!-- Transform Toolbar -->
+          <div class="toolbar-overlay">${this.renderTransformToolbar()}</div>
+
+          <!-- HUD Info -->
           <div class="hud">
             <span class="hud__label">Viewport Online</span>
             <ul class="hud__controls">
@@ -75,6 +86,32 @@ export class ViewportPanel extends ComponentBase {
           </div>
         </div>
       </section>
+    `;
+  }
+
+  private renderTransformToolbar() {
+    const transformModes: Array<{ mode: TransformMode; icon: string; label: string; key: string }> =
+      [
+        { mode: 'translate', icon: '↔', label: 'Move (W)', key: 'W' },
+        { mode: 'rotate', icon: '⟳', label: 'Rotate (E)', key: 'E' },
+        { mode: 'scale', icon: '⤢', label: 'Scale (R)', key: 'R' },
+      ];
+
+    return html`
+      <div class="transform-toolbar">
+        ${transformModes.map(
+          ({ mode, icon, label }) => html`
+            <button
+              class="toolbar-button ${this.transformMode === mode ? 'toolbar-button--active' : ''}"
+              @click=${() => this.handleTransformModeChange(mode)}
+              title=${label}
+              aria-label=${label}
+            >
+              ${icon}
+            </button>
+          `
+        )}
+      </div>
     `;
   }
 
@@ -92,6 +129,33 @@ export class ViewportPanel extends ComponentBase {
     this.viewportRenderer.setSceneGraph(graph);
   }
 
+  private handleTransformModeChange(mode: TransformMode): void {
+    this.transformMode = mode;
+    this.viewportRenderer.setTransformMode(mode);
+  }
+
+  private handleKeyDown = (event: KeyboardEvent): void => {
+    // Only handle keypresses when viewport has focus or is active
+    if (event.target !== this && !this.contains(event.target as Node)) {
+      return;
+    }
+
+    switch (event.key.toLowerCase()) {
+      case 'w':
+        event.preventDefault();
+        this.handleTransformModeChange('translate');
+        break;
+      case 'e':
+        event.preventDefault();
+        this.handleTransformModeChange('rotate');
+        break;
+      case 'r':
+        event.preventDefault();
+        this.handleTransformModeChange('scale');
+        break;
+    }
+  };
+
   static styles = css`
     :host {
       display: block;
@@ -105,6 +169,11 @@ export class ViewportPanel extends ComponentBase {
       position: relative;
       height: 100%;
       width: 100%;
+      outline: none;
+    }
+
+    .panel:focus-visible {
+      box-shadow: inset 0 0 0 2px rgba(78, 141, 245, 0.5);
     }
 
     .viewport-canvas {
@@ -118,10 +187,59 @@ export class ViewportPanel extends ComponentBase {
       inset: 0;
       pointer-events: none;
       display: flex;
-      align-items: flex-start;
-      justify-content: flex-end;
+      flex-direction: column;
       padding: 1.25rem;
       background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(10, 13, 18, 0) 55%);
+    }
+
+    .toolbar-overlay {
+      display: flex;
+      justify-content: flex-start;
+      margin-bottom: auto;
+    }
+
+    .transform-toolbar {
+      display: flex;
+      gap: 0.25rem;
+      pointer-events: auto;
+      background: rgba(12, 15, 22, 0.85);
+      backdrop-filter: blur(14px);
+      border-radius: 0.5rem;
+      padding: 0.5rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .toolbar-button {
+      width: 2.5rem;
+      height: 2.5rem;
+      border: none;
+      border-radius: 0.375rem;
+      background: rgba(42, 47, 58, 0.6);
+      color: rgba(240, 244, 250, 0.8);
+      font-size: 1.1rem;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+    }
+
+    .toolbar-button:hover {
+      background: rgba(42, 47, 58, 0.9);
+      color: rgba(240, 244, 250, 1);
+      transform: translateY(-1px);
+    }
+
+    .toolbar-button--active {
+      background: rgba(78, 141, 245, 0.8);
+      color: rgba(255, 255, 255, 1);
+      box-shadow: 0 0 0 2px rgba(78, 141, 245, 0.3);
+    }
+
+    .toolbar-button--active:hover {
+      background: rgba(78, 141, 245, 1);
+      transform: translateY(-1px);
     }
 
     .hud {
@@ -134,6 +252,8 @@ export class ViewportPanel extends ComponentBase {
       backdrop-filter: blur(14px);
       box-shadow: 0 18px 28px rgba(0, 0, 0, 0.28);
       color: rgba(240, 244, 250, 0.9);
+      align-self: flex-end;
+      margin-top: auto;
     }
 
     .hud__label {

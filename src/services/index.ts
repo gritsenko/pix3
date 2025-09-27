@@ -7,4 +7,10 @@ export {
   type ReadSceneResult,
   resolveFileSystemAPIService,
 } from './FileSystemAPIService';
+export {
+  BaseTemplateService,
+  DEFAULT_TEMPLATE_SCENE_ID,
+  type TemplateScheme,
+} from './BaseTemplateService';
+export { ResourceManager, type ReadResourceOptions } from './ResourceManager';
 export { FocusRingService, type FocusRingServiceOptions } from './FocusRingService';

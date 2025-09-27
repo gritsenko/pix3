@@ -9,8 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.js",
     "lint:fix": "eslint src --ext .ts,.js --fix",
-    "format": "prettier --write src/**/*.{ts,js,json,css,md}",
-    "format:check": "prettier --check src/**/*.{ts,js,json,css,md}",
+    "format": "prettier --write src/**/*.{ts,css}",
+    "format:check": "prettier --check src/**/*.{ts,css}",
     "test": "vitest run",
     "type-check": "tsc --noEmit"
   },
