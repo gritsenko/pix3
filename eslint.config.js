@@ -1,10 +1,9 @@
-const js = require('@eslint/js');
-const tseslint = require('@typescript-eslint/eslint-plugin');
-const tsparser = require('@typescript-eslint/parser');
-const lit = require('eslint-plugin-lit');
-const prettier = require('eslint-plugin-prettier');
+import js from '@eslint/js';
+import tseslint from '@typescript-eslint/eslint-plugin';
+import tsparser from '@typescript-eslint/parser';
+import prettier from 'eslint-plugin-prettier';
 
-module.exports = [
+export default [
   js.configs.recommended,
   {
     files: ['src/**/*.ts', 'src/**/*.js'],
@@ -27,12 +26,10 @@ module.exports = [
     },
     plugins: {
       '@typescript-eslint': tseslint,
-      lit,
       prettier,
     },
     rules: {
       ...tseslint.configs.recommended.rules,
-      ...lit.configs.recommended.rules,
       'prettier/prettier': 'error',
       '@typescript-eslint/no-unused-vars': ['error', {
         argsIgnorePattern: '^_',
@@ -41,8 +38,6 @@ module.exports = [
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/explicit-module-boundary-types': 'off',
-      'lit/no-invalid-html': 'error',
-      'lit/no-useless-template-literals': 'error',
       'no-undef': 'off', // Turn off base no-undef as it doesn't understand browser globals
     },
   },
