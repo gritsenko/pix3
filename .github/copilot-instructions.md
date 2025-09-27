@@ -4,71 +4,99 @@ These guardrails help generate consistent code and documentation for the Pix3 ed
 
 ## Project Overview
 
-- Pix3 is a browser-based editor for building HTML5 scenes that blend 2D and 3D layers.
-- Target stack: **TypeScript**, **Vite**, **Lit** + repo-specific `fw` utilities, **Valtio** for state, **Three.js** for rendering (PixiJS optional overlay), **Golden Layout** for panels.
-- Source of truth for requirements, architecture, and roadmap: `docs/pix3-specification.md` (version 1.5, 2025-09-26).
+- **Pix3** is a browser-based editor for building HTML5 scenes that blend 2D and 3D layers, targeting playable ads and interactive experiences.
+- **Target stack**: TypeScript + Vite, Lit web components with custom `fw` utilities, Valtio for reactive state, Three.js for 3D rendering, Golden Layout for dockable panels.
+- **Source of truth**: `docs/pix3-specification.md` (v1.5, 2025-09-26) contains all requirements, architecture decisions, and MVP roadmap.
+- **Target personas**: Technical Artist (scene composition), Gameplay Engineer (scripting/plugins), Playable Ad Producer (optimization/export).
 
-## Coding Conventions
+## Essential Architecture Patterns
 
-- Default to TypeScript `strict` mode with decorators enabled (`experimentalDecorators`, `emitDecoratorMetadata`).
-- UI components must extend `ComponentBase` from `docs/fw` instead of raw `LitElement` unless explicitly noted. Use the provided helpers (`customElement`, `property`, `css`, etc.).
-- Resolve services via the `@inject()` decorator from `fw/di`. Register services with `@injectable()` and expose a `dispose()` method when they hold resources.
-- Keep DOM mode decisions centralized: `ComponentBase` uses light DOM by default; opt into shadow DOM through `static useShadowDom = true` when necessary.
-- Use `valtio` proxies for global state. Treat the proxy as the single source of truth and mutate it only inside commands/operations.
-- Follow the command lifecycle contract: `preconditions()` → `execute()` → `postCommit()` returning undo payloads. Commands are the **only** code allowed to modify state.
-- Emit telemetry/analytics events whenever commands execute or operations are invoked.
+### Component System
+- Extend `ComponentBase` from `src/fw` instead of raw `LitElement`. It defaults to **light DOM** for global style integration.
+- Use shadow DOM only when needed: `static useShadowDom = true` in your component class.
+- Import helpers from `src/fw`: `customElement`, `property`, `state`, `css`, `html`, `inject`.
 
-## Architecture Expectations
+### Dependency Injection
+- Services use `@injectable()` decorator and must expose `dispose()` method for cleanup.
+- Inject services into components/commands via `@inject(ServiceClass)` - requires `reflect-metadata` polyfill.
+- Register services with `ServiceContainer` - singleton by default, transient optional.
 
-- Respect the unidirectional data flow described in the specification: state → commands → managers → UI.
-- History management lives in `HistoryManager` with bounded stacks (default 100). New operations clear redo history.
-- Use the message bus for async notifications between commands, UI, and plugins. Prefer typed event payloads.
-- Scene data comes from YAML `.pix3scene` files. Enforce unique node IDs, `res://` asset paths, and per-file versioning. Plan for migrations in `SceneManager`.
-- Rendering abstractions should conform to `IRenderLayer`-style interfaces so alternative engines (PixiJS overlay) can slot in.
-- Keep plugin contracts sandboxed: load via manifest, validate capabilities, and namespace registrations.
+### State Management (Valtio)
+- Global state lives in `appState` proxy from `src/state/AppState.ts` - **never mutate directly**.
+- Commands are the **only** code allowed to modify state via the proxy.
+- UI subscribes to state changes via `subscribe(appState.section, callback)`.
+- Use `snapshot(appState)` for read-only access in command preconditions.
 
-## File & Module Layout
+### Command Pattern
+- Commands follow strict lifecycle: `preconditions()` → `execute()` → `postCommit()`.
+- Must be idempotent and emit telemetry events on execution.
+- Return undo payloads from `postCommit()` for `HistoryManager` integration.
+- Register commands via metadata with personas, keywords for command palette.
 
-Follow the structure documented in the specification:
+## Critical Development Setup
+
+### Required TypeScript Config
+```json
+{
+  "experimentalDecorators": true,
+  "emitDecoratorMetadata": true,
+  "useDefineForClassFields": false,
+  "strict": true
+}
+```
+
+### Development Commands
+- `npm run dev` - Vite dev server with hot reload
+- `npm run test` - Vitest unit tests (co-located `.spec.ts` files)
+- `npm run build` - TypeScript compilation + Vite production build
+- `npm run lint` - ESLint with Lit/a11y plugins
+
+### Entry Point Flow
+1. `src/main.ts` imports `reflect-metadata`, Golden Layout CSS, and registers all components
+2. `index.html` renders `<pix3-editor>` shell component
+3. Shell initializes Golden Layout with persona-based presets
+
+## File Structure Conventions
 
 ```
 src/
-  components/
+  fw/                    # Framework utilities (DI, ComponentBase)
+  state/                 # Valtio state definitions
   core/
-    commands/
-    operations/
-    history/
-    layout/
-    plugins/
-    scene/
-  plugins/
-    pix3-basic-tools-plugin/
-  rendering/
-  services/
-  state/
-  styles/
+    commands/            # Command pattern implementations
+    operations/          # Legacy operation system (being replaced)
+    history/             # Undo/redo with bounded stacks
+    layout/              # Golden Layout integration
+  components/            # Lit components extending ComponentBase
+    shell/               # Main editor shell
+    scene/               # Scene tree panel
+    viewport/            # 3D viewport panel
+    inspector/           # Property inspector
+    assets/              # Asset browser
+  services/              # Injectable services (FileSystem API, etc.)
 ```
 
-Create barrel files (`index.ts`) when the spec mentions them. Co-locate tests with source files using `.spec.ts` or `.test.ts` suffixes.
+## Scene File Format (.pix3scene)
+- **YAML format** with `version`, node hierarchy under `root:`, unique node `id` fields.
+- Asset references use `res://` prefix (relative to project root).
+- Scene instances support property overrides.
+- Validation via AJV schemas in `SceneManager`.
 
-## Testing & Quality Gates
+## Testing Patterns
+- Unit tests with Vitest, using `vi.fn()` for mocks and `beforeEach()` cleanup.
+- Test command lifecycle, service injection, state mutations, and edge cases.
+- Example pattern from `command.spec.ts`: test telemetry hooks, disposal, state snapshots.
 
-- Add Vitest unit tests for new logic (commands, operations, managers, services). Include edge cases such as empty scenes, duplicate IDs, and undo-stack overflow.
-- Validate YAML schemas using AJV (or equivalent) for `.pix3scene` files.
-- Ensure accessibility (WCAG 2.1 AA) for UI updates: keyboard navigation, aria attributes, high-contrast themes.
-- Watch performance budgets: ≥85 FPS viewport on baseline hardware, cold start <6s, command-to-UI latency <80ms.
-- Provide optional CLI instructions in documentation but run smoke tests yourself when feasible.
+## Performance & Quality Gates
+- Target ≥85 FPS viewport rendering, <6s cold start, <80ms command latency
+- WCAG 2.1 AA compliance (keyboard nav, ARIA attributes, high-contrast themes)
+- Chromium-only for MVP (show compatibility warning for other browsers)
 
-## Documentation Guidelines
+## Key Integration Points
+- **Golden Layout**: Panel management, persona-based presets
+- **File System Access API**: Direct project folder access, no upload/download
+- **Valtio**: Reactive state with automatic UI updates
+- **Three.js**: 3D rendering (PixiJS overlay planned for v2)
+- **Plugin system**: Sandboxed extensions via manifest validation
 
-- Update `docs/pix3-specification.md` only when scope changes are approved; maintain a changelog entry.
-- Keep `docs/todo.md` synchronized with specification milestones (Milestones 0–3, backlog initiatives).
-- Include persona-aligned notes (Technical Artist, Gameplay Engineer, Playable Ad Producer) when adding onboarding steps or workflows.
-
-## Out of Scope / Cautions
-
-- Do not target non-Chromium browsers for MVP; show compatibility messaging instead.
-- Avoid persisting user project data outside the File System Access API. Plugins must request explicit permissions before accessing services.
-- Treat collaboration features as post-MVP (Milestone 3) unless a task explicitly escalates them.
-
-Always cross-check deliverables with the specification before marking work complete.
+Always cross-check architectural decisions against `docs/pix3-specification.md` before implementing features.

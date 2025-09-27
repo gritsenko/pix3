@@ -73,7 +73,7 @@ export class Pix3Editor extends ComponentBase {
     private renderToolbar() {
         return html`
             <header class="toolbar" role="banner">
-                <h1 class="product-title" aria-level="1">Pix3 Editor</h1>
+                <span class="product-title" role="heading" aria-level="1">Pix3 Editor</span>
                 <div class="toolbar__spacer" aria-hidden="true"></div>
                 <label class="persona-picker">
                     <span class="persona-picker__label">Persona preset</span>
@@ -119,13 +119,15 @@ export class Pix3Editor extends ComponentBase {
     static styles = css`
         :host {
             display: block;
-            height: 100%;
+            inline-size: 100%;
+            block-size: 100%;
         }
 
         .editor-shell {
             display: grid;
             grid-template-rows: auto 1fr;
-            height: 100%;
+            min-block-size: 100vh;
+            min-block-size: 100dvh;
             background: var(--pix3-shell-background, #1b1e24);
             color: #f3f4f6;
         }
@@ -134,7 +136,7 @@ export class Pix3Editor extends ComponentBase {
             display: flex;
             align-items: center;
             gap: 1rem;
-            padding: 0.75rem 1.25rem;
+            padding: 0.5rem 1.25rem;
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             background: rgba(19, 22, 27, 0.95);
             backdrop-filter: blur(18px);
@@ -142,10 +144,11 @@ export class Pix3Editor extends ComponentBase {
 
         .product-title {
             margin: 0;
-            font-size: 1rem;
+            font-size: 0.75rem;
             font-weight: 600;
             letter-spacing: 0.08em;
             text-transform: uppercase;
+            color: rgba(243, 244, 246, 0.7);
         }
 
         .toolbar__spacer {
@@ -183,7 +186,7 @@ export class Pix3Editor extends ComponentBase {
         .workspace {
             position: relative;
             min-height: 0;
-            display: block;
+            block-size: 100%;
         }
 
         .layout-host {
