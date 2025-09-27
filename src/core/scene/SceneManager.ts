@@ -29,6 +29,8 @@ export interface ParseSceneOptions {
 @injectable()
 export class SceneManager {
   private readonly validateScene: ValidateFunction;
+  private readonly sceneGraphs = new Map<string, SceneGraph>();
+  private activeSceneId: string | null = null;
 
   constructor() {
     const ajvInstance = new Ajv({
@@ -99,8 +101,32 @@ export class SceneManager {
     return diff;
   }
 
+  setActiveSceneGraph(sceneId: string, graph: SceneGraph): void {
+    this.sceneGraphs.set(sceneId, graph);
+    this.activeSceneId = sceneId;
+  }
+
+  getSceneGraph(sceneId: string): SceneGraph | null {
+    return this.sceneGraphs.get(sceneId) ?? null;
+  }
+
+  getActiveSceneGraph(): SceneGraph | null {
+    if (!this.activeSceneId) {
+      return null;
+    }
+    return this.sceneGraphs.get(this.activeSceneId) ?? null;
+  }
+
+  removeSceneGraph(sceneId: string): void {
+    this.sceneGraphs.delete(sceneId);
+    if (this.activeSceneId === sceneId) {
+      this.activeSceneId = null;
+    }
+  }
+
   dispose(): void {
-    // no-op for now; placeholder for future resource cleanup
+    this.sceneGraphs.clear();
+    this.activeSceneId = null;
   }
 
   private instantiateNode(

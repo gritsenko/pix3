@@ -55,7 +55,10 @@ export class LoadSceneCommand {
           version: graph.version ?? existing.version,
           isDirty: false,
         };
+        appState.scenes.activeSceneId = activeId;
       }
+
+      this.sceneManager.setActiveSceneGraph(activeId, graph);
 
       appState.scenes.hierarchies[activeId] = hierarchy;
       appState.scenes.loadState = 'ready';

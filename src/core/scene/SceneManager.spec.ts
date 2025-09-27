@@ -129,4 +129,16 @@ root:
     expect(diff.removed).toHaveLength(0);
     expect(diff.updated.map(node => node.id)).toContain('sprite-child');
   });
+
+  it('stores and retrieves active scene graphs', () => {
+    const graph = manager.parseScene(SIMPLE_SCENE);
+    manager.setActiveSceneGraph('sample', graph);
+
+    expect(manager.getActiveSceneGraph()).toBe(graph);
+    expect(manager.getSceneGraph('sample')).toBe(graph);
+
+    manager.removeSceneGraph('sample');
+    expect(manager.getActiveSceneGraph()).toBeNull();
+    expect(manager.getSceneGraph('sample')).toBeNull();
+  });
 });

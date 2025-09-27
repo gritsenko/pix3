@@ -136,11 +136,12 @@ export const createInitialAppState = (): AppState => ({
     descriptors: {
       [SAMPLE_SCENE_DESCRIPTOR.id]: SAMPLE_SCENE_DESCRIPTOR,
     },
-    // Hierarchies will be populated dynamically by LoadSceneCommand at startup
-    hierarchies: {},
-    loadState: 'loading',
+    hierarchies: {
+      [SAMPLE_SCENE_DESCRIPTOR.id]: SAMPLE_SCENE_HIERARCHY,
+    },
+    loadState: 'ready',
     loadError: null,
-    lastLoadedAt: null,
+    lastLoadedAt: Date.now(),
     pendingScenePaths: [SAMPLE_SCENE_DESCRIPTOR.filePath],
   },
   selection: {
@@ -181,4 +182,58 @@ const SAMPLE_SCENE_DESCRIPTOR: SceneDescriptor = {
   version: '1.0.0',
   isDirty: false,
   lastSavedAt: null,
+};
+
+const SAMPLE_SCENE_HIERARCHY: SceneHierarchyState = {
+  version: SAMPLE_SCENE_DESCRIPTOR.version,
+  description: 'Starter scene with box, light, camera and logo sprite',
+  metadata: {
+    placeholder: true,
+  },
+  nodes: [
+    {
+      id: 'environment-root',
+      name: 'Environment Root',
+      type: 'Node3D',
+      instancePath: null,
+      children: [
+        {
+          id: 'main-camera',
+          name: 'Main Camera',
+          type: 'Node3D',
+          instancePath: null,
+          children: [],
+        },
+        {
+          id: 'key-light',
+          name: 'Key Light',
+          type: 'Node3D',
+          instancePath: null,
+          children: [],
+        },
+        {
+          id: 'demo-box',
+          name: 'Demo Box',
+          type: 'Node3D',
+          instancePath: null,
+          children: [],
+        },
+        {
+          id: 'ui-layer',
+          name: 'UI Layer',
+          type: 'Node3D',
+          instancePath: null,
+          children: [
+            {
+              id: 'logo-sprite',
+              name: 'Logo Sprite',
+              type: 'Sprite2D',
+              instancePath: null,
+              children: [],
+            },
+          ],
+        },
+      ],
+    },
+  ],
 };

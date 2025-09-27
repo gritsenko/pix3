@@ -1,6 +1,6 @@
-import { ComponentBase, css, customElement, html, inject } from '../../fw';
-import { subscribe } from 'valtio/vanilla';
+import { ComponentBase, css, customElement, html, inject, subscribe } from '../../fw';
 import { ViewportRendererService } from '../../rendering';
+import { SceneManager } from '../../core/scene';
 import { appState } from '../../state';
 
 @customElement('pix3-viewport-panel')
@@ -9,6 +9,8 @@ export class ViewportPanel extends ComponentBase {
 
   @inject(ViewportRendererService)
   private readonly viewportRenderer!: ViewportRendererService;
+  @inject(SceneManager)
+  private readonly sceneManager!: SceneManager;
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
     if (!entry) {
@@ -28,12 +30,9 @@ export class ViewportPanel extends ComponentBase {
     super.connectedCallback();
     // ResizeObserver will be set up in firstUpdated when canvas is available
     this.disposeSceneSubscription = subscribe(appState.scenes, () => {
-      if (appState.scenes.loadState === 'ready') {
-        // For now, just log that scene is ready; integration with rendering pipeline is future work.
-        // A future enhancement would translate hierarchy to actual render nodes.
-        console.info('[ViewportPanel] Scene loaded:', appState.scenes.activeSceneId);
-      }
+      this.syncViewportScene();
     });
+    this.syncViewportScene();
   }
 
   disconnectedCallback() {
@@ -58,6 +57,7 @@ export class ViewportPanel extends ComponentBase {
     if (rect.width > 0 && rect.height > 0) {
       this.viewportRenderer.resize(rect.width, rect.height);
     }
+    this.syncViewportScene();
   }
 
   protected render() {
@@ -76,6 +76,20 @@ export class ViewportPanel extends ComponentBase {
         </div>
       </section>
     `;
+  }
+
+  private syncViewportScene(): void {
+    const { loadState, activeSceneId } = appState.scenes;
+    if (loadState !== 'ready') {
+      if (!this.sceneManager.getActiveSceneGraph()) {
+        this.viewportRenderer.setSceneGraph(null);
+      }
+      return;
+    }
+
+    const primaryGraph = activeSceneId ? this.sceneManager.getSceneGraph(activeSceneId) : null;
+    const graph = primaryGraph ?? this.sceneManager.getActiveSceneGraph();
+    this.viewportRenderer.setSceneGraph(graph);
   }
 
   static styles = css`
