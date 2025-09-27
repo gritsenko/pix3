@@ -15,35 +15,37 @@ export const getAppStateSnapshot = (): AppStateSnapshot => snapshot(appState);
  * primary mutation mechanism in production code.
  */
 export const resetAppState = (): void => {
-	const defaults = createInitialAppState();
-	appState.project = defaults.project;
-	appState.scenes = defaults.scenes;
-	appState.selection = defaults.selection;
-	appState.ui = defaults.ui;
-	appState.operations = defaults.operations;
-	appState.telemetry = defaults.telemetry;
+  const defaults = createInitialAppState();
+  appState.project = defaults.project;
+  appState.scenes = defaults.scenes;
+  appState.selection = defaults.selection;
+  appState.ui = defaults.ui;
+  appState.operations = defaults.operations;
+  appState.telemetry = defaults.telemetry;
 };
 
 export {
-	DEFAULT_PERSONA,
-	DEFAULT_THEME,
-	PERSONA_IDS,
-	THEME_IDS,
-	createInitialAppState,
+  DEFAULT_PERSONA,
+  DEFAULT_THEME,
+  PERSONA_IDS,
+  THEME_IDS,
+  createInitialAppState,
 } from './AppState';
 
 export type {
-	AppState,
-	OperationState,
-	PanelVisibilityState,
-	PersonaId,
-	ProjectState,
-	ProjectStatus,
-	SceneDescriptor,
-	SceneLoadState,
-	ScenesState,
-	SelectionState,
-	TelemetryState,
-	ThemeName,
-	UIState,
+  AppState,
+  OperationState,
+  PanelVisibilityState,
+  PersonaId,
+  ProjectState,
+  ProjectStatus,
+  SceneDescriptor,
+  SceneHierarchyNode,
+  SceneHierarchyState,
+  SceneLoadState,
+  ScenesState,
+  SelectionState,
+  TelemetryState,
+  ThemeName,
+  UIState,
 } from './AppState';

@@ -1,4 +1,3 @@
-import { ComponentBase } from "./component-base";
+import { ComponentBase } from './component-base';
 
-export class LayoutComponentBase extends ComponentBase {
-}
+export class LayoutComponentBase extends ComponentBase {}

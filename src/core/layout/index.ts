@@ -1,1 +1,5 @@
-export { LayoutManagerService, type PanelComponentType, resolveLayoutManager } from './LayoutManager';
+export {
+  LayoutManagerService,
+  type PanelComponentType,
+  resolveLayoutManager,
+} from './LayoutManager';

@@ -1,9 +1,9 @@
 export {
-	HistoryManager,
-	type HistoryManagerOptions,
-	type HistoryEntry,
-	type HistoryEntryInit,
-	type HistoryEntryMetadata,
-	type HistorySnapshot,
-	type HistoryListener,
+  HistoryManager,
+  type HistoryManagerOptions,
+  type HistoryEntry,
+  type HistoryEntryInit,
+  type HistoryEntryMetadata,
+  type HistorySnapshot,
+  type HistoryListener,
 } from './HistoryManager';

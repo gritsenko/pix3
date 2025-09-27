@@ -8,12 +8,4 @@ export * from './component-base';
 export * from './di';
 export * from './layout-component-base';
 
-export {
-    html,
-    css,
-    customElement,
-    property,
-    state,
-    inject,
-    fromQuery
-};
+export { html, css, customElement, property, state, inject, fromQuery };

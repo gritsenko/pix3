@@ -15,9 +15,9 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@types/three": "^0.180.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
-    "@types/three": "^0.180.0",
     "golden-layout": "^2.6.0",
     "lit": "^3.3.1",
     "pixi.js": "^8.13.2",
@@ -27,6 +27,7 @@
     "yaml": "^2.6.0"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.1",
     "@types/node": "^24.5.2",
     "@typescript-eslint/eslint-plugin": "^8.44.1",
     "@typescript-eslint/parser": "^8.44.1",
