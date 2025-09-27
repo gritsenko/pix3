@@ -1,6 +1,6 @@
 // Decorator to inject value from hash-based query string
 export function fromQuery(paramName: string) {
-  return function (target: any, propertyKey: string) {
+  return function (target: object, propertyKey: string) {
     const getter = function () {
       const hash = window.location.hash;
       if (hash) {

@@ -42,9 +42,9 @@ const DEFAULT_CAPACITY = 100;
 const generateId = (() => {
   let counter = 0;
   return (prefix = 'history'): string => {
-    const uuidProvider = (globalThis as any).crypto?.randomUUID?.bind((globalThis as any).crypto);
-    if (uuidProvider) {
-      return uuidProvider();
+    const crypto = globalThis.crypto as { randomUUID?: () => string } | undefined;
+    if (crypto?.randomUUID) {
+      return crypto.randomUUID();
     }
     counter += 1;
     return `${prefix}-${Date.now()}-${counter}`;

@@ -177,4 +177,5 @@ export const createCommandContext = (
  * Helper exposed for advanced scenarios needing a snapshot only. Provided for completeness so
  * callers that already have a proxy can avoid importing from `valtio` directly.
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const snapshotState = (state: AppState): Snapshot<AppState> => snapshot(state as any);
