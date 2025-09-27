@@ -30,11 +30,14 @@ jobs:
     - name: Type check
       run: npm run type-check
       
-    - name: Lint (use ESLint v8 to support legacy .eslintrc.json)
-      run: npx eslint@8 src --ext .ts,.js --config .eslintrc.json
+    - name: Lint
+      run: npm run lint
       
     - name: Format check
       run: npm run format:check
+      
+    - name: Run tests
+      run: npm run test
       
     - name: Build
       run: npm run build
