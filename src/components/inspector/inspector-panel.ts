@@ -53,10 +53,14 @@ export class InspectorPanel extends ComponentBase {
   private visibleValue = true;
 
   private disposeSelectionSubscription?: () => void;
+  private disposeSceneSubscription?: () => void;
 
   connectedCallback() {
     super.connectedCallback();
     this.disposeSelectionSubscription = subscribe(appState.selection, () => {
+      this.updateSelectedNodes();
+    });
+    this.disposeSceneSubscription = subscribe(appState.scenes, () => {
       this.updateSelectedNodes();
     });
     this.updateSelectedNodes();
@@ -66,6 +70,8 @@ export class InspectorPanel extends ComponentBase {
     super.disconnectedCallback();
     this.disposeSelectionSubscription?.();
     this.disposeSelectionSubscription = undefined;
+    this.disposeSceneSubscription?.();
+    this.disposeSceneSubscription = undefined;
   }
 
   private updateSelectedNodes(): void {

@@ -7,14 +7,21 @@ import {
   Scene,
   PerspectiveCamera,
   WebGLRenderer,
+  MathUtils,
 } from 'three';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { subscribe } from 'valtio/vanilla';
 
-import { injectable, ServiceLifetime } from '../fw/di';
+import { injectable, ServiceLifetime, inject } from '../fw/di';
 import { appState, getAppStateSnapshot } from '../state';
 import { SelectObjectCommand } from '../core/commands/SelectObjectCommand';
 import { createCommandContext } from '../core/commands/command';
+import { SceneManager } from '../core/scene/SceneManager';
+import { Node3D } from '../core/scene/nodes/Node3D';
+import { Sprite2D } from '../core/scene/nodes/Sprite2D';
+import { NodeBase } from '../core/scene/nodes/NodeBase';
+
+type UpdateObjectPropertyCommandCtor = typeof import('../core/commands/UpdateObjectPropertyCommand').UpdateObjectPropertyCommand;
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 
@@ -37,6 +44,11 @@ export class ViewportSelectionService {
   private transformMode: TransformMode = 'translate';
   private isDisposed = false;
   private disposeSelectionSubscription?: () => void;
+  private isApplyingViewportTransform = false;
+  private updateCommandCtor?: UpdateObjectPropertyCommandCtor;
+
+  @inject(SceneManager)
+  private readonly sceneManager!: SceneManager;
 
   initialize(
     canvas: HTMLCanvasElement,
@@ -132,6 +144,7 @@ export class ViewportSelectionService {
       } else {
         this.canvas?.dispatchEvent(new CustomEvent('viewport:gizmo-drag-end'));
         this.updateSelectionBoxes();
+        void this.commitViewportTransform();
       }
     });
 
@@ -308,6 +321,146 @@ export class ViewportSelectionService {
         selectionBox.box.setFromObject(object);
       }
     }
+  }
+
+  private async commitViewportTransform(): Promise<void> {
+    if (!this.transformControls || !this.transformControls.object) {
+      return;
+    }
+
+    if (this.isApplyingViewportTransform) {
+      return;
+    }
+
+    this.isApplyingViewportTransform = true;
+    try {
+      await this.syncObjectTransformToSceneGraph(this.transformControls.object);
+    } finally {
+      this.isApplyingViewportTransform = false;
+    }
+  }
+
+  private async syncObjectTransformToSceneGraph(object: Object3D): Promise<void> {
+    const nodeId = object.userData?.nodeId as string | undefined;
+    if (!nodeId) {
+      return;
+    }
+
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return;
+    }
+
+    const node = sceneGraph.nodeMap.get(nodeId);
+    if (!node) {
+      return;
+    }
+
+    const updates = this.collectTransformUpdates(node, object);
+    if (updates.length === 0) {
+      return;
+    }
+
+    const context = createCommandContext(appState, getAppStateSnapshot());
+
+    if (!this.updateCommandCtor) {
+      const module = await import('../core/commands/UpdateObjectPropertyCommand');
+      this.updateCommandCtor = module.UpdateObjectPropertyCommand;
+    }
+    const UpdateObjectPropertyCommand = this.updateCommandCtor;
+
+    for (const update of updates) {
+      const command = new UpdateObjectPropertyCommand({
+        nodeId,
+        propertyPath: update.propertyPath,
+        value: update.value,
+      });
+
+      try {
+        const execution = await Promise.resolve(command.execute(context));
+        if (execution.didMutate) {
+          await command.postCommit?.(context, execution.payload);
+        }
+      } catch (error) {
+        console.error('[ViewportSelectionService] Failed to sync viewport transform', error);
+        break;
+      }
+    }
+  }
+
+  private collectTransformUpdates(
+    node: NodeBase,
+    object: Object3D
+  ): Array<{ propertyPath: string; value: number }> {
+    const epsilon = 1e-4;
+    const updates: Array<{ propertyPath: string; value: number }> = [];
+
+    if (node instanceof Node3D) {
+      const position = object.position;
+      if (Math.abs(position.x - node.position.x) > epsilon) {
+        updates.push({ propertyPath: 'position.x', value: this.roundTransformValue(position.x) });
+      }
+      if (Math.abs(position.y - node.position.y) > epsilon) {
+        updates.push({ propertyPath: 'position.y', value: this.roundTransformValue(position.y) });
+      }
+      if (Math.abs(position.z - node.position.z) > epsilon) {
+        updates.push({ propertyPath: 'position.z', value: this.roundTransformValue(position.z) });
+      }
+
+      const rotation = object.rotation;
+      const rotX = MathUtils.radToDeg(rotation.x);
+      const rotY = MathUtils.radToDeg(rotation.y);
+      const rotZ = MathUtils.radToDeg(rotation.z);
+
+      if (Math.abs(rotX - node.rotation.x) > epsilon) {
+        updates.push({ propertyPath: 'rotation.x', value: this.roundTransformValue(rotX) });
+      }
+      if (Math.abs(rotY - node.rotation.y) > epsilon) {
+        updates.push({ propertyPath: 'rotation.y', value: this.roundTransformValue(rotY) });
+      }
+      if (Math.abs(rotZ - node.rotation.z) > epsilon) {
+        updates.push({ propertyPath: 'rotation.z', value: this.roundTransformValue(rotZ) });
+      }
+
+      const scale = object.scale;
+      if (Math.abs(scale.x - node.scale.x) > epsilon) {
+        updates.push({ propertyPath: 'scale.x', value: this.roundTransformValue(scale.x) });
+      }
+      if (Math.abs(scale.y - node.scale.y) > epsilon) {
+        updates.push({ propertyPath: 'scale.y', value: this.roundTransformValue(scale.y) });
+      }
+      if (Math.abs(scale.z - node.scale.z) > epsilon) {
+        updates.push({ propertyPath: 'scale.z', value: this.roundTransformValue(scale.z) });
+      }
+    } else if (node instanceof Sprite2D) {
+      const position = object.position;
+      if (Math.abs(position.x - node.position.x) > epsilon) {
+        updates.push({ propertyPath: 'position.x', value: this.roundTransformValue(position.x) });
+      }
+      if (Math.abs(position.y - node.position.y) > epsilon) {
+        updates.push({ propertyPath: 'position.y', value: this.roundTransformValue(position.y) });
+      }
+
+      const rotationZ = MathUtils.radToDeg(object.rotation.z);
+      if (Math.abs(rotationZ - node.rotation) > epsilon) {
+        updates.push({ propertyPath: 'rotation.z', value: this.roundTransformValue(rotationZ) });
+      }
+
+      const scale = object.scale;
+      if (Math.abs(scale.x - node.scale.x) > epsilon) {
+        updates.push({ propertyPath: 'scale.x', value: this.roundTransformValue(scale.x) });
+      }
+      if (Math.abs(scale.y - node.scale.y) > epsilon) {
+        updates.push({ propertyPath: 'scale.y', value: this.roundTransformValue(scale.y) });
+      }
+    }
+
+    return updates;
+  }
+
+  private roundTransformValue(value: number): number {
+    const rounded = Number(value.toFixed(4));
+    return Math.abs(rounded) < 1e-6 ? 0 : rounded;
   }
 
   dispose(): void {
