@@ -59,11 +59,14 @@ export class ViewportPanel extends ComponentBase {
     }
 
     this.resizeObserver.observe(this.canvas);
+
     this.viewportRenderer.initialize(this.canvas);
     const rect = this.canvas.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
       this.viewportRenderer.resize(rect.width, rect.height);
     }
+
+    // Sync scene after renderer is fully initialized
     this.syncViewportScene();
   }
 
@@ -117,16 +120,18 @@ export class ViewportPanel extends ComponentBase {
 
   private syncViewportScene(): void {
     const { loadState, activeSceneId } = appState.scenes;
-    if (loadState !== 'ready') {
-      if (!this.sceneManager.getActiveSceneGraph()) {
-        this.viewportRenderer.setSceneGraph(null);
-      }
+    const primaryGraph = activeSceneId ? this.sceneManager.getSceneGraph(activeSceneId) : null;
+    const fallbackGraph = this.sceneManager.getActiveSceneGraph();
+    const graph = primaryGraph ?? fallbackGraph;
+
+    if (graph) {
+      this.viewportRenderer.setSceneGraph(graph);
       return;
     }
 
-    const primaryGraph = activeSceneId ? this.sceneManager.getSceneGraph(activeSceneId) : null;
-    const graph = primaryGraph ?? this.sceneManager.getActiveSceneGraph();
-    this.viewportRenderer.setSceneGraph(graph);
+    if (loadState === 'ready' && !this.viewportRenderer.hasActiveSceneGraph()) {
+      this.viewportRenderer.setSceneGraph(null);
+    }
   }
 
   private handleTransformModeChange(mode: TransformMode): void {

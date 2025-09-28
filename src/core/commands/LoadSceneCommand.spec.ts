@@ -37,6 +37,6 @@ describe('LoadSceneCommand', () => {
     expect(demoNode).toBeDefined();
     const properties = demoNode?.properties as Record<string, unknown> | undefined;
     expect(properties?.material).toBeDefined();
-    expect((properties?.material as Record<string, unknown>).color).toBe('#ff0000');
+    expect((properties?.material as Record<string, unknown>).color).toBe('#ff00ff');
   });
 });

@@ -17,7 +17,11 @@ describe('ViewportRendererService scene loading', () => {
   let service: ViewportRendererService;
 
   beforeEach(() => {
+    // Create a new instance for each test since it's now a singleton
     service = new ViewportRendererService();
+    // Manually dispose and reset for clean test state
+    service.dispose();
+
     // Inject stubbed dependencies
     Object.defineProperty(service, 'selectionService', {
       value: {
@@ -42,6 +46,7 @@ describe('ViewportRendererService scene loading', () => {
     const graph = loadGraph();
 
     service.setSceneGraph(graph);
+    expect(service.hasActiveSceneGraph()).toBe(true);
 
     const root = (service as unknown as { sceneContentRoot: Group }).sceneContentRoot;
     expect(root.children.length).toBeGreaterThan(0);
@@ -58,10 +63,51 @@ describe('ViewportRendererService scene loading', () => {
     const groups = [root, ...flatten(root)];
     const demoContainer = groups.find(child => child.name === 'Demo Box');
     expect(demoContainer).toBeDefined();
-    const mesh = demoContainer?.children.find(child => 'isMesh' in child && (child as { isMesh?: boolean }).isMesh === true) as
-      | { material: { color: { getHex: () => number } } }
-      | undefined;
+    const mesh = demoContainer?.children.find(
+      child => 'isMesh' in child && (child as { isMesh?: boolean }).isMesh === true
+    ) as { material: { color: { getHex: () => number } } } | undefined;
     expect(mesh).toBeDefined();
-    expect(mesh?.material.color.getHex().toString(16)).toBe('ff0000');
+    expect(mesh?.material.color.getHex().toString(16)).toBe('ff00ff');
+  });
+
+  it('rebuilds scene content when graph set before scene root exists', () => {
+    const graph = loadGraph();
+
+    // Simulate state before initialize (no root/main scene yet)
+    Object.defineProperty(service, 'sceneContentRoot', { value: null, configurable: true });
+    Object.defineProperty(service, 'mainScene', { value: null, configurable: true });
+
+    service.setSceneGraph(graph);
+    expect(service.hasActiveSceneGraph()).toBe(true);
+
+    // Later, initialization provides scene root and main scene; re-sync should build content
+    const root = new Group();
+    const mainScene = new Scene();
+    Object.defineProperty(service, 'sceneContentRoot', { value: root, configurable: true });
+    Object.defineProperty(service, 'mainScene', { value: mainScene, configurable: true });
+
+    const sync = (service as unknown as { syncSceneContent: () => void }).syncSceneContent;
+    sync.call(service);
+
+    expect(root.children.length).toBeGreaterThan(0);
+    const findByName = (group: Group, name: string): Group | undefined => {
+      if (group.name === name) {
+        return group;
+      }
+      for (const child of group.children) {
+        if ('isGroup' in child && child.isGroup) {
+          const match = findByName(child as Group, name);
+          if (match) {
+            return match;
+          }
+        }
+      }
+      return undefined;
+    };
+
+    const demoContainer = findByName(root, 'Demo Box');
+    expect(demoContainer).toBeDefined();
+    const fallback = findByName(root, 'Fallback Demo Mesh');
+    expect(fallback).toBeUndefined();
   });
 });

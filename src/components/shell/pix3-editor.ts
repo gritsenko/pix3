@@ -55,6 +55,10 @@ export class Pix3Editor extends ComponentBase {
     const pending = appState.scenes.pendingScenePaths[0];
     if (pending) {
       // Ensure FileSystemAPIService resource prefix logic is available
+      // Debug log for startup load
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[Pix3Editor] Loading startup scene', { pending });
+      }
       await this.loadSceneCommand.execute({ filePath: pending });
     }
   }

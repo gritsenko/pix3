@@ -31,7 +31,14 @@ import { Node3D } from '../core/scene/nodes/Node3D';
 import { Sprite2D } from '../core/scene/nodes/Sprite2D';
 import { ViewportSelectionService, type TransformMode } from './ViewportSelectionService';
 
-@injectable(ServiceLifetime.Transient)
+/**
+ * Viewport renderer service for 3D scene rendering.
+ *
+ * This service is a singleton to ensure the same initialized instance
+ * is used across all viewport panels and scene updates. This prevents
+ * race conditions where scene graphs might be set on uninitialized instances.
+ */
+@injectable(ServiceLifetime.Singleton)
 export class ViewportRendererService {
   private renderer: WebGLRenderer | null = null;
   private mainScene: Scene | null = null;
@@ -58,10 +65,16 @@ export class ViewportRendererService {
     }
 
     if (this.canvas === canvas && this.renderer) {
+      try {
+        // eslint-disable-next-line no-console
+        console.log('[ViewportRenderer] initialize -> already initialized, skipping');
+      } catch (err) {
+        // ignore
+      }
       return;
     }
 
-    this.dispose();
+    this.dispose({ preserveSceneGraph: true });
     this.canvas = canvas;
 
     this.renderer = new WebGLRenderer({
@@ -94,7 +107,11 @@ export class ViewportRendererService {
     this.setupOverlayScene();
     this.setupControls();
     this.setupSelection();
+
     this.syncSceneContent();
+    if (this.sceneContentRoot && this.activeSceneGraph) {
+      this.selectionService.updateSelection();
+    }
     this.startAnimationLoop();
   }
 
@@ -108,10 +125,34 @@ export class ViewportRendererService {
 
   setSceneGraph(sceneGraph: SceneGraph | null): void {
     this.activeSceneGraph = sceneGraph;
+    // Emit a small debug report for diagnostics
+    this.debugReportSceneGraph(sceneGraph);
+
     if (this.sceneContentRoot) {
       this.syncSceneContent();
       // Update selection after scene content changes
       this.selectionService.updateSelection();
+    } else {
+      // Scene graph is stored, will be synced when initialize() calls syncSceneContent()
+      if (process.env.NODE_ENV === 'development') {
+        console.debug(
+          '[ViewportRenderer] Scene graph set before initialization, will sync after init'
+        );
+      }
+    }
+  }
+
+  hasActiveSceneGraph(): boolean {
+    return !!this.activeSceneGraph;
+  }
+
+  // Added for diagnostics — reports when viewport receives scene graphs
+  private debugReportSceneGraph(sceneGraph: SceneGraph | null): void {
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[ViewportRenderer] setSceneGraph', {
+        hasGraph: !!sceneGraph,
+        rootCount: sceneGraph ? sceneGraph.rootNodes.length : 0,
+      });
     }
   }
 
@@ -222,13 +263,17 @@ export class ViewportRendererService {
       return;
     }
 
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[ViewportRenderer] No scene graph available, showing fallback content');
+    }
+
     const geometry = new BoxGeometry(1.2, 1.2, 1.2);
-      const fallbackColor = new Color('#ff00ff').convertSRGBToLinear();
-      const material = new MeshStandardMaterial({
-        color: fallbackColor,
-        roughness: 0.35,
-        metalness: 0.25,
-      });
+    const fallbackColor = new Color('#0000ff').convertSRGBToLinear();
+    const material = new MeshStandardMaterial({
+      color: fallbackColor,
+      roughness: 0.35,
+      metalness: 0.25,
+    });
     const mesh = new Mesh(geometry, material);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -497,10 +542,11 @@ export class ViewportRendererService {
 
   private parseColor(value: unknown, fallback: string): Color {
     const colorString = this.asString(value) ?? fallback;
-      return new Color(colorString).convertSRGBToLinear();
+    return new Color(colorString).convertSRGBToLinear();
   }
 
-  dispose(): void {
+  dispose(options?: { preserveSceneGraph?: boolean }): void {
+    const preserveSceneGraph = options?.preserveSceneGraph ?? false;
     if (this.animationHandle !== null && typeof cancelAnimationFrame === 'function') {
       cancelAnimationFrame(this.animationHandle);
     }
@@ -532,7 +578,9 @@ export class ViewportRendererService {
       this.mainScene.remove(this.sceneContentRoot);
     }
     this.sceneContentRoot = null;
-    this.activeSceneGraph = null;
+    if (!preserveSceneGraph) {
+      this.activeSceneGraph = null;
+    }
     this.sceneDisposables = [];
 
     this.mainScene = null;

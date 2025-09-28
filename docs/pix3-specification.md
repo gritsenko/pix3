@@ -1,8 +1,8 @@
 # Pix3 — Technical Specification
 
-Version: 1.5
+Version: 1.6
 
-Date: 2025-09-26
+Date: 2025-09-28
 
 ## 1. Introduction
 
@@ -138,6 +138,28 @@ Notes:
 - **Conditional Bundling:** Keep the PixiJS adapter in a separate optional module loaded via dynamic import. When projects opt into pixel-perfect overlays, the adapter and PixiJS dependency are pulled in; otherwise the bundle remains Three-only.
 - **Shared Scene Contracts:** Scene node definitions for 2D sprites expose engine-agnostic properties (texture, anchors, nine-slice). The layer implementation decides how to realize them in Three.js today and in PixiJS later.
 - **Testing Path:** Establish renderer integration tests that run against the `IRenderLayer` contract so new engines can be validated with the same suite.
+
+## Implementation status (current repository state)
+
+The repository contains a working MVP scaffold and a small, functional rendering pipeline. The list below summarizes concrete items already implemented in the codebase and points to the primary files so maintainers can quickly find the behavior.
+
+- Viewport rendering: a Three.js-based viewport is implemented and exposed via `ViewportRendererService` (`src/rendering/ViewportRendererService.ts`). It provides a perspective pass (3D) plus an orthographic overlay pass for HUD/crosshair rendering.
+- DPI / resize handling: the renderer and viewport panel now correctly handle device pixel ratio (DPR) and layout resizing to produce pixel-perfect output. Key files:
+  - `src/rendering/ViewportRendererService.ts` — DPR-aware resize logic, explicit canvas CSS sizing, overlay camera aspect updates, and DPR/layout polling in the render loop.
+  - `src/components/viewport/viewport-panel.ts` — observes the canvas with `ResizeObserver` and initializes the renderer with the measured canvas size.
+- Controls and demo scene: orbit controls, demo cube, lighting and helper axes are wired in the viewport service for a visible default scene (`setupDemoScene`, `setupControls`).
+- Scene parsing and validation: `SceneManager` parses `.pix3scene` YAML files and validates them with AJV. A recent type-safe fix was applied for AJV error pointer handling (`src/core/scene/SceneManager.ts`).
+- Build and dev tooling: Vite + TypeScript project is configured with dev (`npm run dev`), build (`npm run build`) and tests (Vitest) present in the repo. CI-friendly scripts exist in `package.json`.
+- Panels and layout: Golden Layout-based shell and panels exist and are wired to the DI container (`src/components/*`, `src/core/layout/`). The `pix3-viewport-panel` component mounts the canvas and coordinates renderer initialization.
+
+Known gaps / next work items
+
+- PixiJS overlay adapter: the `PixiOverlayLayer` is still planned (see Rendering Extensibility Plan) — current overlay uses Three.js line primitives for simple HUD.
+- Fixed-pixel overlay: if you want an overlay that always measures N screen pixels (for UI chrome or pixel-perfect guides) we can add a small helper to compute orthographic bounds from pixel size or render HUD via HTML overlay.
+- Tests: unit/integration tests exist for core managers, but adding an integration test that asserts resize/DPR behavior for `ViewportRendererService` would be valuable.
+- Performance tuning: production build emits a chunk-size warning for some bundles; consider code-splitting large optional modules (plugins, Pixi adapter) to reduce initial bundle size.
+
+If you want I can: 1) add a small integration test for the renderer resize behavior, 2) implement a fixed-pixel overlay option, or 3) add a small README entry documenting the renderer lifecycle and where to hook scene data. Tell me which and I will implement it.
 
 ## 5. Scene File Format (*.pix3scene)
 
