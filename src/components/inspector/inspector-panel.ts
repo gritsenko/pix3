@@ -1,9 +1,11 @@
 import { ComponentBase, css, customElement, html, state, subscribe, inject } from '../../fw';
 import { SceneManager } from '../../core/scene';
-import { appState } from '../../state';
+import { appState, getAppStateSnapshot } from '../../state';
 import type { NodeBase } from '../../core/scene/nodes/NodeBase';
 import { Node3D } from '../../core/scene/nodes/Node3D';
 import { Sprite2D } from '../../core/scene/nodes/Sprite2D';
+import { UpdateObjectPropertyCommand } from '../../core/commands/UpdateObjectPropertyCommand';
+import { createCommandContext } from '../../core/commands/command';
 
 import '../ui/pix3-panel';
 
@@ -194,27 +196,51 @@ export class InspectorPanel extends ComponentBase {
     return rad * (180 / Math.PI);
   }
 
-  private degToRad(deg: number): number {
-    return deg * (Math.PI / 180);
-  }
-
-  private handleNameInput(e: Event) {
+  private async handleNameInput(e: Event) {
     const input = e.target as HTMLInputElement;
     this.nameValue = input.value;
 
     if (this.primaryNode) {
-      // TODO: Execute proper command to update node name
-      this.primaryNode.name = input.value;
+      const command = new UpdateObjectPropertyCommand({
+        nodeId: this.primaryNode.id,
+        propertyPath: 'name',
+        value: input.value,
+      });
+
+      try {
+        const context = createCommandContext(appState, getAppStateSnapshot());
+        const execution = await Promise.resolve(command.execute(context));
+        if (execution.didMutate) {
+          await command.postCommit?.(context, execution.payload);
+        }
+      } catch (error) {
+        console.error('[InspectorPanel] Failed to execute name update command', error);
+      }
     }
   }
 
-  private handleVisibilityChange(e: Event) {
+  private async handleVisibilityChange(e: Event) {
     const checkbox = e.target as HTMLInputElement;
     this.visibleValue = checkbox.checked;
 
     if (this.primaryNode) {
-      // TODO: Execute proper command to update node visibility
-      this.primaryNode.properties.visible = checkbox.checked;
+      const command = new UpdateObjectPropertyCommand({
+        nodeId: this.primaryNode.id,
+        propertyPath: 'visible',
+        value: checkbox.checked,
+      });
+
+      try {
+        const context = createCommandContext(appState, getAppStateSnapshot());
+        const execution = await Promise.resolve(command.execute(context));
+        if (execution.didMutate) {
+          await command.postCommit?.(context, execution.payload);
+        }
+      } catch (error) {
+        console.error('[InspectorPanel] Failed to execute visibility update command', error);
+        // Revert the UI state on error
+        this.visibleValue = !checkbox.checked;
+      }
     }
   }
 
@@ -274,36 +300,27 @@ export class InspectorPanel extends ComponentBase {
     }
   }
 
-  private applyTransformToNode(
+  private async applyTransformToNode(
     field: 'position' | 'rotation' | 'scale',
     axis: 'x' | 'y' | 'z',
     value: number
   ) {
     if (!this.primaryNode) return;
 
-    // TODO: Execute proper command to update node transform
-    if (this.primaryNode instanceof Node3D) {
-      if (field === 'position') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.primaryNode.position as any)[axis] = value;
-      } else if (field === 'rotation') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.primaryNode.rotation as any)[axis] = this.degToRad(value);
-      } else if (field === 'scale') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.primaryNode.scale as any)[axis] = value;
+    const command = new UpdateObjectPropertyCommand({
+      nodeId: this.primaryNode.id,
+      propertyPath: `${field}.${axis}`,
+      value: value,
+    });
+
+    try {
+      const context = createCommandContext(appState, getAppStateSnapshot());
+      const execution = await Promise.resolve(command.execute(context));
+      if (execution.didMutate) {
+        await command.postCommit?.(context, execution.payload);
       }
-    } else if (this.primaryNode instanceof Sprite2D) {
-      if (field === 'position' && (axis === 'x' || axis === 'y')) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.primaryNode.position as any)[axis] = value;
-      } else if (field === 'rotation' && axis === 'z') {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.primaryNode as any).rotation = this.degToRad(value);
-      } else if (field === 'scale' && (axis === 'x' || axis === 'y')) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        (this.primaryNode.scale as any)[axis] = value;
-      }
+    } catch (error) {
+      console.error('[InspectorPanel] Failed to execute transform update command', error);
     }
   }
 
