@@ -175,8 +175,23 @@ export class ViewportSelectionService {
         continue;
       }
 
-      // Get node ID from the root object
-      selectedNodeId = rootObject.userData.nodeId || null;
+      // Skip root scene nodes (direct children of sceneContentRoot that are containers)
+      // Instead, try to find a more specific child object
+      const selectableObject = this.findSelectableObject(intersect.object);
+      if (!selectableObject) {
+        continue;
+      }
+
+      // Get node ID from the selectable object
+      selectedNodeId = selectableObject.userData.nodeId || null;
+      
+      if (process.env.NODE_ENV === 'development') {
+        console.debug('[ViewportSelection] Selected object:', {
+          objectName: selectableObject.name,
+          nodeId: selectedNodeId,
+          isRootChild: selectableObject.parent === this.sceneContentRoot,
+        });
+      }
       break;
     }
 
@@ -209,6 +224,36 @@ export class ViewportSelectionService {
       current = current.parent;
     }
     return current;
+  }
+
+  private findSelectableObject(object: Object3D): Object3D | null {
+    let current = object;
+    
+    // Traverse up to find a selectable object
+    while (current && current !== this.sceneContentRoot) {
+      // Skip root scene nodes (direct children of sceneContentRoot that are just containers)
+      const isRootSceneNode = current.parent === this.sceneContentRoot && 
+                              current.children.length > 0 && 
+                              !this.hasVisualContent(current);
+      
+      if (!isRootSceneNode && current.userData.nodeId) {
+        return current;
+      }
+      
+      current = current.parent!;
+    }
+    
+    return null;
+  }
+
+  private hasVisualContent(object: Object3D): boolean {
+    // Check if this object or its immediate children have visual content (meshes, lights, etc.)
+    for (const child of object.children) {
+      if ((child as any).isMesh || (child as any).isLight || (child as any).isSprite) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private findObjectByNodeId(nodeId: string, root: Object3D): Object3D | null {
