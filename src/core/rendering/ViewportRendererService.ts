@@ -24,11 +24,11 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-import { injectable, ServiceLifetime, inject } from '../fw/di';
-import type { SceneGraph } from '../core/scene/types';
-import type { NodeBase } from '../core/scene/nodes/NodeBase';
-import { Node3D } from '../core/scene/nodes/Node3D';
-import { Sprite2D } from '../core/scene/nodes/Sprite2D';
+import { injectable, ServiceLifetime, inject } from '../../fw/di';
+import type { SceneGraph } from '../scene/types';
+import type { NodeBase } from '../scene/nodes/NodeBase';
+import { Node3D } from '../scene/nodes/Node3D';
+import { Sprite2D } from '../scene/nodes/Sprite2D';
 import { ViewportSelectionService, type TransformMode } from './ViewportSelectionService';
 
 /**

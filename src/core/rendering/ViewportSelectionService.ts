@@ -12,16 +12,16 @@ import {
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { subscribe } from 'valtio/vanilla';
 
-import { injectable, ServiceLifetime, inject } from '../fw/di';
-import { appState, getAppStateSnapshot } from '../state';
-import { SelectObjectCommand } from '../core/commands/SelectObjectCommand';
-import { createCommandContext } from '../core/commands/command';
-import { SceneManager } from '../core/scene/SceneManager';
-import { Node3D } from '../core/scene/nodes/Node3D';
-import { Sprite2D } from '../core/scene/nodes/Sprite2D';
-import { NodeBase } from '../core/scene/nodes/NodeBase';
+import { injectable, ServiceLifetime, inject } from '../../fw/di';
+import { appState, getAppStateSnapshot } from '../../state';
+import { SelectObjectCommand } from '../commands/SelectObjectCommand';
+import { createCommandContext } from '../commands/command';
+import { SceneManager } from '../scene/SceneManager';
+import { Node3D } from '../scene/nodes/Node3D';
+import { Sprite2D } from '../scene/nodes/Sprite2D';
+import { NodeBase } from '../scene/nodes/NodeBase';
 
-type UpdateObjectPropertyCommandCtor = typeof import('../core/commands/UpdateObjectPropertyCommand').UpdateObjectPropertyCommand;
+type UpdateObjectPropertyCommandCtor = typeof import('../commands/UpdateObjectPropertyCommand').UpdateObjectPropertyCommand;
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 
@@ -364,7 +364,7 @@ export class ViewportSelectionService {
     const context = createCommandContext(appState, getAppStateSnapshot());
 
     if (!this.updateCommandCtor) {
-      const module = await import('../core/commands/UpdateObjectPropertyCommand');
+      const module = await import('../commands/UpdateObjectPropertyCommand');
       this.updateCommandCtor = module.UpdateObjectPropertyCommand;
     }
     const UpdateObjectPropertyCommand = this.updateCommandCtor;

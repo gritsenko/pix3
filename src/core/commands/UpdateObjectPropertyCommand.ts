@@ -10,7 +10,7 @@ import { NodeBase } from '../scene/nodes/NodeBase';
 import { Node3D, type Vector3 } from '../scene/nodes/Node3D';
 import { Sprite2D } from '../scene/nodes/Sprite2D';
 import { SceneManager } from '../scene/SceneManager';
-import { ViewportRendererService } from '../../rendering/ViewportRendererService';
+import { ViewportRendererService } from '../rendering/ViewportRendererService';
 
 export interface UpdateObjectPropertyExecutePayload {
   /** The node ID that was updated */

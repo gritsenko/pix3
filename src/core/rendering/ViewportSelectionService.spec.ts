@@ -2,12 +2,12 @@ import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { Object3D, Scene, Vector3 } from 'three';
 
 import { ViewportSelectionService } from './ViewportSelectionService';
-import { ServiceContainer, ServiceLifetime } from '../fw/di';
+import { ServiceContainer, ServiceLifetime } from '../../fw/di';
 import { ViewportRendererService } from './ViewportRendererService';
-import { SceneManager } from '../core/scene/SceneManager';
+import { SceneManager } from '../scene/SceneManager';
 import startupScene from '../services/templates/startup-scene.pix3scene?raw';
-import { Node3D } from '../core/scene/nodes/Node3D';
-import { Sprite2D } from '../core/scene/nodes/Sprite2D';
+import { Node3D } from '../scene/nodes/Node3D';
+import { Sprite2D } from '../scene/nodes/Sprite2D';
 
 class StubViewportRendererService {
   setSceneGraph = vi.fn();

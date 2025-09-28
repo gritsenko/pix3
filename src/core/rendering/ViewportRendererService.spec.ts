@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Group, Scene } from 'three';
 
 import { ViewportRendererService } from './ViewportRendererService';
-import { SceneManager } from '../core/scene/SceneManager';
+import { SceneManager } from '../scene/SceneManager';
 
 import startupScene from '../services/templates/startup-scene.pix3scene?raw';
 

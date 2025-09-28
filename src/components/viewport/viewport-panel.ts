@@ -1,5 +1,5 @@
 import { ComponentBase, css, customElement, html, inject, subscribe, state } from '../../fw';
-import { ViewportRendererService, type TransformMode } from '../../rendering';
+import { ViewportRendererService, type TransformMode } from '../../core/rendering';
 import { SceneManager } from '../../core/scene';
 import { appState } from '../../state';
 
