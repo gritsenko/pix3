@@ -3,7 +3,7 @@ import { subscribe } from 'valtio/vanilla';
 import { ComponentBase, css, customElement, html, inject, property, state } from '@/fw';
 import { LayoutManagerService } from '../core/layout';
 import { LoadSceneCommand } from '../core/commands/LoadSceneCommand';
-import { appState, PERSONA_IDS, type PersonaId } from '../state';
+import { appState, type PersonaId } from '../state';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './welcome/pix3-welcome';
@@ -124,19 +124,7 @@ export class Pix3EditorShell extends ComponentBase {
       <pix3-toolbar aria-label="Editor toolbar">
         <span slot="start" class="product-title" role="heading" aria-level="1"> Pix3 Editor </span>
         <div class="toolbar-content">
-          <label class="persona-picker">
-            <span class="persona-picker__label">Persona preset</span>
-            <select
-              class="persona-picker__select"
-              @change=${this.onPersonaChange}
-              .value=${this.activePersona}
-              aria-label="Select workspace persona preset"
-            >
-              ${PERSONA_IDS.map(
-                persona => html`<option value=${persona}>${this.describePersona(persona)}</option>`
-              )}
-            </select>
-          </label>
+          <!-- Persona selector removed: default persona is now the Gameplay Engineer preset -->
         </div>
         <pix3-toolbar-button
           slot="actions"
@@ -173,31 +161,7 @@ export class Pix3EditorShell extends ComponentBase {
 
   // Note: project open is handled by <pix3-welcome> to keep shell concerns minimal.
 
-  private onPersonaChange = (event: Event): void => {
-    const select = event.currentTarget as HTMLSelectElement | null;
-    if (!select) {
-      return;
-    }
-
-    const persona = select.value as PersonaId;
-    if (persona === this.activePersona) {
-      return;
-    }
-
-    void this.layoutManager.applyPersonaPreset(persona);
-  };
-
-  private describePersona(persona: PersonaId): string {
-    switch (persona) {
-      case 'gameplay-engineer':
-        return 'Gameplay Engineer';
-      case 'playable-ad-producer':
-        return 'Playable Ad Producer';
-      case 'technical-artist':
-      default:
-        return 'Technical Artist';
-    }
-  }
+  // persona change UI removed; default persona controlled from app state
 
   static styles = css`
     :host {

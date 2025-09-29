@@ -6,7 +6,7 @@ export const PERSONA_IDS = [
 
 export type PersonaId = (typeof PERSONA_IDS)[number];
 
-export const DEFAULT_PERSONA: PersonaId = 'technical-artist';
+export const DEFAULT_PERSONA: PersonaId = 'gameplay-engineer';
 
 export const THEME_IDS = ['dark', 'light', 'high-contrast'] as const;
 
