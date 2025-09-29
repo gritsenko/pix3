@@ -21,7 +21,8 @@ import { Node3D } from '../scene/nodes/Node3D';
 import { Sprite2D } from '../scene/nodes/Sprite2D';
 import { NodeBase } from '../scene/nodes/NodeBase';
 
-type UpdateObjectPropertyCommandCtor = typeof import('../commands/UpdateObjectPropertyCommand').UpdateObjectPropertyCommand;
+type UpdateObjectPropertyCommandCtor =
+  typeof import('../commands/UpdateObjectPropertyCommand').UpdateObjectPropertyCommand;
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 
@@ -197,7 +198,7 @@ export class ViewportSelectionService {
 
       // Get node ID from the selectable object
       selectedNodeId = selectableObject.userData.nodeId || null;
-      
+
       if (process.env.NODE_ENV === 'development') {
         console.debug('[ViewportSelection] Selected object:', {
           objectName: selectableObject.name,
@@ -241,28 +242,34 @@ export class ViewportSelectionService {
 
   private findSelectableObject(object: Object3D): Object3D | null {
     let current = object;
-    
+
     // Traverse up to find a selectable object
     while (current && current !== this.sceneContentRoot) {
       // Skip root scene nodes (direct children of sceneContentRoot that are just containers)
-      const isRootSceneNode = current.parent === this.sceneContentRoot && 
-                              current.children.length > 0 && 
-                              !this.hasVisualContent(current);
-      
+      const isRootSceneNode =
+        current.parent === this.sceneContentRoot &&
+        current.children.length > 0 &&
+        !this.hasVisualContent(current);
+
       if (!isRootSceneNode && current.userData.nodeId) {
         return current;
       }
-      
+
       current = current.parent!;
     }
-    
+
     return null;
   }
 
   private hasVisualContent(object: Object3D): boolean {
     // Check if this object or its immediate children have visual content (meshes, lights, etc.)
     for (const child of object.children) {
-      if ((child as any).isMesh || (child as any).isLight || (child as any).isSprite) {
+      const childRecord = child as unknown as Record<string, unknown>;
+      if (
+        (childRecord.isMesh as unknown as boolean) ||
+        (childRecord.isLight as unknown as boolean) ||
+        (childRecord.isSprite as unknown as boolean)
+      ) {
         return true;
       }
     }

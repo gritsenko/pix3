@@ -19,7 +19,7 @@ describe('UpdateObjectPropertyCommand', () => {
 
   beforeEach(() => {
     resetAppState();
-    
+
     // Create a mock scene manager class
     class MockSceneManager {
       getActiveSceneGraph = vi.fn();
@@ -28,7 +28,7 @@ describe('UpdateObjectPropertyCommand', () => {
       removeSceneGraph = vi.fn();
       dispose = vi.fn();
     }
-    
+
     sceneManager = new MockSceneManager() as unknown as SceneManager;
 
     // Create fresh test nodes for each test
@@ -50,10 +50,10 @@ describe('UpdateObjectPropertyCommand', () => {
     testSprite2D.properties.visible = false;
 
     // Create mock scene graph
-    const nodeMap = new Map<string, any>();
+    const nodeMap = new Map<string, import('../scene/nodes/NodeBase').NodeBase>();
     nodeMap.set('test-node-3d', testNode3D);
     nodeMap.set('test-sprite-2d', testSprite2D);
-    
+
     mockSceneGraph = {
       version: '1.0.0',
       description: 'Test scene',
@@ -278,7 +278,7 @@ describe('UpdateObjectPropertyCommand', () => {
 
       expect(result.didMutate).toBe(true);
       expect(result.payload.newValue).toBe(45);
-      expect((testSprite2D as any).rotation).toBe(45);
+      expect((testSprite2D as unknown as Record<string, unknown>).rotation).toBe(45);
     });
 
     it('throws error when node is not found', () => {
@@ -287,19 +287,21 @@ describe('UpdateObjectPropertyCommand', () => {
         propertyPath: 'position.x',
         value: 5,
       });
-      
-      expect(() => command.execute(buildContext())).toThrow("Node with ID 'non-existent-node' not found in active scene");
+
+      expect(() => command.execute(buildContext())).toThrow(
+        "Node with ID 'non-existent-node' not found in active scene"
+      );
     });
 
     it('throws error when no active scene', () => {
       vi.mocked(sceneManager.getActiveSceneGraph).mockReturnValue(null);
-      
+
       const command = new UpdateObjectPropertyCommand({
         nodeId: 'test-node-3d',
         propertyPath: 'position.x',
         value: 5,
       });
-      
+
       expect(() => command.execute(buildContext())).toThrow('No active scene available');
     });
   });

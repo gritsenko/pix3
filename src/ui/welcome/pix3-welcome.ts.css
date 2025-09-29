@@ -1,0 +1,103 @@
+/* Styles for <pix3-welcome> moved out of the component file so bundlers can
+   load them as a separate asset. The selectors reference the host element
+   by tag name to emulate the previous :host rules. */
+
+pix3-welcome {
+  display: block;
+  position: relative;
+}
+.welcome-root {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  z-index: 99999;
+  pointer-events: auto;
+}
+.welcome-card {
+  background: rgba(24, 28, 34, 0.96);
+  padding: 1.25rem 1.5rem;
+  border-radius: 0.6rem;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
+  max-width: 36rem;
+  color: #f7fafc;
+  pointer-events: auto;
+}
+.welcome-card h2 {
+  margin: 0 0 0.25rem 0;
+}
+.welcome-card p {
+  margin: 0 0 1rem 0;
+  color: rgba(247, 250, 252, 0.78);
+}
+.open-btn {
+  background: linear-gradient(180deg, #4fb3ff, #1f9aff);
+  color: #06202b;
+  border: none;
+  padding: 0.5rem 0.85rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  font-weight: 700;
+  pointer-events: auto;
+}
+.recent-list {
+  margin-top: 1rem;
+  color: rgba(247, 250, 252, 0.7);
+}
+.recent-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+.recent-item {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  width: 100%;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  padding: 0.45rem;
+  border-radius: 0.35rem;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.recent-item:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.folder-icon {
+  display: inline-flex;
+  align-items: center;
+}
+.recent-name {
+  flex: 1;
+  font-weight: 600;
+}
+.recent-time {
+  color: rgba(247, 250, 252, 0.6);
+  font-size: 0.85rem;
+}
+.recent-remove {
+  background: transparent;
+  border: none;
+  padding: 0.25rem;
+  margin-left: 0.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 0.25rem;
+  cursor: pointer;
+  color: inherit;
+}
+.recent-remove:hover {
+  background: rgba(255, 255, 255, 0.03);
+}
+.recent-remove:focus {
+  outline: 2px solid rgba(99, 102, 241, 0.6);
+  outline-offset: 2px;
+}

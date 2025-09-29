@@ -196,44 +196,7 @@ const SAMPLE_SCENE_HIERARCHY: SceneHierarchyState = {
       name: 'Environment Root',
       type: 'Node3D',
       instancePath: null,
-      children: [
-        {
-          id: 'main-camera',
-          name: 'Main Camera',
-          type: 'Node3D',
-          instancePath: null,
-          children: [],
-        },
-        {
-          id: 'key-light',
-          name: 'Key Light',
-          type: 'Node3D',
-          instancePath: null,
-          children: [],
-        },
-        {
-          id: 'demo-box',
-          name: 'Demo Box',
-          type: 'Node3D',
-          instancePath: null,
-          children: [],
-        },
-        {
-          id: 'ui-layer',
-          name: 'UI Layer',
-          type: 'Node3D',
-          instancePath: null,
-          children: [
-            {
-              id: 'logo-sprite',
-              name: 'Logo Sprite',
-              type: 'Sprite2D',
-              instancePath: null,
-              children: [],
-            },
-          ],
-        },
-      ],
+      children: [],
     },
   ],
 };

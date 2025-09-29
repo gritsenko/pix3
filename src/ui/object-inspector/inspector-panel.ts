@@ -1,4 +1,4 @@
-import { ComponentBase, css, customElement, html, state, subscribe, inject } from '../../fw';
+import { ComponentBase, css, customElement, html, state, subscribe, inject } from '@/fw';
 import { SceneManager } from '../../core/scene';
 import { appState, getAppStateSnapshot } from '../../state';
 import type { NodeBase } from '../../core/scene/nodes/NodeBase';
@@ -7,7 +7,7 @@ import { Sprite2D } from '../../core/scene/nodes/Sprite2D';
 import { UpdateObjectPropertyCommand } from '../../core/commands/UpdateObjectPropertyCommand';
 import { createCommandContext } from '../../core/commands/command';
 
-import '../ui/pix3-panel';
+import '../shared/pix3-panel';
 
 interface PropertyValue {
   value: string;

@@ -7,7 +7,7 @@ import { ComponentBase, css, customElement, html, state } from '../../fw';
 import { appState, type SceneDescriptor, type SceneHierarchyNode } from '../../state';
 import { SelectObjectCommand } from '../../core/commands/SelectObjectCommand';
 
-import '../ui/pix3-panel';
+import '../shared/pix3-panel';
 
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {

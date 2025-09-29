@@ -1,4 +1,4 @@
-import { injectable } from '../fw/di';
+import { injectable } from '@/fw/di';
 
 import startupScene from './templates/startup-scene.pix3scene?raw';
 

@@ -66,9 +66,8 @@ export class ViewportRendererService {
 
     if (this.canvas === canvas && this.renderer) {
       try {
-        // eslint-disable-next-line no-console
         console.log('[ViewportRenderer] initialize -> already initialized, skipping');
-      } catch (err) {
+      } catch {
         // ignore
       }
       return;
@@ -714,8 +713,7 @@ export class ViewportRendererService {
             this.applySizeToRenderer(cssW, cssH);
           }
         }
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (err) {
+      } catch {
         // Ignore sizing errors during teardown
       }
 

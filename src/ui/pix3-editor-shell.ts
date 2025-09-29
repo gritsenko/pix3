@@ -1,19 +1,21 @@
 import { subscribe } from 'valtio/vanilla';
 
-import { ComponentBase, css, customElement, html, inject, property, state } from '../../fw';
-import { LayoutManagerService } from '../../core/layout';
-import { LoadSceneCommand } from '../../core/commands/LoadSceneCommand';
-import { appState, PERSONA_IDS, type PersonaId } from '../../state';
-import '../ui/pix3-toolbar';
-import '../ui/pix3-toolbar-button';
+import { ComponentBase, css, customElement, html, inject, property, state } from '@/fw';
+import { LayoutManagerService } from '../core/layout';
+import { LoadSceneCommand } from '../core/commands/LoadSceneCommand';
+import { appState, PERSONA_IDS, type PersonaId } from '../state';
+import './shared/pix3-toolbar';
+import './shared/pix3-toolbar-button';
+import './welcome/pix3-welcome';
 
 @customElement('pix3-editor')
-export class Pix3Editor extends ComponentBase {
+export class Pix3EditorShell extends ComponentBase {
   @inject(LayoutManagerService)
   private readonly layoutManager!: LayoutManagerService;
 
   // Inject command used to load the startup scene
   @inject(LoadSceneCommand) private readonly loadSceneCommand!: LoadSceneCommand;
+  // project open handled by <pix3-welcome>
 
   @state()
   private activePersona: PersonaId = appState.ui.persona;
@@ -25,6 +27,7 @@ export class Pix3Editor extends ComponentBase {
   protected shellReady = false;
 
   private disposeSubscription?: () => void;
+  private onWelcomeProjectReady?: (e: Event) => void;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -34,11 +37,49 @@ export class Pix3Editor extends ComponentBase {
       this.shellReady = this.isLayoutReady;
       this.requestUpdate();
     });
+    // also subscribe to project state so we can initialize layout once a project is opened
+    subscribe(appState.project, () => {
+      // if project becomes ready and layout has not been initialized, initialize it
+      if (appState.project.status === 'ready') {
+        const host = this.renderRoot.querySelector<HTMLDivElement>('.layout-host');
+        if (host && !this.shellReady) {
+          void this.layoutManager.initialize(host).then(() => {
+            this.shellReady = true;
+            this.requestUpdate();
+            void this.layoutManager.applyPersonaPreset(appState.ui.persona);
+          });
+        }
+      }
+    });
+
+    // Listen for the welcome component signaling that project is ready so
+    // the shell can remove it from the DOM and proceed with layout initialization.
+    this.onWelcomeProjectReady = () => {
+      try {
+        const welcome = this.renderRoot.querySelector('pix3-welcome');
+        if (welcome && welcome.parentElement) {
+          welcome.parentElement.removeChild(welcome);
+        }
+      } catch {
+        // ignore
+      }
+    };
+    this.addEventListener(
+      'pix3-welcome:project-ready',
+      this.onWelcomeProjectReady as EventListener
+    );
   }
 
   disconnectedCallback(): void {
     this.disposeSubscription?.();
     this.disposeSubscription = undefined;
+    if (this.onWelcomeProjectReady) {
+      this.removeEventListener(
+        'pix3-welcome:project-ready',
+        this.onWelcomeProjectReady as EventListener
+      );
+      this.onWelcomeProjectReady = undefined;
+    }
     super.disconnectedCallback();
   }
 
@@ -48,8 +89,11 @@ export class Pix3Editor extends ComponentBase {
       return;
     }
 
-    await this.layoutManager.initialize(host);
-    this.shellReady = true;
+    // Only initialize the Golden Layout if a project is already opened.
+    if (appState.project.status === 'ready') {
+      await this.layoutManager.initialize(host);
+      this.shellReady = true;
+    }
 
     // Kick off loading of the pending startup scene (first in queue) if any
     const pending = appState.scenes.pendingScenePaths[0];
@@ -69,11 +113,7 @@ export class Pix3Editor extends ComponentBase {
         ${this.renderToolbar()}
         <div class="workspace" role="presentation">
           <div class="layout-host" role="application" aria-busy=${!this.isLayoutReady}></div>
-          ${this.isLayoutReady
-            ? html``
-            : html`<div class="loading-overlay" role="status">
-                <span class="loading-label">Preparing workspace…</span>
-              </div>`}
+          ${this.isLayoutReady ? html`` : html`<pix3-welcome></pix3-welcome>`}
         </div>
       </div>
     `;
@@ -130,6 +170,8 @@ export class Pix3Editor extends ComponentBase {
   private onPersonaRefreshRequest = (): void => {
     void this.layoutManager.applyPersonaPreset(this.activePersona);
   };
+
+  // Note: project open is handled by <pix3-welcome> to keep shell concerns minimal.
 
   private onPersonaChange = (event: Event): void => {
     const select = event.currentTarget as HTMLSelectElement | null;
@@ -249,6 +291,8 @@ export class Pix3Editor extends ComponentBase {
       background: rgba(18, 20, 24, 0.72);
     }
 
+    /* Welcome UI moved into <pix3-welcome> component */
+
     .loading-label {
       padding: 0.5rem 0.75rem;
       border-radius: 0.5rem;
@@ -262,6 +306,6 @@ export class Pix3Editor extends ComponentBase {
 
 declare global {
   interface HTMLElementTagNameMap {
-    'pix3-editor': Pix3Editor;
+    'pix3-editor': Pix3EditorShell;
   }
 }

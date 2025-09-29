@@ -14,3 +14,4 @@ export {
 } from './BaseTemplateService';
 export { ResourceManager, type ReadResourceOptions } from './ResourceManager';
 export { FocusRingService, type FocusRingServiceOptions } from './FocusRingService';
+export { ProjectService, resolveProjectService } from './ProjectService';

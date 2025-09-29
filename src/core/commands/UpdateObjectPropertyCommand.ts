@@ -80,7 +80,7 @@ export class UpdateObjectPropertyCommand extends CommandBase<
     const sceneManagerToken = container.getOrCreateToken(SceneManager);
     const sceneManager = container.getService<SceneManager>(sceneManagerToken);
     const sceneGraph = sceneManager.getActiveSceneGraph();
-    
+
     if (!sceneGraph) {
       return {
         canExecute: false,
@@ -156,14 +156,15 @@ export class UpdateObjectPropertyCommand extends CommandBase<
       if (propertyPath === 'name') {
         const hierarchy = state.scenes.hierarchies[activeSceneId];
         if (hierarchy && hierarchy.nodes) {
-          const updateNameRec = (nodes: any[]): boolean => {
+          const updateNameRec = (nodes: Array<unknown>): boolean => {
             for (const n of nodes) {
-              if (n.id === nodeId) {
-                n.name = value as string;
+              const nRec = n as Record<string, unknown>;
+              if ((nRec.id as unknown as string) === nodeId) {
+                (nRec.name as unknown) = value as string;
                 return true;
               }
-              if (n.children && n.children.length > 0) {
-                const found = updateNameRec(n.children);
+              if (nRec.children && (nRec.children as unknown as Array<unknown>).length > 0) {
+                const found = updateNameRec(nRec.children as unknown as Array<unknown>);
                 if (found) return true;
               }
             }
@@ -181,7 +182,7 @@ export class UpdateObjectPropertyCommand extends CommandBase<
       const vrToken = container.getOrCreateToken(ViewportRendererService);
       const viewportRenderer = container.getService<ViewportRendererService>(vrToken);
       viewportRenderer.setSceneGraph(sceneGraph);
-    } catch (err) {
+    } catch {
       // Non-fatal: if the renderer/service isn't available (e.g., headless tests), ignore.
     }
 
@@ -207,17 +208,15 @@ export class UpdateObjectPropertyCommand extends CommandBase<
     };
   }
 
-
-
   private getPropertyValue(node: NodeBase, propertyPath: string): unknown {
     const parts = propertyPath.split('.');
-    let current: any = node;
+    let current: unknown = node;
 
     for (const part of parts) {
       if (current === null || current === undefined) {
         return undefined;
       }
-      current = current[part];
+      current = (current as Record<string, unknown>)[part];
     }
 
     // Handle special properties
@@ -230,7 +229,7 @@ export class UpdateObjectPropertyCommand extends CommandBase<
 
   private setPropertyValue(node: NodeBase, propertyPath: string, value: unknown): void {
     const parts = propertyPath.split('.');
-    
+
     if (parts.length === 1) {
       // Simple property (e.g., 'visible')
       const property = parts[0];
@@ -245,26 +244,32 @@ export class UpdateObjectPropertyCommand extends CommandBase<
     } else if (parts.length === 2) {
       // Nested property (e.g., 'position.x', 'rotation.y')
       const [objectName, propertyName] = parts;
-      
+
       if (node instanceof Node3D) {
-        const targetObject = (node as any)[objectName] as Vector3;
+        // Access transform-like members via a typed record to avoid `any`.
+        const nodeAsRecord = node as unknown as Record<string, unknown>;
+        const targetObject = nodeAsRecord[objectName] as Vector3 | undefined;
         if (targetObject && typeof targetObject === 'object') {
-          (targetObject as any)[propertyName] = value as number;
+          (targetObject as unknown as Record<string, unknown>)[propertyName] = value as number;
         }
       } else if (node instanceof Sprite2D) {
-        // Handle Sprite2D properties
+        // Handle Sprite2D properties with safer casts
         if (objectName === 'position' && (propertyName === 'x' || propertyName === 'y')) {
-          (node.position as any)[propertyName] = value as number;
+          (node.position as unknown as Record<string, unknown>)[propertyName] = value as number;
         } else if (objectName === 'rotation' && propertyName === 'z') {
-          (node as any).rotation = value as number;
+          (node as unknown as Record<string, unknown>).rotation = value as number;
         } else if (objectName === 'scale' && (propertyName === 'x' || propertyName === 'y')) {
-          (node.scale as any)[propertyName] = value as number;
+          (node.scale as unknown as Record<string, unknown>)[propertyName] = value as number;
         }
       }
     }
   }
 
-  private validatePropertyUpdate(node: NodeBase, propertyPath: string, value: unknown): {
+  private validatePropertyUpdate(
+    node: NodeBase,
+    propertyPath: string,
+    value: unknown
+  ): {
     isValid: boolean;
     reason?: string;
   } {
@@ -285,19 +290,19 @@ export class UpdateObjectPropertyCommand extends CommandBase<
     } else if (parts.length === 2) {
       // Validate transform properties
       const [objectName, propertyName] = parts;
-      
+
       if (!['position', 'rotation', 'scale'].includes(objectName)) {
         return { isValid: false, reason: `Unknown transform object: ${objectName}` };
       }
-      
+
       if (!['x', 'y', 'z'].includes(propertyName)) {
         return { isValid: false, reason: `Invalid property name: ${propertyName}` };
       }
-      
+
       if (typeof value !== 'number' || !isFinite(value)) {
         return { isValid: false, reason: 'Transform properties must be finite numbers' };
       }
-      
+
       // Validate based on node type
       if (node instanceof Sprite2D) {
         if (objectName === 'position' && propertyName === 'z') {
@@ -310,7 +315,7 @@ export class UpdateObjectPropertyCommand extends CommandBase<
           return { isValid: false, reason: 'Sprite2D does not support scale.z' };
         }
       }
-      
+
       // Validate scale bounds
       if (objectName === 'scale' && (value as number) <= 0) {
         return { isValid: false, reason: 'Scale values must be greater than 0' };
