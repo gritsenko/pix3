@@ -23,6 +23,8 @@ export class ViewportPanel extends ComponentBase {
     if (width <= 0 || height <= 0) {
       return;
     }
+    // Observe the host container size (may be different from canvas CSS size when splitters
+    // or layout managers change dimensions). Forward the measured size to the renderer.
     this.viewportRenderer.resize(width, height);
   });
 
@@ -31,7 +33,7 @@ export class ViewportPanel extends ComponentBase {
 
   connectedCallback() {
     super.connectedCallback();
-    // ResizeObserver will be set up in firstUpdated when canvas is available
+    // ResizeObserver will be set up in firstUpdated when host element is available
     this.disposeSceneSubscription = subscribe(appState.scenes, () => {
       this.syncViewportScene();
     });
@@ -58,7 +60,17 @@ export class ViewportPanel extends ComponentBase {
       return;
     }
 
-    this.resizeObserver.observe(this.canvas);
+    // Observe the component host (the element itself) instead of the canvas. When the
+    // surrounding layout (Golden Layout splitters or window resizes) changes the host
+    // bounding rect, we want to update the renderer to match the visible area.
+    // Using the host avoids cases where the canvas CSS size remains unchanged while
+    // the host shrinks/grows due to layout adjustments.
+    try {
+      this.resizeObserver.observe(this);
+    } catch (err) {
+      // Fallback to observing the canvas if observing the host fails in some environments.
+      this.resizeObserver.observe(this.canvas);
+    }
 
     this.viewportRenderer.initialize(this.canvas);
     const rect = this.canvas.getBoundingClientRect();

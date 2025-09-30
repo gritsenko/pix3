@@ -708,8 +708,23 @@ export class ViewportRendererService {
           const cssH = Math.round(rect.height);
           const currentDpr =
             typeof window !== 'undefined' ? Math.min(window.devicePixelRatio || 1, 2) : 1;
+
+          // The renderer drawing buffer size equals cssSize * pixelRatio. Compare against
+          // the renderer's current drawing buffer size (getDrawingBufferSize) or the size
+          // reported by renderer.getSize() multiplied by the current DPR; use integer
+          // comparisons to avoid frequent resizes from small subpixel changes.
+          const drawingBufferWidth = Math.round(cssW * currentDpr);
+          const drawingBufferHeight = Math.round(cssH * currentDpr);
+
           const size = this.renderer.getSize(new Vector2());
-          if (currentDpr !== this.lastDpr || size.width !== cssW || size.height !== cssH) {
+          const bufferWidth = Math.round(size.width);
+          const bufferHeight = Math.round(size.height);
+
+          if (
+            currentDpr !== this.lastDpr ||
+            bufferWidth !== drawingBufferWidth ||
+            bufferHeight !== drawingBufferHeight
+          ) {
             this.applySizeToRenderer(cssW, cssH);
           }
         }
