@@ -34,11 +34,12 @@ export class LoadSceneCommand {
       const current = snapshot(appState.scenes);
       const activeId = params.sceneId ?? current.activeSceneId ?? 'startup-scene';
       const existing = current.descriptors[activeId];
+      const sceneName = this.deriveSceneName(filePath, graph.metadata ?? {}, existing?.name);
       if (!existing) {
         appState.scenes.descriptors[activeId] = {
           id: activeId,
           filePath,
-          name: 'Startup Scene',
+          name: sceneName,
           version: graph.version ?? '1.0.0',
           isDirty: false,
           lastSavedAt: null,
@@ -47,6 +48,8 @@ export class LoadSceneCommand {
       } else {
         appState.scenes.descriptors[activeId] = {
           ...existing,
+          filePath,
+          name: sceneName,
           version: graph.version ?? existing.version,
           isDirty: false,
         };
@@ -61,6 +64,7 @@ export class LoadSceneCommand {
       appState.scenes.pendingScenePaths = appState.scenes.pendingScenePaths.filter(
         p => p !== filePath
       );
+      appState.project.lastOpenedScenePath = filePath;
     } catch (error) {
       let message = 'Failed to load scene.';
       if (error instanceof SceneValidationError) {
@@ -93,5 +97,51 @@ export class LoadSceneCommand {
       metadata: graph.metadata ?? {},
       nodes: graph.rootNodes.map(n => mapNode(n)),
     };
+  }
+
+  private deriveSceneName(
+    filePath: string,
+    metadata: SceneGraph['metadata'] | Record<string, unknown>,
+    existingName?: string | null
+  ): string {
+    const preserved = typeof existingName === 'string' ? existingName.trim() : '';
+    if (preserved) {
+      return preserved;
+    }
+
+    const metaName = this.extractMetadataName(metadata);
+    if (metaName) {
+      return metaName;
+    }
+
+    const normalizedPath = this.resources.normalize(filePath).replace(/\\+/g, '/');
+    const segments = normalizedPath.split('/').filter(Boolean);
+    const basename = segments.length ? segments[segments.length - 1] : normalizedPath;
+    const withoutExtension = basename.replace(/\.[^./]+$/i, '');
+    const words = withoutExtension
+      .split(/[^a-z0-9]+/i)
+      .map(part => part.trim())
+      .filter(Boolean)
+      .map(part => part.charAt(0).toUpperCase() + part.slice(1));
+    return words.length ? words.join(' ') : 'Scene';
+  }
+
+  private extractMetadataName(metadata: SceneGraph['metadata'] | Record<string, unknown>): string {
+    const candidates = [
+      (metadata as Record<string, unknown>)?.name,
+      (metadata as Record<string, unknown>)?.title,
+      (metadata as Record<string, unknown>)?.displayName,
+    ];
+
+    for (const candidate of candidates) {
+      if (typeof candidate === 'string') {
+        const trimmed = candidate.trim();
+        if (trimmed) {
+          return trimmed;
+        }
+      }
+    }
+
+    return '';
   }
 }

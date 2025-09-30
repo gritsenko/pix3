@@ -5,6 +5,7 @@ import feather from 'feather-icons';
 import type { FileDescriptor } from '../../services/FileSystemAPIService';
 import { ProjectService } from '../../services/ProjectService';
 import { ResourceManager } from '../../services/ResourceManager';
+import { LoadSceneCommand } from '@/core/commands/LoadSceneCommand';
 
 type Node = {
   name: string;
@@ -21,6 +22,8 @@ export class AssetTree extends ComponentBase {
   private readonly projectService!: ProjectService;
   @inject(ResourceManager)
   private readonly resourceManager!: ResourceManager;
+  @inject(LoadSceneCommand)
+  private readonly loadSceneCommand!: LoadSceneCommand;
 
   // root path to show, defaults to project root
   @property({ type: String }) rootPath = '.';
@@ -79,6 +82,93 @@ export class AssetTree extends ComponentBase {
     else this.expandNode(node);
   }
 
+  private onNodeActivate(event: MouseEvent, node: Node): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (node.editing) {
+      return;
+    }
+
+    if (node.kind === 'directory') {
+      if (node.expanded) {
+        this.collapseNode(node);
+      } else {
+        void this.expandNode(node);
+      }
+      return;
+    }
+
+    if (!this.isSceneAsset(node.name)) {
+      return;
+    }
+
+    void this.loadSceneFromNode(node);
+  }
+
+  private isSceneAsset(name: string): boolean {
+    return name.toLowerCase().endsWith('.pix3scene');
+  }
+
+  private async loadSceneFromNode(node: Node): Promise<void> {
+    const resourcePath = this.toResourceUri(node.path);
+
+    if (!resourcePath) {
+      console.warn('[AssetTree] Ignoring scene load for empty path', { path: node.path });
+      return;
+    }
+
+    const sceneId = this.deriveSceneId(resourcePath);
+
+    try {
+      await this.loadSceneCommand.execute({
+        filePath: resourcePath,
+        sceneId,
+      });
+      this.dispatchEvent(
+        new CustomEvent('pix3-scene-loaded', {
+          detail: { filePath: resourcePath, sceneId },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    } catch (error) {
+      console.error('[AssetTree] Failed to load scene asset', {
+        path: node.path,
+        resourcePath,
+        error,
+      });
+      this.dispatchEvent(
+        new CustomEvent('pix3-scene-load-error', {
+          detail: { filePath: resourcePath, sceneId, error },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    }
+  }
+
+  private toResourceUri(path: string): string | null {
+    const normalized = path
+      .replace(/^[\.\/]+/, '')
+      .replace(/\\+/g, '/')
+      .trim();
+    if (!normalized) {
+      return null;
+    }
+    return normalized.startsWith('res://') ? normalized : `res://${normalized}`;
+  }
+
+  private deriveSceneId(resourcePath: string): string {
+    const withoutScheme = resourcePath.replace(/^res:\/\//i, '').replace(/^templ:\/\//i, '');
+    const withoutExtension = withoutScheme.replace(/\.[^./]+$/i, '');
+    const normalized = withoutExtension
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
+    return normalized || 'scene';
+  }
+
   private onSelect(node: Node): void {
     this.selectedPath = node.path;
     this.dispatchEvent(new CustomEvent('asset-selected', { detail: { path: node.path, kind: node.kind }, bubbles: true, composed: true }));
@@ -91,7 +181,11 @@ export class AssetTree extends ComponentBase {
     return html`<div class="tree-node" data-path=${node.path} role="treeitem" aria-expanded=${ifDefined(
       node.kind === 'directory' ? (node.expanded ? 'true' : 'false') : undefined
     )} style="padding-left: ${depth * 0.3}rem;">
-        <div class="node-row ${isSelected ? 'selected' : ''}" @click=${() => this.onSelect(node)}>
+        <div
+          class="node-row ${isSelected ? 'selected' : ''}"
+          @click=${() => this.onSelect(node)}
+          @dblclick=${(event: MouseEvent) => this.onNodeActivate(event, node)}
+        >
           ${node.kind === 'directory'
             ? html`<button class="expander" data-expanded=${node.expanded ? 'true' : 'false'} @click=${(e: Event) => { e.stopPropagation(); this.toggleNode(node); }} aria-label="Toggle folder">
                 ${this.caretIcon()}
