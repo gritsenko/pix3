@@ -2,8 +2,8 @@ import { ComponentBase, css, customElement, html, state, subscribe, inject } fro
 import { SceneManager } from '../../core/scene';
 import { appState, getAppStateSnapshot } from '../../state';
 import type { NodeBase } from '../../core/scene/nodes/NodeBase';
-import { Node3D } from '../../core/scene/nodes/Node3D';
-import { Sprite2D } from '../../core/scene/nodes/Sprite2D';
+import { Node3D } from '../../core/scene/nodes/3D/Node3D';
+import { Sprite2D } from '../../core/scene/nodes/2D/Sprite2D';
 import { UpdateObjectPropertyCommand } from '../../core/commands/UpdateObjectPropertyCommand';
 import { createCommandContext } from '../../core/commands/command';
 

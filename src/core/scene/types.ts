@@ -1,6 +1,6 @@
 import type { NodeBase } from './nodes/NodeBase';
 
-export type NodeKind = 'Node3D' | 'Sprite2D' | 'Group' | 'Instance';
+export type NodeKind = 'Node3D' | 'Node2D' | 'Sprite2D' | 'Group' | 'Instance';
 
 export interface SceneNodeDefinition {
   id: string;
@@ -25,10 +25,4 @@ export interface SceneGraph {
   rootNodes: NodeBase[];
   nodeMap: Map<string, NodeBase>;
   metadata: Record<string, unknown>;
-}
-
-export interface SceneDiff {
-  added: NodeBase[];
-  removed: NodeBase[];
-  updated: NodeBase[];
 }

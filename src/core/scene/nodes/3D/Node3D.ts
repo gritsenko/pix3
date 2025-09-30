@@ -1,4 +1,4 @@
-import { NodeBase, type NodeBaseProps } from './NodeBase';
+import { NodeBase, type NodeBaseProps } from '../NodeBase';
 
 export interface Vector3 {
   x: number;

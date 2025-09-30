@@ -7,8 +7,8 @@ import {
   type CommandPreconditionResult,
 } from './command';
 import { NodeBase } from '../scene/nodes/NodeBase';
-import { Node3D, type Vector3 } from '../scene/nodes/Node3D';
-import { Sprite2D } from '../scene/nodes/Sprite2D';
+import { Node3D, type Vector3 } from '../scene/nodes/3D/Node3D';
+import { Sprite2D } from '../scene/nodes/2D/Sprite2D';
 import { SceneManager } from '../scene/SceneManager';
 import { ViewportRendererService } from '../rendering/ViewportRendererService';
 

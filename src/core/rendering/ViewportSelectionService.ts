@@ -17,8 +17,8 @@ import { appState, getAppStateSnapshot } from '../../state';
 import { SelectObjectCommand } from '../commands/SelectObjectCommand';
 import { createCommandContext } from '../commands/command';
 import { SceneManager } from '../scene/SceneManager';
-import { Node3D } from '../scene/nodes/Node3D';
-import { Sprite2D } from '../scene/nodes/Sprite2D';
+import { Node3D } from '../scene/nodes/3D/Node3D';
+import { Sprite2D } from '../scene/nodes/2D/Sprite2D';
 import { NodeBase } from '../scene/nodes/NodeBase';
 
 type UpdateObjectPropertyCommandCtor =

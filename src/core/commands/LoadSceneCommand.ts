@@ -1,6 +1,7 @@
 import { snapshot } from 'valtio/vanilla';
 import { appState } from '../../state';
-import { SceneManager, SceneValidationError } from '../scene/SceneManager';
+import { SceneManager } from '../scene/SceneManager';
+import { SceneValidationError } from '../scene/SceneLoader';
 import { injectable, inject } from '../../fw/di';
 import type { SceneGraph } from '../scene/types';
 import type { NodeBase } from '../scene/nodes/NodeBase';

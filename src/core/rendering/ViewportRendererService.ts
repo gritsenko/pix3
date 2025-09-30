@@ -28,8 +28,8 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { injectable, ServiceLifetime, inject } from '../../fw/di';
 import type { SceneGraph } from '../scene/types';
 import type { NodeBase } from '../scene/nodes/NodeBase';
-import { Node3D } from '../scene/nodes/Node3D';
-import { Sprite2D } from '../scene/nodes/Sprite2D';
+import { Node3D } from '../scene/nodes/3D/Node3D';
+import { Sprite2D } from '../scene/nodes/2D/Sprite2D';
 import { ViewportSelectionService, type TransformMode } from './ViewportSelectionService';
 
 interface ViewportCameraState {
@@ -59,7 +59,6 @@ export class ViewportRendererService {
   private animationHandle: number | null = null;
   private canvas: HTMLCanvasElement | null = null;
   private lastDpr = 1;
-  private demoMesh: Mesh | null = null;
   private disposables: Array<{ dispose: () => void }> = [];
   private sceneContentRoot: Group | null = null;
   private activeSceneGraph: SceneGraph | null = null;
@@ -236,7 +235,6 @@ export class ViewportRendererService {
     this.clearSceneContent();
 
     if (!this.activeSceneGraph) {
-      this.ensureFallbackContent();
       return;
     }
 
@@ -251,7 +249,6 @@ export class ViewportRendererService {
   private clearSceneContent(): void {
     if (!this.sceneContentRoot) {
       this.sceneDisposables = [];
-      this.demoMesh = null;
       return;
     }
 
@@ -268,34 +265,6 @@ export class ViewportRendererService {
       }
     });
     this.sceneDisposables = [];
-    this.demoMesh = null;
-  }
-
-  private ensureFallbackContent(): void {
-    if (!this.sceneContentRoot) {
-      return;
-    }
-
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('[ViewportRenderer] No scene graph available, showing fallback content');
-    }
-
-    const geometry = new BoxGeometry(1.2, 1.2, 1.2);
-    const fallbackColor = new Color('#0000ff').convertSRGBToLinear();
-    const material = new MeshStandardMaterial({
-      color: fallbackColor,
-      roughness: 0.35,
-      metalness: 0.25,
-    });
-    const mesh = new Mesh(geometry, material);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    mesh.name = 'Fallback Demo Mesh';
-
-    this.sceneContentRoot.add(mesh);
-    this.demoMesh = mesh;
-    this.registerSceneDisposable(geometry);
-    this.registerSceneDisposable(material);
   }
 
   private registerSceneDisposable(resource: { dispose: () => void }): void {
@@ -615,7 +584,6 @@ export class ViewportRendererService {
     this.renderer?.dispose();
     this.renderer = null;
     this.canvas = null;
-    this.demoMesh = null;
 
     if (this.sceneContentRoot && this.mainScene) {
       this.mainScene.remove(this.sceneContentRoot);
@@ -766,10 +734,6 @@ export class ViewportRendererService {
       }
 
       this.controls?.update();
-      if (this.demoMesh) {
-        this.demoMesh.rotation.y += 0.01;
-        this.demoMesh.rotation.x += 0.005;
-      }
 
       // Check for DPR or layout size changes and adjust renderer size if needed.
       try {
