@@ -12,11 +12,4 @@ export class Sprite2D extends Node2D {
     super({ ...props, type: 'Sprite2D' }, parent);
     this.texturePath = props.texturePath ?? null;
   }
-
-  override toJSON(): Record<string, unknown> {
-    return {
-      ...super.toJSON(),
-      texturePath: this.texturePath ?? undefined,
-    };
-  }
 }

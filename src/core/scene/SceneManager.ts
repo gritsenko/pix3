@@ -1,4 +1,4 @@
-import { injectable, inject } from '../../fw/di';
+import { injectable, inject } from '@/fw/di';
 import { SceneLoader, type ParseSceneOptions } from './SceneLoader';
 import type { SceneGraph } from './types';
 

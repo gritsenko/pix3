@@ -27,13 +27,4 @@ export class Node3D extends NodeBase {
     this.rotation = { ...DEFAULT_ROTATION, ...props.rotation };
     this.scale = { ...DEFAULT_SCALE, ...props.scale };
   }
-
-  override toJSON(): Record<string, unknown> {
-    return {
-      ...super.toJSON(),
-      position: this.position,
-      rotation: this.rotation,
-      scale: this.scale,
-    };
-  }
 }

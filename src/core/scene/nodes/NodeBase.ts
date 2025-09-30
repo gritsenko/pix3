@@ -73,16 +73,4 @@ export class NodeBase {
     }
     return null;
   }
-
-  toJSON(): Record<string, unknown> {
-    return {
-      id: this.id,
-      type: this.type,
-      name: this.name,
-      instance: this.instancePath ?? undefined,
-      properties: this.properties,
-      metadata: this.metadata,
-      children: this.children.map(child => child.toJSON()),
-    };
-  }
 }

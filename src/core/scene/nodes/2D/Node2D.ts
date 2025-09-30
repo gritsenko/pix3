@@ -25,13 +25,4 @@ export class Node2D extends NodeBase {
     this.scale = { ...DEFAULT_SCALE, ...props.scale };
     this.rotation = props.rotation ?? 0;
   }
-
-  override toJSON(): Record<string, unknown> {
-    return {
-      ...super.toJSON(),
-      position: this.position,
-      scale: this.scale,
-      rotation: this.rotation,
-    };
-  }
 }
