@@ -1,7 +1,10 @@
 import { ComponentBase, css, customElement, html, inject, property, state } from '@/fw';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
+import feather from 'feather-icons';
 import type { FileDescriptor } from '../../services/FileSystemAPIService';
 import { ProjectService } from '../../services/ProjectService';
+import { ResourceManager } from '../../services/ResourceManager';
 
 type Node = {
   name: string;
@@ -9,12 +12,15 @@ type Node = {
   kind: FileSystemHandleKind;
   children?: Node[] | null; // null = not loaded yet, [] = loaded and empty
   expanded?: boolean;
+  editing?: boolean;
 };
 
 @customElement('pix3-asset-tree')
 export class AssetTree extends ComponentBase {
   @inject(ProjectService)
   private readonly projectService!: ProjectService;
+  @inject(ResourceManager)
+  private readonly resourceManager!: ResourceManager;
 
   // root path to show, defaults to project root
   @property({ type: String }) rootPath = '.';
@@ -82,17 +88,19 @@ export class AssetTree extends ComponentBase {
   private renderNode(node: Node, depth = 0): ReturnType<typeof html> {
     const isSelected = this.selectedPath === node.path;
     // reduce per-level indent to 0.6rem for a denser tree
-    return html`<div class="tree-node" role="treeitem" aria-expanded=${ifDefined(
+    return html`<div class="tree-node" data-path=${node.path} role="treeitem" aria-expanded=${ifDefined(
       node.kind === 'directory' ? (node.expanded ? 'true' : 'false') : undefined
     )} style="padding-left: ${depth * 0.3}rem;">
-        <div class="node-row ${isSelected ? 'selected' : ''}" @click=${() => (node.kind === 'directory' ? this.toggleNode(node) : this.onSelect(node))}>
+        <div class="node-row ${isSelected ? 'selected' : ''}" @click=${() => this.onSelect(node)}>
           ${node.kind === 'directory'
             ? html`<button class="expander" data-expanded=${node.expanded ? 'true' : 'false'} @click=${(e: Event) => { e.stopPropagation(); this.toggleNode(node); }} aria-label="Toggle folder">
                 ${this.caretIcon()}
               </button>`
             : html`<span class="expander-placeholder"></span>`}
           ${node.kind === 'directory' ? this.folderIcon(!!node.expanded) : this.fileIcon()}
-          <span class="node-name">${node.name}</span>
+          ${node.editing
+            ? html`<input class="node-edit" .value=${this._editingValue ?? node.name} @input=${(e: Event) => (this._editingValue = (e.target as HTMLInputElement).value)} @keydown=${(e: KeyboardEvent) => this.onEditKeyDown(e, node)} @blur=${() => this.commitCreateFolder(node)} />`
+            : html`<span class="node-name">${node.name}</span>`}
           <span class="node-kind">${node.kind}</span>
         </div>
         ${node.expanded && node.children && node.children.length
@@ -132,10 +140,230 @@ export class AssetTree extends ComponentBase {
   }
 
   protected render() {
-    return html`<div class="tree" role="tree" aria-label="Assets">
-      ${this.tree.length === 0 ? html`<p class="empty">No assets</p>` : this.tree.map(n => this.renderNode(n))}
+    return html`<div class="asset-tree-root">
+      <div class="toolbar" role="toolbar" aria-label="Assets toolbar">
+        <button class="tb-btn" @click=${this.onCreateFolder} title="Create folder" aria-label="Create folder">
+          <span class="tb-icon folder">${unsafeSVG(feather.icons['folder-plus'].toSvg({ width: 18, height: 18 }))}</span>
+        </button>
+
+        <div class="tb-dropdown">
+          <button class="tb-btn" @click=${this.toggleCreateAssetMenu} aria-haspopup="menu" aria-expanded=${ifDefined(this._createAssetOpen ? 'true' : 'false')} title="Create asset" aria-label="Create asset">
+            <span class="tb-icon file">${unsafeSVG(feather.icons['file-plus'].toSvg({ width: 18, height: 18 }))}</span>
+            <svg viewBox="0 0 12 12" class="small-caret" aria-hidden="true"><path d="M3 4L6 7L9 4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>
+          </button>
+          ${this._createAssetOpen
+            ? html`<div class="menu" role="menu">
+                <button role="menuitem" class="menu-item" @click=${() => this.startCreateScene()}>Scene</button>
+              </div>`
+            : null}
+        </div>
+      </div>
+
+      <div class="tree" role="tree" aria-label="Assets">
+        ${this.tree.length === 0 ? html`<p class="empty">No assets</p>` : this.tree.map(n => this.renderNode(n))}
+      </div>
     </div>`;
   }
+
+  private _createAssetOpen = false;
+  private _editingValue: string | null = null;
+
+  private toggleCreateAssetMenu = (e: Event) => {
+    e.stopPropagation();
+    this._createAssetOpen = !this._createAssetOpen;
+    this.requestUpdate();
+  };
+
+  private onCreateFolder = (e: Event) => {
+    e.stopPropagation();
+    // initiate create-folder flow in UI
+    this.startCreateFolder();
+  };
+
+  private startCreateScene(): void {
+    // similar to startCreateFolder but for scene file
+    const selected = this.selectedPath ? this.findNodeByPath(this.selectedPath) : null;
+    const parentPath = selected && selected.node && selected.node.kind === 'directory' ? selected.node.path : '.';
+
+    // ensure parent children loaded
+    const parentNode = selected && selected.node && selected.node.kind === 'directory' ? selected.node : null;
+
+    const newName = 'New Scene';
+    const newPath = this.joinPath(parentPath, `${newName}.pix3scene`);
+    const newNode: Node = { name: `${newName}.pix3scene`, path: newPath, kind: 'file', children: [], editing: true };
+
+    if (parentNode) {
+      parentNode.children = parentNode.children || [];
+      parentNode.children.unshift(newNode);
+      parentNode.expanded = true;
+    } else {
+      this.tree.unshift(newNode);
+    }
+
+  this._editingValue = newNode.name;
+    this.selectedPath = newPath;
+    this.requestUpdate();
+
+    this.updateComplete.then(() => {
+      const input = this.renderRoot.querySelector('.node-edit') as HTMLInputElement | null;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    });
+  }
+
+  private async startCreateFolder(): Promise<void> {
+    // determine parent path
+    const selected = this.selectedPath ? this.findNodeByPath(this.selectedPath) : null;
+    const parentPath = selected && selected.node && selected.node.kind === 'directory' ? selected.node.path : '.';
+
+    // ensure parent is expanded and children loaded
+    let parentNode = selected && selected.node && selected.node.kind === 'directory' ? selected.node : null;
+    if (parentNode && parentNode.children === null) {
+      await this.expandNode(parentNode);
+    }
+
+    const newName = 'New Folder';
+    const newPath = this.joinPath(parentPath, newName);
+    const newNode: Node = { name: newName, path: newPath, kind: 'directory', children: [], editing: true };
+
+    if (parentNode) {
+      parentNode.children = parentNode.children || [];
+      parentNode.children.unshift(newNode);
+      parentNode.expanded = true;
+    } else {
+      // root
+      this.tree.unshift(newNode);
+    }
+
+    this._editingValue = newName;
+    this.selectedPath = newPath;
+    this.requestUpdate();
+
+    // focus input after render
+    await this.updateComplete;
+    const input = this.renderRoot.querySelector('.node-edit') as HTMLInputElement | null;
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }
+
+  private onEditKeyDown(e: KeyboardEvent, node: Node) {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      this.cancelCreateFolder(node);
+    } else if (e.key === 'Enter') {
+      e.stopPropagation();
+      this.commitCreateFolder(node);
+    }
+  }
+
+  private async cancelCreateFolder(node: Node) {
+    // remove the temporary node
+    const removed = this.removeNodeByPath(node.path);
+    this._editingValue = null;
+    if (removed) {
+      this.requestUpdate();
+    }
+  }
+
+  private async commitCreateFolder(node: Node) {
+    const finalName = (this._editingValue ?? node.name).trim();
+    if (!finalName) {
+      await this.cancelCreateFolder(node);
+      return;
+    }
+    // create folder or file via ProjectService
+    try {
+      const parentPath = this.getParentPath(node.path);
+      const createdPath = this.joinPath(parentPath === '.' ? '' : parentPath, finalName);
+
+      if (node.kind === 'directory') {
+        await this.projectService.createDirectory(createdPath);
+      } else if (node.kind === 'file') {
+        // ensure extension
+        let filename = finalName;
+        if (!filename.endsWith('.pix3scene')) filename = `${filename}.pix3scene`;
+        const filePath = this.joinPath(parentPath === '.' ? '' : parentPath, filename);
+        // read template via ResourceManager and write
+        const template = await this.resourceManager.readText('templ://startup-scene');
+        await this.projectService.writeFile(filePath, template);
+      }
+
+      // refresh parent in UI
+      if (parentPath === '.' || parentPath === '') {
+        await this.loadRoot();
+      } else {
+        const parentNodeEntry = this.findNodeByPath(parentPath);
+        if (parentNodeEntry && parentNodeEntry.node) {
+          parentNodeEntry.node.children = null;
+          await this.expandNode(parentNodeEntry.node);
+        }
+      }
+
+      this.selectedPath = createdPath.replace(/^\//, '');
+      this._editingValue = null;
+      this.requestUpdate();
+    } catch (err) {
+      console.error('Failed to create folder', err);
+      // remove temp node
+      await this.cancelCreateFolder(node);
+    }
+  }
+
+  private getParentPath(path: string): string {
+    const parts = path.split('/').filter(p => p.length > 0);
+    if (parts.length <= 1) return '.';
+    return parts.slice(0, -1).join('/');
+  }
+
+  private joinPath(base: string, name: string): string {
+    if (!base || base === '.' || base === '') return name;
+    return `${base.replace(/\/+$/,'')}/${name}`;
+  }
+
+  private findNodeByPath(path: string): { node?: Node; parent?: Node | null } | null {
+    const stack: Array<{ node: Node; parent: Node | null }> = this.tree.map(n => ({ node: n, parent: null }));
+    while (stack.length) {
+      const { node, parent } = stack.shift()!;
+      if (node.path === path) return { node, parent };
+      if (node.children && node.children.length) {
+        for (const child of node.children) stack.push({ node: child, parent: node });
+      }
+    }
+    return null;
+  }
+
+  private removeNodeByPath(path: string): boolean {
+    // try root
+    const idx = this.tree.findIndex(n => n.path === path);
+    if (idx >= 0) {
+      this.tree.splice(idx, 1);
+      this.tree = [...this.tree];
+      return true;
+    }
+    // recurse
+    const walk = (nodes: Node[]): boolean => {
+      for (let i = 0; i < nodes.length; i++) {
+        const n = nodes[i];
+        if (n.path === path) {
+          nodes.splice(i, 1);
+          return true;
+        }
+        if (n.children && n.children.length) {
+          if (walk(n.children)) return true;
+        }
+      }
+      return false;
+    };
+    const removed = walk(this.tree);
+    if (removed) this.tree = [...this.tree];
+    return removed;
+  }
+
+  // create-asset event no longer used here; menu directly starts creation flows
 
   static styles = css`
     :host {
@@ -271,6 +499,83 @@ export class AssetTree extends ComponentBase {
       font-style: italic;
       padding: 0.5rem 0.25rem;
     }
+
+    /* Toolbar */
+    .asset-tree-root {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    .toolbar {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+      padding: 0.25rem;
+      border-bottom: 1px solid rgba(255,255,255,0.02);
+      background: linear-gradient(180deg, rgba(255,255,255,0.01), transparent);
+    }
+
+    .tb-btn {
+      background: none;
+      border: none;
+      color: inherit;
+      width: 28px;
+      height: 28px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2px;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+
+    .tb-btn:hover {
+      background: rgba(255,255,255,0.02);
+    }
+
+    .tb-dropdown { position: relative; }
+
+    .small-caret { width: 10px; height: 10px; margin-left: 4px; }
+
+    .tb-icon {
+      display: inline-flex;
+      width: 18px;
+      height: 18px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* File icons in feather are visually narrower; scale slightly to match folder */
+    .tb-icon.file svg { transform: scale(1.05); transform-origin: 50% 50%; }
+
+    .menu {
+      position: absolute;
+      top: 34px;
+      left: 0;
+      background: #15171a;
+      border: 1px solid rgba(255,255,255,0.03);
+      box-shadow: 0 6px 18px rgba(0,0,0,0.6);
+      padding: 0.25rem;
+      border-radius: 6px;
+      min-width: 120px;
+      z-index: 10;
+    }
+
+    .menu-item {
+      display: block;
+      width: 100%;
+      background: none;
+      border: none;
+      color: rgba(245,247,250,0.95);
+      text-align: left;
+      padding: 0.35rem 0.5rem;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+
+    .menu-item:hover { background: rgba(255,255,255,0.02); }
   `;
 }
 

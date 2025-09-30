@@ -323,6 +323,35 @@ export class FileSystemAPIService {
     }
     return normalized;
   }
+
+  /**
+   * Create a directory at the given project-relative path. The path may be nested.
+   * Example: 'assets/levels/newFolder'
+   */
+  async createDirectory(path: string): Promise<void> {
+    try {
+      const parentPath = this.getDirectoryPart(path);
+      const dirName = this.getFileName(path);
+      const parentHandle = await this.resolveDirectoryHandle(parentPath, 'readwrite');
+      await parentHandle.getDirectoryHandle(dirName, { create: true });
+    } catch (error) {
+      throw this.normalizeError(error, `Failed to create directory at ${path}`);
+    }
+  }
+
+  async writeTextFile(path: string, contents: string): Promise<void> {
+    try {
+      const directory = await this.resolveDirectoryHandle(this.getDirectoryPart(path), 'readwrite');
+      const fileName = this.getFileName(path);
+      const handle = await directory.getFileHandle(fileName, { create: true });
+      await this.ensurePermission(handle, 'readwrite');
+      const writable = await handle.createWritable();
+      await writable.write(contents);
+      await writable.close();
+    } catch (error) {
+      throw this.normalizeError(error, `Failed to write file at ${path}`);
+    }
+  }
 }
 
 export const resolveFileSystemAPIService = (): FileSystemAPIService => {

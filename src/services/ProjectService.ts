@@ -230,6 +230,23 @@ export class ProjectService {
       return [];
     }
   }
+
+  async createDirectory(path: string): Promise<void> {
+    try {
+      await this.fs.createDirectory(path);
+    } catch (err) {
+      // rethrow or wrap if needed
+      throw err;
+    }
+  }
+
+  async writeFile(path: string, contents: string): Promise<void> {
+    try {
+      await this.fs.writeTextFile(path, contents);
+    } catch (err) {
+      throw err;
+    }
+  }
 }
 
 export const resolveProjectService = (): ProjectService => {
