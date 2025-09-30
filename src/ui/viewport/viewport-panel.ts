@@ -89,16 +89,6 @@ export class ViewportPanel extends ComponentBase {
         <div class="overlay" aria-hidden="true">
           <!-- Transform Toolbar -->
           <div class="toolbar-overlay">${this.renderTransformToolbar()}</div>
-
-          <!-- HUD Info -->
-          <div class="hud">
-            <span class="hud__label">Viewport Online</span>
-            <ul class="hud__controls">
-              <li><kbd>Left Drag</kbd><span>Orbit</span></li>
-              <li><kbd>Right Drag</kbd><span>Pan</span></li>
-              <li><kbd>Scroll</kbd><span>Zoom</span></li>
-            </ul>
-          </div>
         </div>
       </section>
     `;
