@@ -7,7 +7,9 @@ import { SceneManager } from '../scene/SceneManager';
 import { ServiceContainer, ServiceLifetime } from '../../fw/di';
 import { Node3D } from '../scene/nodes/Node3D';
 import { Sprite2D } from '../scene/nodes/Sprite2D';
+import type { NodeBase } from '../scene/nodes/NodeBase';
 import type { SceneGraph } from '../scene/types';
+import { ViewportRendererService } from '../rendering/ViewportRendererService';
 
 const buildContext = () => createCommandContext(appState, getAppStateSnapshot());
 
@@ -16,6 +18,12 @@ describe('UpdateObjectPropertyCommand', () => {
   let mockSceneGraph: SceneGraph;
   let testNode3D: Node3D;
   let testSprite2D: Sprite2D;
+  let mockViewportRendererInstance: MockViewportRenderer;
+
+  class MockViewportRenderer {
+    updateNodeTransform = vi.fn<(node: NodeBase) => boolean>(() => true);
+    setSceneGraph = vi.fn<(graph: SceneGraph, options?: { preserveCamera?: boolean }) => void>();
+  }
 
   beforeEach(() => {
     resetAppState();
@@ -71,6 +79,22 @@ describe('UpdateObjectPropertyCommand', () => {
     // Create a constructor function that returns our mock instance
     const MockSceneManagerConstructor = vi.fn(() => sceneManager);
     container.addService(token, MockSceneManagerConstructor, ServiceLifetime.Singleton);
+
+    const viewportToken = container.getOrCreateToken(ViewportRendererService);
+    class MockViewportRendererConstructor {
+      constructor() {
+        mockViewportRendererInstance = new MockViewportRenderer();
+        return mockViewportRendererInstance as unknown as ViewportRendererService;
+      }
+    }
+    container.addService(
+      viewportToken,
+      MockViewportRendererConstructor as unknown as new () => ViewportRendererService,
+      ServiceLifetime.Singleton
+    );
+
+    // Force instantiation so tests can override behavior before executing commands
+    container.getService<ViewportRendererService>(viewportToken);
   });
 
   describe('preconditions', () => {
@@ -190,6 +214,8 @@ describe('UpdateObjectPropertyCommand', () => {
       expect(result.payload.newValue).toBe(10);
       expect(result.payload.previousValue).toBe(1);
       expect(testNode3D.position.x).toBe(10);
+      expect(mockViewportRendererInstance.updateNodeTransform).toHaveBeenCalledWith(testNode3D);
+      expect(mockViewportRendererInstance.setSceneGraph).not.toHaveBeenCalled();
     });
 
     it('updates Node3D rotation properties correctly (stored in degrees)', () => {
@@ -205,6 +231,7 @@ describe('UpdateObjectPropertyCommand', () => {
       expect(result.payload.newValue).toBe(90);
       expect(result.payload.previousValue).toBe(45);
       expect(testNode3D.rotation.y).toBe(90);
+      expect(mockViewportRendererInstance.updateNodeTransform).toHaveBeenCalledWith(testNode3D);
     });
 
     it('updates Node3D scale properties correctly', () => {
@@ -220,6 +247,7 @@ describe('UpdateObjectPropertyCommand', () => {
       expect(result.payload.newValue).toBe(2.5);
       expect(result.payload.previousValue).toBe(1);
       expect(testNode3D.scale.y).toBe(2.5);
+      expect(mockViewportRendererInstance.updateNodeTransform).toHaveBeenCalledWith(testNode3D);
     });
 
     it('updates visibility property correctly', () => {
@@ -235,6 +263,10 @@ describe('UpdateObjectPropertyCommand', () => {
       expect(result.payload.newValue).toBe(false);
       expect(result.payload.previousValue).toBe(true);
       expect(testNode3D.properties.visible).toBe(false);
+      expect(mockViewportRendererInstance.updateNodeTransform).not.toHaveBeenCalled();
+      expect(mockViewportRendererInstance.setSceneGraph).toHaveBeenCalledWith(mockSceneGraph, {
+        preserveCamera: true,
+      });
     });
 
     it('updates name property correctly', () => {
@@ -250,6 +282,9 @@ describe('UpdateObjectPropertyCommand', () => {
       expect(result.payload.newValue).toBe('Updated Name');
       expect(result.payload.previousValue).toBe('Test Node 3D');
       expect(testNode3D.name).toBe('Updated Name');
+      expect(mockViewportRendererInstance.setSceneGraph).toHaveBeenCalledWith(mockSceneGraph, {
+        preserveCamera: true,
+      });
     });
 
     it('updates Sprite2D position properties correctly', () => {
@@ -265,6 +300,7 @@ describe('UpdateObjectPropertyCommand', () => {
       expect(result.payload.newValue).toBe(50);
       expect(result.payload.previousValue).toBe(10);
       expect(testSprite2D.position.x).toBe(50);
+      expect(mockViewportRendererInstance.updateNodeTransform).toHaveBeenCalledWith(testSprite2D);
     });
 
     it('updates Sprite2D rotation correctly (z-axis only)', () => {
@@ -320,6 +356,40 @@ describe('UpdateObjectPropertyCommand', () => {
       expect(undoPayload.nodeId).toBe('test-node-3d');
       expect(undoPayload.propertyPath).toBe('position.x');
       expect(undoPayload.previousValue).toBe(1);
+    });
+  });
+
+  describe('viewport integration', () => {
+    it('falls back to full scene sync when in-place update fails', () => {
+      mockViewportRendererInstance.updateNodeTransform.mockReturnValue(false);
+
+      const command = new UpdateObjectPropertyCommand({
+        nodeId: 'test-node-3d',
+        propertyPath: 'position.y',
+        value: 12,
+      });
+
+      command.execute(buildContext());
+
+      expect(mockViewportRendererInstance.updateNodeTransform).toHaveBeenCalledWith(testNode3D);
+      expect(mockViewportRendererInstance.setSceneGraph).toHaveBeenCalledWith(mockSceneGraph, {
+        preserveCamera: true,
+      });
+    });
+
+    it('preserves camera when falling back for non-transform property updates', () => {
+      const command = new UpdateObjectPropertyCommand({
+        nodeId: 'test-node-3d',
+        propertyPath: 'visible',
+        value: false,
+      });
+
+      command.execute(buildContext());
+
+      expect(mockViewportRendererInstance.updateNodeTransform).not.toHaveBeenCalled();
+      expect(mockViewportRendererInstance.setSceneGraph).toHaveBeenCalledWith(mockSceneGraph, {
+        preserveCamera: true,
+      });
     });
   });
 });

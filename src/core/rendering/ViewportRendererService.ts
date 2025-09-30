@@ -20,6 +20,7 @@ import {
   Scene,
   Vector2,
   Vector3,
+  Quaternion,
   WebGLRenderer,
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -30,6 +31,12 @@ import type { NodeBase } from '../scene/nodes/NodeBase';
 import { Node3D } from '../scene/nodes/Node3D';
 import { Sprite2D } from '../scene/nodes/Sprite2D';
 import { ViewportSelectionService, type TransformMode } from './ViewportSelectionService';
+
+interface ViewportCameraState {
+  position: Vector3;
+  quaternion: Quaternion;
+  target: Vector3 | null;
+}
 
 /**
  * Viewport renderer service for 3D scene rendering.
@@ -122,7 +129,10 @@ export class ViewportRendererService {
     this.applySizeToRenderer(width, height);
   }
 
-  setSceneGraph(sceneGraph: SceneGraph | null): void {
+  setSceneGraph(sceneGraph: SceneGraph | null, options?: { preserveCamera?: boolean }): void {
+    const preserveCamera = options?.preserveCamera ?? false;
+    const preservedCameraState = preserveCamera ? this.captureCameraState() : null;
+
     this.activeSceneGraph = sceneGraph;
     // Emit a small debug report for diagnostics
     this.debugReportSceneGraph(sceneGraph);
@@ -138,6 +148,10 @@ export class ViewportRendererService {
           '[ViewportRenderer] Scene graph set before initialization, will sync after init'
         );
       }
+    }
+
+    if (preservedCameraState) {
+      this.restoreCameraState(preservedCameraState);
     }
   }
 
@@ -366,23 +380,38 @@ export class ViewportRendererService {
           ? [node.scale.x, node.scale.y, 1]
           : [1, 1, 1];
 
-    const props = this.asRecord(node.properties) ?? {};
-    const transform = this.asRecord(props.transform);
+    target.position.set(basePosition[0], basePosition[1], basePosition[2]);
 
-    const position = this.extractVector3(transform?.position ?? transform?.translate, basePosition);
-    target.position.set(position[0], position[1], position[2]);
+    const rotation = [
+      MathUtils.degToRad(baseRotation[0]),
+      MathUtils.degToRad(baseRotation[1]),
+      MathUtils.degToRad(baseRotation[2]),
+    ];
+    target.rotation.set(rotation[0], rotation[1], rotation[2]);
 
-    const rotationSource = transform?.rotationEuler ?? transform?.rotation ?? transform?.euler;
-    const rotation = this.extractVector3(rotationSource, baseRotation);
-    target.rotation.set(
-      MathUtils.degToRad(rotation[0]),
-      MathUtils.degToRad(rotation[1]),
-      MathUtils.degToRad(rotation[2])
-    );
+    target.scale.set(baseScale[0], baseScale[1], baseScale[2]);
+  }
 
-    const scaleSource = transform && 'scale' in transform ? transform.scale : undefined;
-    const scale = this.extractVector3(scaleSource, baseScale);
-    target.scale.set(scale[0], scale[1], scale[2]);
+  updateNodeTransform(node: NodeBase): boolean {
+    if (!this.sceneContentRoot) {
+      return false;
+    }
+
+    const object = this.findObjectByNodeId(node.id, this.sceneContentRoot);
+    if (!object) {
+      return false;
+    }
+
+    this.applyTransform(object, node);
+    if (node instanceof Node3D) {
+      const props = this.asRecord(node.properties) ?? {};
+      const kind = (this.asString(props.kind) ?? node.type)?.toLowerCase();
+      if (kind === 'camera') {
+        this.applyCameraSettings(object, props);
+      }
+    }
+    this.selectionService.updateSelection();
+    return true;
   }
 
   private applyCameraSettings(container: Object3D, props: Record<string, unknown>): void {
@@ -532,6 +561,21 @@ export class ViewportRendererService {
     return value as Record<string, unknown>;
   }
 
+  private findObjectByNodeId(nodeId: string, root: Object3D): Object3D | null {
+    if (root.userData?.nodeId === nodeId) {
+      return root;
+    }
+
+    for (const child of root.children) {
+      const match = this.findObjectByNodeId(nodeId, child);
+      if (match) {
+        return match;
+      }
+    }
+
+    return null;
+  }
+
   private asString(value: unknown): string | null {
     if (typeof value === 'string' && value.trim().length > 0) {
       return value;
@@ -615,6 +659,33 @@ export class ViewportRendererService {
           this.controls.enabled = true;
         }
       });
+    }
+  }
+
+  private captureCameraState(): ViewportCameraState | null {
+    if (!this.perspectiveCamera) {
+      return null;
+    }
+
+    const position = this.perspectiveCamera.position.clone();
+    const quaternion = this.perspectiveCamera.quaternion.clone();
+    const target = this.controls ? this.controls.target.clone() : null;
+
+    return { position, quaternion, target };
+  }
+
+  private restoreCameraState(state: ViewportCameraState): void {
+    if (!this.perspectiveCamera) {
+      return;
+    }
+
+    this.perspectiveCamera.position.copy(state.position);
+    this.perspectiveCamera.quaternion.copy(state.quaternion);
+    this.perspectiveCamera.updateMatrixWorld();
+
+    if (this.controls && state.target) {
+      this.controls.target.copy(state.target);
+      this.controls.update();
     }
   }
 

@@ -9,7 +9,6 @@ export default defineConfig({
     exclude: [
       'src/core/commands/SelectObjectCommand.spec.ts',
       'src/core/rendering/ViewportRendererService.spec.ts',
-      'src/core/rendering/ViewportSelectionService.spec.ts',
       'src/core/commands/LoadSceneCommand.spec.ts',
     ],
   },

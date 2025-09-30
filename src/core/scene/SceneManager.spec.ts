@@ -72,6 +72,18 @@ root:
         type: Group
 `;
 
+const TRANSFORM_ONLY_SCENE = `
+version: '1.0.0'
+root:
+  - id: demo-box
+    type: Node3D
+    properties:
+      transform:
+        position: [1, 2, 3]
+        rotationEuler: [10, 20, 30]
+        scale: [2, 2, 2]
+`;
+
 describe('SceneManager', () => {
   let manager: SceneManager;
 
@@ -101,6 +113,18 @@ describe('SceneManager', () => {
     expect(sprite2D.rotation).toBe(90);
     expect(sprite2D.position).toEqual({ x: 4, y: 5 });
     expect(graph.metadata).toEqual({});
+  });
+
+  it('normalizes Node3D transforms defined within transform property blocks', () => {
+    const graph = manager.parseScene(TRANSFORM_ONLY_SCENE);
+    const node = graph.nodeMap.get('demo-box');
+    expect(node).toBeInstanceOf(Node3D);
+
+    const node3D = node as Node3D;
+    expect(node3D.position).toEqual({ x: 1, y: 2, z: 3 });
+    expect(node3D.rotation).toEqual({ x: 10, y: 20, z: 30 });
+    expect(node3D.scale).toEqual({ x: 2, y: 2, z: 2 });
+    expect(node3D.properties.transform).toBeUndefined();
   });
 
   it('throws a SceneValidationError when duplicate ids are found', () => {

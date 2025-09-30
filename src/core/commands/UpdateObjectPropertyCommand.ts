@@ -181,7 +181,14 @@ export class UpdateObjectPropertyCommand extends CommandBase<
     try {
       const vrToken = container.getOrCreateToken(ViewportRendererService);
       const viewportRenderer = container.getService<ViewportRendererService>(vrToken);
-      viewportRenderer.setSceneGraph(sceneGraph);
+      const isTransformUpdate = this.isTransformProperty(propertyPath);
+      const didUpdateInPlace = isTransformUpdate
+        ? viewportRenderer.updateNodeTransform(node)
+        : false;
+
+      if (!didUpdateInPlace) {
+        viewportRenderer.setSceneGraph(sceneGraph, { preserveCamera: true });
+      }
     } catch {
       // Non-fatal: if the renderer/service isn't available (e.g., headless tests), ignore.
     }
@@ -325,5 +332,13 @@ export class UpdateObjectPropertyCommand extends CommandBase<
     }
 
     return { isValid: true };
+  }
+
+  private isTransformProperty(propertyPath: string): boolean {
+    return (
+      propertyPath.startsWith('position.') ||
+      propertyPath.startsWith('rotation.') ||
+      propertyPath.startsWith('scale.')
+    );
   }
 }

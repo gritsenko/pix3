@@ -46,6 +46,7 @@ export class ViewportSelectionService {
   private isDisposed = false;
   private disposeSelectionSubscription?: () => void;
   private isApplyingViewportTransform = false;
+  private suppressClickUntil = 0;
   private updateCommandCtor?: UpdateObjectPropertyCommandCtor;
 
   @inject(SceneManager)
@@ -145,6 +146,7 @@ export class ViewportSelectionService {
       } else {
         this.canvas?.dispatchEvent(new CustomEvent('viewport:gizmo-drag-end'));
         this.updateSelectionBoxes();
+        this.suppressClickUntil = Date.now() + 250;
         void this.commitViewportTransform();
       }
     });
@@ -165,6 +167,15 @@ export class ViewportSelectionService {
   private handleClick = async (event: MouseEvent): Promise<void> => {
     if (!this.canvas || !this.camera || !this.sceneContentRoot) {
       return;
+    }
+
+    if (this.suppressClickUntil !== 0) {
+      if (Date.now() < this.suppressClickUntil) {
+        this.suppressClickUntil = 0;
+        return;
+      }
+
+      this.suppressClickUntil = 0;
     }
 
     // Ignore clicks during transform gizmo dragging
@@ -497,6 +508,7 @@ export class ViewportSelectionService {
     this.clearSelectionBoxes();
 
     // Clear references
+  this.suppressClickUntil = 0;
     this.canvas = null;
     this.camera = null;
     this.renderer = null;
