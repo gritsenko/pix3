@@ -1,6 +1,6 @@
-import { injectable, ServiceContainer } from '../fw/di';
+import { injectable, ServiceContainer } from '@/fw/di';
+import { appState } from '@/state';
 import { resolveFileSystemAPIService, type FileDescriptor } from './FileSystemAPIService';
-import { appState } from '../state';
 
 const RECENTS_KEY = 'pix3.recentProjects:v1';
 
@@ -232,20 +232,15 @@ export class ProjectService {
   }
 
   async createDirectory(path: string): Promise<void> {
-    try {
-      await this.fs.createDirectory(path);
-    } catch (err) {
-      // rethrow or wrap if needed
-      throw err;
-    }
+    await this.fs.createDirectory(path);
   }
 
   async writeFile(path: string, contents: string): Promise<void> {
-    try {
-      await this.fs.writeTextFile(path, contents);
-    } catch (err) {
-      throw err;
-    }
+    await this.fs.writeTextFile(path, contents);
+  }
+
+  listDirectory(path = '.'): Promise<FileDescriptor[]> {
+    return this.fs.listDirectory(path);
   }
 }
 

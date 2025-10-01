@@ -1,11 +1,11 @@
 import { ComponentBase, css, customElement, html, state, subscribe, inject } from '@/fw';
-import { SceneManager } from '../../core/scene';
-import { appState, getAppStateSnapshot } from '../../state';
-import type { NodeBase } from '../../core/scene/nodes/NodeBase';
-import { Node3D } from '../../core/scene/nodes/3D/Node3D';
-import { Sprite2D } from '../../core/scene/nodes/2D/Sprite2D';
-import { UpdateObjectPropertyCommand } from '../../core/commands/UpdateObjectPropertyCommand';
-import { createCommandContext } from '../../core/commands/command';
+import { SceneManager } from '@/core/scene';
+import { appState, getAppStateSnapshot } from '@/state';
+import type { NodeBase } from '@/core/scene/nodes/NodeBase';
+import { Node3D } from '@/core/scene/nodes/Node3D';
+import { Sprite2D } from '@/core/scene/nodes/2D/Sprite2D';
+import { UpdateObjectPropertyCommand } from '@/core/commands/UpdateObjectPropertyCommand';
+import { createCommandContext } from '@/core/commands/command';
 
 import '../shared/pix3-panel';
 
@@ -108,7 +108,7 @@ export class InspectorPanel extends ComponentBase {
 
   private findNodeById(nodeId: string, nodes: NodeBase[]): NodeBase | null {
     for (const node of nodes) {
-      if (node.id === nodeId) {
+      if (node.nodeId === nodeId) {
         return node;
       }
       const found = this.findNodeById(nodeId, node.children);
@@ -128,8 +128,11 @@ export class InspectorPanel extends ComponentBase {
     const node = this.primaryNode;
     this.nameValue = node.name;
 
-    // Handle visibility (assuming it's stored in properties)
-    this.visibleValue = (node.properties.visible as boolean) ?? true;
+    // Handle visibility (prefer live Object3D state)
+    this.visibleValue =
+      typeof node.properties.visible === 'boolean'
+        ? (node.properties.visible as boolean)
+        : node.visible;
 
     if (node instanceof Node3D) {
       // Position
@@ -157,19 +160,19 @@ export class InspectorPanel extends ComponentBase {
       this.positionValues = {
         x: { value: this.formatNumber(node.position.x), isValid: true },
         y: { value: this.formatNumber(node.position.y), isValid: true },
-        z: { value: '0', isValid: true },
+        z: { value: this.formatNumber(node.position.z), isValid: true },
       };
 
       this.rotationValues = {
         x: { value: '0', isValid: true },
         y: { value: '0', isValid: true },
-        z: { value: this.formatNumber(this.radToDeg(node.rotation)), isValid: true },
+        z: { value: this.formatNumber(this.radToDeg(node.rotation.z)), isValid: true },
       };
 
       this.scaleValues = {
         x: { value: this.formatNumber(node.scale.x), isValid: true },
         y: { value: this.formatNumber(node.scale.y), isValid: true },
-        z: { value: '1', isValid: true },
+        z: { value: this.formatNumber(node.scale.z), isValid: true },
       };
     }
   }
@@ -208,7 +211,7 @@ export class InspectorPanel extends ComponentBase {
 
     if (this.primaryNode) {
       const command = new UpdateObjectPropertyCommand({
-        nodeId: this.primaryNode.id,
+        nodeId: this.primaryNode.nodeId,
         propertyPath: 'name',
         value: input.value,
       });
@@ -231,7 +234,7 @@ export class InspectorPanel extends ComponentBase {
 
     if (this.primaryNode) {
       const command = new UpdateObjectPropertyCommand({
-        nodeId: this.primaryNode.id,
+        nodeId: this.primaryNode.nodeId,
         propertyPath: 'visible',
         value: checkbox.checked,
       });
@@ -314,7 +317,7 @@ export class InspectorPanel extends ComponentBase {
     if (!this.primaryNode) return;
 
     const command = new UpdateObjectPropertyCommand({
-      nodeId: this.primaryNode.id,
+      nodeId: this.primaryNode.nodeId,
       propertyPath: `${field}.${axis}`,
       value: value,
     });

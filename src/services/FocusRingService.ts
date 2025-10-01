@@ -1,4 +1,4 @@
-import { injectable } from '../fw/di';
+import { injectable } from '@/fw/di';
 
 export type RovingOrientation = 'horizontal' | 'vertical';
 

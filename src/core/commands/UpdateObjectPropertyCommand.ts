@@ -1,3 +1,5 @@
+import { MathUtils, Vector3 } from 'three';
+
 import {
   CommandBase,
   type CommandExecutionResult,
@@ -6,11 +8,11 @@ import {
   type CommandUndoPayload,
   type CommandPreconditionResult,
 } from './command';
-import { NodeBase } from '../scene/nodes/NodeBase';
-import { Node3D, type Vector3 } from '../scene/nodes/3D/Node3D';
-import { Sprite2D } from '../scene/nodes/2D/Sprite2D';
-import { SceneManager } from '../scene/SceneManager';
-import { ViewportRendererService } from '../rendering/ViewportRendererService';
+import { NodeBase } from '@/core/scene/nodes/NodeBase';
+import { Node3D } from '@/core/scene/nodes/Node3D';
+import { Sprite2D } from '@/core/scene/nodes/2D/Sprite2D';
+import { SceneManager } from '@/core/scene/SceneManager';
+import { ViewportRendererService } from '@/core/rendering/ViewportRendererService';
 
 export interface UpdateObjectPropertyExecutePayload {
   /** The node ID that was updated */
@@ -231,6 +233,16 @@ export class UpdateObjectPropertyCommand extends CommandBase<
       return current ?? node.properties.visible ?? true;
     }
 
+    if (parts.length === 2 && parts[0] === 'rotation') {
+      const axis = parts[1] as 'x' | 'y' | 'z';
+      if (node instanceof Node3D) {
+        return MathUtils.radToDeg(node.rotation[axis]);
+      }
+      if (node instanceof Sprite2D && axis === 'z') {
+        return MathUtils.radToDeg(node.rotation.z);
+      }
+    }
+
     return current;
   }
 
@@ -241,7 +253,9 @@ export class UpdateObjectPropertyCommand extends CommandBase<
       // Simple property (e.g., 'visible')
       const property = parts[0];
       if (property === 'visible') {
-        node.properties.visible = value;
+        const boolValue = Boolean(value);
+        node.visible = boolValue;
+        node.properties.visible = boolValue;
       } else if (property === 'name') {
         node.name = value as string;
       } else {
@@ -253,20 +267,20 @@ export class UpdateObjectPropertyCommand extends CommandBase<
       const [objectName, propertyName] = parts;
 
       if (node instanceof Node3D) {
-        // Access transform-like members via a typed record to avoid `any`.
-        const nodeAsRecord = node as unknown as Record<string, unknown>;
-        const targetObject = nodeAsRecord[objectName] as Vector3 | undefined;
-        if (targetObject && typeof targetObject === 'object') {
-          (targetObject as unknown as Record<string, unknown>)[propertyName] = value as number;
+        if (objectName === 'rotation') {
+          node.rotation[propertyName as 'x' | 'y' | 'z'] = MathUtils.degToRad(value as number);
+        } else if (objectName === 'position' || objectName === 'scale') {
+          const vector = node[objectName] as Vector3;
+          vector[propertyName as 'x' | 'y' | 'z'] = value as number;
         }
       } else if (node instanceof Sprite2D) {
-        // Handle Sprite2D properties with safer casts
-        if (objectName === 'position' && (propertyName === 'x' || propertyName === 'y')) {
-          (node.position as unknown as Record<string, unknown>)[propertyName] = value as number;
+        const axis = propertyName as 'x' | 'y' | 'z';
+        if (objectName === 'position' && (axis === 'x' || axis === 'y')) {
+          node.position[axis] = value as number;
+        } else if (objectName === 'scale' && (axis === 'x' || axis === 'y')) {
+          node.scale[axis] = value as number;
         } else if (objectName === 'rotation' && propertyName === 'z') {
-          (node as unknown as Record<string, unknown>).rotation = value as number;
-        } else if (objectName === 'scale' && (propertyName === 'x' || propertyName === 'y')) {
-          (node.scale as unknown as Record<string, unknown>)[propertyName] = value as number;
+          node.rotation.set(0, 0, MathUtils.degToRad(value as number));
         }
       }
     }

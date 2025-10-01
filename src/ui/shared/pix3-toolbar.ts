@@ -1,5 +1,5 @@
-import { ComponentBase, css, customElement, html, inject, property } from '../../fw';
-import { FocusRingService } from '../../services/FocusRingService';
+import { ComponentBase, css, customElement, html, inject, property } from '@/fw';
+import { FocusRingService } from '@/services/FocusRingService';
 
 @customElement('pix3-toolbar')
 export class Pix3Toolbar extends ComponentBase {

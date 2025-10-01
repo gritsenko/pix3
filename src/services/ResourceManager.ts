@@ -1,4 +1,4 @@
-import { inject, injectable } from '../fw/di';
+import { inject, injectable } from '@/fw/di';
 
 import { FileSystemAPIError, FileSystemAPIService } from './FileSystemAPIService';
 import { BaseTemplateService } from './BaseTemplateService';

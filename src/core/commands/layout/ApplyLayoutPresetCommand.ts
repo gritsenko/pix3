@@ -4,8 +4,8 @@ import {
   type CommandExecutionResult,
   type CommandMetadata,
   type CommandUndoPayload,
-} from '../command';
-import type { PersonaId, PanelVisibilityState } from '../../../state';
+} from '@/core/commands/command';
+import type { PersonaId, PanelVisibilityState } from '@/state';
 
 export interface ApplyLayoutPresetCommandOptions {
   readonly persona: PersonaId;

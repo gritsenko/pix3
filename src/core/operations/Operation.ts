@@ -2,9 +2,9 @@ import {
   createCommandContext,
   snapshotState,
   type CommandContext as CommandContextType,
-} from '../commands/command';
-import { ServiceContainer } from '../../fw/di';
-import { appState, getAppStateSnapshot, type AppState, type AppStateSnapshot } from '../../state';
+} from '@/core/commands/command';
+import { ServiceContainer } from '@/fw/di';
+import { appState, getAppStateSnapshot, type AppState, type AppStateSnapshot } from '@/state';
 
 export type OperationContext = CommandContextType;
 

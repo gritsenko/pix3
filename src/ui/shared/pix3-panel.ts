@@ -1,6 +1,6 @@
-import { ComponentBase, css, customElement, html, inject, property } from '../../fw';
+import { ComponentBase, css, customElement, html, inject, property } from '@/fw';
 import { ifDefined } from 'lit/directives/if-defined.js';
-import { FocusRingService } from '../../services/FocusRingService';
+import { FocusRingService } from '@/services/FocusRingService';
 
 let panelCounter = 0;
 

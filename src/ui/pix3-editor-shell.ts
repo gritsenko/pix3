@@ -1,9 +1,9 @@
 import { subscribe } from 'valtio/vanilla';
 
 import { ComponentBase, css, customElement, html, inject, property, state } from '@/fw';
-import { LayoutManagerService } from '../core/layout';
-import { LoadSceneCommand } from '../core/commands/LoadSceneCommand';
-import { appState, type PersonaId } from '../state';
+import { LayoutManagerService } from '@/core/layout';
+import { LoadSceneCommand } from '@/core/commands/LoadSceneCommand';
+import { appState, type PersonaId } from '@/state';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './welcome/pix3-welcome';

@@ -1,4 +1,4 @@
-import type { AppStateSnapshot } from '../../state';
+import type { AppStateSnapshot } from '@/state';
 
 export interface HistoryEntryMetadata {
   readonly commandId?: string;

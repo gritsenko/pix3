@@ -1,6 +1,6 @@
 import { parse } from 'yaml';
 
-import { injectable, ServiceContainer } from '../fw/di';
+import { injectable, ServiceContainer } from '@/fw/di';
 
 export type FileSystemAPIErrorCode =
   | 'not-initialized'

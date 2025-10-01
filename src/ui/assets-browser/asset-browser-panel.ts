@@ -12,7 +12,7 @@ export class AssetBrowserPanel extends ComponentBase {
         panel-description="Open a project to browse textures, models, and prefabs."
         actions-label="Asset browser actions"
       >
-  <pix3-asset-tree></pix3-asset-tree>
+        <pix3-asset-tree></pix3-asset-tree>
       </pix3-panel>
     `;
   }

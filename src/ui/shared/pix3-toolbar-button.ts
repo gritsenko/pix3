@@ -1,4 +1,4 @@
-import { ComponentBase, css, customElement, html, property } from '../../fw';
+import { ComponentBase, css, customElement, html, property } from '@/fw';
 
 @customElement('pix3-toolbar-button')
 export class Pix3ToolbarButton extends ComponentBase {

@@ -1,7 +1,7 @@
-import { ComponentBase, css, customElement, html, inject, subscribe, state } from '../../fw';
-import { ViewportRendererService, type TransformMode } from '../../core/rendering';
-import { SceneManager } from '../../core/scene';
-import { appState } from '../../state';
+import { ComponentBase, css, customElement, html, inject, subscribe, state } from '@/fw';
+import { ViewportRendererService, type TransformMode } from '@/core/rendering';
+import { SceneManager } from '@/core/scene';
+import { appState } from '@/state';
 
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
@@ -67,7 +67,7 @@ export class ViewportPanel extends ComponentBase {
     // the host shrinks/grows due to layout adjustments.
     try {
       this.resizeObserver.observe(this);
-    } catch (err) {
+    } catch {
       // Fallback to observing the canvas if observing the host fails in some environments.
       this.resizeObserver.observe(this.canvas);
     }

@@ -1,14 +1,16 @@
 import { parse } from 'yaml';
+import { Euler, MathUtils, Vector2, Vector3 } from 'three';
 
-import { injectable } from '../../fw/di';
-import { NodeBase, type NodeBaseProps } from './nodes/NodeBase';
-import { Node3D, type Vector3 } from './nodes/3D/Node3D';
-import { Sprite2D } from './nodes/2D/Sprite2D';
-import { type Vector2 } from './nodes/2D/Node2D';
-import type { SceneGraph, SceneNodeDefinition, SceneDocument } from './types';
+import { injectable } from '@/fw/di';
+import { NodeBase, type NodeBaseProps } from '@/core/scene/nodes/NodeBase';
+import { Node3D } from '@/core/scene/nodes/Node3D';
+import { Sprite2D } from '@/core/scene/nodes/2D/Sprite2D';
+import type { SceneGraph, SceneNodeDefinition, SceneDocument } from '@/core/scene/types';
 
-const DEFAULT_VECTOR3: Vector3 = { x: 0, y: 0, z: 0 };
-const DEFAULT_VECTOR2: Vector2 = { x: 0, y: 0 };
+const ZERO_VECTOR3 = new Vector3(0, 0, 0);
+const UNIT_VECTOR3 = new Vector3(1, 1, 1);
+const ZERO_VECTOR2 = new Vector2(0, 0);
+const UNIT_VECTOR2 = new Vector2(1, 1);
 
 export class SceneValidationError extends Error {
   readonly details: string[];
@@ -40,9 +42,17 @@ export class SceneLoader {
     }
 
     const nodeIndex = new Map<string, NodeBase>();
-    const rootNodes = (document.root ?? []).map(definition =>
-      this.instantiateNode(definition, null, nodeIndex, options.filePath ?? 'unknown')
-    );
+    const rootNodes: NodeBase[] = [];
+
+    for (const definition of document.root ?? []) {
+      const rootNode = this.instantiateNode(
+        definition,
+        null,
+        nodeIndex,
+        options.filePath ?? 'unknown'
+      );
+      rootNodes.push(rootNode);
+    }
 
     return {
       version: document.version,
@@ -65,22 +75,22 @@ export class SceneLoader {
       ]);
     }
 
-    const node = this.createNodeFromDefinition(definition, parent);
-    index.set(node.id, node);
+    const node = this.createNodeFromDefinition(definition);
+    index.set(node.nodeId, node);
+
+    if (parent) {
+      parent.adoptChild(node);
+    }
 
     const childDefinitions = definition.children ?? [];
     for (const childDef of childDefinitions) {
-      const child = this.instantiateNode(childDef, node, index, sceneIdentifier);
-      node.adoptChild(child);
+      this.instantiateNode(childDef, node, index, sceneIdentifier);
     }
 
     return node;
   }
 
-  private createNodeFromDefinition(
-    definition: SceneNodeDefinition,
-    parent: NodeBase | null
-  ): NodeBase {
+  private createNodeFromDefinition(definition: SceneNodeDefinition): NodeBase {
     const baseProps: NodeBaseProps = {
       id: definition.id,
       name: definition.name,
@@ -89,14 +99,11 @@ export class SceneLoader {
     };
 
     if (definition.instance) {
-      return new NodeBase(
-        {
-          ...baseProps,
-          type: definition.type ?? 'Instance',
-          instancePath: definition.instance,
-        },
-        parent
-      );
+      return new NodeBase({
+        ...baseProps,
+        type: definition.type ?? 'Instance',
+        instancePath: definition.instance,
+      });
     }
 
     switch (definition.type) {
@@ -105,162 +112,160 @@ export class SceneLoader {
           string,
           unknown
         >;
-        return new Sprite2D(
-          {
-            ...baseProps,
-            properties: rest,
-            position: this.asVector2(position, DEFAULT_VECTOR2),
-            scale: this.asVector2(scale, { x: 1, y: 1 }),
-            rotation: typeof rotation === 'number' ? rotation : 0,
-            texturePath: typeof texturePath === 'string' ? texturePath : null,
-          },
-          parent
-        );
+        return new Sprite2D({
+          ...baseProps,
+          properties: rest,
+          position: this.readVector2(position, ZERO_VECTOR2),
+          scale: this.readVector2(scale, UNIT_VECTOR2),
+          rotation: typeof rotation === 'number' ? rotation : 0,
+          texturePath: typeof texturePath === 'string' ? texturePath : null,
+        });
       }
       case 'Group':
-        return new NodeBase({ ...baseProps, type: 'Group' }, parent);
+        return new NodeBase({ ...baseProps, type: 'Group' });
       case 'Node3D':
       case undefined: {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
-        return new Node3D(
-          {
-            ...baseProps,
-            properties: parsed.restProps,
-            position: parsed.position,
-            rotation: parsed.rotation,
-            scale: parsed.scale,
-          },
-          parent
-        );
+        return new Node3D({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+        });
       }
       default:
-        return new NodeBase({ ...baseProps, type: definition.type }, parent);
+        return new NodeBase({ ...baseProps, type: definition.type });
     }
   }
 
   private parseNode3DTransforms(properties: Record<string, unknown>): {
     position: Vector3;
-    rotation: Vector3;
+    rotation: Euler;
+    rotationOrder: Euler['order'];
     scale: Vector3;
     restProps: Record<string, unknown>;
   } {
     const { position, rotation, scale, transform, ...rest } = properties;
 
-    const fallbackPosition = this.asVector3(position, DEFAULT_VECTOR3);
-    const fallbackRotation = this.asVector3(rotation, DEFAULT_VECTOR3);
-    const fallbackScale = this.asVector3(scale, { x: 1, y: 1, z: 1 });
+    const fallbackPosition = this.readVector3(position, ZERO_VECTOR3);
+    const fallbackRotation = this.readVector3(rotation, ZERO_VECTOR3);
+    const fallbackScale = this.readVector3(scale, UNIT_VECTOR3);
 
     const transformRecord = this.asRecord(transform);
 
-    const fallbackPositionTuple: [number, number, number] = [
-      fallbackPosition.x,
-      fallbackPosition.y,
-      fallbackPosition.z,
-    ];
-    const fallbackRotationTuple: [number, number, number] = [
-      fallbackRotation.x,
-      fallbackRotation.y,
-      fallbackRotation.z,
-    ];
-    const fallbackScaleTuple: [number, number, number] = [
-      fallbackScale.x,
-      fallbackScale.y,
-      fallbackScale.z,
-    ];
+    let resolvedPosition = fallbackPosition;
+    let resolvedRotation = fallbackRotation;
+    let resolvedScale = fallbackScale;
+    let rotationOrder: Euler['order'] = 'XYZ';
 
-    const resolvedPositionTuple = transformRecord
-      ? this.readVector3(transformRecord.position ?? transformRecord.translate, fallbackPositionTuple)
-      : fallbackPositionTuple;
-
-    const resolvedRotationTuple = transformRecord
-      ? this.readVector3(
-          transformRecord.rotationEuler ??
-            transformRecord.rotation ??
-            transformRecord.euler,
-          fallbackRotationTuple
-        )
-      : fallbackRotationTuple;
-
-    const resolvedScaleTuple = transformRecord
-      ? this.readVector3(transformRecord.scale, fallbackScaleTuple)
-      : fallbackScaleTuple;
-
-    const restProps: Record<string, unknown> = { ...rest };
     if (transformRecord) {
+      rotationOrder = this.readRotationOrder(transformRecord.rotationOrder) ?? rotationOrder;
+      resolvedPosition = this.readVector3(
+        transformRecord.position ?? transformRecord.translate,
+        fallbackPosition
+      );
+      resolvedRotation = this.readVector3(
+        transformRecord.rotationEuler ?? transformRecord.rotation ?? transformRecord.euler,
+        fallbackRotation
+      );
+      resolvedScale = this.readVector3(transformRecord.scale, fallbackScale);
+
       const remainingTransformEntries = Object.entries(transformRecord).filter(
-        ([key]) => !['position', 'translate', 'rotation', 'rotationEuler', 'euler', 'scale'].includes(key)
+        ([key]) =>
+          ![
+            'position',
+            'translate',
+            'rotation',
+            'rotationEuler',
+            'euler',
+            'scale',
+            'rotationOrder',
+          ].includes(key)
       );
 
       if (remainingTransformEntries.length > 0) {
-        restProps.transform = Object.fromEntries(remainingTransformEntries);
+        rest.transform = Object.fromEntries(remainingTransformEntries);
       }
     }
 
+    const rotationEuler = new Euler(
+      MathUtils.degToRad(resolvedRotation.x),
+      MathUtils.degToRad(resolvedRotation.y),
+      MathUtils.degToRad(resolvedRotation.z),
+      rotationOrder
+    );
+
     return {
-      position: {
-        x: resolvedPositionTuple[0],
-        y: resolvedPositionTuple[1],
-        z: resolvedPositionTuple[2],
-      },
-      rotation: {
-        x: resolvedRotationTuple[0],
-        y: resolvedRotationTuple[1],
-        z: resolvedRotationTuple[2],
-      },
-      scale: {
-        x: resolvedScaleTuple[0],
-        y: resolvedScaleTuple[1],
-        z: resolvedScaleTuple[2],
-      },
-      restProps,
+      position: resolvedPosition,
+      rotation: rotationEuler,
+      rotationOrder,
+      scale: resolvedScale,
+      restProps: rest,
     };
   }
 
-  private asVector3(value: unknown, fallback: Vector3): Vector3 {
-    if (!value || typeof value !== 'object') {
-      return { ...fallback };
+  private readVector3(value: unknown, fallback: Vector3): Vector3 {
+    if (!value) {
+      return fallback.clone();
     }
-    const vector = value as Record<string, unknown>;
-    return {
-      x: this.asNumber(vector.x, fallback.x),
-      y: this.asNumber(vector.y, fallback.y),
-      z: this.asNumber(vector.z, fallback.z),
-    };
-  }
 
-  private readVector3(
-    value: unknown,
-    fallback: [number, number, number]
-  ): [number, number, number] {
+    if (value instanceof Vector3) {
+      return value.clone();
+    }
+
     if (Array.isArray(value)) {
-      return [
-        this.asNumber(value[0], fallback[0]),
-        this.asNumber(value[1], fallback[1]),
-        this.asNumber(value[2], fallback[2]),
-      ];
+      return new Vector3(
+        this.asNumber(value[0], fallback.x),
+        this.asNumber(value[1], fallback.y),
+        this.asNumber(value[2], fallback.z)
+      );
     }
 
-    if (value && typeof value === 'object') {
+    if (typeof value === 'object') {
       const vector = value as Record<string, unknown>;
-      return [
-        this.asNumber(vector.x, fallback[0]),
-        this.asNumber(vector.y, fallback[1]),
-        this.asNumber(vector.z, fallback[2]),
-      ];
+      return new Vector3(
+        this.asNumber(vector.x, fallback.x),
+        this.asNumber(vector.y, fallback.y),
+        this.asNumber(vector.z, fallback.z)
+      );
     }
 
-    return [...fallback];
+    return fallback.clone();
   }
 
-  private asVector2(value: unknown, fallback: Vector2): Vector2 {
-    if (!value || typeof value !== 'object') {
-      return { ...fallback };
+  private readVector2(value: unknown, fallback: Vector2): Vector2 {
+    if (!value) {
+      return fallback.clone();
     }
-    const vector = value as Record<string, unknown>;
-    return {
-      x: this.asNumber(vector.x, fallback.x),
-      y: this.asNumber(vector.y, fallback.y),
-    };
+
+    if (value instanceof Vector2) {
+      return value.clone();
+    }
+
+    if (Array.isArray(value)) {
+      return new Vector2(this.asNumber(value[0], fallback.x), this.asNumber(value[1], fallback.y));
+    }
+
+    if (typeof value === 'object') {
+      const vector = value as Record<string, unknown>;
+      return new Vector2(this.asNumber(vector.x, fallback.x), this.asNumber(vector.y, fallback.y));
+    }
+
+    return fallback.clone();
+  }
+
+  private readRotationOrder(value: unknown): Euler['order'] | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    const normalized = value.trim().toUpperCase();
+    const validOrders: Euler['order'][] = ['XYZ', 'XZY', 'YXZ', 'YZX', 'ZXY', 'ZYX'];
+    return validOrders.includes(normalized as Euler['order'])
+      ? (normalized as Euler['order'])
+      : undefined;
   }
 
   private asNumber(value: unknown, fallback: number): number {

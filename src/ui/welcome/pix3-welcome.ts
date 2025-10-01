@@ -1,7 +1,7 @@
 import { ComponentBase, customElement, html, inject, state, subscribe } from '@/fw';
 import './pix3-welcome.ts.css';
-import { ProjectService } from '../../services';
-import { appState } from '../../state';
+import { ProjectService } from '@/services';
+import { appState } from '@/state';
 
 @customElement('pix3-welcome')
 export class Pix3Welcome extends ComponentBase {

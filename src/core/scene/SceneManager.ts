@@ -9,8 +9,7 @@ export class SceneManager {
   private readonly sceneGraphs = new Map<string, SceneGraph>();
   private activeSceneId: string | null = null;
 
-  constructor() {
-  }
+  constructor() {}
 
   parseScene(sceneText: string, options: ParseSceneOptions = {}): SceneGraph {
     return this.sceneLoader.parseScene(sceneText, options);

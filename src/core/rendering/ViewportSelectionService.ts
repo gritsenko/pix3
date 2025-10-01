@@ -12,14 +12,12 @@ import {
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { subscribe } from 'valtio/vanilla';
 
-import { injectable, ServiceLifetime, inject } from '../../fw/di';
-import { appState, getAppStateSnapshot } from '../../state';
-import { SelectObjectCommand } from '../commands/SelectObjectCommand';
-import { createCommandContext } from '../commands/command';
-import { SceneManager } from '../scene/SceneManager';
-import { Node3D } from '../scene/nodes/3D/Node3D';
-import { Sprite2D } from '../scene/nodes/2D/Sprite2D';
-import { NodeBase } from '../scene/nodes/NodeBase';
+import { injectable, ServiceLifetime, inject } from '@/fw/di';
+import { appState, getAppStateSnapshot } from '@/state';
+import { SelectObjectCommand } from '@/core/commands/SelectObjectCommand';
+import { createCommandContext } from '@/core/commands/command';
+import { SceneManager } from '@/core/scene/SceneManager';
+import { NodeBase } from '@/core/scene/nodes/NodeBase';
 
 type UpdateObjectPropertyCommandCtor =
   typeof import('../commands/UpdateObjectPropertyCommand').UpdateObjectPropertyCommand;
@@ -413,64 +411,41 @@ export class ViewportSelectionService {
     const epsilon = 1e-4;
     const updates: Array<{ propertyPath: string; value: number }> = [];
 
-    if (node instanceof Node3D) {
-      const position = object.position;
-      if (Math.abs(position.x - node.position.x) > epsilon) {
-        updates.push({ propertyPath: 'position.x', value: this.roundTransformValue(position.x) });
-      }
-      if (Math.abs(position.y - node.position.y) > epsilon) {
-        updates.push({ propertyPath: 'position.y', value: this.roundTransformValue(position.y) });
-      }
-      if (Math.abs(position.z - node.position.z) > epsilon) {
-        updates.push({ propertyPath: 'position.z', value: this.roundTransformValue(position.z) });
-      }
+    const position = object.position;
+    if (Math.abs(position.x - node.position.x) > epsilon) {
+      updates.push({ propertyPath: 'position.x', value: this.roundTransformValue(position.x) });
+    }
+    if (Math.abs(position.y - node.position.y) > epsilon) {
+      updates.push({ propertyPath: 'position.y', value: this.roundTransformValue(position.y) });
+    }
+    if (Math.abs(position.z - node.position.z) > epsilon) {
+      updates.push({ propertyPath: 'position.z', value: this.roundTransformValue(position.z) });
+    }
 
-      const rotation = object.rotation;
-      const rotX = MathUtils.radToDeg(rotation.x);
-      const rotY = MathUtils.radToDeg(rotation.y);
-      const rotZ = MathUtils.radToDeg(rotation.z);
+    const rotation = object.rotation;
+    const rotX = MathUtils.radToDeg(rotation.x);
+    const rotY = MathUtils.radToDeg(rotation.y);
+    const rotZ = MathUtils.radToDeg(rotation.z);
 
-      if (Math.abs(rotX - node.rotation.x) > epsilon) {
-        updates.push({ propertyPath: 'rotation.x', value: this.roundTransformValue(rotX) });
-      }
-      if (Math.abs(rotY - node.rotation.y) > epsilon) {
-        updates.push({ propertyPath: 'rotation.y', value: this.roundTransformValue(rotY) });
-      }
-      if (Math.abs(rotZ - node.rotation.z) > epsilon) {
-        updates.push({ propertyPath: 'rotation.z', value: this.roundTransformValue(rotZ) });
-      }
+    if (Math.abs(rotX - node.rotation.x) > epsilon) {
+      updates.push({ propertyPath: 'rotation.x', value: this.roundTransformValue(rotX) });
+    }
+    if (Math.abs(rotY - node.rotation.y) > epsilon) {
+      updates.push({ propertyPath: 'rotation.y', value: this.roundTransformValue(rotY) });
+    }
+    if (Math.abs(rotZ - node.rotation.z) > epsilon) {
+      updates.push({ propertyPath: 'rotation.z', value: this.roundTransformValue(rotZ) });
+    }
 
-      const scale = object.scale;
-      if (Math.abs(scale.x - node.scale.x) > epsilon) {
-        updates.push({ propertyPath: 'scale.x', value: this.roundTransformValue(scale.x) });
-      }
-      if (Math.abs(scale.y - node.scale.y) > epsilon) {
-        updates.push({ propertyPath: 'scale.y', value: this.roundTransformValue(scale.y) });
-      }
-      if (Math.abs(scale.z - node.scale.z) > epsilon) {
-        updates.push({ propertyPath: 'scale.z', value: this.roundTransformValue(scale.z) });
-      }
-    } else if (node instanceof Sprite2D) {
-      const position = object.position;
-      if (Math.abs(position.x - node.position.x) > epsilon) {
-        updates.push({ propertyPath: 'position.x', value: this.roundTransformValue(position.x) });
-      }
-      if (Math.abs(position.y - node.position.y) > epsilon) {
-        updates.push({ propertyPath: 'position.y', value: this.roundTransformValue(position.y) });
-      }
-
-      const rotationZ = MathUtils.radToDeg(object.rotation.z);
-      if (Math.abs(rotationZ - node.rotation) > epsilon) {
-        updates.push({ propertyPath: 'rotation.z', value: this.roundTransformValue(rotationZ) });
-      }
-
-      const scale = object.scale;
-      if (Math.abs(scale.x - node.scale.x) > epsilon) {
-        updates.push({ propertyPath: 'scale.x', value: this.roundTransformValue(scale.x) });
-      }
-      if (Math.abs(scale.y - node.scale.y) > epsilon) {
-        updates.push({ propertyPath: 'scale.y', value: this.roundTransformValue(scale.y) });
-      }
+    const scale = object.scale;
+    if (Math.abs(scale.x - node.scale.x) > epsilon) {
+      updates.push({ propertyPath: 'scale.x', value: this.roundTransformValue(scale.x) });
+    }
+    if (Math.abs(scale.y - node.scale.y) > epsilon) {
+      updates.push({ propertyPath: 'scale.y', value: this.roundTransformValue(scale.y) });
+    }
+    if (Math.abs(scale.z - node.scale.z) > epsilon) {
+      updates.push({ propertyPath: 'scale.z', value: this.roundTransformValue(scale.z) });
     }
 
     return updates;
@@ -508,7 +483,7 @@ export class ViewportSelectionService {
     this.clearSelectionBoxes();
 
     // Clear references
-  this.suppressClickUntil = 0;
+    this.suppressClickUntil = 0;
     this.canvas = null;
     this.camera = null;
     this.renderer = null;

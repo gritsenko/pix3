@@ -25,12 +25,13 @@ import {
 } from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
-import { injectable, ServiceLifetime, inject } from '../../fw/di';
-import type { SceneGraph } from '../scene/types';
-import type { NodeBase } from '../scene/nodes/NodeBase';
-import { Node3D } from '../scene/nodes/3D/Node3D';
-import { Sprite2D } from '../scene/nodes/2D/Sprite2D';
-import { ViewportSelectionService, type TransformMode } from './ViewportSelectionService';
+import { injectable, ServiceLifetime, inject } from '@/fw/di';
+import type { SceneGraph } from '@/core/scene/types';
+import type { NodeBase } from '@/core/scene/nodes/NodeBase';
+import {
+  ViewportSelectionService,
+  type TransformMode,
+} from '@/core/rendering/ViewportSelectionService';
 
 interface ViewportCameraState {
   position: Vector3;
@@ -273,14 +274,16 @@ export class ViewportRendererService {
 
   private buildObjectFromNode(node: NodeBase): Object3D | null {
     const container = new Group();
-    container.name = node.name ?? node.id;
-    container.userData.nodeId = node.id;
+    container.name = node.name ?? node.nodeId;
+    container.userData.nodeId = node.nodeId;
 
     this.applyTransform(container, node);
+    container.visible = node.visible;
 
-    if (node instanceof Node3D) {
-      const props = this.asRecord(node.properties) ?? {};
-      const kind = (this.asString(props.kind) ?? node.type)?.toLowerCase();
+    const props = this.asRecord(node.properties) ?? {};
+    const kind = (this.asString(props.kind) ?? node.type)?.toLowerCase();
+
+    if (node.type === 'Node3D') {
       switch (kind) {
         case 'mesh': {
           const mesh = this.createMeshForNode(node, props);
@@ -290,15 +293,13 @@ export class ViewportRendererService {
           break;
         }
         case 'directionallight': {
-          const light = this.createDirectionalLight(props);
-          container.add(light);
+          container.add(this.createDirectionalLight(props));
           break;
         }
         case 'ambientlight': {
           const color = this.parseColor(props.color, '#ffffff');
           const intensity = this.asNumber(props.intensity, 0.35);
-          const ambient = new AmbientLight(color, intensity);
-          container.add(ambient);
+          container.add(new AmbientLight(color, intensity));
           break;
         }
         case 'camera': {
@@ -309,9 +310,8 @@ export class ViewportRendererService {
         default:
           break;
       }
-    } else if (node instanceof Sprite2D) {
-      const spriteProps = this.asRecord(node.properties) ?? {};
-      const plane = this.createSpritePlaceholder(spriteProps, node);
+    } else if (node.type === 'Sprite2D' || node.type === 'Node2D') {
+      const plane = this.createSpritePlaceholder(props, node);
       if (plane) {
         container.add(plane);
       }
@@ -328,37 +328,10 @@ export class ViewportRendererService {
   }
 
   private applyTransform(target: Object3D, node: NodeBase): void {
-    const basePosition: [number, number, number] =
-      node instanceof Node3D
-        ? [node.position.x, node.position.y, node.position.z]
-        : node instanceof Sprite2D
-          ? [node.position.x, node.position.y, 0]
-          : [0, 0, 0];
-
-    const baseRotation: [number, number, number] =
-      node instanceof Node3D
-        ? [node.rotation.x, node.rotation.y, node.rotation.z]
-        : node instanceof Sprite2D
-          ? [0, 0, node.rotation]
-          : [0, 0, 0];
-
-    const baseScale: [number, number, number] =
-      node instanceof Node3D
-        ? [node.scale.x, node.scale.y, node.scale.z]
-        : node instanceof Sprite2D
-          ? [node.scale.x, node.scale.y, 1]
-          : [1, 1, 1];
-
-    target.position.set(basePosition[0], basePosition[1], basePosition[2]);
-
-    const rotation = [
-      MathUtils.degToRad(baseRotation[0]),
-      MathUtils.degToRad(baseRotation[1]),
-      MathUtils.degToRad(baseRotation[2]),
-    ];
-    target.rotation.set(rotation[0], rotation[1], rotation[2]);
-
-    target.scale.set(baseScale[0], baseScale[1], baseScale[2]);
+    target.position.copy(node.position);
+    target.quaternion.copy(node.quaternion);
+    target.rotation.order = node.rotation.order;
+    target.scale.copy(node.scale);
   }
 
   updateNodeTransform(node: NodeBase): boolean {
@@ -366,13 +339,13 @@ export class ViewportRendererService {
       return false;
     }
 
-    const object = this.findObjectByNodeId(node.id, this.sceneContentRoot);
+    const object = this.findObjectByNodeId(node.nodeId, this.sceneContentRoot);
     if (!object) {
       return false;
     }
 
     this.applyTransform(object, node);
-    if (node instanceof Node3D) {
+    if (node.type === 'Node3D') {
       const props = this.asRecord(node.properties) ?? {};
       const kind = (this.asString(props.kind) ?? node.type)?.toLowerCase();
       if (kind === 'camera') {
@@ -413,7 +386,7 @@ export class ViewportRendererService {
     this.controls?.update();
   }
 
-  private createMeshForNode(node: Node3D, props: Record<string, unknown>): Mesh | null {
+  private createMeshForNode(node: NodeBase, props: Record<string, unknown>): Mesh | null {
     const geometryKind = this.asString(props.geometry) ?? 'box';
     const size = this.extractVector3(props.size, [1, 1, 1]);
 
@@ -454,11 +427,8 @@ export class ViewportRendererService {
     return light;
   }
 
-  private createSpritePlaceholder(
-    props: Record<string, unknown>,
-    sprite: Sprite2D
-  ): Object3D | null {
-    const baseSize: [number, number] = [sprite.scale.x, sprite.scale.y];
+  private createSpritePlaceholder(props: Record<string, unknown>, node: NodeBase): Object3D | null {
+    const baseSize: [number, number] = [node.scale.x, node.scale.y];
     const rawSize = this.extractVector2(props.size, baseSize);
     const size: [number, number] = [
       Math.max(rawSize[0], 0.1) / 100,
@@ -478,7 +448,7 @@ export class ViewportRendererService {
     this.registerSceneDisposable(material);
 
     const mesh = new Mesh(geometry, material);
-    mesh.name = `${sprite.name ?? sprite.id} Sprite`;
+    mesh.name = `${node.name ?? node.nodeId} Sprite`;
     return mesh;
   }
 

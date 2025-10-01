@@ -1,4 +1,4 @@
-import type { NodeKind } from '../types';
+import { Object3D } from 'three';
 
 export interface NodeMetadata {
   [key: string]: unknown;
@@ -6,67 +6,62 @@ export interface NodeMetadata {
 
 export interface NodeBaseProps {
   id: string;
-  type?: NodeKind;
+  type?: string;
   name?: string;
   instancePath?: string | null;
   properties?: Record<string, unknown>;
   metadata?: NodeMetadata;
 }
 
-export class NodeBase {
-  readonly id: string;
-  readonly type: NodeKind;
-  name: string;
-  readonly children: NodeBase[] = [];
+export class NodeBase extends Object3D {
+  readonly nodeId: string;
+  readonly type: string;
+  override name: string;
+  override children!: NodeBase[];
   readonly properties: Record<string, unknown>;
   readonly metadata: NodeMetadata;
   readonly instancePath: string | null;
-  private parent: NodeBase | null;
 
-  constructor(props: NodeBaseProps, parent: NodeBase | null = null) {
-    this.id = props.id;
+  constructor(props: NodeBaseProps) {
+    super();
+
+    this.nodeId = props.id;
+    this.uuid = props.id;
     this.type = props.type ?? 'Group';
     this.name = props.name ?? this.type;
     this.properties = { ...(props.properties ?? {}) };
     this.metadata = { ...(props.metadata ?? {}) };
     this.instancePath = props.instancePath ?? null;
-    this.parent = parent;
+
+    this.userData = {
+      ...this.userData,
+      nodeId: this.nodeId,
+      metadata: this.metadata,
+      properties: this.properties,
+    };
   }
 
   get parentNode(): NodeBase | null {
-    return this.parent;
-  }
-
-  protected setParent(parent: NodeBase | null): void {
-    this.parent = parent;
+    return this.parent instanceof NodeBase ? this.parent : null;
   }
 
   adoptChild(child: NodeBase): void {
     if (child === this) {
       throw new Error('Cannot adopt node as its own child.');
     }
-    if (child.parentNode) {
-      child.parentNode.disownChild(child);
-    }
-    child.setParent(this);
-    this.children.push(child);
+    this.add(child);
   }
 
   disownChild(child: NodeBase): void {
-    const index = this.children.indexOf(child);
-    if (index === -1) {
-      return;
-    }
-    this.children.splice(index, 1);
-    child.setParent(null);
+    this.remove(child);
   }
 
   findById(id: string): NodeBase | null {
-    if (this.id === id) {
+    if (this.nodeId === id) {
       return this;
     }
     for (const child of this.children) {
-      const match = child.findById(id);
+      const match = child instanceof NodeBase ? child.findById(id) : null;
       if (match) {
         return match;
       }

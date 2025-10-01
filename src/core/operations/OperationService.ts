@@ -1,11 +1,11 @@
-import { ServiceContainer, injectable } from '../../fw/di';
+import { ServiceContainer, injectable } from '@/fw/di';
 import {
   HistoryManager,
   type HistoryEntry,
   type HistoryEntryInit,
   type HistoryEntryMetadata,
   type HistorySnapshot,
-} from '../history';
+} from '@/core/history';
 import {
   createOperationContext,
   snapshotOperationState,
@@ -16,7 +16,7 @@ import {
   type OperationInvokeResult,
   type OperationMetadata,
 } from './Operation';
-import { appState, type AppState, type AppStateSnapshot } from '../../state';
+import { appState, type AppState, type AppStateSnapshot } from '@/state';
 
 export type OperationEvent =
   | {

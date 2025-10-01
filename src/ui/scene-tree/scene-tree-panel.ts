@@ -3,9 +3,9 @@ import { subscribe } from 'valtio/vanilla';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
-import { ComponentBase, css, customElement, html, state } from '../../fw';
-import { appState, type SceneDescriptor, type SceneHierarchyNode } from '../../state';
-import { SelectObjectCommand } from '../../core/commands/SelectObjectCommand';
+import { ComponentBase, css, customElement, html, state } from '@/fw';
+import { appState, type SceneDescriptor, type SceneHierarchyNode } from '@/state';
+import { SelectObjectCommand } from '@/core/commands/SelectObjectCommand';
 
 import '../shared/pix3-panel';
 

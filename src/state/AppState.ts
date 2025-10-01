@@ -122,6 +122,8 @@ export interface AppState {
   telemetry: TelemetryState;
 }
 
+const STARTUP_SCENE_URI = 'templ://startup-scene';
+
 export const createInitialAppState = (): AppState => ({
   project: {
     directoryHandle: null,
@@ -132,17 +134,13 @@ export const createInitialAppState = (): AppState => ({
     lastOpenedScenePath: null,
   },
   scenes: {
-    activeSceneId: SAMPLE_SCENE_DESCRIPTOR.id,
-    descriptors: {
-      [SAMPLE_SCENE_DESCRIPTOR.id]: SAMPLE_SCENE_DESCRIPTOR,
-    },
-    hierarchies: {
-      [SAMPLE_SCENE_DESCRIPTOR.id]: SAMPLE_SCENE_HIERARCHY,
-    },
-    loadState: 'ready',
+    activeSceneId: null,
+    descriptors: {},
+    hierarchies: {},
+    loadState: 'idle',
     loadError: null,
-    lastLoadedAt: Date.now(),
-    pendingScenePaths: [SAMPLE_SCENE_DESCRIPTOR.filePath],
+    lastLoadedAt: null,
+    pendingScenePaths: [STARTUP_SCENE_URI],
   },
   selection: {
     nodeIds: [],
@@ -174,29 +172,3 @@ export const createInitialAppState = (): AppState => ({
     unsentEventCount: 0,
   },
 });
-
-const SAMPLE_SCENE_DESCRIPTOR: SceneDescriptor = {
-  id: 'sample-orbit-runner',
-  filePath: 'templ://startup-scene',
-  name: 'Startup Scene',
-  version: '1.0.0',
-  isDirty: false,
-  lastSavedAt: null,
-};
-
-const SAMPLE_SCENE_HIERARCHY: SceneHierarchyState = {
-  version: SAMPLE_SCENE_DESCRIPTOR.version,
-  description: 'Starter scene with box, light, camera and logo sprite',
-  metadata: {
-    placeholder: true,
-  },
-  nodes: [
-    {
-      id: 'environment-root',
-      name: 'Environment Root',
-      type: 'Node3D',
-      instancePath: null,
-      children: [],
-    },
-  ],
-};

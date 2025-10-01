@@ -1,10 +1,8 @@
 import type { NodeBase } from './nodes/NodeBase';
 
-export type NodeKind = 'Node3D' | 'Node2D' | 'Sprite2D' | 'Group' | 'Instance';
-
 export interface SceneNodeDefinition {
   id: string;
-  type?: NodeKind;
+  type?: string;
   name?: string;
   instance?: string;
   properties?: Record<string, unknown>;

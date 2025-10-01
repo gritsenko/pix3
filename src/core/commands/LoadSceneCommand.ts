@@ -1,11 +1,12 @@
 import { snapshot } from 'valtio/vanilla';
-import { appState } from '../../state';
-import { SceneManager } from '../scene/SceneManager';
-import { SceneValidationError } from '../scene/SceneLoader';
-import { injectable, inject } from '../../fw/di';
-import type { SceneGraph } from '../scene/types';
-import type { NodeBase } from '../scene/nodes/NodeBase';
-import { ResourceManager } from '../../services/ResourceManager';
+
+import { injectable, inject } from '@/fw/di';
+import { appState } from '@/state';
+import { SceneManager } from '@/core/scene/SceneManager';
+import { SceneValidationError } from '@/core/scene/SceneLoader';
+import type { SceneGraph } from '@/core/scene/types';
+import type { NodeBase } from '@/core/scene/nodes/NodeBase';
+import { ResourceManager } from '@/services/ResourceManager';
 
 export interface LoadSceneCommandParams {
   filePath: string; // res:// path
@@ -82,8 +83,8 @@ export class LoadSceneCommand {
   }
 
   private toHierarchy(graph: SceneGraph) {
-    const mapNode = (node: NodeBase): import('../../state').SceneHierarchyNode => ({
-      id: node.id,
+    const mapNode = (node: NodeBase): import('@/state').SceneHierarchyNode => ({
+      id: node.nodeId,
       name: node.name,
       // NodeBase derivative types expose type/instancePath when present
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

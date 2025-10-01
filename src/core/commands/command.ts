@@ -1,7 +1,7 @@
 import { snapshot, type Snapshot } from 'valtio/vanilla';
 
-import type { AppState, AppStateSnapshot, PersonaId } from '../../state';
-import { ServiceContainer } from '../../fw/di';
+import type { AppState, AppStateSnapshot, PersonaId } from '@/state';
+import { ServiceContainer } from '@/fw/di';
 
 /**
  * Unique identifier for a command. Use a stable namespace (e.g. `scene.select-node`).

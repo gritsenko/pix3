@@ -1,10 +1,10 @@
 import { GoldenLayout, type LayoutConfig } from 'golden-layout';
 import { subscribeKey } from 'valtio/vanilla/utils';
 
-import { injectable, ServiceContainer } from '../../fw/di';
-import { appState, type AppState, type PersonaId, type PanelVisibilityState } from '../../state';
-import { ApplyLayoutPresetCommand } from '../commands/layout/ApplyLayoutPresetCommand';
-import { createCommandContext, snapshotState } from '../commands/command';
+import { injectable, ServiceContainer } from '@/fw/di';
+import { appState, type AppState, type PersonaId, type PanelVisibilityState } from '@/state';
+import { ApplyLayoutPresetCommand } from '@/core/commands/layout/ApplyLayoutPresetCommand';
+import { createCommandContext, snapshotState } from '@/core/commands/command';
 
 const PANEL_COMPONENT_TYPES = {
   sceneTree: 'scene-tree',

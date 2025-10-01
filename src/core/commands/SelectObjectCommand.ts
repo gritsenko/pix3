@@ -5,7 +5,7 @@ import {
   type CommandContext,
   type CommandUndoPayload,
 } from './command';
-import type { AppStateSnapshot } from '../../state';
+import type { AppStateSnapshot } from '@/state';
 
 export interface SelectObjectExecutePayload {
   /** The node IDs that were selected */
