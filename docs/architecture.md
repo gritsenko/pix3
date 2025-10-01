@@ -31,16 +31,14 @@ flowchart LR
   end
 
   subgraph Rendering
-    O["ThreeViewportLayer / ViewportRendererService"]
+    O["Three.js Pipeline (Perspective + Ortho Pass)"]
     R["Viewport Panel (ResizeObserver)"]
-    P["Overlay Layer (Three / Pixi adapter)"]
   end
 
   A ---|renders| D
-  D ---|uses| O
+  D ---|uses unified pipeline| O
   D ---|observes resize| R
   R ---|triggers resize| O
-  D ---|overlays| P
 
   C -->|interacts| G
   E -->|inspects| G

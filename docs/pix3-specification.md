@@ -1,8 +1,8 @@
 # Pix3 — Technical Specification
 
-Version: 1.6
+Version: 1.7
 
-Date: 2025-09-28
+Date: 2025-10-01
 
 ## 1. Introduction
 
@@ -55,7 +55,7 @@ This specification covers the MVP scope and foundation architecture. Changes are
 | UI Components      | Lit + fw utilities         | A lightweight library for creating fast, native, and encapsulated web components. Use the project `fw` helpers (`ComponentBase`, `inject`, and related exports) as the default building blocks for UI components instead of raw LitElement to simplify configuration (light vs shadow DOM), dependency injection, and consistency across the codebase.
 | State Management   | Valtio                     | An ultra-lightweight, high-performance state manager based on proxies. Ensures reactivity and is easy to use.
 | Rendering (MVP)    | Three.js                   | Single engine for both 3D (perspective) and 2D (orthographic) layers to minimize bundle size for playable ads.
-| Future 2D Module   | PixiJS (optional)          | Planned add-on for pixel-perfect overlays once advanced 2D UI fidelity is required.
+| 2D Overlays        | Three.js (orthographic)    | Orthographic camera + sprite/material system handles HUD & UI layers without second engine.
 | Panel Layout       | Golden Layout              | A ready-made solution for creating complex, customizable, and persistent panel layouts.
 | Language           | TypeScript                 | Strong typing to increase reliability, improve autocompletion, and simplify work with AI agents.
 | Build Tool         | Vite                       | A modern and extremely fast build tool, perfectly suited for development with native web technologies.
@@ -79,7 +79,7 @@ The application will be built on the principles of unidirectional data flow and 
 - Services: An infrastructure layer for interacting with the outside world (FileSystemAPIService). They do not contain business logic.
 - UI Components: "Dumb" components built on top of the project's fw helpers. Prefer extending `ComponentBase` (which wraps LitElement and provides a configurable render root) and use the `inject` decorator from `fw/di` for services instead of wiring dependencies manually. This ensures consistent DOM mode (light vs shadow), simpler service wiring, and a single recommended pattern across the project.
 - Message Bus: A lightweight pub/sub bus to bridge state updates, commands, and plugins without coupling. Commands emit events describing mutations; UI components subscribe via typed channels.
-- Rendering Layer: Three.js drives both the perspective 3D view and orthographic 2D overlays in MVP. Rendering facades (`ViewportRenderer`, `OverlayRenderer`) hide engine specifics so that a PixiJS-backed overlay can be attached later without refactoring UI or scene logic.
+- Rendering Layer: A single Three.js pipeline drives both perspective (3D) and orthographic (2D) passes. UI / HUD style 2D elements are rendered using an orthographic camera, sprites, and mesh-based primitives—no secondary PixiJS adapter.
 
 ### Recommended component pattern
 
@@ -131,13 +131,12 @@ Notes:
 - **Telemetry Hooks:** Every invocation funnels through `OperationService`, making it the ideal point to emit analytics, autosave triggers, and cross-device sync messages.
 - **Tool/Command Integration:** Tools cancel active operations via the service; command handlers can call `invokeAndPush()` to perform and enqueue operations in one step.
 
-### 4.4 Rendering Extensibility Plan
+### 4.4 Rendering Architecture Notes
 
-- **Renderer Facades:** Define `IRenderLayer` interfaces that describe lifecycle hooks (`init`, `render`, `resize`, `dispose`). MVP ships with `ThreeViewportLayer` (perspective) and `ThreeOverlayLayer` (orthographic) implementations.
-- **Dependency Injection:** Register render layers through the DI container so alternative implementations (e.g., `PixiOverlayLayer`) can be swapped without touching SceneManager or UI panels.
-- **Conditional Bundling:** Keep the PixiJS adapter in a separate optional module loaded via dynamic import. When projects opt into pixel-perfect overlays, the adapter and PixiJS dependency are pulled in; otherwise the bundle remains Three-only.
-- **Shared Scene Contracts:** Scene node definitions for 2D sprites expose engine-agnostic properties (texture, anchors, nine-slice). The layer implementation decides how to realize them in Three.js today and in PixiJS later.
-- **Testing Path:** Establish renderer integration tests that run against the `IRenderLayer` contract so new engines can be validated with the same suite.
+- **Single Engine:** All rendering (3D + 2D) is handled by Three.js to minimize complexity and bundle size. 2D overlays (HUD, selection outlines, gizmos) use an orthographic camera and sprite/material abstractions.
+- **Layer Separation:** Logical separation is maintained via internal render phases (viewport pass, overlay pass) rather than different engines. This keeps the API stable and simplifies debugging.
+- **Extensibility:** If a future dedicated 2D engine integration is ever reconsidered, it would plug in behind the same abstract interfaces (`ViewportRendererService` style facade). For now this is explicitly out of scope and removed from roadmap.
+- **Testing Path:** Planned integration tests will validate resize, DPR scaling, and render ordering across the two passes using the single-engine pipeline.
 
 ## Implementation status (current repository state)
 
@@ -154,10 +153,10 @@ The repository contains a working MVP scaffold and a small, functional rendering
 
 Known gaps / next work items
 
-- PixiJS overlay adapter: the `PixiOverlayLayer` is still planned (see Rendering Extensibility Plan) — current overlay uses Three.js line primitives for simple HUD.
+- (Removed) Previous plan for a PixiJS overlay adapter has been deprecated; the orthographic Three.js pass provides sufficient 2D capability for MVP.
 - Fixed-pixel overlay: if you want an overlay that always measures N screen pixels (for UI chrome or pixel-perfect guides) we can add a small helper to compute orthographic bounds from pixel size or render HUD via HTML overlay.
 - Tests: unit/integration tests exist for core managers, but adding an integration test that asserts resize/DPR behavior for `ViewportRendererService` would be valuable.
-- Performance tuning: production build emits a chunk-size warning for some bundles; consider code-splitting large optional modules (plugins, Pixi adapter) to reduce initial bundle size.
+- Performance tuning: production build emits a chunk-size warning for some bundles; consider code-splitting large optional modules (e.g., plugin packs) to reduce initial bundle size.
 
 If you want I can: 1) add a small integration test for the renderer resize behavior, 2) implement a fixed-pixel overlay option, or 3) add a small README entry documenting the renderer lifecycle and where to hook scene data. Tell me which and I will implement it.
 
@@ -225,7 +224,7 @@ root:
 - Implement the basic architecture: AppState with Valtio, Command pattern contracts, and DI container wiring.
 - Integrate FileSystemAPIService to open a project folder, list assets, and load `.pix3scene` files.
 - Integrate Golden Layout to create a basic layout: Scene Tree, Viewport, Inspector, Asset Browser. Provide persona presets.
-- Implement rendering of a simple 3D scene in the viewport using Three.js, including an orthographic pass for 2D overlays. Keep the rendering bridge extensible so PixiJS can be plugged in later for pixel-perfect UI.
+- Implement rendering of a simple 3D scene in the viewport using Three.js, including an orthographic pass for 2D overlays (single-engine pipeline).
 - Create SceneManager to parse and display the scene structure (`*.pix3scene`) and expose diff events.
 - Implement the `pix3-basic-tools-plugin` to add a tool for creating primitives (e.g., a cube) with undoable commands.
 - Implement a basic Undo/Redo system using HistoryManager, wired to keyboard shortcuts and UI controls.
@@ -243,71 +242,37 @@ root:
 
 ```
 /
-├── dist/                     # Folder for the compiled application
-├── public/                   # Static assets (icons, fonts)
+├── dist/                     # Build output (generated)
+├── public/                   # Static assets (logo, icons)
 ├── src/
-│   ├── components/           # UI Components (panels, buttons, inspectors)
-│   │   ├── inspector/
-│   │   │   └── inspector-panel.ts
-│   │   ├── scene/
-│   │   │   └── scene-tree.ts
-│   │   └── viewport/
-│   │       └── viewport-component.ts
-│   │
-│   ├── core/                 # Application core (main business logic)
-│   │   ├── commands/         # Command pattern for all actions
-│   │   │   └── command.ts    # Base class/interface for commands
-│   │   ├── operations/       # Undoable operations and manager
-│   │   │   ├── operation-base.ts
-│   │   │   ├── bulk-operation.ts
-│   │   │   ├── operation-service.ts
-│   │   │   ├── operation-events.ts
-│   │   │   └── index.ts
-│   │   ├── history/
-│   │   │   └── HistoryManager.ts # Undo/Redo Manager
-│   │   ├── layout/
-│   │   │   └── LayoutManager.ts  # Panel management (Golden Layout)
-│   │   ├── plugins/
-│   │   │   └── PluginManager.ts  # Loads and manages plugins
-│   │   └── scene/
-│   │       ├── nodes/          # Classes for each node type
-│   │       │   ├── NodeBase.ts
-│   │       │   ├── Node3D.ts
-│   │       │   └── Sprite2D.ts
-│   │       ├── SceneManager.ts # Manages the scene and nodes
-│   │       └── types.ts      # Type aggregator, exports classes from /nodes
-│   │
-│   ├── plugins/              # Folder for plugins
+│   ├── core/                 # Core architecture (commands, history, layout, legacy ops)
+│   │   ├── commands/         # Command implementations (state mutations)
+│   │   ├── history/          # HistoryManager & undo/redo wiring
+│   │   ├── layout/           # Golden Layout integration
+│   │   ├── operations/       # Legacy operation system (being phased out)
+│   │   ├── rendering/        # (Legacy placeholder – migrate to top-level rendering/)
+│   │   └── scene/            # Scene-related managers & parsing (placeholder for future)
+│   ├── fw/                   # Framework utilities (ComponentBase, DI, helpers)
+│   ├── plugins/              # First-party & sample plugins
 │   │   └── pix3-basic-tools-plugin/
-│   │       ├── commands/
-│   │       │   └── create-primitive.ts
-│   │       ├── components/
-│   │       │   └── tool-options.ts
-│   │       └── pix3-basic-tools-plugin.ts # Main plugin file
-│   
-│   ├── services/             # Infrastructure services (interaction with the "outside world")
-│   │   ├── FileSystemAPIService.ts
-│   │   └── CollaborationService.ts (for the future)
-│   
-│   ├── state/                # Global application state
-│   │   ├── AppState.ts       # State definition (with Valtio)
-│   │   └── index.ts          # Exports the state proxy
-│   
-│   ├── rendering/            # Rendering logic (Three.js core + optional PixiJS adapters)
-│   │   ├── WebGLRenderer.ts
-│   │   └── Canvas2DRenderer.ts
-│   │
-│   ├── styles/               # Global styles
-│   │   └── main.css
-│   │
-│   ├── utils/                # Helper functions
-│   │
+│   ├── rendering/            # Active Three.js renderer services & helpers
+│   ├── services/             # File system, resource, project services
+│   ├── state/                # Valtio app state definitions
+│   ├── styles/               # Global stylesheets / design tokens
+│   ├── ui/                   # UI components (panels, shells, feature UIs)
+│   │   ├── assets-browser/
+│   │   ├── object-inspector/
+│   │   ├── scene-tree/
+│   │   ├── shared/
+│   │   ├── viewport/
+│   │   └── welcome/
+│   ├── index.css             # Global CSS entry
 │   └── main.ts               # Application entry point
-
 ├── index.html
 ├── package.json
 ├── tsconfig.json
-└── vite.config.ts
+├── vite.config.ts
+└── vitest.config.ts
 
 ```
 
@@ -321,6 +286,7 @@ root:
 ## 10. Change Log
 
 - **1.5 (2025-09-26):** Added personas, target platforms, non-functional requirements, detailed architecture contracts, validation rules, and roadmap updates. Synced guidance on `fw` helpers.
+- **1.7 (2025-10-01):** Removed PixiJS dual-engine plan; consolidated rendering to single Three.js pipeline (perspective + orthographic). Updated project structure, removed obsolete adapter references, clarified rendering notes.
 
 ## 11. Plugin State Management
 

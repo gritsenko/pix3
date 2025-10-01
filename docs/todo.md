@@ -10,7 +10,7 @@ This tracker summarizes the execution status derived from `pix3-specification.md
 
 ### Milestone 0 — Foundation (Completed)
 - [x] Bootstrap Vite + TypeScript + Lit workspace via `npm create vite@latest pix3 -- --template lit-ts`
-- [x] Install baseline dependencies: Valtio, Three.js, PixiJS (optional), Golden Layout, reflect-metadata
+- [x] Install baseline dependencies: Valtio, Three.js, Golden Layout, reflect-metadata
 - [x] Configure strict TypeScript (`experimentalDecorators`, `emitDecoratorMetadata`, path aliases)
 - [x] Scaffold repo structure per spec (src/components, src/core, src/plugins, src/rendering, src/services, src/state, src/styles)
 - [x] Implement `fw` helpers (`ComponentBase`, DI container, injectables) and export barrel in `docs/fw`
@@ -26,7 +26,7 @@ This tracker summarizes the execution status derived from `pix3-specification.md
 	- Bootstrapped `LayoutManagerService` with persona-aware presets and registered panel components (`scene-tree`, `viewport`, `inspector`, `asset-browser`).
 	- Added `pix3-editor` shell with persona picker, loading overlay, and Golden Layout host wired through DI.
 - [x] Create foundational UI components extending `ComponentBase` with DI usage and keyboard-accessible chrome
-- [ ] Stand up rendering pipeline: Three.js viewport + orthographic overlay stub, camera controls, lighting primitives — in progress (renderer service initialized; needs scene wiring)
+- [ ] Stand up unified Three.js rendering pipeline (perspective + orthographic pass), camera controls, lighting primitives — in progress (renderer service initialized; needs scene wiring)
 - [x] Build `SceneManager`, node classes (`NodeBase`, `Node3D`, `Sprite2D`), and YAML schema validation pipeline
 
 ### Milestone 2 — Playable Export (Not started)
