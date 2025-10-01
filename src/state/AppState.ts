@@ -89,8 +89,6 @@ export interface PanelVisibilityState {
 export interface UIState {
   persona: PersonaId;
   theme: ThemeName;
-  /** Persona-aligned Golden Layout preset identifier. */
-  layoutPresetId: PersonaId;
   isLayoutReady: boolean;
   focusedPanelId: string | null;
   commandPaletteOpen: boolean;
@@ -150,7 +148,6 @@ export const createInitialAppState = (): AppState => ({
   ui: {
     persona: DEFAULT_PERSONA,
     theme: DEFAULT_THEME,
-    layoutPresetId: DEFAULT_PERSONA,
     isLayoutReady: false,
     focusedPanelId: null,
     commandPaletteOpen: false,

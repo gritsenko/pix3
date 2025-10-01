@@ -3,7 +3,7 @@ import { subscribe } from 'valtio/vanilla';
 import { ComponentBase, css, customElement, html, inject, property, state } from '@/fw';
 import { LayoutManagerService } from '@/core/layout';
 import { LoadSceneCommand } from '@/core/commands/LoadSceneCommand';
-import { appState, type PersonaId } from '@/state';
+import { appState } from '@/state';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './welcome/pix3-welcome';
@@ -18,9 +18,6 @@ export class Pix3EditorShell extends ComponentBase {
   // project open handled by <pix3-welcome>
 
   @state()
-  private activePersona: PersonaId = appState.ui.persona;
-
-  @state()
   private isLayoutReady = appState.ui.isLayoutReady;
 
   @property({ type: Boolean, reflect: true, attribute: 'shell-ready' })
@@ -32,7 +29,6 @@ export class Pix3EditorShell extends ComponentBase {
   connectedCallback(): void {
     super.connectedCallback();
     this.disposeSubscription = subscribe(appState.ui, () => {
-      this.activePersona = appState.ui.persona;
       this.isLayoutReady = appState.ui.isLayoutReady;
       this.shellReady = this.isLayoutReady;
       this.requestUpdate();
@@ -46,7 +42,6 @@ export class Pix3EditorShell extends ComponentBase {
           void this.layoutManager.initialize(host).then(() => {
             this.shellReady = true;
             this.requestUpdate();
-            void this.layoutManager.applyPersonaPreset(appState.ui.persona);
           });
         }
       }
@@ -124,7 +119,7 @@ export class Pix3EditorShell extends ComponentBase {
       <pix3-toolbar aria-label="Editor toolbar">
         <span slot="start" class="product-title" role="heading" aria-level="1"> Pix3 Editor </span>
         <div class="toolbar-content">
-          <!-- Persona selector removed: default persona is now the Gameplay Engineer preset -->
+          <!-- Layout presets removed: layout defaults to the gameplay engineer configuration -->
         </div>
         <pix3-toolbar-button
           slot="actions"
@@ -135,9 +130,9 @@ export class Pix3EditorShell extends ComponentBase {
         </pix3-toolbar-button>
         <pix3-toolbar-button
           slot="actions"
-          aria-label="Reapply persona layout"
+          aria-label="Reset editor layout"
           ?disabled=${!this.isLayoutReady}
-          @click=${this.onPersonaRefreshRequest}
+          @click=${this.onLayoutResetRequest}
         >
           Layout
         </pix3-toolbar-button>
@@ -155,13 +150,13 @@ export class Pix3EditorShell extends ComponentBase {
     );
   };
 
-  private onPersonaRefreshRequest = (): void => {
-    void this.layoutManager.applyPersonaPreset(this.activePersona);
+  private onLayoutResetRequest = (): void => {
+    void this.layoutManager.resetLayout();
   };
 
   // Note: project open is handled by <pix3-welcome> to keep shell concerns minimal.
 
-  // persona change UI removed; default persona controlled from app state
+  // layout presets removed; editor uses single default layout
 
   static styles = css`
     :host {
@@ -202,38 +197,6 @@ export class Pix3EditorShell extends ComponentBase {
       justify-content: flex-end;
       gap: 1rem;
       inline-size: 100%;
-    }
-
-    .persona-picker {
-      display: grid;
-      grid-auto-flow: column;
-      grid-auto-columns: auto;
-      align-items: center;
-      gap: 0.65rem;
-      font-size: 0.85rem;
-    }
-
-    .persona-picker__label {
-      color: rgba(240, 240, 240, 0.8);
-      text-transform: none;
-      letter-spacing: 0.02em;
-      font-weight: 500;
-    }
-
-    .persona-picker__select {
-      min-width: 13rem;
-      background: rgba(39, 44, 53, 0.92);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: #f5f6f8;
-      padding: 0.4rem 0.75rem;
-      border-radius: 0.45rem;
-      font-size: 0.95rem;
-      line-height: 1.1;
-    }
-
-    .persona-picker__select:focus {
-      outline: 2px solid #5ec2ff;
-      outline-offset: 2px;
     }
 
     .workspace {

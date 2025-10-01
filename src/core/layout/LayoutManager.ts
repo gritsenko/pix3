@@ -1,10 +1,9 @@
 import { GoldenLayout, type LayoutConfig } from 'golden-layout';
-import { subscribeKey } from 'valtio/vanilla/utils';
 
 import { injectable, ServiceContainer } from '@/fw/di';
-import { appState, type AppState, type PersonaId, type PanelVisibilityState } from '@/state';
-import { ApplyLayoutPresetCommand } from '@/core/commands/layout/ApplyLayoutPresetCommand';
-import { createCommandContext, snapshotState } from '@/core/commands/command';
+import { appState, type AppState, type PanelVisibilityState } from '@/state';
+// Layout initialization logic inlined below
+// Removed unused imports after inlining layout logic
 
 const PANEL_COMPONENT_TYPES = {
   sceneTree: 'scene-tree',
@@ -29,231 +28,75 @@ const PANEL_DISPLAY_TITLES: Record<PanelComponentType, string> = {
   [PANEL_COMPONENT_TYPES.assetBrowser]: 'Asset Browser',
 };
 
-interface PersonaPresetDefinition {
-  readonly persona: PersonaId;
-  readonly layout: LayoutConfig;
-  readonly panelVisibility: PanelVisibilityState;
-}
-
-const presetLayout = (persona: PersonaId): LayoutConfig => {
-  switch (persona) {
-    case 'gameplay-engineer':
-      return {
-        settings: {
-          hasHeaders: true,
-          reorderEnabled: true,
-        },
-        header: {
-          show: 'top',
-        },
-        dimensions: {
-          minItemHeight: 120,
-          minItemWidth: 200,
-        },
-        root: {
-          type: 'row',
-          content: [
-            {
-              type: 'column',
-              width: 25,
-              content: [
-                {
-                  type: 'component',
-                  componentType: PANEL_COMPONENT_TYPES.sceneTree,
-                  title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.sceneTree],
-                  isClosable: false,
-                },
-                {
-                  type: 'component',
-                  componentType: PANEL_COMPONENT_TYPES.assetBrowser,
-                  title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.assetBrowser],
-                  height: 50,
-                  isClosable: false,
-                },
-              ],
-            },
-            {
-              type: 'stack',
-              width: 50,
-              content: [
-                {
-                  type: 'component',
-                  componentType: PANEL_COMPONENT_TYPES.viewport,
-                  title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.viewport],
-                  isClosable: false,
-                },
-              ],
-            },
-            {
-              type: 'component',
-              width: 25,
-              componentType: PANEL_COMPONENT_TYPES.inspector,
-              title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.inspector],
-              isClosable: false,
-            },
-          ],
-        },
-      } satisfies LayoutConfig;
-    case 'playable-ad-producer':
-      return {
-        settings: {
-          hasHeaders: true,
-          reorderEnabled: true,
-        },
-        header: {
-          show: 'top',
-        },
-        dimensions: {
-          minItemHeight: 120,
-          minItemWidth: 200,
-        },
-        root: {
-          type: 'column',
-          content: [
-            {
-              type: 'row',
-              height: 70,
-              content: [
-                {
-                  type: 'component',
-                  width: 25,
-                  componentType: PANEL_COMPONENT_TYPES.sceneTree,
-                  title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.sceneTree],
-                  isClosable: false,
-                },
-                {
-                  type: 'stack',
-                  width: 50,
-                  content: [
-                    {
-                      type: 'component',
-                      componentType: PANEL_COMPONENT_TYPES.viewport,
-                      title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.viewport],
-                      isClosable: false,
-                    },
-                  ],
-                },
-                {
-                  type: 'component',
-                  width: 25,
-                  componentType: PANEL_COMPONENT_TYPES.inspector,
-                  title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.inspector],
-                  isClosable: false,
-                },
-              ],
-            },
-            {
-              type: 'component',
-              height: 30,
-              componentType: PANEL_COMPONENT_TYPES.assetBrowser,
-              title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.assetBrowser],
-              isClosable: false,
-            },
-          ],
-        },
-      } satisfies LayoutConfig;
-    case 'technical-artist':
-    default:
-      return {
-        settings: {
-          hasHeaders: true,
-          reorderEnabled: true,
-        },
-        header: {
-          show: 'top',
-        },
-        dimensions: {
-          minItemHeight: 120,
-          minItemWidth: 200,
-        },
-        root: {
-          type: 'row',
-          content: [
-            {
-              type: 'component',
-              width: 22,
-              componentType: PANEL_COMPONENT_TYPES.sceneTree,
-              title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.sceneTree],
-              isClosable: false,
-            },
-            {
-              type: 'stack',
-              width: 56,
-              content: [
-                {
-                  type: 'component',
-                  componentType: PANEL_COMPONENT_TYPES.viewport,
-                  title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.viewport],
-                  isClosable: false,
-                },
-              ],
-            },
-            {
-              type: 'column',
-              width: 22,
-              content: [
-                {
-                  type: 'component',
-                  height: 60,
-                  componentType: PANEL_COMPONENT_TYPES.inspector,
-                  title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.inspector],
-                  isClosable: false,
-                },
-                {
-                  type: 'component',
-                  height: 40,
-                  componentType: PANEL_COMPONENT_TYPES.assetBrowser,
-                  title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.assetBrowser],
-                  isClosable: false,
-                },
-              ],
-            },
-          ],
-        },
-      } satisfies LayoutConfig;
-  }
+const DEFAULT_PANEL_VISIBILITY: PanelVisibilityState = {
+  sceneTree: true,
+  viewport: true,
+  inspector: true,
+  assetBrowser: true,
 };
 
-const personaPresets: Record<PersonaId, PersonaPresetDefinition> = {
-  'technical-artist': {
-    persona: 'technical-artist',
-    layout: presetLayout('technical-artist'),
-    panelVisibility: {
-      sceneTree: true,
-      viewport: true,
-      inspector: true,
-      assetBrowser: true,
-    },
+const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
+  settings: {
+    hasHeaders: true,
+    reorderEnabled: true,
   },
-  'gameplay-engineer': {
-    persona: 'gameplay-engineer',
-    layout: presetLayout('gameplay-engineer'),
-    panelVisibility: {
-      sceneTree: true,
-      viewport: true,
-      inspector: true,
-      assetBrowser: true,
-    },
+  header: {
+    show: 'top',
   },
-  'playable-ad-producer': {
-    persona: 'playable-ad-producer',
-    layout: presetLayout('playable-ad-producer'),
-    panelVisibility: {
-      sceneTree: true,
-      viewport: true,
-      inspector: true,
-      assetBrowser: true,
-    },
+  dimensions: {
+    minItemHeight: 120,
+    minItemWidth: 200,
   },
-};
+  root: {
+    type: 'row',
+    content: [
+      {
+        type: 'column',
+        width: 25,
+        content: [
+          {
+            type: 'component',
+            componentType: PANEL_COMPONENT_TYPES.sceneTree,
+            title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.sceneTree],
+            isClosable: false,
+          },
+          {
+            type: 'component',
+            componentType: PANEL_COMPONENT_TYPES.assetBrowser,
+            title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.assetBrowser],
+            height: 50,
+            isClosable: false,
+          },
+        ],
+      },
+      {
+        type: 'stack',
+        width: 50,
+        content: [
+          {
+            type: 'component',
+            componentType: PANEL_COMPONENT_TYPES.viewport,
+            title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.viewport],
+            isClosable: false,
+          },
+        ],
+      },
+      {
+        type: 'component',
+        width: 25,
+        componentType: PANEL_COMPONENT_TYPES.inspector,
+        title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.inspector],
+        isClosable: false,
+      },
+    ],
+  },
+} satisfies LayoutConfig;
 
 @injectable()
 export class LayoutManagerService {
   private layout: GoldenLayout | null = null;
   private readonly state: AppState;
   private container: HTMLElement | null = null;
-  private unsubscribePersona?: () => void;
-  private currentPersona: PersonaId | null = null;
 
   constructor(state: AppState = appState) {
     this.state = state;
@@ -273,61 +116,52 @@ export class LayoutManagerService {
     this.layout.resizeWithContainerAutomatically = true;
 
     this.registerComponents(this.layout);
-
-    const persona = this.state.ui.layoutPresetId ?? this.state.ui.persona;
-    await this.applyPersonaPreset(persona);
-
-    this.unsubscribePersona?.();
-    this.unsubscribePersona = subscribeKey(this.state.ui, 'layoutPresetId', nextPersona => {
-      if (!nextPersona) {
-        return;
-      }
-      if (this.currentPersona === nextPersona) {
-        return;
-      }
-      void this.applyPersonaPreset(nextPersona);
-    });
+    await this.loadDefaultLayout();
   }
 
-  async applyPersonaPreset(persona: PersonaId): Promise<void> {
-    if (this.currentPersona === persona && this.layout) {
-      return;
-    }
-
-    const preset = personaPresets[persona];
-    if (!preset) {
-      console.warn(`[LayoutManager] Unknown persona preset: ${persona}`);
-      return;
-    }
-
+  async resetLayout(): Promise<void> {
     if (!this.layout) {
       throw new Error('LayoutManager has not been initialized');
     }
 
-    this.layout.loadLayout(preset.layout);
+    await this.loadDefaultLayout();
+  }
 
-    const command = new ApplyLayoutPresetCommand({
-      persona,
-      panelVisibility: preset.panelVisibility,
-    });
-    const context = createCommandContext(this.state, snapshotState(this.state));
-    const preconditionsResult = command.preconditions?.(context) ?? { canExecute: true };
-    const resolvedPreconditions = await Promise.resolve(preconditionsResult);
-    if (!resolvedPreconditions.canExecute) {
-      console.warn('[LayoutManager] Cannot apply layout preset:', resolvedPreconditions.reason);
+  private async loadDefaultLayout(): Promise<void> {
+    if (!this.layout) {
+      throw new Error('LayoutManager has not been initialized');
+    }
+
+    this.layout.loadLayout(DEFAULT_LAYOUT_CONFIG);
+
+    // Inline logic from InitializeLayoutCommand
+    const previousLayoutReady = this.state.ui.isLayoutReady;
+    const previousPanelVisibility = { ...this.state.ui.panelVisibility };
+    const previousFocusedPanelId = this.state.ui.focusedPanelId;
+
+    const nextPanelVisibility = { ...DEFAULT_PANEL_VISIBILITY };
+    const nextFocusedPanelId = 'viewport';
+
+    const didMutate =
+      previousLayoutReady === false ||
+      !(
+        previousPanelVisibility.sceneTree === nextPanelVisibility.sceneTree &&
+        previousPanelVisibility.viewport === nextPanelVisibility.viewport &&
+        previousPanelVisibility.inspector === nextPanelVisibility.inspector &&
+        previousPanelVisibility.assetBrowser === nextPanelVisibility.assetBrowser
+      ) ||
+      previousFocusedPanelId !== nextFocusedPanelId;
+
+    if (!didMutate) {
       return;
     }
-    const executionResult = await Promise.resolve(command.execute(context));
-    if (executionResult.didMutate) {
-      await command.postCommit?.(context, executionResult.payload);
-    }
 
-    this.currentPersona = persona;
+    this.state.ui.isLayoutReady = true;
+    this.state.ui.panelVisibility = nextPanelVisibility;
+    this.state.ui.focusedPanelId = nextFocusedPanelId;
   }
 
   dispose(): void {
-    this.unsubscribePersona?.();
-    this.unsubscribePersona = undefined;
     if (this.layout) {
       try {
         this.layout.destroy();
@@ -337,7 +171,6 @@ export class LayoutManagerService {
     }
     this.layout = null;
     this.container = null;
-    this.currentPersona = null;
   }
 
   private registerComponents(layout: GoldenLayout): void {
@@ -354,9 +187,3 @@ export class LayoutManagerService {
     });
   }
 }
-
-export const resolveLayoutManager = (): LayoutManagerService => {
-  return ServiceContainer.getInstance().getService(
-    ServiceContainer.getInstance().getOrCreateToken(LayoutManagerService)
-  ) as LayoutManagerService;
-};
