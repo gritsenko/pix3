@@ -153,28 +153,8 @@ export class UpdateObjectPropertyCommand extends CommandBase<
         descriptor.isDirty = true;
       }
 
-      // If the node's name changed, update the hierarchy representation so the Scene Tree
-      // shows the new name immediately.
-      if (propertyPath === 'name') {
-        const hierarchy = state.scenes.hierarchies[activeSceneId];
-        if (hierarchy && hierarchy.nodes) {
-          const updateNameRec = (nodes: Array<unknown>): boolean => {
-            for (const n of nodes) {
-              const nRec = n as Record<string, unknown>;
-              if ((nRec.id as unknown as string) === nodeId) {
-                (nRec.name as unknown) = value as string;
-                return true;
-              }
-              if (nRec.children && (nRec.children as unknown as Array<unknown>).length > 0) {
-                const found = updateNameRec(nRec.children as unknown as Array<unknown>);
-                if (found) return true;
-              }
-            }
-            return false;
-          };
-          updateNameRec(hierarchy.nodes);
-        }
-      }
+      // Node name is already updated in the NodeBase instance above,
+      // no need to update hierarchy separately since we store instances directly.
     }
 
     // Best-effort: force the viewport renderer to re-sync its scene graph so transforms

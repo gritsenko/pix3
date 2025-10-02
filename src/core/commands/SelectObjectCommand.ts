@@ -79,7 +79,7 @@ export class SelectObjectCommand extends CommandBase<
       // Range selection: select from primary to target
       const sceneHierarchy = this.getActiveSceneHierarchy(snapshot);
       if (sceneHierarchy) {
-        const allNodeIds = this.collectAllNodeIds(sceneHierarchy.nodes);
+        const allNodeIds = this.collectAllNodeIds(sceneHierarchy.rootNodes);
         const primaryIndex = allNodeIds.indexOf(snapshot.selection.primaryNodeId);
         const targetIndex = allNodeIds.indexOf(nodeId);
 
@@ -158,15 +158,15 @@ export class SelectObjectCommand extends CommandBase<
 
   private collectAllNodeIds(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    nodes: readonly { readonly id: string; readonly children: readonly any[] }[]
+    nodes: readonly any[]
   ): string[] {
     const result: string[] = [];
     const collectRecursive = (
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      nodeList: readonly { readonly id: string; readonly children: readonly any[] }[]
+      nodeList: readonly any[]
     ) => {
       for (const node of nodeList) {
-        result.push(node.id);
+        result.push(node.nodeId || node.id);
         if (node.children?.length > 0) {
           collectRecursive(node.children);
         }

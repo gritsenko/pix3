@@ -29,4 +29,8 @@ export class Node3D extends NodeBase {
       this.scale.copy(props.scale);
     }
   }
+
+  get treeColor(): string {
+    return '#fe9ebeff'; // pink
+  }
 }

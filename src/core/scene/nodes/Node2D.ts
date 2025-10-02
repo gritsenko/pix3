@@ -22,4 +22,8 @@ export class Node2D extends NodeBase {
     const rotationRadians = MathUtils.degToRad(rotationDegrees);
     this.rotation.set(0, 0, rotationRadians);
   }
+
+  get treeColor(): string {
+    return '#96cbf6ff'; // blue
+  }
 }

@@ -5,7 +5,6 @@ import { appState } from '@/state';
 import { SceneManager } from '@/core/scene/SceneManager';
 import { SceneValidationError } from '@/core/scene/SceneLoader';
 import type { SceneGraph } from '@/core/scene/types';
-import type { NodeBase } from '@/core/scene/nodes/NodeBase';
 import { ResourceManager } from '@/services/ResourceManager';
 
 export interface LoadSceneCommandParams {
@@ -32,7 +31,6 @@ export class LoadSceneCommand {
       const sceneText = await this.resources.readText(filePath);
       const graph = this.sceneManager.parseScene(sceneText, { filePath });
 
-      const hierarchy = this.toHierarchy(graph);
       const current = snapshot(appState.scenes);
       const activeId = params.sceneId ?? current.activeSceneId ?? 'startup-scene';
       const existing = current.descriptors[activeId];
@@ -60,7 +58,13 @@ export class LoadSceneCommand {
 
       this.sceneManager.setActiveSceneGraph(activeId, graph);
 
-      appState.scenes.hierarchies[activeId] = hierarchy;
+      // Store the actual NodeBase instances directly
+      appState.scenes.hierarchies[activeId] = {
+        version: graph.version ?? null,
+        description: graph.description ?? null,
+        rootNodes: graph.rootNodes,
+        metadata: graph.metadata ?? {},
+      };
       appState.scenes.loadState = 'ready';
       appState.scenes.lastLoadedAt = Date.now();
       appState.scenes.pendingScenePaths = appState.scenes.pendingScenePaths.filter(
@@ -80,25 +84,6 @@ export class LoadSceneCommand {
     }
 
     return {};
-  }
-
-  private toHierarchy(graph: SceneGraph) {
-    const mapNode = (node: NodeBase): import('@/state').SceneHierarchyNode => ({
-      id: node.nodeId,
-      name: node.name,
-      // NodeBase derivative types expose type/instancePath when present
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      type: (node as any).type ?? 'Node3D',
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      instancePath: (node as any).instancePath ?? null,
-      children: node.children.map(child => mapNode(child)),
-    });
-    return {
-      version: graph.version ?? null,
-      description: graph.description ?? null,
-      metadata: graph.metadata ?? {},
-      nodes: graph.rootNodes.map(n => mapNode(n)),
-    };
   }
 
   private deriveSceneName(

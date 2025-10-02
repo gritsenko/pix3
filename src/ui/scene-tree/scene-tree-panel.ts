@@ -4,11 +4,24 @@ import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
 import { ComponentBase, customElement, html, state } from '@/fw';
-import { appState, type SceneDescriptor, type SceneHierarchyNode } from '@/state';
+import { appState, type SceneDescriptor } from '@/state';
 import { SelectObjectCommand } from '@/core/commands/SelectObjectCommand';
+import type { NodeBase } from '@/core/scene/nodes/NodeBase';
 
 import '../shared/pix3-panel';
 import './scene-tree-panel.ts.css';
+
+/**
+ * View model for scene tree nodes - UI-specific representation.
+ */
+interface SceneTreeNode {
+  id: string;
+  name: string;
+  type: string;
+  treeColor: string;
+  instancePath: string | null;
+  children: SceneTreeNode[];
+}
 
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {
@@ -19,7 +32,7 @@ export class SceneTreePanel extends ComponentBase {
   private activeSceneId: string | null = appState.scenes.activeSceneId;
 
   @state()
-  private hierarchy: SceneHierarchyNode[] = this.cloneNodesForRender(
+  private hierarchy: SceneTreeNode[] = this.buildTreeNodes(
     this.resolveActiveHierarchyNodes()
   );
 
@@ -93,7 +106,7 @@ export class SceneTreePanel extends ComponentBase {
 
     this.activeSceneId = nextSceneId;
     this.activeScene = this.resolveActiveSceneDescriptor();
-    this.hierarchy = this.cloneNodesForRender(this.resolveActiveHierarchyNodes());
+    this.hierarchy = this.buildTreeNodes(this.resolveActiveHierarchyNodes());
     this.loadState = appState.scenes.loadState;
     this.loadError = appState.scenes.loadError;
 
@@ -122,7 +135,7 @@ export class SceneTreePanel extends ComponentBase {
     return appState.scenes.descriptors[sceneId] ?? null;
   }
 
-  private resolveActiveHierarchyNodes(): SceneHierarchyNode[] {
+  private resolveActiveHierarchyNodes(): NodeBase[] {
     const sceneId = appState.scenes.activeSceneId;
     if (!sceneId) {
       return [];
@@ -131,17 +144,24 @@ export class SceneTreePanel extends ComponentBase {
     if (!hierarchy) {
       return [];
     }
-    return hierarchy.nodes ?? [];
+    return (hierarchy.rootNodes ?? []) as NodeBase[];
   }
 
-  private cloneNodesForRender(nodes: SceneHierarchyNode[]): SceneHierarchyNode[] {
+  /**
+   * Converts NodeBase instances to SceneTreeNode view models.
+   */
+  private buildTreeNodes(nodes: NodeBase[]): SceneTreeNode[] {
     return nodes.map(node => ({
-      ...node,
-      children: this.cloneNodesForRender(node.children),
+      id: node.nodeId,
+      name: node.name,
+      type: node.type,
+      treeColor: node.treeColor,
+      instancePath: node.instancePath,
+      children: this.buildTreeNodes(node.children),
     }));
   }
 
-  private collectNodeIds(nodes: SceneHierarchyNode[], target: Set<string>): void {
+  private collectNodeIds(nodes: SceneTreeNode[], target: Set<string>): void {
     for (const node of nodes) {
       target.add(node.id);
       if (node.children.length > 0) {
@@ -150,7 +170,7 @@ export class SceneTreePanel extends ComponentBase {
     }
   }
 
-  private renderNode(node: SceneHierarchyNode, level: number, focusable = false): TemplateResult {
+  private renderNode(node: SceneTreeNode, level: number, focusable = false): TemplateResult {
     const hasChildren = node.children.length > 0;
     const isCollapsed = hasChildren && this.collapsedNodeIds.has(node.id);
     const isSelected = this.selectedNodeIds.includes(node.id);
@@ -194,8 +214,7 @@ export class SceneTreePanel extends ComponentBase {
           ${expanderTemplate}
           <span class="tree-node__label">
             <span class="tree-node__header">
-              <span class="tree-node__name">${node.name}</span>
-              <span class="tree-node__type">${this.describeNodeType(node.type)}</span>
+              <span class="tree-node__name" style="color: ${node.treeColor};">${node.name}</span>
             </span>
             ${node.instancePath
               ? html`<span class="tree-node__instance">${node.instancePath}</span>`
@@ -231,27 +250,13 @@ export class SceneTreePanel extends ComponentBase {
     return 'Scene hierarchy will appear here once a project is loaded.';
   }
 
-  private describeNodeType(type: string): string {
-    switch (type) {
-      case 'Node3D':
-        return '3D';
-      case 'Sprite2D':
-        return '2D Sprite';
-      case 'Group':
-        return 'Group';
-      case 'Instance':
-        return 'Instance';
-      default:
-        return type;
-    }
-  }
 
-  private getNodeTooltip(node: SceneHierarchyNode): string {
-    const typeLabel = this.describeNodeType(node.type);
+
+  private getNodeTooltip(node: SceneTreeNode): string {
     if (node.instancePath) {
-      return `${node.name} · ${typeLabel} · ${node.instancePath}`;
+      return `${node.name} · ${node.type} · ${node.instancePath}`;
     }
-    return `${node.name} · ${typeLabel}`;
+    return `${node.name} · ${node.type}`;
   }
 
   private getToggleLabel(nodeName: string, isCollapsed: boolean): string {

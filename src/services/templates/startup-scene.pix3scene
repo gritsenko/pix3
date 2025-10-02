@@ -46,15 +46,15 @@ root:
           transform:
             position: [0, 0.5, 0]
             rotationEuler: [0, 45, 0]
-      - id: ui-layer
-        type: Node3D
-        name: UI Layer
-        children:
-          - id: logo-sprite
-            type: Sprite2D
-            name: Logo Sprite
-            properties:
-              source: "res://pix3-logo.png"
-              pivot: [0.5, 0.5]
-              size: [256, 256]
-              opacity: 1
+  - id: ui-layer
+    type: Node2D
+    name: UI Layer
+    children:
+      - id: logo-sprite
+        type: Sprite2D
+        name: Logo Sprite
+        properties:
+          source: "res://pix3-logo.png"
+          pivot: [0.5, 0.5]
+          size: [256, 256]
+          opacity: 1

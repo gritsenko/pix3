@@ -26,18 +26,10 @@ export interface SceneDescriptor {
   lastSavedAt: number | null;
 }
 
-export interface SceneHierarchyNode {
-  id: string;
-  name: string;
-  type: string;
-  instancePath: string | null;
-  children: SceneHierarchyNode[];
-}
-
 export interface SceneHierarchyState {
   version: string | null;
   description: string | null;
-  nodes: SceneHierarchyNode[];
+  rootNodes: any[]; // NodeBase instances (avoiding circular dependency)
   metadata: Record<string, unknown>;
 }
 

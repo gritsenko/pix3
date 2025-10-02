@@ -22,6 +22,10 @@ export class NodeBase extends Object3D {
   readonly metadata: NodeMetadata;
   readonly instancePath: string | null;
 
+  get treeColor(): string {
+    return '#fff';
+  }
+
   constructor(props: NodeBaseProps) {
     super();
 
