@@ -1,0 +1,13 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+pix3-panel {
+  height: 100%;
+}
+
+.asset-list {
+  display: grid;
+  gap: 0.75rem;
+}

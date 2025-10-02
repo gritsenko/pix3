@@ -1,7 +1,8 @@
-import { ComponentBase, css, customElement, html } from '@/fw';
+import { ComponentBase, customElement, html } from '@/fw';
 
 import '../shared/pix3-panel';
 import './asset-tree';
+import './asset-browser-panel.ts.css';
 
 @customElement('pix3-asset-browser-panel')
 export class AssetBrowserPanel extends ComponentBase {
@@ -16,22 +17,6 @@ export class AssetBrowserPanel extends ComponentBase {
       </pix3-panel>
     `;
   }
-
-  static styles = css`
-    :host {
-      display: block;
-      height: 100%;
-    }
-
-    pix3-panel {
-      height: 100%;
-    }
-
-    .asset-list {
-      display: grid;
-      gap: 0.75rem;
-    }
-  `;
 }
 
 declare global {

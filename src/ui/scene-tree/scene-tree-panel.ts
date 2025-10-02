@@ -3,11 +3,12 @@ import { subscribe } from 'valtio/vanilla';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
-import { ComponentBase, css, customElement, html, state } from '@/fw';
+import { ComponentBase, customElement, html, state } from '@/fw';
 import { appState, type SceneDescriptor, type SceneHierarchyNode } from '@/state';
 import { SelectObjectCommand } from '@/core/commands/SelectObjectCommand';
 
 import '../shared/pix3-panel';
+import './scene-tree-panel.ts.css';
 
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {
@@ -306,164 +307,6 @@ export class SceneTreePanel extends ComponentBase {
       console.error('[SceneTreePanel] Failed to execute selection command', error);
     }
   }
-
-  static styles = css`
-    :host {
-      display: block;
-      height: 100%;
-    }
-
-    pix3-panel {
-      height: 100%;
-    }
-
-    .tree-container {
-      display: flex;
-      flex-direction: column;
-      min-height: 100%;
-      font-size: 0.88rem;
-      color: rgba(245, 247, 250, 0.88);
-    }
-
-    .tree-root,
-    .tree-children {
-      list-style: none;
-      margin: 0;
-      padding: 0;
-    }
-
-    .tree-root {
-      display: flex;
-      flex-direction: column;
-      gap: 0.2rem;
-    }
-
-    .tree-children {
-      margin-top: 0.15rem;
-      margin-bottom: 0.3rem;
-      padding-inline-start: 1.4rem;
-      border-inline-start: 1px solid rgba(255, 255, 255, 0.06);
-    }
-
-    .tree-node {
-      margin: 0;
-    }
-
-    .tree-node__content {
-      display: grid;
-      grid-template-columns: auto 1fr;
-      align-items: center;
-      gap: 0.55rem;
-      padding: 0.35rem 0.5rem;
-      border-radius: 0.45rem;
-      background: rgba(38, 42, 50, 0.35);
-      border: 1px solid rgba(255, 255, 255, 0.04);
-      transition:
-        background 120ms ease,
-        border-color 120ms ease;
-    }
-
-    .tree-node__content:hover {
-      background: rgba(56, 62, 74, 0.55);
-    }
-
-    .tree-node__content:focus-visible {
-      outline: 2px solid rgba(94, 194, 255, 0.8);
-      outline-offset: 2px;
-    }
-
-    .tree-node__content--selected {
-      background: rgba(48, 113, 255, 0.25);
-      border-color: rgba(90, 162, 255, 0.5);
-    }
-
-    .tree-node__content--primary {
-      box-shadow: 0 0 0 1px rgba(90, 162, 255, 0.45);
-    }
-
-    .tree-node__expander {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.2rem;
-      min-width: 1.2rem;
-      height: 1.2rem;
-      padding: 0;
-      border: none;
-      background: transparent;
-      color: rgba(245, 247, 250, 0.45);
-      font-size: 0.75rem;
-      line-height: 1;
-      font: inherit;
-    }
-
-    .tree-node__expander--button {
-      cursor: pointer;
-    }
-
-    .tree-node__expander--button:hover {
-      color: rgba(245, 247, 250, 0.7);
-    }
-
-    .tree-node__expander--button:focus-visible {
-      outline: 2px solid rgba(94, 194, 255, 0.8);
-      border-radius: 0.35rem;
-    }
-
-    .tree-node__expander::before {
-      content: '';
-    }
-
-    .tree-node__expander--visible::before {
-      content: '▾';
-    }
-
-    .tree-node__expander--collapsed::before {
-      content: '▸';
-    }
-
-    .tree-node__label {
-      display: inline-flex;
-      flex-direction: column;
-      gap: 0.18rem;
-      align-items: flex-start;
-    }
-
-    .tree-node__header {
-      display: inline-flex;
-      flex-wrap: wrap;
-      align-items: center;
-      gap: 0.45rem;
-    }
-
-    .tree-node__name {
-      font-weight: 500;
-      letter-spacing: 0.01em;
-    }
-
-    .tree-node__type {
-      display: inline-block;
-      padding: 0.1rem 0.35rem;
-      border-radius: 999px;
-      font-size: 0.64rem;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      background: rgba(74, 88, 112, 0.55);
-      color: rgba(236, 240, 248, 0.82);
-      align-self: flex-start;
-    }
-
-    .tree-node__instance {
-      font-size: 0.7rem;
-      color: rgba(236, 239, 243, 0.6);
-    }
-
-    .panel-placeholder {
-      margin: 0;
-      color: rgba(245, 247, 250, 0.58);
-      font-style: italic;
-    }
-  `;
 }
 
 declare global {

@@ -1,6 +1,6 @@
 import { customElement, property, state } from 'lit/decorators.js';
 import { inject } from './di';
-import { css, html } from 'lit';
+import { css, html, unsafeCSS } from 'lit';
 
 import { fromQuery } from './from-query';
 
@@ -10,4 +10,4 @@ export * from './component-base';
 export * from './di';
 export * from './layout-component-base';
 
-export { html, css, customElement, property, state, inject, fromQuery, subscribe };
+export { html, css, unsafeCSS, customElement, property, state, inject, fromQuery, subscribe };

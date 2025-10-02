@@ -1,5 +1,6 @@
-import { ComponentBase, css, customElement, html, inject, property } from '@/fw';
+import { ComponentBase, customElement, html, inject, property } from '@/fw';
 import { FocusRingService } from '@/services/FocusRingService';
+import './pix3-toolbar.ts.css';
 
 @customElement('pix3-toolbar')
 export class Pix3Toolbar extends ComponentBase {
@@ -66,47 +67,6 @@ export class Pix3Toolbar extends ComponentBase {
       </nav>
     `;
   }
-
-  static styles = css`
-    :host {
-      display: flex;
-    }
-
-    .toolbar {
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      inline-size: 100%;
-      padding: 0.75rem 1rem;
-      background: var(--pix3-toolbar-background, rgba(26, 29, 35, 0.92));
-      color: var(--pix3-toolbar-foreground, rgba(245, 247, 250, 0.92));
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-    }
-
-    :host([dense]) .toolbar {
-      padding-block: 0.5rem;
-    }
-
-    .toolbar__section {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-    }
-
-    .toolbar__section--start {
-      min-width: 0;
-    }
-
-    .toolbar__section--content {
-      flex: 1;
-      min-width: 0;
-      justify-content: flex-end;
-    }
-
-    .toolbar__section--actions {
-      gap: 0.25rem;
-    }
-  `;
 }
 
 declare global {

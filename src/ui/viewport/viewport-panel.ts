@@ -1,11 +1,11 @@
-import { ComponentBase, css, customElement, html, inject, subscribe, state } from '@/fw';
+import { ComponentBase, customElement, html, inject, subscribe, state, css, unsafeCSS } from '@/fw';
 import { ViewportRendererService, type TransformMode } from '@/core/rendering';
 import { SceneManager } from '@/core/scene';
 import { appState } from '@/state';
-
+import styles from './viewport-panel.ts.css?raw';
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
-  protected static useShadowDom = true;
+  static useShadowDom = true
 
   @inject(ViewportRendererService)
   private readonly viewportRenderer!: ViewportRendererService;
@@ -164,138 +164,7 @@ export class ViewportPanel extends ComponentBase {
   };
 
   static styles = css`
-    :host {
-      display: block;
-      height: 100%;
-      width: 100%;
-      position: relative;
-      background: radial-gradient(circle at top, #20242a, #14171c 70%);
-    }
-
-    .panel {
-      position: relative;
-      height: 100%;
-      width: 100%;
-      outline: none;
-    }
-
-    .panel:focus-visible {
-      box-shadow: inset 0 0 0 2px rgba(78, 141, 245, 0.5);
-    }
-
-    .viewport-canvas {
-      height: 100%;
-      width: 100%;
-      display: block;
-    }
-
-    .overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      display: flex;
-      flex-direction: column;
-      padding: 1.25rem;
-      background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(10, 13, 18, 0) 55%);
-    }
-
-    .toolbar-overlay {
-      display: flex;
-      justify-content: flex-start;
-      margin-bottom: auto;
-    }
-
-    .transform-toolbar {
-      display: flex;
-      gap: 0.25rem;
-      pointer-events: auto;
-      background: rgba(12, 15, 22, 0.85);
-      backdrop-filter: blur(14px);
-      border-radius: 0.5rem;
-      padding: 0.5rem;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-    }
-
-    .toolbar-button {
-      width: 2.5rem;
-      height: 2.5rem;
-      border: none;
-      border-radius: 0.375rem;
-      background: rgba(42, 47, 58, 0.6);
-      color: rgba(240, 244, 250, 0.8);
-      font-size: 1.1rem;
-      cursor: pointer;
-      transition: all 0.15s ease;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-
-    .toolbar-button:hover {
-      background: rgba(42, 47, 58, 0.9);
-      color: rgba(240, 244, 250, 1);
-      transform: translateY(-1px);
-    }
-
-    .toolbar-button--active {
-      background: rgba(78, 141, 245, 0.8);
-      color: rgba(255, 255, 255, 1);
-      box-shadow: 0 0 0 2px rgba(78, 141, 245, 0.3);
-    }
-
-    .toolbar-button--active:hover {
-      background: rgba(78, 141, 245, 1);
-      transform: translateY(-1px);
-    }
-
-    .hud {
-      display: inline-flex;
-      flex-direction: column;
-      gap: 0.4rem;
-      padding: 0.65rem 0.85rem;
-      border-radius: 0.65rem;
-      background: rgba(12, 15, 22, 0.78);
-      backdrop-filter: blur(14px);
-      box-shadow: 0 18px 28px rgba(0, 0, 0, 0.28);
-      color: rgba(240, 244, 250, 0.9);
-      align-self: flex-end;
-      margin-top: auto;
-    }
-
-    .hud__label {
-      font-size: 0.72rem;
-      letter-spacing: 0.14em;
-      text-transform: uppercase;
-      color: rgba(240, 244, 250, 0.58);
-    }
-
-    .hud__controls {
-      margin: 0;
-      padding: 0;
-      list-style: none;
-      display: grid;
-      gap: 0.2rem;
-      font-size: 0.78rem;
-      color: rgba(240, 244, 250, 0.85);
-    }
-
-    .hud__controls li {
-      display: flex;
-      align-items: center;
-      gap: 0.5rem;
-      letter-spacing: 0.02em;
-    }
-
-    .hud__controls kbd {
-      padding: 0.18rem 0.45rem;
-      border-radius: 0.35rem;
-      background: rgba(42, 47, 58, 0.9);
-      border: 1px solid rgba(255, 255, 255, 0.12);
-      color: rgba(240, 244, 250, 0.85);
-      font-size: 0.7rem;
-      letter-spacing: 0.04em;
-    }
+    ${unsafeCSS(styles)}
   `;
 }
 

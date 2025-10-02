@@ -1,0 +1,84 @@
+:host {
+  display: block;
+  height: 100%;
+  width: 100%;
+  position: relative;
+  background: radial-gradient(circle at top, #20242a, #14171c 70%);
+}
+
+.panel {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  outline: none;
+}
+
+.panel:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(78, 141, 245, 0.5);
+}
+
+.viewport-canvas {
+  height: 100%;
+  width: 100%;
+  display: block;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  padding: 1.25rem;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04) 0%, rgba(10, 13, 18, 0) 55%);
+}
+
+.toolbar-overlay {
+  display: flex;
+  justify-content: flex-start;
+  margin-bottom: auto;
+}
+
+.transform-toolbar {
+  display: flex;
+  gap: 0.25rem;
+  pointer-events: auto;
+  background: rgba(12, 15, 22, 0.85);
+  backdrop-filter: blur(14px);
+  border-radius: 0.5rem;
+  padding: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.toolbar-button {
+  width: 2.5rem;
+  height: 2.5rem;
+  border: none;
+  border-radius: 0.375rem;
+  background: rgba(42, 47, 58, 0.6);
+  color: rgba(240, 244, 250, 0.8);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.toolbar-button:hover {
+  background: rgba(42, 47, 58, 0.9);
+  color: rgba(240, 244, 250, 1);
+  transform: translateY(-1px);
+}
+
+.toolbar-button--active {
+  background: rgba(78, 141, 245, 0.8);
+  color: rgba(255, 255, 255, 1);
+  box-shadow: 0 0 0 2px rgba(78, 141, 245, 0.3);
+}
+
+.toolbar-button--active:hover {
+  background: rgba(78, 141, 245, 1);
+  transform: translateY(-1px);
+}

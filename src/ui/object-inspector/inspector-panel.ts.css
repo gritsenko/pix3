@@ -1,0 +1,126 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+pix3-panel {
+  height: 100%;
+}
+
+.inspector-body {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  font-family: var(--font-family-ui, 'Inter', sans-serif);
+}
+
+.property-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.section-header {
+  border-bottom: 1px solid var(--color-border, #333);
+  padding-bottom: 0.5rem;
+}
+
+.section-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  color: var(--color-text-primary, #eee);
+}
+
+.selection-info {
+  font-size: 0.75rem;
+  color: var(--color-text-subtle, #aaa);
+  margin: 0;
+}
+
+.node-type {
+  font-size: 0.75rem;
+  color: var(--color-text-secondary, #aaa);
+  margin: 0.25rem 0 0 0;
+}
+
+.property-group {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.property-label {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #aaa);
+  min-width: 4.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.property-label--checkbox {
+  min-width: auto;
+}
+
+.property-input {
+  background: var(--color-input-bg, #222);
+  color: var(--color-text-primary, #eee);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+  box-sizing: border-box;
+}
+
+.property-input--text {
+  flex: 1;
+  min-width: 10rem;
+}
+
+.property-input--number {
+  width: 4rem;
+  margin-right: 0.25rem;
+}
+
+.property-input--invalid {
+  border-color: var(--color-error, #f56565);
+}
+
+.property-input:focus {
+  outline: none;
+  border-color: var(--color-accent, #4e8df5);
+}
+
+.property-checkbox {
+  margin: 0;
+}
+
+.transform-section {
+  border-top: 1px solid var(--color-border-subtle, #2a2a2a);
+  padding-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.subsection-title {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  color: var(--color-text-primary, #eee);
+}
+
+.vector-input {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.unit-label {
+  font-size: 0.7rem;
+  color: var(--color-text-subtle, #888);
+  margin-left: 0.25rem;
+}

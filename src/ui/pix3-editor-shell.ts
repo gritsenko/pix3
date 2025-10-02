@@ -1,12 +1,13 @@
 import { subscribe } from 'valtio/vanilla';
 
-import { ComponentBase, css, customElement, html, inject, property, state } from '@/fw';
+import { ComponentBase, customElement, html, inject, property, state } from '@/fw';
 import { LayoutManagerService } from '@/core/layout/LayoutManager';
 import { LoadSceneCommand } from '@/core/commands/LoadSceneCommand';
 import { appState } from '@/state';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './welcome/pix3-welcome';
+import './pix3-editor-shell.ts.css';
 
 @customElement('pix3-editor')
 export class Pix3EditorShell extends ComponentBase {
@@ -157,78 +158,6 @@ export class Pix3EditorShell extends ComponentBase {
   // Note: project open is handled by <pix3-welcome> to keep shell concerns minimal.
 
   // layout presets removed; editor uses single default layout
-
-  static styles = css`
-    :host {
-      display: block;
-      inline-size: 100%;
-      block-size: 100%;
-    }
-
-    .editor-shell {
-      display: grid;
-      grid-template-rows: auto 1fr;
-      min-block-size: 100vh;
-      min-block-size: 100dvh;
-      background: var(--pix3-shell-background, #1b1e24);
-      color: #f3f4f6;
-    }
-
-    pix3-toolbar {
-      --pix3-toolbar-background: rgba(19, 22, 27, 0.95);
-      --pix3-toolbar-foreground: rgba(243, 244, 246, 0.92);
-      inline-size: 100%;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      backdrop-filter: blur(18px);
-    }
-
-    .product-title {
-      margin: 0;
-      font-size: 0.85rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      text-transform: uppercase;
-      color: rgba(243, 244, 246, 0.72);
-    }
-
-    .toolbar-content {
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      gap: 1rem;
-      inline-size: 100%;
-    }
-
-    .workspace {
-      position: relative;
-      min-height: 0;
-      block-size: 100%;
-    }
-
-    .layout-host {
-      position: absolute;
-      inset: 0;
-    }
-
-    .loading-overlay {
-      position: absolute;
-      inset: 0;
-      display: grid;
-      place-items: center;
-      background: rgba(18, 20, 24, 0.72);
-    }
-
-    /* Welcome UI moved into <pix3-welcome> component */
-
-    .loading-label {
-      padding: 0.5rem 0.75rem;
-      border-radius: 0.5rem;
-      background: rgba(34, 38, 44, 0.86);
-      box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
-      font-size: 0.85rem;
-      letter-spacing: 0.04em;
-    }
-  `;
 }
 
 declare global {
