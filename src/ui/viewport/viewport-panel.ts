@@ -127,7 +127,8 @@ export class ViewportPanel extends ComponentBase {
     const graph = primaryGraph ?? fallbackGraph;
 
     if (graph) {
-      this.viewportRenderer.setSceneGraph(graph);
+      const preserveCamera = this.viewportRenderer.hasActiveSceneGraph();
+      this.viewportRenderer.setSceneGraph(graph, { preserveCamera });
       return;
     }
 

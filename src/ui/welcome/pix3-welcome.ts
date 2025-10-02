@@ -12,7 +12,11 @@ export class Pix3Welcome extends ComponentBase {
   private recents: { id?: string; name: string; lastOpenedAt: number }[] = [];
 
   protected firstUpdated(): void {
-    this.loadRecents();
+    // Avoid mutating reactive properties synchronously during the update
+    // lifecycle (which causes Lit's "scheduled an update after an update
+    // completed" warning). Schedule the load on a microtask so it runs
+    // after the current update completes.
+    Promise.resolve().then(() => this.loadRecents());
   }
 
   private disposeProjectSubscription?: () => void;
