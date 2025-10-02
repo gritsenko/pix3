@@ -1,6 +1,6 @@
 import { GoldenLayout, type LayoutConfig } from 'golden-layout';
 
-import { injectable, ServiceContainer } from '@/fw/di';
+import { injectable } from '@/fw/di';
 import { appState, type AppState, type PanelVisibilityState } from '@/state';
 // Layout initialization logic inlined below
 // Removed unused imports after inlining layout logic

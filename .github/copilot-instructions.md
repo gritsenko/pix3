@@ -15,6 +15,8 @@ These guardrails help generate consistent code and documentation for the Pix3 ed
 - Extend `ComponentBase` from `src/fw` instead of raw `LitElement`. It defaults to **light DOM** for global style integration.
 - Use shadow DOM only when needed: `static useShadowDom = true` in your component class.
 - Import helpers from `src/fw`: `customElement`, `property`, `state`, `css`, `html`, `inject`.
+- Split component styles into separate CSS files: `[component].ts.css`, and import them into the component file (e.g., `pix3-welcome.ts` imports `pix3-welcome.ts.css`).
+- Import from core folders using @ aliases (e.g., `@/fw`, `@/state`, `@/core`, `@/services`) instead of relative paths.
 
 ### Dependency Injection
 - Services use `@injectable()` decorator and must expose `dispose()` method for cleanup.
@@ -23,7 +25,7 @@ These guardrails help generate consistent code and documentation for the Pix3 ed
 
 ### State Management (Valtio)
 - Global state lives in `appState` proxy from `src/state/AppState.ts` - **never mutate directly**.
-- Commands are the **only** code allowed to modify state via the proxy.
+- Commands are the **only** code allowed to modify state via the proxy, except for Managers which can modify state directly when no user interaction is performed and no undo/redo operations are created.
 - UI subscribes to state changes via `subscribe(appState.section, callback)`.
 - Use `snapshot(appState)` for read-only access in command preconditions.
 
@@ -93,7 +95,7 @@ src/
 - Chromium-only for MVP (show compatibility warning for other browsers)
 
 ## Key Integration Points
-- **Golden Layout**: Panel management, persona-based presets
+- **Golden Layout**: Panel management
 - **File System Access API**: Direct project folder access, no upload/download
 - **Valtio**: Reactive state with automatic UI updates
 - **Three.js**: 3D rendering (PixiJS overlay planned for v2)
