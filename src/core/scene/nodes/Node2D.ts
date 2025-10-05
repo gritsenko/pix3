@@ -26,4 +26,8 @@ export class Node2D extends NodeBase {
   get treeColor(): string {
     return '#96cbf6ff'; // blue
   }
+
+  get treeIcon(): string {
+    return 'square';
+  }
 }

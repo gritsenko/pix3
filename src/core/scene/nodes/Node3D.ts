@@ -10,8 +10,8 @@ export interface Node3DProps extends Omit<NodeBaseProps, 'type'> {
 }
 
 export class Node3D extends NodeBase {
-  constructor(props: Node3DProps) {
-    super({ ...props, type: 'Node3D' });
+  constructor(props: Node3DProps, nodeType: string = 'Node3D') {
+    super({ ...props, type: nodeType });
 
     if (props.position) {
       this.position.copy(props.position);
@@ -32,5 +32,9 @@ export class Node3D extends NodeBase {
 
   get treeColor(): string {
     return '#fe9ebeff'; // pink
+  }
+
+  get treeIcon(): string {
+    return 'cube';
   }
 }

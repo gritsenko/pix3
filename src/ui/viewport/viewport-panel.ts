@@ -5,7 +5,7 @@ import { appState } from '@/state';
 import styles from './viewport-panel.ts.css?raw';
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
-  static useShadowDom = true
+  static useShadowDom = true;
 
   @inject(ViewportRendererService)
   private readonly viewportRenderer!: ViewportRendererService;

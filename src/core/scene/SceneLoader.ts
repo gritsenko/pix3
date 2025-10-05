@@ -4,6 +4,7 @@ import { Euler, MathUtils, Vector2, Vector3 } from 'three';
 import { injectable } from '@/fw/di';
 import { NodeBase, type NodeBaseProps } from '@/core/scene/nodes/NodeBase';
 import { Node3D } from '@/core/scene/nodes/Node3D';
+import { GlbModel } from '@/core/scene/nodes/3D/GlbModel';
 import { Sprite2D } from '@/core/scene/nodes/2D/Sprite2D';
 import type { SceneGraph, SceneNodeDefinition, SceneDocument } from '@/core/scene/types';
 
@@ -106,7 +107,7 @@ export class SceneLoader {
       });
     }
 
-    switch (definition.type) {
+  switch (definition.type) {
       case 'Sprite2D': {
         const { position, scale, rotation, texturePath, ...rest } = baseProps.properties as Record<
           string,
@@ -123,6 +124,19 @@ export class SceneLoader {
       }
       case 'Group':
         return new NodeBase({ ...baseProps, type: 'Group' });
+      case 'GlbModel': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const src = this.asString((baseProps.properties ?? {})['src']) ?? null;
+        return new GlbModel({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          src,
+        });
+      }
       case 'Node3D':
       case undefined: {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
@@ -277,5 +291,9 @@ export class SceneLoader {
       return null;
     }
     return value as Record<string, unknown>;
+  }
+
+  private asString(value: unknown): string | undefined {
+    return typeof value === 'string' ? value : undefined;
   }
 }

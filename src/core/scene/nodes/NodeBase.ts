@@ -26,6 +26,10 @@ export class NodeBase extends Object3D {
     return '#fff';
   }
 
+  get treeIcon(): string {
+    return 'box';
+  }
+
   constructor(props: NodeBaseProps) {
     super();
 

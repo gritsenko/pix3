@@ -5,8 +5,6 @@ import feather from 'feather-icons';
 import type { FileDescriptor } from '@/services/FileSystemAPIService';
 import { ProjectService } from '@/services/ProjectService';
 import { ResourceManager } from '@/services/ResourceManager';
-import { OperationService } from '@/core/operations/OperationService';
-import { LoadSceneOperation } from '@/core/features/scene/operations/LoadSceneOperation';
 import './asset-tree.ts.css';
 
 type Node = {
@@ -24,8 +22,7 @@ export class AssetTree extends ComponentBase {
   private readonly projectService!: ProjectService;
   @inject(ResourceManager)
   private readonly resourceManager!: ResourceManager;
-  @inject(OperationService)
-  private readonly operationService!: OperationService;
+  // Parent will handle actions via 'asset-activate' event
 
   // root path to show, defaults to project root
   @property({ type: String }) rootPath = '.';
@@ -113,50 +110,27 @@ export class AssetTree extends ComponentBase {
       return;
     }
 
-    if (!this.isSceneAsset(node.name)) {
-      return;
-    }
-
-    void this.loadSceneFromNode(node);
+    // Raise activation event to parent instead of handling here
+    const payload = this.buildAssetPayload(node);
+    this.dispatchEvent(
+      new CustomEvent('asset-activate', {
+        detail: payload,
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
-  private isSceneAsset(name: string): boolean {
-    return name.toLowerCase().endsWith('.pix3scene');
-  }
-
-  private async loadSceneFromNode(node: Node): Promise<void> {
+  private buildAssetPayload(node: Node): {
+    name: string;
+    path: string;
+    kind: FileSystemHandleKind;
+    resourcePath: string | null;
+    extension: string;
+  } {
     const resourcePath = this.toResourceUri(node.path);
-
-    if (!resourcePath) {
-      console.warn('[AssetTree] Ignoring scene load for empty path', { path: node.path });
-      return;
-    }
-
-    const sceneId = this.deriveSceneId(resourcePath);
-
-    try {
-      await this.operationService.invoke(new LoadSceneOperation({ filePath: resourcePath, sceneId }));
-      this.dispatchEvent(
-        new CustomEvent('pix3-scene-loaded', {
-          detail: { filePath: resourcePath, sceneId },
-          bubbles: true,
-          composed: true,
-        })
-      );
-    } catch (error) {
-      console.error('[AssetTree] Failed to load scene asset', {
-        path: node.path,
-        resourcePath,
-        error,
-      });
-      this.dispatchEvent(
-        new CustomEvent('pix3-scene-load-error', {
-          detail: { filePath: resourcePath, sceneId, error },
-          bubbles: true,
-          composed: true,
-        })
-      );
-    }
+    const extension = (node.name.split('.').pop() || '').toLowerCase();
+    return { name: node.name, path: node.path, kind: node.kind, resourcePath, extension };
   }
 
   private toResourceUri(path: string): string | null {
@@ -170,15 +144,7 @@ export class AssetTree extends ComponentBase {
     return normalized.startsWith('res://') ? normalized : `res://${normalized}`;
   }
 
-  private deriveSceneId(resourcePath: string): string {
-    const withoutScheme = resourcePath.replace(/^res:\/\//i, '').replace(/^templ:\/\//i, '');
-    const withoutExtension = withoutScheme.replace(/\.[^./]+$/i, '');
-    const normalized = withoutExtension
-      .replace(/[^a-z0-9]+/gi, '-')
-      .replace(/^-+|-+$/g, '')
-      .toLowerCase();
-    return normalized || 'scene';
-  }
+  // deriveSceneId moved to service-level usage; tree no longer loads scenes directly
 
   private onSelect(node: Node): void {
     this.selectedPath = node.path;

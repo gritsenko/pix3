@@ -23,6 +23,7 @@ import {
   Quaternion,
   WebGLRenderer,
 } from 'three';
+import { Node3D } from '@/core/scene/nodes/Node3D';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 
 import { injectable, ServiceLifetime, inject } from '@/fw/di';
@@ -283,13 +284,20 @@ export class ViewportRendererService {
     const props = this.asRecord(node.properties) ?? {};
     const kind = (this.asString(props.kind) ?? node.type)?.toLowerCase();
 
-    if (node.type === 'Node3D') {
+    if (node instanceof Node3D || node.type === 'Node3D') {
       switch (kind) {
         case 'mesh': {
           const mesh = this.createMeshForNode(node, props);
           if (mesh) {
             container.add(mesh);
           }
+          break;
+        }
+        case 'glbmodel': {
+          // Placeholder: real GLB loading should be implemented via ResourceManager/Three.js loader
+          // For now, visualize as a box until asset system is wired.
+          const mesh = this.createMeshForNode(node, { geometry: 'box', material: { color: '#77cc77' } });
+          if (mesh) container.add(mesh);
           break;
         }
         case 'directionallight': {
@@ -345,7 +353,7 @@ export class ViewportRendererService {
     }
 
     this.applyTransform(object, node);
-    if (node.type === 'Node3D') {
+    if (node instanceof Node3D || node.type === 'Node3D') {
       const props = this.asRecord(node.properties) ?? {};
       const kind = (this.asString(props.kind) ?? node.type)?.toLowerCase();
       if (kind === 'camera') {

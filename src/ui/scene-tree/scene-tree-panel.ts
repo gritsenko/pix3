@@ -2,6 +2,8 @@ import type { TemplateResult } from 'lit';
 import { subscribe } from 'valtio/vanilla';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
+import feather from 'feather-icons';
 
 import { ComponentBase, customElement, html, state, inject } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
@@ -20,6 +22,7 @@ interface SceneTreeNode {
   name: string;
   type: string;
   treeColor: string;
+  treeIcon: string;
   instancePath: string | null;
   children: SceneTreeNode[];
 }
@@ -159,6 +162,7 @@ export class SceneTreePanel extends ComponentBase {
       name: node.name,
       type: node.type,
       treeColor: node.treeColor,
+      treeIcon: node.treeIcon,
       instancePath: node.instancePath,
       children: this.buildTreeNodes(node.children),
     }));
@@ -215,6 +219,13 @@ export class SceneTreePanel extends ComponentBase {
           @click=${(event: Event) => this.onSelectNode(event, node.id)}
         >
           ${expanderTemplate}
+          <span
+            class="tree-node__icon"
+            title=${node.type}
+            aria-label=${node.type}
+          >
+            ${this.renderNodeIcon(node.treeIcon)}
+          </span>
           <span class="tree-node__label">
             <span class="tree-node__header">
               <span class="tree-node__name" style="color: ${node.treeColor};">${node.name}</span>
@@ -264,6 +275,15 @@ export class SceneTreePanel extends ComponentBase {
 
   private getToggleLabel(nodeName: string, isCollapsed: boolean): string {
     return isCollapsed ? `Expand ${nodeName}` : `Collapse ${nodeName}`;
+  }
+
+  private renderNodeIcon(iconName: string): TemplateResult {
+    const icon = feather.icons[iconName as keyof typeof feather.icons];
+    if (!icon) {
+      console.warn(`[SceneTreePanel] Icon not found: ${iconName}`);
+      return html`${unsafeSVG(feather.icons['box'].toSvg({ width: 16, height: 16 }))}`;
+    }
+    return html`${unsafeSVG(icon.toSvg({ width: 16, height: 16 }))}`;
   }
 
   private onToggleNode(event: Event, nodeId: string): void {
