@@ -3,9 +3,11 @@ import { subscribe } from 'valtio/vanilla';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 
-import { ComponentBase, customElement, html, state } from '@/fw';
+import { ComponentBase, customElement, html, state, inject } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
 import { SelectObjectCommand } from '@/core/commands/SelectObjectCommand';
+import { wrapCommand } from '@/core/commands/CommandOperationAdapter';
+import { OperationService } from '@/core/operations/OperationService';
 import type { NodeBase } from '@/core/scene/nodes/NodeBase';
 
 import '../shared/pix3-panel';
@@ -25,6 +27,8 @@ interface SceneTreeNode {
 
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {
+  @inject(OperationService)
+  private readonly operationService!: OperationService;
   @state()
   private activeScene: SceneDescriptor | null = this.resolveActiveSceneDescriptor();
 
@@ -274,7 +278,7 @@ export class SceneTreePanel extends ComponentBase {
     this.collapsedNodeIds = next;
   }
 
-  private onSelectNode(event: Event, nodeId: string): void {
+  private async onSelectNode(event: Event, nodeId: string): Promise<void> {
     event.stopPropagation();
 
     // Determine selection behavior based on modifier keys
@@ -282,32 +286,21 @@ export class SceneTreePanel extends ComponentBase {
     const isAdditive = mouseEvent.ctrlKey || mouseEvent.metaKey;
     const isRange = mouseEvent.shiftKey;
 
-    // Execute selection command
+    // Execute selection command via dispatcher
     const command = new SelectObjectCommand({
       nodeId,
       additive: isAdditive,
       range: isRange,
     });
 
-    // TODO: Execute command through proper command dispatcher
-    // For now, execute directly (this should be replaced with proper command system)
     try {
-      const context = {
-        state: appState,
-        snapshot: appState, // This is not correct, should be proper snapshot
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        container: null as any,
-        requestedAt: Date.now(),
-      };
-      const result = command.execute(context);
-      if (result.didMutate) {
-        // Selection state will be automatically updated via subscription
-        console.log(`Selected node: ${nodeId}`, {
-          additive: isAdditive,
-          range: isRange,
-          selectedCount: appState.selection.nodeIds.length,
-        });
-      }
+      await this.operationService.invokeAndPush(wrapCommand(command));
+      // Selection state will be automatically updated via subscription
+      console.log(`Selected node: ${nodeId}`, {
+        additive: isAdditive,
+        range: isRange,
+        selectedCount: appState.selection.nodeIds.length,
+      });
     } catch (error) {
       console.error('[SceneTreePanel] Failed to execute selection command', error);
     }

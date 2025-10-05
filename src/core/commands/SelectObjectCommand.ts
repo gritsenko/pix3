@@ -151,6 +151,26 @@ export class SelectObjectCommand extends CommandBase<
     };
   }
 
+  /**
+   * Undo the selection by restoring the previous selection state
+   */
+  async undo(context: CommandContext, undoPayload: SelectObjectUndoPayload): Promise<void> {
+    const { state } = context;
+    const { previousNodeIds, previousPrimaryNodeId } = undoPayload;
+
+    // Restore previous selection
+    state.selection.nodeIds = [...previousNodeIds];
+    state.selection.primaryNodeId = previousPrimaryNodeId;
+  }
+
+  /**
+   * Redo the selection by re-applying the new selection
+   */
+  async redo(context: CommandContext): Promise<void> {
+    // Re-execute the command
+    await this.execute(context);
+  }
+
   private getActiveSceneHierarchy(snapshot: AppStateSnapshot) {
     const activeSceneId = snapshot.scenes.activeSceneId;
     return activeSceneId ? snapshot.scenes.hierarchies[activeSceneId] : null;

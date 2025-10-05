@@ -1,11 +1,12 @@
 import { ComponentBase, customElement, html, state, subscribe, inject } from '@/fw';
 import { SceneManager } from '@/core/scene';
-import { appState, getAppStateSnapshot } from '@/state';
+import { appState } from '@/state';
 import type { NodeBase } from '@/core/scene/nodes/NodeBase';
 import { Node3D } from '@/core/scene/nodes/Node3D';
 import { Sprite2D } from '@/core/scene/nodes/2D/Sprite2D';
 import { UpdateObjectPropertyCommand } from '@/core/commands/UpdateObjectPropertyCommand';
-import { createCommandContext } from '@/core/commands/command';
+import { wrapCommand } from '@/core/commands/CommandOperationAdapter';
+import { OperationService } from '@/core/operations/OperationService';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
@@ -19,6 +20,9 @@ interface PropertyValue {
 export class InspectorPanel extends ComponentBase {
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
+
+  @inject(OperationService)
+  private readonly operationService!: OperationService;
 
   @state()
   private selectedNodes: NodeBase[] = [];
@@ -218,11 +222,7 @@ export class InspectorPanel extends ComponentBase {
       });
 
       try {
-        const context = createCommandContext(appState, getAppStateSnapshot());
-        const execution = await Promise.resolve(command.execute(context));
-        if (execution.didMutate) {
-          await command.postCommit?.(context, execution.payload);
-        }
+        await this.operationService.invokeAndPush(wrapCommand(command));
       } catch (error) {
         console.error('[InspectorPanel] Failed to execute name update command', error);
       }
@@ -241,11 +241,7 @@ export class InspectorPanel extends ComponentBase {
       });
 
       try {
-        const context = createCommandContext(appState, getAppStateSnapshot());
-        const execution = await Promise.resolve(command.execute(context));
-        if (execution.didMutate) {
-          await command.postCommit?.(context, execution.payload);
-        }
+        await this.operationService.invokeAndPush(wrapCommand(command));
       } catch (error) {
         console.error('[InspectorPanel] Failed to execute visibility update command', error);
         // Revert the UI state on error
@@ -324,11 +320,7 @@ export class InspectorPanel extends ComponentBase {
     });
 
     try {
-      const context = createCommandContext(appState, getAppStateSnapshot());
-      const execution = await Promise.resolve(command.execute(context));
-      if (execution.didMutate) {
-        await command.postCommit?.(context, execution.payload);
-      }
+      await this.operationService.invokeAndPush(wrapCommand(command));
     } catch (error) {
       console.error('[InspectorPanel] Failed to execute transform update command', error);
     }

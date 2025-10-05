@@ -197,6 +197,114 @@ export class UpdateObjectPropertyCommand extends CommandBase<
     };
   }
 
+  /**
+   * Undo the property update by restoring the previous value
+   */
+  async undo(
+    context: CommandContext,
+    undoPayload: UpdateObjectPropertyUndoPayload
+  ): Promise<void> {
+    const { container, state } = context;
+    const { nodeId, propertyPath, previousValue } = undoPayload;
+
+    // Get the scene manager
+    const sceneManagerToken = container.getOrCreateToken(SceneManager);
+    const sceneManager = container.getService<SceneManager>(sceneManagerToken);
+    const sceneGraph = sceneManager.getActiveSceneGraph();
+
+    if (!sceneGraph) {
+      throw new Error('No active scene available for undo');
+    }
+
+    // Find the node
+    const node = sceneGraph.nodeMap.get(nodeId);
+    if (!node) {
+      throw new Error(`Node with ID '${nodeId}' not found for undo`);
+    }
+
+    // Restore the previous value
+    this.setPropertyValue(node, propertyPath, previousValue);
+
+    // Update state to trigger UI refresh
+    const activeSceneId = state.scenes.activeSceneId;
+    if (activeSceneId) {
+      state.scenes.lastLoadedAt = Date.now();
+      const descriptor = state.scenes.descriptors[activeSceneId];
+      if (descriptor) {
+        descriptor.isDirty = true;
+      }
+    }
+
+    // Update viewport renderer
+    try {
+      const vrToken = container.getOrCreateToken(ViewportRendererService);
+      const viewportRenderer = container.getService<ViewportRendererService>(vrToken);
+      const isTransformUpdate = this.isTransformProperty(propertyPath);
+      const didUpdateInPlace = isTransformUpdate
+        ? viewportRenderer.updateNodeTransform(node)
+        : false;
+
+      if (!didUpdateInPlace) {
+        viewportRenderer.setSceneGraph(sceneGraph, { preserveCamera: true });
+      }
+    } catch {
+      // Non-fatal: if the renderer/service isn't available, ignore
+    }
+  }
+
+  /**
+   * Redo the property update by re-applying the original value
+   */
+  async redo(context: CommandContext): Promise<void> {
+    // For redo, we simply re-execute the command with the original parameters
+    const { container, state } = context;
+    const { nodeId, propertyPath, value } = this.params;
+
+    // Get the scene manager
+    const sceneManagerToken = container.getOrCreateToken(SceneManager);
+    const sceneManager = container.getService<SceneManager>(sceneManagerToken);
+    const sceneGraph = sceneManager.getActiveSceneGraph();
+
+    if (!sceneGraph) {
+      throw new Error('No active scene available for redo');
+    }
+
+    // Find the node
+    const node = sceneGraph.nodeMap.get(nodeId);
+    if (!node) {
+      throw new Error(`Node with ID '${nodeId}' not found for redo`);
+    }
+
+    // Apply the value again
+    this.setPropertyValue(node, propertyPath, value);
+
+    // Update state to trigger UI refresh
+    const activeSceneId = state.scenes.activeSceneId;
+    if (activeSceneId) {
+      state.scenes.lastLoadedAt = Date.now();
+      const descriptor = state.scenes.descriptors[activeSceneId];
+      if (descriptor) {
+        descriptor.isDirty = true;
+      }
+    }
+
+    // Update viewport renderer
+    try {
+      const vrToken = container.getOrCreateToken(ViewportRendererService);
+      const viewportRenderer = container.getService<ViewportRendererService>(vrToken);
+      const isTransformUpdate = this.isTransformProperty(propertyPath);
+      const didUpdateInPlace = isTransformUpdate
+        ? viewportRenderer.updateNodeTransform(node)
+        : false;
+
+      if (!didUpdateInPlace) {
+        viewportRenderer.setSceneGraph(sceneGraph, { preserveCamera: true });
+      }
+    } catch {
+      // Non-fatal: if the renderer/service isn't available, ignore
+    }
+  }
+
   private getPropertyValue(node: NodeBase, propertyPath: string): unknown {
     const parts = propertyPath.split('.');
     let current: unknown = node;

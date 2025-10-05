@@ -3,6 +3,7 @@ import { subscribe } from 'valtio/vanilla';
 import { ComponentBase, customElement, html, inject, property, state } from '@/fw';
 import { LayoutManagerService } from '@/core/layout/LayoutManager';
 import { LoadSceneCommand } from '@/core/commands/LoadSceneCommand';
+import { OperationService } from '@/core/operations/OperationService';
 import { appState } from '@/state';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
@@ -13,6 +14,9 @@ import './pix3-editor-shell.ts.css';
 export class Pix3EditorShell extends ComponentBase {
   @inject(LayoutManagerService)
   private readonly layoutManager!: LayoutManagerService;
+
+  @inject(OperationService)
+  private readonly operationService!: OperationService;
 
   // Inject command used to load the startup scene
   @inject(LoadSceneCommand) private readonly loadSceneCommand!: LoadSceneCommand;
@@ -26,9 +30,14 @@ export class Pix3EditorShell extends ComponentBase {
 
   private disposeSubscription?: () => void;
   private onWelcomeProjectReady?: (e: Event) => void;
+  private keyboardHandler?: (e: KeyboardEvent) => void;
 
   connectedCallback(): void {
     super.connectedCallback();
+    
+    // Setup keyboard shortcuts
+    this.keyboardHandler = this.handleKeyboardShortcuts.bind(this);
+    window.addEventListener('keydown', this.keyboardHandler);
     this.disposeSubscription = subscribe(appState.ui, () => {
       this.isLayoutReady = appState.ui.isLayoutReady;
       this.shellReady = this.isLayoutReady;
@@ -76,7 +85,58 @@ export class Pix3EditorShell extends ComponentBase {
       );
       this.onWelcomeProjectReady = undefined;
     }
+    if (this.keyboardHandler) {
+      window.removeEventListener('keydown', this.keyboardHandler);
+      this.keyboardHandler = undefined;
+    }
     super.disconnectedCallback();
+  }
+
+  private handleKeyboardShortcuts(e: KeyboardEvent): void {
+    // Check if target is an input element where we should not intercept
+    const target = e.target as HTMLElement;
+    const isInputElement =
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.contentEditable === 'true';
+
+    // Undo: Cmd+Z (Mac) or Ctrl+Z (Windows/Linux)
+    if (
+      (e.key === 'z' || e.key === 'Z') &&
+      (e.metaKey || e.ctrlKey) &&
+      !e.shiftKey &&
+      !isInputElement
+    ) {
+      e.preventDefault();
+      void this.executeUndoCommand();
+      return;
+    }
+
+    // Redo: Shift+Cmd+Z (Mac) or Ctrl+Y (Windows/Linux)
+    if (
+      ((e.key === 'z' || e.key === 'Z') && (e.metaKey || e.ctrlKey) && e.shiftKey) ||
+      ((e.key === 'y' || e.key === 'Y') && e.ctrlKey && !isInputElement)
+    ) {
+      e.preventDefault();
+      void this.executeRedoCommand();
+      return;
+    }
+  }
+
+  private async executeUndoCommand(): Promise<void> {
+    try {
+      await this.operationService.undo();
+    } catch (error) {
+      console.error('[Pix3EditorShell] Failed to undo', error);
+    }
+  }
+
+  private async executeRedoCommand(): Promise<void> {
+    try {
+      await this.operationService.redo();
+    } catch (error) {
+      console.error('[Pix3EditorShell] Failed to redo', error);
+    }
   }
 
   protected async firstUpdated(): Promise<void> {
