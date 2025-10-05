@@ -16,11 +16,9 @@ flowchart LR
     B --> F["Asset Browser"]
   end
 
-
-    ## Roles
-
-    Pix3 is designed for a range of users with different priorities and workflows. The architecture supports flexible UI layouts, plugin APIs, and export options to meet these needs.
-
+  subgraph Core
+    G["AppState (Valtio)"]
+    H["Command / Operation Service"]
     I["HistoryManager"]
     J["SceneManager"]
     K["PluginManager"]
@@ -57,3 +55,7 @@ flowchart LR
   O -->|reads scene nodes| J
   P -->|renders 2D nodes| J
 ```
+
+## Roles
+
+Pix3 is designed for a range of users with different priorities and workflows. The architecture supports flexible UI layouts, plugin APIs, and export options to meet these needs.
