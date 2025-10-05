@@ -15,9 +15,6 @@ export {
   type OperationEvent,
   type OperationEventListener,
 } from './OperationService';
-export { SelectObjectOperation, type SelectObjectParams } from './SelectObjectOperation';
-export {
-  UpdateObjectPropertyOperation,
-  type UpdateObjectPropertyParams,
-} from './UpdateObjectPropertyOperation';
-export { LoadSceneOperation, type LoadSceneParams } from './LoadSceneOperation';
+export { SelectObjectOperation, type SelectObjectParams } from '@/core/features/selection/operations/SelectObjectOperation';
+export { UpdateObjectPropertyOperation, type UpdateObjectPropertyParams } from '@/core/features/properties/operations/UpdateObjectPropertyOperation';
+export { LoadSceneOperation, type LoadSceneParams } from '@/core/features/scene/operations/LoadSceneOperation';

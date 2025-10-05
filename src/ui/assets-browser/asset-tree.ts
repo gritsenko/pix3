@@ -6,7 +6,7 @@ import type { FileDescriptor } from '@/services/FileSystemAPIService';
 import { ProjectService } from '@/services/ProjectService';
 import { ResourceManager } from '@/services/ResourceManager';
 import { OperationService } from '@/core/operations/OperationService';
-import { LoadSceneOperation } from '@/core/operations/LoadSceneOperation';
+import { LoadSceneOperation } from '@/core/features/scene/operations/LoadSceneOperation';
 import './asset-tree.ts.css';
 
 type Node = {

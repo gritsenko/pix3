@@ -1,8 +1,8 @@
-# Refactoring Summary: Using OperationService Instead of CommandDispatcherService
+# Refactoring Summary: Operations-first with OperationService
 
 ## Why the Refactor?
 
-The initial implementation created `CommandDispatcherService` which **duplicated functionality** that already existed in `OperationService`. This was an architectural oversight.
+The initial implementation created `CommandDispatcherService` which duplicated functionality that already existed in `OperationService`. We first bridged Commands to Operations via an adapter. We have now fully adopted an operations-first model and deprecated the adapter in favor of direct OperationService usage and thin commands.
 
 ### What OperationService Already Provided:
 ✅ Command execution lifecycle  
@@ -12,49 +12,38 @@ The initial implementation created `CommandDispatcherService` which **duplicated
 ✅ Before/after snapshots  
 ✅ `undo()` and `redo()` methods  
 
-## The Better Solution: Adapter Pattern
+## The Adopted Solution: Operations-first
 
-Instead of creating a parallel dispatcher, we now use an **adapter** that bridges Commands to Operations:
+Operations encapsulate mutations and provide undo/redo closures via `OperationCommit`. `OperationService` is the only gateway for invoking, undoing, and redoing. Commands are optional thin wrappers for palette/shortcut integration.
 
 ```typescript
-// Old approach (duplicated code):
-const dispatcher = new CommandDispatcherService();
-await dispatcher.execute(command);
-
-// New approach (leverages existing infrastructure):
-const operation = wrapCommand(command);
-await operationService.invokeAndPush(operation);
+// UI or tools invoke operations directly
+await operationService.invokeAndPush(new UpdateObjectPropertyOperation({
+  nodeId,
+  propertyPath: path,
+  value,
+}));
 ```
 
 ## How It Works
 
-### 1. CommandOperationAdapter
+1) Create operations that implement `perform()` and return an `OperationCommit` with `undo()` and `redo()` closures. Example operations now exist for selection, property updates, and scene loading under `src/core/features/*/operations`.
+2) From UI, call `operationService.invoke(op)` or `invokeAndPush(op)` when the change should be undoable.
+3) Thin commands in `src/core/features/*/commands` only validate preconditions and delegate to OperationService. Undo/redo commands call `operationService.undo()`/`redo()`.
+
+### Usage in UI Components
 ```typescript
-export class CommandOperationAdapter<TExecutePayload, TUndoPayload> 
-  implements Operation<OperationInvokeResult>
-{
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    // 1. Check preconditions
-    // 2. Execute command
-    // 3. Get undo payload from postCommit
-    // 4. Return OperationInvokeResult with commit containing undo/redo closures
-  }
+// Inspector panel example (no adapter):
+@inject(OperationService) private readonly operationService!: OperationService;
+
+async handlePropertyChange(nodeId: string, path: string, value: unknown) {
+  await this.operationService.invokeAndPush(
+    new UpdateObjectPropertyOperation({ nodeId, propertyPath: path, value })
+  );
 }
 ```
 
-### 2. Usage in UI Components
-```typescript
-// Inspector panel example:
-@inject(OperationService)
-private readonly operationService!: OperationService;
-
-async handlePropertyChange(nodeId: string, path: string, value: any) {
-  const command = new UpdateObjectPropertyCommand({ nodeId, propertyPath: path, value });
-  await this.operationService.invokeAndPush(wrapCommand(command));
-}
-```
-
-### 3. Keyboard Shortcuts
+### Keyboard Shortcuts
 ```typescript
 // Editor shell example:
 @inject(OperationService)
@@ -74,19 +63,16 @@ async handleRedo() {
 1. **No Code Duplication**: Uses existing, tested OperationService
 2. **Single Source of Truth**: All operations go through one service
 3. **Existing Features**: Automatic access to coalescing, events, telemetry
-4. **Cleaner Architecture**: Adapter pattern is a well-known design pattern
+4. **Cleaner Architecture**: Single source of truth for mutations and history
 5. **Less Maintenance**: One system to maintain instead of two
-6. **Better Integration**: Commands automatically work with the existing operation infrastructure
+6. **Better Integration**: UI and commands both use the same OperationService API
 
 ## What Changed
 
-### Removed Files:
-- ❌ `CommandDispatcherService.ts` (no longer needed)
-- ❌ `UndoCommand.ts` (direct `operationService.undo()` calls instead)
-- ❌ `RedoCommand.ts` (direct `operationService.redo()` calls instead)
-
-### Added Files:
-- ✅ `CommandOperationAdapter.ts` (bridges Command → Operation)
+### Removed/Deprecated:
+- ❌ `CommandDispatcherService.ts` (replaced by OperationService usage)
+- ⚠️ `CommandOperationAdapter.ts` (deprecated; kept temporarily for reference if present)
+- ⏩ Undo/Redo commands are thin wrappers that directly call OperationService
 
 // Before:
 @inject(CommandDispatcherService)
@@ -98,19 +84,15 @@ private readonly operationService!: OperationService;
 await this.operationService.invokeAndPush(wrapCommand(command));
 ```
 
-## Comparison Table
+## Comparison Snapshot
 
-| Feature | CommandDispatcherService (Old) | OperationService + Adapter (New) |
-|---------|-------------------------------|-----------------------------------|
-| Undo/Redo | ✅ Custom implementation | ✅ Existing implementation |
-| History | ✅ Uses HistoryManager | ✅ Uses HistoryManager |
-| Telemetry | ✅ Command telemetry | ✅ Operation events (richer) |
-| Coalescing | ❌ Not implemented | ✅ Already supported |
-| Event System | ❌ Limited | ✅ Full event lifecycle |
-| Code Duplication | ❌ ~150 lines duplicated | ✅ ~100 lines adapter only |
-| Maintenance | ❌ Two systems to maintain | ✅ One system |
+Operations-first vs legacy dispatcher/adapter:
+- Single execution gateway (OperationService)
+- Operations own undo/redo via commits
+- Commands optional and thin
+- UI can invoke operations directly
 
-## Architecture Flow
+## Architecture Flow (Operations-first)
 
 ```
 ┌─────────────┐
@@ -122,10 +104,7 @@ await this.operationService.invokeAndPush(wrapCommand(command));
 └──────┬──────────┘
        │ wraps via
        ▼
-┌─────────────────────┐
-│CommandOperationAdapt│
-└──────┬──────────────┘
-       │ executes through
+  │ invokes
        ▼
 ┌─────────────────┐
 │ OperationService│
@@ -146,12 +125,12 @@ await this.operationService.invokeAndPush(wrapCommand(command));
 
 ## Result
 
-✅ Undo/redo functionality works exactly the same  
+✅ Undo/redo via OperationService  
 ✅ Keyboard shortcuts work (Cmd+Z, Shift+Cmd+Z)  
-✅ All commands integrate with history  
+✅ All mutations flow through a single service  
 ✅ Less code to maintain  
-✅ Better alignment with existing architecture  
-✅ No compile errors  
+✅ Better alignment with the architecture  
+✅ Clean build  
 
 ---
 

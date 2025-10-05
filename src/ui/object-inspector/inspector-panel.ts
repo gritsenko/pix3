@@ -4,7 +4,7 @@ import { appState } from '@/state';
 import type { NodeBase } from '@/core/scene/nodes/NodeBase';
 import { Node3D } from '@/core/scene/nodes/Node3D';
 import { Sprite2D } from '@/core/scene/nodes/2D/Sprite2D';
-import { UpdateObjectPropertyOperation } from '@/core/operations/UpdateObjectPropertyOperation';
+import { UpdateObjectPropertyOperation } from '@/core/features/properties/operations/UpdateObjectPropertyOperation';
 import { OperationService } from '@/core/operations/OperationService';
 
 import '../shared/pix3-panel';

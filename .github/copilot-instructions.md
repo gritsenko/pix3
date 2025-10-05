@@ -1,12 +1,12 @@
 # Copilot Instructions
 
-These guardrails help generate consistent code and documentation for the Pix3 editor. Treat them as authoritative unless the specification (`docs/pix3-specification.md`) or maintainers request an exception.
+These guardrails help generate consistent code and documentation for the Pix3 editor. Treat them as authoritative unless the specification (`docs/pix3-specification.md`) or maintainers request an exception. Pix3 uses an operations-first model where OperationService is the single gateway for mutations and history.
 
 ## Project Overview
 
 - **Pix3** is a browser-based editor for building HTML5 scenes that blend 2D and 3D layers, targeting playable ads and interactive experiences.
 - **Target stack**: TypeScript + Vite, Lit web components with custom `fw` utilities, Valtio for reactive state, Three.js for 3D rendering, Golden Layout for dockable panels.
-- **Source of truth**: `docs/pix3-specification.md` (v1.5, 2025-09-26) contains all requirements, architecture decisions, and MVP roadmap.
+- **Source of truth**: `docs/pix3-specification.md` (v1.8, 2025-10-05) contains all requirements, architecture decisions, and MVP roadmap.
 - **Target users**: Scene composers, gameplay developers, ad producers.
 
 ## Essential Architecture Patterns
@@ -24,16 +24,15 @@ These guardrails help generate consistent code and documentation for the Pix3 ed
 - Register services with `ServiceContainer` - singleton by default, transient optional.
 
 ### State Management (Valtio)
-- Global state lives in `appState` proxy from `src/state/AppState.ts` - **never mutate directly**.
-- Commands are the **only** code allowed to modify state via the proxy, except for Managers which can modify state directly when no user interaction is performed and no undo/redo operations are created.
+- Global state lives in `appState` proxy from `src/state/AppState.ts` — never mutate directly.
+- Mutations flow through Operations executed via OperationService. Commands are thin wrappers that invoke operations. Managers may update state directly only for non-interactive, non-history flows.
 - UI subscribes to state changes via `subscribe(appState.section, callback)`.
-- Use `snapshot(appState)` for read-only access in command preconditions.
+- Use `snapshot(appState)` for read-only checks in command preconditions or operation validation.
 
-### Command Pattern
-- Commands follow strict lifecycle: `preconditions()` → `execute()` → `postCommit()`.
-- Must be idempotent and emit telemetry events on execution.
-- Return undo payloads from `postCommit()` for `HistoryManager` integration.
-- Register commands via metadata with keywords for command palette.
+### Commands and Operations
+- Operations are first-class and encapsulate all mutation logic. Implement `perform()` and return an OperationCommit with `undo()`/`redo()` closures and optional metadata for coalescing and scene diffing.
+- OperationService is the single gateway: `invoke(op)`, `invokeAndPush(op)`, `undo()`, `redo()`.
+- Commands are thin wrappers: `preconditions()` → `execute()`; they never implement their own undo/redo. They validate context and call OperationService with operations. Register via metadata for the command palette.
 
 ## Critical Development Setup
 
@@ -56,26 +55,37 @@ These guardrails help generate consistent code and documentation for the Pix3 ed
 ### Entry Point Flow
 1. `src/main.ts` imports `reflect-metadata`, Golden Layout CSS, and registers all components
 2. `index.html` renders `<pix3-editor>` shell component
-3. Shell initializes Golden Layout with layout presets
+3. Shell initializes Golden Layout (single default layout by default) and wires keyboard shortcuts to `OperationService.undo()` / `redo()`
 
 ## File Structure Conventions
 
 ```
 src/
-  fw/                    # Framework utilities (DI, ComponentBase)
-  state/                 # Valtio state definitions
+  fw/                      # Framework utilities (DI, ComponentBase)
+  state/                   # Valtio state definitions
   core/
-    commands/            # Command pattern implementations
-    operations/          # Legacy operation system (being replaced)
-    history/             # Undo/redo with bounded stacks
-    layout/              # Golden Layout integration
-  components/            # Lit components extending ComponentBase
-    shell/               # Main editor shell
-    scene/               # Scene tree panel
-    viewport/            # 3D viewport panel
-    inspector/           # Property inspector
-    assets/              # Asset browser
-  services/              # Injectable services (FileSystem API, etc.)
+    features/
+      selection/
+        commands/
+        operations/
+      properties/
+        commands/
+        operations/
+      scene/
+        commands/
+        operations/
+      history/
+        commands/         # Undo/Redo thin commands
+    operations/           # OperationService, base types, events
+    history/              # HistoryManager (bounded stacks)
+    layout/               # Golden Layout integration
+  ui/                     # Lit components extending ComponentBase
+    welcome/
+    scene-tree/
+    viewport/
+    object-inspector/
+    assets-browser/
+  services/               # Injectable services (FileSystem API, etc.)
 ```
 
 ## Scene File Format (.pix3scene)
@@ -86,8 +96,9 @@ src/
 
 ## Testing Patterns
 - Unit tests with Vitest, using `vi.fn()` for mocks and `beforeEach()` cleanup.
-- Test command lifecycle, service injection, state mutations, and edge cases.
-- Example pattern from `command.spec.ts`: test telemetry hooks, disposal, state snapshots.
+- Prefer testing operation lifecycle and OperationService integration over command-owned undo.
+- Validate operation `perform()`, commit `undo()`/`redo()` closures, coalescing (when applicable), and HistoryManager behavior.
+- Test thin commands for preconditions and delegation to OperationService.
 
 ## Performance & Quality Gates
 - Target ≥85 FPS viewport rendering, <6s cold start, <80ms command latency
@@ -98,7 +109,7 @@ src/
 - **Golden Layout**: Panel management
 - **File System Access API**: Direct project folder access, no upload/download
 - **Valtio**: Reactive state with automatic UI updates
-- **Three.js**: 3D rendering (PixiJS overlay planned for v2)
+- **Three.js**: Single-engine rendering; orthographic overlay for 2D/HUD in the same pipeline
 - **Plugin system**: Sandboxed extensions via manifest validation
 
 Always cross-check architectural decisions against `docs/pix3-specification.md` before implementing features.

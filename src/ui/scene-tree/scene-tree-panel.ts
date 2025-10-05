@@ -5,7 +5,7 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 
 import { ComponentBase, customElement, html, state, inject } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
-import { SelectObjectOperation } from '@/core/operations/SelectObjectOperation';
+import { SelectObjectOperation } from '@/core/features/selection/operations/SelectObjectOperation';
 import { OperationService } from '@/core/operations/OperationService';
 import type { NodeBase } from '@/core/scene/nodes/NodeBase';
 

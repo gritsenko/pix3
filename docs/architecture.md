@@ -1,10 +1,10 @@
 # Pix3 Architecture Diagram
 
-This document contains a high-level architecture diagram for Pix3 and notes about viewing and exporting diagrams in VS Code.
+This document contains a high-level architecture diagram for Pix3 and notes about viewing and exporting diagrams in VS Code. It reflects the current operations-first model where the OperationService is the single entry point for mutations and history.
 
 ## Mermaid diagram
 
-Below is a Mermaid system diagram that represents the architecture described in `pix3-specification.md` (v1.5).
+Below is a Mermaid system diagram that represents the architecture described in `pix3-specification.md` (v1.8, operations-first).
 
 ```mermaid
 flowchart LR
@@ -18,11 +18,12 @@ flowchart LR
 
   subgraph Core
     G["AppState (Valtio)"]
-    H["Command / Operation Service"]
+    H["OperationService (invoke, undo, redo)"]
     I["HistoryManager"]
     J["SceneManager"]
     K["PluginManager"]
     L["Plugin State Management"]
+    Q["Commands (thin wrappers)"]
   end
 
   subgraph Services
@@ -40,9 +41,10 @@ flowchart LR
   D ---|observes resize| R
   R ---|triggers resize| O
 
-  C -->|interacts| G
-  E -->|inspects| G
-  H -->|mutates via commands| G
+  C -->|reads| G
+  E -->|reads| G
+  Q -->|invokes operations| H
+  H -->|mutates via operations| G
   I -->|tracks| H
   J -->|loads/parses| G
   K -->|registers commands| H
@@ -51,6 +53,9 @@ flowchart LR
   G -->|persists layout| M
   H -->|emits| N
   J -->|loads scenes| M
+
+  %% UI can also call operations directly for tool flows
+  A -.direct ops for tools.- H
 
   O -->|reads scene nodes| J
   P -->|renders 2D nodes| J

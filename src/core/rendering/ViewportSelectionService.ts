@@ -14,10 +14,11 @@ import { subscribe } from 'valtio/vanilla';
 
 import { injectable, ServiceLifetime, inject } from '@/fw/di';
 import { appState } from '@/state';
-import { SelectObjectOperation } from '@/core/operations/SelectObjectOperation';
+import { SelectObjectOperation } from '@/core/features/selection/operations/SelectObjectOperation';
 import { OperationService } from '@/core/operations/OperationService';
 import { SceneManager } from '@/core/scene/SceneManager';
 import { NodeBase } from '@/core/scene/nodes/NodeBase';
+import { UpdateObjectPropertyOperation } from '@/core/features/properties/operations/UpdateObjectPropertyOperation';
 
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';
@@ -375,7 +376,7 @@ export class ViewportSelectionService {
     }
 
     for (const update of updates) {
-      const op = new (await import('@/core/operations/UpdateObjectPropertyOperation')).UpdateObjectPropertyOperation({
+      const op = new UpdateObjectPropertyOperation({
         nodeId,
         propertyPath: update.propertyPath,
         value: update.value,

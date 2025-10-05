@@ -1,38 +1,33 @@
-# Undo/Redo Implementation Summary
+# Undo/Redo Implementation Summary (Operations-first)
 
 ## Overview
-Successfully implemented full undo/redo functionality for the Pix3 editor using the existing **OperationService** infrastructure with a Command-to-Operation adapter pattern.
+Undo/redo in Pix3 is implemented via the **OperationService**. Operations are the single source of truth for mutations and provide their own undo/redo via `OperationCommit` closures. Commands are thin wrappers that delegate to OperationService.
 
 ## What Was Implemented
 
-### 1. CommandOperationAdapter (`src/core/commands/CommandOperationAdapter.ts`)
-A bridge that wraps Commands to work as Operations, allowing them to integrate with the existing **OperationService**:
+### 1. Operations (first-class)
+Operations live under `src/core/features/*/operations`. Examples:
+- Selection: `SelectObjectOperation`
+- Properties: `UpdateObjectPropertyOperation`
+- Scene: `LoadSceneOperation` (non-undoable)
 
-Key features:
-
-### 2. Command Undo/Redo Support
-Updated commands to implement undo/redo methods:
-
-#### UpdateObjectPropertyCommand
-
-#### SelectObjectCommand  
+### 2. Thin Commands
+Commands live under `src/core/features/*/commands` and merely validate preconditions then call OperationService. Undo/redo commands call `operationService.undo()`/`redo()` directly.
 
 ### 3. Keyboard Shortcuts
 Registered in `Pix3EditorShell` component:
 
 ### 4. UI Component Integration
-Updated all UI components to use **OperationService** with wrapped commands:
+UI components call `OperationService` with operations directly (no adapter). Example: Inspector invokes `UpdateObjectPropertyOperation`; Scene Tree invokes `SelectObjectOperation`; Editor Shell invokes `LoadSceneOperation` on startup.
 
 
-### Command Lifecycle (Using OperationService)
+### Operation Lifecycle
 ```
-User Action → Command Created → Wrap with Adapter → OperationService.invokeAndPush()
-                                                              ↓
-                                                  Preconditions → Execute → PostCommit
-                                                              ↓
-                                                  Create OperationCommit with undo/redo
-                                                              ↓
-                                                  HistoryManager.push()
+User Action → Operation Created → OperationService.invokeAndPush()
+                                                     ↓
+                                         perform() returns OperationCommit
+                                                     ↓
+                                     HistoryManager.push(commit)
 ```
 
 ### Undo Flow
@@ -40,8 +35,6 @@ User Action → Command Created → Wrap with Adapter → OperationService.invok
 User: Cmd+Z → operationService.undo() → HistoryManager.undo()
                                               ↓
                                   Call stored undo() function from OperationCommit
-                                              ↓
-                                  Command's undo() method restores previous state
 ```
 
 ### Redo Flow  
@@ -49,19 +42,17 @@ User: Cmd+Z → operationService.undo() → HistoryManager.undo()
 User: Shift+Cmd+Z → operationService.redo() → HistoryManager.redo()
                                                     ↓
                                         Call stored redo() function from OperationCommit
-                                                    ↓
-                                        Command's redo() method re-applies changes
 ```
 
 ## Key Design Decisions
 
 1. **Leverage existing OperationService**: Instead of creating a new dispatcher, we use the already-established OperationService which provides history, telemetry, coalescing, and event emission.
 
-2. **Adapter Pattern**: CommandOperationAdapter bridges the Command and Operation interfaces, allowing Commands to work seamlessly with OperationService.
+2. **Operations-first**: Operations encapsulate mutation logic and provide undo/redo via `OperationCommit` closures.
 
-3. **Commands own their undo logic**: Each command implements its own `undo()` and `redo()` methods, which know how to reverse/reapply their specific changes.
+3. **Thin commands, no command-owned undo**: Commands do not implement undo/redo; they only delegate to OperationService and are used for palette/shortcuts.
 
-4. **OperationCommit wraps undo/redo**: The adapter creates OperationCommit objects that wrap command undo/redo methods as closures with captured payloads.
+4. **OperationCommit**: Operations return commits with undo/redo closures and metadata for coalescing and scene diffing.
 
 5. **Single source of truth**: OperationService is the only entry point for command execution, ensuring consistent lifecycle, history management, and event emission.
 
@@ -91,28 +82,28 @@ To test undo/redo functionality:
 ## Files Modified/Created
 
 ### Created:
-- `src/core/commands/CommandOperationAdapter.ts` - Adapter to bridge Command → Operation
-- `src/core/commands/index.ts` - Barrel exports for commands
+- `src/core/features/selection/operations/SelectObjectOperation.ts`
+- `src/core/features/properties/operations/UpdateObjectPropertyOperation.ts`
+- `src/core/features/scene/operations/LoadSceneOperation.ts`
+- `src/core/features/history/commands/UndoCommand.ts`
+- `src/core/features/history/commands/RedoCommand.ts`
 
 ### Modified:
-- `src/core/commands/UpdateObjectPropertyCommand.ts` - Added undo/redo methods
-- `src/core/commands/SelectObjectCommand.ts` - Added undo/redo methods
-- `src/ui/pix3-editor-shell.ts` - Added keyboard shortcuts, uses OperationService
-- `src/ui/object-inspector/inspector-panel.ts` - Uses OperationService with wrapCommand()
-- `src/ui/scene-tree/scene-tree-panel.ts` - Uses OperationService with wrapCommand()
-- `src/core/rendering/ViewportSelectionService.ts` - Uses OperationService with wrapCommand()
+- `src/ui/pix3-editor-shell.ts` - Keyboard shortcuts wired to OperationService
+- `src/ui/object-inspector/inspector-panel.ts` - Uses UpdateObjectPropertyOperation
+- `src/ui/scene-tree/scene-tree-panel.ts` - Uses SelectObjectOperation
+- `src/core/rendering/ViewportSelectionService.ts` - Uses SelectObjectOperation and property updates via operations
 
 ## Compliance with Architecture
 
 This implementation follows the Pix3 architecture guidelines:
-- ✅ Commands follow strict lifecycle (preconditions → execute → postCommit)
-- ✅ Commands are idempotent
-- ✅ Commands emit telemetry events
+- ✅ OperationService is the single gateway for mutations and history
+- ✅ Operations are idempotent and return commits for undo/redo
+- ✅ Commands are thin and do not contain undo logic
 - ✅ HistoryManager uses bounded stacks
 - ✅ Services use dependency injection with `@injectable()` and `@inject()`
-- ✅ State mutations only happen through commands
 - ✅ UI components subscribe to state changes via Valtio
 
 ---
 
-**Status**: ✅ Complete and ready for testing
+**Status**: ✅ Complete and aligned with operations-first model

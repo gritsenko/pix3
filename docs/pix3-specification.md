@@ -1,8 +1,8 @@
 # Pix3 — Technical Specification
 
-Version: 1.7
+Version: 1.8
 
-Date: 2025-10-01
+Date: 2025-10-05
 
 ## 1. Introduction
 
@@ -68,7 +68,7 @@ Non-Chromium browsers (Firefox, Safari) are out of scope for MVP but should degr
 The application will be built on the principles of unidirectional data flow and clear separation of concerns.
 
 - State: A centralized store based on Valtio, serving as the single source of truth. It is passive and contains no business logic.
-- Commands (Operations): Small, isolated classes containing all business logic. Only they are allowed to modify the State. This pattern is the foundation for the Undo/Redo system.
+- Commands and Operations: Operations are first-class, encapsulating business logic and state mutations. The OperationService is the only gateway to perform, undo, and redo changes. Commands exist as thin wrappers that validate context and then invoke operations via OperationService. UI and tools may also invoke operations directly when appropriate.
 - Core Managers: Classes that manage the main aspects of the editor (HistoryManager, SceneManager, PluginManager). They orchestrate the execution of commands.
 - Services: An infrastructure layer for interacting with the outside world (FileSystemAPIService). They do not contain business logic.
 - UI Components: "Dumb" components built on top of the project's fw helpers. Prefer extending `ComponentBase` (which wraps LitElement and provides a configurable render root) and use the `inject` decorator from `fw/di` for services instead of wiring dependencies manually. This ensures consistent DOM mode (light vs shadow), simpler service wiring, and a single recommended pattern across the project.
@@ -102,7 +102,8 @@ Notes:
 
 ### 4.1 Core Architecture Contracts
 
-- **Command Lifecycle:** `preconditions()` → `execute()` → `postCommit()` with undo payload returned. Commands must be idempotent and report telemetry events.
+- **Operation Lifecycle (source of truth):** An operation implements `perform(context)` and returns an `OperationCommit` object containing closures for `undo()`/`redo()` and metadata for coalescing. OperationService executes operations, pushes commits to history when requested, emits telemetry, and is solely responsible for undo/redo.
+- **Command Lifecycle (thin wrappers):** `preconditions()` → `execute()`; commands delegate to OperationService to invoke operations and never implement their own undo/redo. They remain idempotent and emit telemetry via OperationService.
 - **HistoryManager Contract:** Maintains a bounded stack of command snapshots, integrates with collaborative locking, and exposes `canUndo`/`canRedo` signals to the UI.
 - **SceneManager Contract:** Responsible for parsing `.pix3scene` files, resolving instances, applying overrides, and emitting change diffs for viewport renderers.
 - **PluginManager Contract:** Discovers plugins (`manifest.json` with `capabilities`), validates signatures, and sandboxes command registrations per namespace.
@@ -116,14 +117,13 @@ Notes:
 - **Preset:** Saved layout configuration.
 - **Command:** Unit of business logic that mutates the state and can be undone/redone.
 
-### 4.3 Operation Pipeline Blueprint (Legacy Inspiration)
+### 4.3 Operations-first Pipeline
 
-- **OperationService:** Central undo/redo manager inspired by the Pix2d `OperationService`. Maintains bounded stacks (default 100 items), clears redo history on new pushes, prevents duplicate operations, and emits typed events to the message bus (`OperationInvokedEvent`) for UI updates.
-- **Operation Base Class:** `EditOperationBase`-style abstraction with `perform()`, `undo()` and `getEditedNodes()` hooks. Operations declare `affectsNodeStructure` to help scene diffing.
-- **BulkOperation Aggregator:** Allows tools to bundle multiple granular operations into a single undo step (mirroring Pix2d’s `BulkEditOperation`). Useful for drag gestures or batched property changes.
-- **Operation Factories:** Context-specific factories (e.g., drawing, selection) create operations with injected services and automatically push them through `OperationService`.
-- **Telemetry Hooks:** Every invocation funnels through `OperationService`, making it the ideal point to emit analytics, autosave triggers, and cross-device sync messages.
-- **Tool/Command Integration:** Tools cancel active operations via the service; command handlers can call `invokeAndPush()` to perform and enqueue operations in one step.
+- **OperationService:** Central orchestrator. Methods: `invoke(op)`, `invokeAndPush(op)` to also record history, `undo()`, `redo()`. Maintains bounded stacks (default 100 items), clears redo on new pushes, supports coalescing, and emits typed events for UI updates and telemetry.
+- **Operation Contract:** `perform()` returns an `OperationCommit` with `undo`/`redo` closures. Optionally includes metadata like affected nodes and structure flags for efficient scene diffing.
+- **Bulk operations:** Tools can compose granular operations into one undo step via a helper that produces a single coalesced commit.
+- **UI/Tools Integration:** UI panels and tools may call operations directly through OperationService. Commands are optional thin facades for palette/shortcut integration and should never carry undo logic.
+- **Telemetry Hooks:** All mutations flow through OperationService, making it the ideal hook for analytics, autosave, and sync.
 
 ### 4.4 Rendering Architecture Notes
 
@@ -144,6 +144,7 @@ The repository contains a working MVP scaffold and a small, functional rendering
 - Scene parsing and validation: `SceneManager` parses `.pix3scene` YAML files and validates them with AJV. A recent type-safe fix was applied for AJV error pointer handling (`src/core/scene/SceneManager.ts`).
 - Build and dev tooling: Vite + TypeScript project is configured with dev (`npm run dev`), build (`npm run build`) and tests (Vitest) present in the repo. CI-friendly scripts exist in `package.json`.
 - Panels and layout: Golden Layout-based shell and panels exist and are wired to the DI container (`src/components/*`, `src/core/layout/`). The `pix3-viewport-panel` component mounts the canvas and coordinates renderer initialization.
+- Operations-first history: UI invokes operations via `OperationService`. Commands are thin wrappers that delegate to operations. Undo/redo commands delegate to `OperationService.undo()`/`redo()`.
 
 Known gaps / next work items
 
@@ -239,13 +240,23 @@ root:
 ├── dist/                     # Build output (generated)
 ├── public/                   # Static assets (logo, icons)
 ├── src/
-│   ├── core/                 # Core architecture (commands, history, layout, legacy ops)
-│   │   ├── commands/         # Command implementations (state mutations)
-│   │   ├── history/          # HistoryManager & undo/redo wiring
-│   │   ├── layout/           # Golden Layout integration
-│   │   ├── operations/       # Legacy operation system (being phased out)
-│   │   ├── rendering/        # (Legacy placeholder – migrate to top-level rendering/)
-│   │   └── scene/            # Scene-related managers & parsing (placeholder for future)
+│   ├── core/                 # Core architecture (operations-first, history, layout)
+│   │   ├── features/
+│   │   │   ├── selection/
+│   │   │   │   ├── commands/
+│   │   │   │   └── operations/
+│   │   │   ├── properties/
+│   │   │   │   ├── commands/
+│   │   │   │   └── operations/
+│   │   │   ├── scene/
+│   │   │   │   ├── commands/
+│   │   │   │   └── operations/
+│   │   │   └── history/
+│   │   │       └── commands/   # Undo/Redo thin commands
+│   │   ├── operations/         # OperationService, base types, events
+│   │   ├── history/            # HistoryManager & undo/redo wiring
+│   │   ├── layout/             # Golden Layout integration
+│   │   └── scene/              # Scene-related managers & parsing
 │   ├── fw/                   # Framework utilities (ComponentBase, DI, helpers)
 │   ├── plugins/              # First-party & sample plugins
 │   │   └── pix3-basic-tools-plugin/
@@ -281,6 +292,7 @@ root:
 
 - **1.5 (2025-09-26):** Added target platforms, non-functional requirements, detailed architecture contracts, validation rules, and roadmap updates. Synced guidance on `fw` helpers.
 - **1.7 (2025-10-01):** Removed PixiJS dual-engine plan; consolidated rendering to single Three.js pipeline (perspective + orthographic). Updated project structure, removed obsolete adapter references, clarified rendering notes.
+- **1.8 (2025-10-05):** Adopted operations-first model. Commands are thin wrappers that delegate to `OperationService`. UI invokes operations directly. Code organized into `core/features/*/{commands,operations}`. Deprecated `CommandOperationAdapter` in documentation.
 
 ## 11. Plugin State Management
 
