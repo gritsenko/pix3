@@ -25,9 +25,7 @@ export const resetAppState = (): void => {
 };
 
 export {
-  DEFAULT_PERSONA,
   DEFAULT_THEME,
-  PERSONA_IDS,
   THEME_IDS,
   createInitialAppState,
 } from './AppState';
@@ -36,11 +34,9 @@ export type {
   AppState,
   OperationState,
   PanelVisibilityState,
-  PersonaId,
   ProjectState,
   ProjectStatus,
   SceneDescriptor,
-  SceneHierarchyNode,
   SceneHierarchyState,
   SceneLoadState,
   ScenesState,

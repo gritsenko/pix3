@@ -7,45 +7,22 @@ Successfully implemented full undo/redo functionality for the Pix3 editor using 
 
 ### 1. CommandOperationAdapter (`src/core/commands/CommandOperationAdapter.ts`)
 A bridge that wraps Commands to work as Operations, allowing them to integrate with the existing **OperationService**:
-- **Adapter Pattern**: Wraps Command interface → Operation interface
-- **Preconditions check**: Validates via `command.preconditions()`
-- **Execute**: Calls `command.execute()` 
-- **PostCommit**: Calls `command.postCommit()` to get undo payload
-- **Creates OperationCommit**: Wraps command's undo/redo methods into Operation's commit structure
 
 Key features:
-- Leverages existing OperationService infrastructure
-- No code duplication
-- Commands work seamlessly with history, telemetry, and coalescing
-- Simple `wrapCommand()` helper function for convenience
 
 ### 2. Command Undo/Redo Support
 Updated commands to implement undo/redo methods:
 
 #### UpdateObjectPropertyCommand
-- **undo()**: Restores the previous property value
-- **redo()**: Re-applies the original value
-- Handles transform properties (position, rotation, scale)
-- Updates viewport renderer for immediate visual feedback
 
 #### SelectObjectCommand  
-- **undo()**: Restores previous selection state (nodeIds + primaryNodeId)
-- **redo()**: Re-executes the selection
 
 ### 3. Keyboard Shortcuts
 Registered in `Pix3EditorShell` component:
-- **Cmd+Z / Ctrl+Z**: Undo last action
-- **Shift+Cmd+Z / Ctrl+Y**: Redo last undone action
-- Smart input detection: Shortcuts don't fire when typing in input fields
 
 ### 4. UI Component Integration
 Updated all UI components to use **OperationService** with wrapped commands:
-- **InspectorPanel**: Property updates via `operationService.invokeAndPush(wrapCommand(command))`
-- **SceneTreePanel**: Node selection via `operationService.invokeAndPush(wrapCommand(command))`
-- **ViewportSelectionService**: Selection and transform updates
-- **Pix3EditorShell**: Direct undo/redo via `operationService.undo()` / `operationService.redo()`
 
-## Architecture Benefits
 
 ### Command Lifecycle (Using OperationService)
 ```

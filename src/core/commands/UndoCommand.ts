@@ -16,7 +16,6 @@ export class UndoCommand extends CommandBase<void, void> {
     title: 'Undo',
     description: 'Undo the last action',
     keywords: ['undo', 'revert', 'history'],
-    personas: ['technical-artist', 'gameplay-engineer', 'playable-ad-producer'],
   };
 
   private readonly dispatcher: CommandDispatcherService;

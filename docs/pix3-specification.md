@@ -14,19 +14,13 @@ This document describes the technical requirements, architecture, and developmen
 
 Pix3 is a browser-based editor, similar to Figma and Unity, designed for rapid and iterative development of game scenes. It allows working with project files directly through the File System Access API, ensuring tight integration with external IDEs (like VS Code) for code editing.
 
-### 1.3 Target Audience and Personas
+### 1.3 Target Audience
 
 Pix3 targets professional and indie teams who already create playable ads and interactive experiences with WebGL engines:
 
 - **Playable ad creators** migrating from PixiJS and Three.js pipelines who need scene tooling and rapid iteration.
 - **Construct 3 and Godot users** looking for a browser-first workflow with minimal install friction.
 - **Cocos and custom engine developers** who want to assemble UI overlays and scene flow visually before exporting to code.
-
-Primary personas:
-
-1. **Technical Artist (TA):** Owns scene composition, expects drag-and-drop asset flow, configurable layouts, and undo safety. Works cross-functionally with engineers providing shaders and scripts.
-2. **Gameplay Engineer (GE):** Implements commands and plugins, needs a well-documented API, dependency injection, and TypeScript-first tooling.
-3. **Playable Ad Producer (PAP):** Focused on iteration speed, expects single-click previews, analytics hooks, and export presets for ad networks.
 
 Success metrics:
 
@@ -46,7 +40,7 @@ This specification covers the MVP scope and foundation architecture. Changes are
 - Multi-tab Interface: Users can open and edit multiple scenes in different tabs simultaneously, simplifying work on complex projects.
 - Drag-and-Drop Assets: Project resources (images, models) can be dragged directly from the editor's file browser into the scene viewport to create nodes.
 - Customizable Interface: The user can move and dock editor panels to different areas of the window, similar to VS Code, and save their layout between sessions.
-- Workspace Presets: Provide opinionated workspace presets (Playable Ad, 3D Scene Authoring, UI Overlay) to match the primary personas.
+- Workspace Presets: Provide opinionated workspace presets (Playable Ad, 3D Scene Authoring, UI Overlay).
 
 ## 3. Technology Stack
 
@@ -119,7 +113,7 @@ Notes:
 - **Node:** Atomic element in the scene graph representing an entity (sprite, mesh, light).
 - **Scene:** YAML document describing root node hierarchy and references.
 - **Instance:** Inclusion of another scene file inside the active scene with optional overrides.
-- **Preset:** Saved layout configuration tailored to a persona’s workflow.
+- **Preset:** Saved layout configuration.
 - **Command:** Unit of business logic that mutates the state and can be undone/redone.
 
 ### 4.3 Operation Pipeline Blueprint (Legacy Inspiration)
@@ -223,7 +217,7 @@ root:
 - Establish Vite + TypeScript + Lit project with ESLint, Prettier, Vitest, and CI lint/test workflows.
 - Implement the basic architecture: AppState with Valtio, Command pattern contracts, and DI container wiring.
 - Integrate FileSystemAPIService to open a project folder, list assets, and load `.pix3scene` files.
-- Integrate Golden Layout to create a basic layout: Scene Tree, Viewport, Inspector, Asset Browser. Provide persona presets.
+- Integrate Golden Layout to create a basic layout: Scene Tree, Viewport, Inspector, Asset Browser. Provide layout presets.
 - Implement rendering of a simple 3D scene in the viewport using Three.js, including an orthographic pass for 2D overlays (single-engine pipeline).
 - Create SceneManager to parse and display the scene structure (`*.pix3scene`) and expose diff events.
 - Implement the `pix3-basic-tools-plugin` to add a tool for creating primitives (e.g., a cube) with undoable commands.
@@ -285,7 +279,7 @@ root:
 
 ## 10. Change Log
 
-- **1.5 (2025-09-26):** Added personas, target platforms, non-functional requirements, detailed architecture contracts, validation rules, and roadmap updates. Synced guidance on `fw` helpers.
+- **1.5 (2025-09-26):** Added target platforms, non-functional requirements, detailed architecture contracts, validation rules, and roadmap updates. Synced guidance on `fw` helpers.
 - **1.7 (2025-10-01):** Removed PixiJS dual-engine plan; consolidated rendering to single Three.js pipeline (perspective + orthographic). Updated project structure, removed obsolete adapter references, clarified rendering notes.
 
 ## 11. Plugin State Management

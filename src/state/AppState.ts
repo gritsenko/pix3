@@ -1,12 +1,3 @@
-export const PERSONA_IDS = [
-  'technical-artist',
-  'gameplay-engineer',
-  'playable-ad-producer',
-] as const;
-
-export type PersonaId = (typeof PERSONA_IDS)[number];
-
-export const DEFAULT_PERSONA: PersonaId = 'gameplay-engineer';
 
 export const THEME_IDS = ['dark', 'light', 'high-contrast'] as const;
 
@@ -79,7 +70,6 @@ export interface PanelVisibilityState {
 }
 
 export interface UIState {
-  persona: PersonaId;
   theme: ThemeName;
   isLayoutReady: boolean;
   focusedPanelId: string | null;
@@ -138,7 +128,6 @@ export const createInitialAppState = (): AppState => ({
     hoveredNodeId: null,
   },
   ui: {
-    persona: DEFAULT_PERSONA,
     theme: DEFAULT_THEME,
     isLayoutReady: false,
     focusedPanelId: null,

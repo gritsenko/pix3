@@ -2,23 +2,6 @@
 
 **Pix3** is a browser-based editor for building HTML5 scenes that blend 2D and 3D layers. It empowers creators to craft interactive experiences, playable ads, and multimedia content using modern web technologies.
 
-## 🎯 Target Personas
-
-### Technical Artist (TA)
-- **Primary Goal**: Create visually rich scenes combining 2D and 3D elements
-- **Key Features**: Visual scene composition, asset management, real-time preview
-- **Workflow**: Import assets → Compose scenes → Fine-tune properties → Export
-
-### Gameplay Engineer (GE)
-- **Primary Goal**: Build interactive mechanics and logic for scenes
-- **Key Features**: Node-based scripting, event system, behavior trees
-- **Workflow**: Design logic → Implement interactions → Test behavior → Integrate
-
-### Playable Ad Producer (PAP)
-- **Primary Goal**: Create engaging playable advertisements under strict constraints
-- **Key Features**: Export optimization, analytics hooks, size budgets
-- **Workflow**: Prototype concept → Optimize performance → Add tracking → Deploy
-
 ## 🚀 Quick Start
 
 ### Prerequisites

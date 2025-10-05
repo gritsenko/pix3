@@ -88,12 +88,8 @@ async handleRedo() {
 ### Added Files:
 - ✅ `CommandOperationAdapter.ts` (bridges Command → Operation)
 
-### Modified Files:
-All UI components now:
-```typescript
 // Before:
 @inject(CommandDispatcherService)
-private readonly commandDispatcher!: CommandDispatcherService;
 await this.commandDispatcher.execute(command);
 
 // After:
@@ -123,7 +119,6 @@ await this.operationService.invokeAndPush(wrapCommand(command));
        │ creates
        ▼
 ┌─────────────────┐
-│    Command      │
 └──────┬──────────┘
        │ wraps via
        ▼

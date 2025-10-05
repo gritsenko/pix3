@@ -16,7 +16,6 @@ export class RedoCommand extends CommandBase<void, void> {
     title: 'Redo',
     description: 'Redo the last undone action',
     keywords: ['redo', 'history'],
-    personas: ['technical-artist', 'gameplay-engineer', 'playable-ad-producer'],
   };
 
   private readonly dispatcher: CommandDispatcherService;

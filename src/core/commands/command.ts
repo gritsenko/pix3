@@ -1,6 +1,6 @@
 import { snapshot, type Snapshot } from 'valtio/vanilla';
 
-import type { AppState, AppStateSnapshot, PersonaId } from '@/state';
+import type { AppState, AppStateSnapshot } from '@/state';
 import { ServiceContainer } from '@/fw/di';
 
 /**
@@ -21,7 +21,6 @@ export interface CommandMetadata {
   readonly title: string;
   readonly description?: string;
   readonly keywords?: readonly string[];
-  readonly personas?: readonly PersonaId[];
 }
 
 /**

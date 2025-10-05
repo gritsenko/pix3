@@ -54,7 +54,6 @@ export class SelectObjectCommand extends CommandBase<
     title: 'Select Object',
     description: 'Select one or more objects in the scene hierarchy',
     keywords: ['select', 'object', 'node', 'hierarchy'],
-    personas: ['technical-artist', 'gameplay-engineer'],
   };
 
   private readonly params: SelectObjectParams;

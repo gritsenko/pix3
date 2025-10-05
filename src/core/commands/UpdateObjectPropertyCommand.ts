@@ -64,7 +64,6 @@ export class UpdateObjectPropertyCommand extends CommandBase<
     title: 'Update Object Property',
     description: 'Update a property on a scene object',
     keywords: ['update', 'property', 'object', 'node', 'transform'],
-    personas: ['technical-artist', 'gameplay-engineer'],
   };
 
   private readonly params: UpdateObjectPropertyParams;

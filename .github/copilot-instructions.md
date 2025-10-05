@@ -7,7 +7,7 @@ These guardrails help generate consistent code and documentation for the Pix3 ed
 - **Pix3** is a browser-based editor for building HTML5 scenes that blend 2D and 3D layers, targeting playable ads and interactive experiences.
 - **Target stack**: TypeScript + Vite, Lit web components with custom `fw` utilities, Valtio for reactive state, Three.js for 3D rendering, Golden Layout for dockable panels.
 - **Source of truth**: `docs/pix3-specification.md` (v1.5, 2025-09-26) contains all requirements, architecture decisions, and MVP roadmap.
-- **Target personas**: Technical Artist (scene composition), Gameplay Engineer (scripting/plugins), Playable Ad Producer (optimization/export).
+- **Target users**: Scene composers, gameplay developers, ad producers.
 
 ## Essential Architecture Patterns
 
@@ -33,7 +33,7 @@ These guardrails help generate consistent code and documentation for the Pix3 ed
 - Commands follow strict lifecycle: `preconditions()` → `execute()` → `postCommit()`.
 - Must be idempotent and emit telemetry events on execution.
 - Return undo payloads from `postCommit()` for `HistoryManager` integration.
-- Register commands via metadata with personas, keywords for command palette.
+- Register commands via metadata with keywords for command palette.
 
 ## Critical Development Setup
 
@@ -56,7 +56,7 @@ These guardrails help generate consistent code and documentation for the Pix3 ed
 ### Entry Point Flow
 1. `src/main.ts` imports `reflect-metadata`, Golden Layout CSS, and registers all components
 2. `index.html` renders `<pix3-editor>` shell component
-3. Shell initializes Golden Layout with persona-based presets
+3. Shell initializes Golden Layout with layout presets
 
 ## File Structure Conventions
 

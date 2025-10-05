@@ -15,16 +15,16 @@ This tracker summarizes the execution status derived from `pix3-specification.md
 - [x] Scaffold repo structure per spec (src/components, src/core, src/plugins, src/rendering, src/services, src/state, src/styles)
 - [x] Implement `fw` helpers (`ComponentBase`, DI container, injectables) and export barrel in `docs/fw`
 - [x] Establish CI pipeline (lint, type-check, test) and add ESLint + Prettier configuration
-- [x] Author initial README with setup workflow and persona overview
+- [x] Author initial README with setup workflow
 
 ### Milestone 1 — Scene Authoring (Not started)
 - [x] Implement Valtio-based `AppState` and expose proxy via `src/state/index.ts`
 - [x] Define command contracts (`src/core/commands/command.ts`) and telemetry hooks
 - [x] Build `HistoryManager`, `OperationService`, and supporting operation abstractions (bulk, undo payloads)
 - [x] Implement FileSystemAPIService for project folder access, YAML loading, and error handling
-- [x] Integrate Golden Layout shell with Scene Tree, Viewport, Inspector, Asset Browser panels and persona presets
-	- Bootstrapped `LayoutManagerService` with persona-aware presets and registered panel components (`scene-tree`, `viewport`, `inspector`, `asset-browser`).
-	- Added `pix3-editor` shell with persona picker, loading overlay, and Golden Layout host wired through DI.
+ - [x] Integrate Golden Layout shell with Scene Tree, Viewport, Inspector, Asset Browser panels
+ 	- Bootstrapped `LayoutManagerService` with layout presets and registered panel components (`scene-tree`, `viewport`, `inspector`, `asset-browser`).
+ 	- Added `pix3-editor` shell with loading overlay and Golden Layout host wired through DI.
 - [x] Create foundational UI components extending `ComponentBase` with DI usage and keyboard-accessible chrome
 - [ ] Stand up unified Three.js rendering pipeline (perspective + orthographic pass), camera controls, lighting primitives — in progress (renderer service initialized; needs scene wiring)
 - [x] Build `SceneManager`, node classes (`NodeBase`, `Node3D`, `Sprite2D`), and YAML schema validation pipeline
@@ -45,5 +45,5 @@ This tracker summarizes the execution status derived from `pix3-specification.md
 - [ ] Performance: verify ≥85 FPS on baseline hardware, cold start <6s, command latency <80ms
 - [ ] Internationalization: wire i18n keys with EN/RU bundles and localized YAML support (`locale` blocks)
 - [ ] Testing: add Vitest suites for command history, renderer facades, FileSystem API mocks, scene parsing
-- [ ] Documentation: draft persona-specific onboarding checklists (TA, GE, PAP) and plugin SDK guidance
+- [ ] Documentation: draft onboarding checklists and plugin SDK guidance
 <parameter name="filePath">/Users/igor.gritsenko/Projects/pix3/todo.md
