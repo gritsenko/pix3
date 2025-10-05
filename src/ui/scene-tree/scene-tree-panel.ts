@@ -5,8 +5,7 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 
 import { ComponentBase, customElement, html, state, inject } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
-import { SelectObjectCommand } from '@/core/commands/SelectObjectCommand';
-import { wrapCommand } from '@/core/commands/CommandOperationAdapter';
+import { SelectObjectOperation } from '@/core/operations/SelectObjectOperation';
 import { OperationService } from '@/core/operations/OperationService';
 import type { NodeBase } from '@/core/scene/nodes/NodeBase';
 
@@ -287,14 +286,14 @@ export class SceneTreePanel extends ComponentBase {
     const isRange = mouseEvent.shiftKey;
 
     // Execute selection command via dispatcher
-    const command = new SelectObjectCommand({
+    const op = new SelectObjectOperation({
       nodeId,
       additive: isAdditive,
       range: isRange,
     });
 
     try {
-      await this.operationService.invokeAndPush(wrapCommand(command));
+  await this.operationService.invokeAndPush(op);
       // Selection state will be automatically updated via subscription
       console.log(`Selected node: ${nodeId}`, {
         additive: isAdditive,

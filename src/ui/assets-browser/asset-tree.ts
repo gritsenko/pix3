@@ -5,7 +5,8 @@ import feather from 'feather-icons';
 import type { FileDescriptor } from '@/services/FileSystemAPIService';
 import { ProjectService } from '@/services/ProjectService';
 import { ResourceManager } from '@/services/ResourceManager';
-import { LoadSceneCommand } from '@/core/commands/LoadSceneCommand';
+import { OperationService } from '@/core/operations/OperationService';
+import { LoadSceneOperation } from '@/core/operations/LoadSceneOperation';
 import './asset-tree.ts.css';
 
 type Node = {
@@ -23,8 +24,8 @@ export class AssetTree extends ComponentBase {
   private readonly projectService!: ProjectService;
   @inject(ResourceManager)
   private readonly resourceManager!: ResourceManager;
-  @inject(LoadSceneCommand)
-  private readonly loadSceneCommand!: LoadSceneCommand;
+  @inject(OperationService)
+  private readonly operationService!: OperationService;
 
   // root path to show, defaults to project root
   @property({ type: String }) rootPath = '.';
@@ -134,10 +135,7 @@ export class AssetTree extends ComponentBase {
     const sceneId = this.deriveSceneId(resourcePath);
 
     try {
-      await this.loadSceneCommand.execute({
-        filePath: resourcePath,
-        sceneId,
-      });
+      await this.operationService.invoke(new LoadSceneOperation({ filePath: resourcePath, sceneId }));
       this.dispatchEvent(
         new CustomEvent('pix3-scene-loaded', {
           detail: { filePath: resourcePath, sceneId },

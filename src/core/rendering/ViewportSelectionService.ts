@@ -14,14 +14,11 @@ import { subscribe } from 'valtio/vanilla';
 
 import { injectable, ServiceLifetime, inject } from '@/fw/di';
 import { appState } from '@/state';
-import { SelectObjectCommand } from '@/core/commands/SelectObjectCommand';
-import { wrapCommand } from '@/core/commands/CommandOperationAdapter';
+import { SelectObjectOperation } from '@/core/operations/SelectObjectOperation';
 import { OperationService } from '@/core/operations/OperationService';
 import { SceneManager } from '@/core/scene/SceneManager';
 import { NodeBase } from '@/core/scene/nodes/NodeBase';
 
-type UpdateObjectPropertyCommandCtor =
-  typeof import('../commands/UpdateObjectPropertyCommand').UpdateObjectPropertyCommand;
 
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 
@@ -46,7 +43,7 @@ export class ViewportSelectionService {
   private disposeSelectionSubscription?: () => void;
   private isApplyingViewportTransform = false;
   private suppressClickUntil = 0;
-  private updateCommandCtor?: UpdateObjectPropertyCommandCtor;
+  // no cached command ctor; using operations directly
 
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
@@ -227,14 +224,14 @@ export class ViewportSelectionService {
     const isRange = event.shiftKey;
 
     // Execute selection command via dispatcher
-    const command = new SelectObjectCommand({
+    const op = new SelectObjectOperation({
       nodeId: selectedNodeId,
       additive: isAdditive,
       range: isRange,
     });
 
     try {
-      await this.operationService.invokeAndPush(wrapCommand(command));
+      await this.operationService.invokeAndPush(op);
       this.updateSelection();
     } catch (error) {
       console.error('[ViewportSelectionService] Failed to execute selection command', error);
@@ -377,21 +374,15 @@ export class ViewportSelectionService {
       return;
     }
 
-    if (!this.updateCommandCtor) {
-      const module = await import('../commands/UpdateObjectPropertyCommand');
-      this.updateCommandCtor = module.UpdateObjectPropertyCommand;
-    }
-    const UpdateObjectPropertyCommand = this.updateCommandCtor;
-
     for (const update of updates) {
-      const command = new UpdateObjectPropertyCommand({
+      const op = new (await import('@/core/operations/UpdateObjectPropertyOperation')).UpdateObjectPropertyOperation({
         nodeId,
         propertyPath: update.propertyPath,
         value: update.value,
       });
 
       try {
-        await this.operationService.invokeAndPush(wrapCommand(command));
+        await this.operationService.invokeAndPush(op);
       } catch (error) {
         console.error('[ViewportSelectionService] Failed to sync viewport transform', error);
         break;

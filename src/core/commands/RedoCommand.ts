@@ -5,7 +5,7 @@ import {
   type CommandContext,
   type CommandPreconditionResult,
 } from './command';
-import type { CommandDispatcherService } from './CommandDispatcherService';
+import { OperationService } from '@/core/operations/OperationService';
 
 /**
  * Command that performs a redo operation by delegating to the CommandDispatcherService
@@ -18,15 +18,15 @@ export class RedoCommand extends CommandBase<void, void> {
     keywords: ['redo', 'history'],
   };
 
-  private readonly dispatcher: CommandDispatcherService;
+  private readonly operations: OperationService;
 
-  constructor(dispatcher: CommandDispatcherService) {
+  constructor(operations: OperationService) {
     super();
-    this.dispatcher = dispatcher;
+    this.operations = operations;
   }
 
   preconditions(_context: CommandContext): CommandPreconditionResult {
-    if (!this.dispatcher.canRedo()) {
+    if (!this.operations.history.canRedo) {
       return {
         canExecute: false,
         reason: 'No actions available to redo',
@@ -39,7 +39,7 @@ export class RedoCommand extends CommandBase<void, void> {
   }
 
   async execute(_context: CommandContext): Promise<CommandExecutionResult<void>> {
-    const success = await this.dispatcher.redo();
+  const success = await this.operations.redo();
 
     return {
       didMutate: success,

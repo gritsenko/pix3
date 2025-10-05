@@ -15,3 +15,9 @@ export {
   type OperationEvent,
   type OperationEventListener,
 } from './OperationService';
+export { SelectObjectOperation, type SelectObjectParams } from './SelectObjectOperation';
+export {
+  UpdateObjectPropertyOperation,
+  type UpdateObjectPropertyParams,
+} from './UpdateObjectPropertyOperation';
+export { LoadSceneOperation, type LoadSceneParams } from './LoadSceneOperation';

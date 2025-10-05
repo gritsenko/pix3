@@ -5,7 +5,7 @@ import {
   type CommandContext,
   type CommandPreconditionResult,
 } from './command';
-import type { CommandDispatcherService } from './CommandDispatcherService';
+import { OperationService } from '@/core/operations/OperationService';
 
 /**
  * Command that performs an undo operation by delegating to the CommandDispatcherService
@@ -18,15 +18,15 @@ export class UndoCommand extends CommandBase<void, void> {
     keywords: ['undo', 'revert', 'history'],
   };
 
-  private readonly dispatcher: CommandDispatcherService;
+  private readonly operations: OperationService;
 
-  constructor(dispatcher: CommandDispatcherService) {
+  constructor(operations: OperationService) {
     super();
-    this.dispatcher = dispatcher;
+    this.operations = operations;
   }
 
   preconditions(_context: CommandContext): CommandPreconditionResult {
-    if (!this.dispatcher.canUndo()) {
+    if (!this.operations.history.canUndo) {
       return {
         canExecute: false,
         reason: 'No actions available to undo',
@@ -39,7 +39,7 @@ export class UndoCommand extends CommandBase<void, void> {
   }
 
   async execute(_context: CommandContext): Promise<CommandExecutionResult<void>> {
-    const success = await this.dispatcher.undo();
+  const success = await this.operations.undo();
 
     return {
       didMutate: success,

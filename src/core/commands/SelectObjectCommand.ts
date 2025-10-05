@@ -1,29 +1,8 @@
-import {
-  CommandBase,
-  type CommandExecutionResult,
-  type CommandMetadata,
-  type CommandContext,
-  type CommandUndoPayload,
-} from './command';
-import type { AppStateSnapshot } from '@/state';
+import { CommandBase, type CommandExecutionResult, type CommandMetadata, type CommandContext } from './command';
+import { OperationService } from '@/core/operations/OperationService';
+import { SelectObjectOperation } from '@/core/operations/SelectObjectOperation';
 
-export interface SelectObjectExecutePayload {
-  /** The node IDs that were selected */
-  selectedNodeIds: string[];
-  /** The primary node ID that was selected */
-  primaryNodeId: string | null;
-  /** Whether this was an additive selection (Ctrl+click) */
-  isAdditive: boolean;
-  /** Whether this was a multi-selection range (Shift+click) */
-  isRange: boolean;
-}
-
-export interface SelectObjectUndoPayload {
-  /** Previous selection state to restore */
-  previousNodeIds: readonly string[];
-  /** Previous primary node to restore */
-  previousPrimaryNodeId: string | null;
-}
+export interface SelectObjectExecutePayload {}
 
 export interface SelectObjectParams {
   /** Node ID to select. If null, deselect all */
@@ -45,10 +24,7 @@ export interface SelectObjectParams {
  *
  * This command is undoable and will restore previous selection state.
  */
-export class SelectObjectCommand extends CommandBase<
-  SelectObjectExecutePayload,
-  SelectObjectUndoPayload
-> {
+export class SelectObjectCommand extends CommandBase<SelectObjectExecutePayload, void> {
   readonly metadata: CommandMetadata = {
     id: 'scene.select-object',
     title: 'Select Object',
@@ -63,137 +39,16 @@ export class SelectObjectCommand extends CommandBase<
     this.params = params;
   }
 
-  execute(context: CommandContext): CommandExecutionResult<SelectObjectExecutePayload> {
-    const { state, snapshot } = context;
-    const { nodeId, additive = false, range = false, makePrimary = false } = this.params;
-
-    let newNodeIds: string[];
-    let newPrimaryNodeId: string | null;
-
-    if (nodeId === null) {
-      // Deselect all
-      newNodeIds = [];
-      newPrimaryNodeId = null;
-    } else if (range && snapshot.selection.primaryNodeId) {
-      // Range selection: select from primary to target
-      const sceneHierarchy = this.getActiveSceneHierarchy(snapshot);
-      if (sceneHierarchy) {
-        const allNodeIds = this.collectAllNodeIds(sceneHierarchy.rootNodes);
-        const primaryIndex = allNodeIds.indexOf(snapshot.selection.primaryNodeId);
-        const targetIndex = allNodeIds.indexOf(nodeId);
-
-        if (primaryIndex !== -1 && targetIndex !== -1) {
-          const startIndex = Math.min(primaryIndex, targetIndex);
-          const endIndex = Math.max(primaryIndex, targetIndex);
-          newNodeIds = allNodeIds.slice(startIndex, endIndex + 1);
-          newPrimaryNodeId = snapshot.selection.primaryNodeId; // Keep original primary
-        } else {
-          // Fallback to single selection if range can't be determined
-          newNodeIds = [nodeId];
-          newPrimaryNodeId = nodeId;
-        }
-      } else {
-        newNodeIds = [nodeId];
-        newPrimaryNodeId = nodeId;
-      }
-    } else if (additive) {
-      // Additive selection: toggle node in current selection
-      const currentSelection = new Set(snapshot.selection.nodeIds);
-      if (currentSelection.has(nodeId)) {
-        // Remove from selection
-        currentSelection.delete(nodeId);
-        newNodeIds = Array.from(currentSelection);
-        // If we removed the primary, pick a new one or clear it
-        newPrimaryNodeId =
-          snapshot.selection.primaryNodeId === nodeId
-            ? newNodeIds.length > 0
-              ? newNodeIds[0]
-              : null
-            : snapshot.selection.primaryNodeId;
-      } else {
-        // Add to selection
-        currentSelection.add(nodeId);
-        newNodeIds = Array.from(currentSelection);
-        newPrimaryNodeId =
-          makePrimary || !snapshot.selection.primaryNodeId
-            ? nodeId
-            : snapshot.selection.primaryNodeId;
-      }
-    } else {
-      // Single selection: replace current selection
-      newNodeIds = [nodeId];
-      newPrimaryNodeId = nodeId;
-    }
-
-    // Update state
-    state.selection.nodeIds = newNodeIds;
-    state.selection.primaryNodeId = newPrimaryNodeId;
-
-    return {
-      didMutate: true,
-      payload: {
-        selectedNodeIds: newNodeIds,
-        primaryNodeId: newPrimaryNodeId,
-        isAdditive: additive,
-        isRange: range,
-      },
-    };
+  async execute(context: CommandContext): Promise<CommandExecutionResult<SelectObjectExecutePayload>> {
+    const operations = context.container.getService<OperationService>(
+      context.container.getOrCreateToken(OperationService)
+    );
+    const op = new SelectObjectOperation(this.params);
+    const pushed = await operations.invokeAndPush(op);
+    return { didMutate: pushed, payload: {} };
   }
 
-  postCommit(
-    context: CommandContext,
-    _payload: SelectObjectExecutePayload
-  ): CommandUndoPayload<SelectObjectUndoPayload> {
-    return {
-      previousNodeIds: context.snapshot.selection.nodeIds,
-      previousPrimaryNodeId: context.snapshot.selection.primaryNodeId,
-    };
-  }
-
-  /**
-   * Undo the selection by restoring the previous selection state
-   */
-  async undo(context: CommandContext, undoPayload: SelectObjectUndoPayload): Promise<void> {
-    const { state } = context;
-    const { previousNodeIds, previousPrimaryNodeId } = undoPayload;
-
-    // Restore previous selection
-    state.selection.nodeIds = [...previousNodeIds];
-    state.selection.primaryNodeId = previousPrimaryNodeId;
-  }
-
-  /**
-   * Redo the selection by re-applying the new selection
-   */
-  async redo(context: CommandContext): Promise<void> {
-    // Re-execute the command
-    await this.execute(context);
-  }
-
-  private getActiveSceneHierarchy(snapshot: AppStateSnapshot) {
-    const activeSceneId = snapshot.scenes.activeSceneId;
-    return activeSceneId ? snapshot.scenes.hierarchies[activeSceneId] : null;
-  }
-
-  private collectAllNodeIds(
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    nodes: readonly any[]
-  ): string[] {
-    const result: string[] = [];
-    const collectRecursive = (
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      nodeList: readonly any[]
-    ) => {
-      for (const node of nodeList) {
-        result.push(node.nodeId || node.id);
-        if (node.children?.length > 0) {
-          collectRecursive(node.children);
-        }
-      }
-    };
-    collectRecursive(nodes);
-    return result;
-  }
+  // No local helpers needed; selection logic is handled by the SelectObjectOperation
 }
 
 /**

@@ -2,7 +2,7 @@ import { subscribe } from 'valtio/vanilla';
 
 import { ComponentBase, customElement, html, inject, property, state } from '@/fw';
 import { LayoutManagerService } from '@/core/layout/LayoutManager';
-import { LoadSceneCommand } from '@/core/commands/LoadSceneCommand';
+import { LoadSceneOperation } from '@/core/operations/LoadSceneOperation';
 import { OperationService } from '@/core/operations/OperationService';
 import { appState } from '@/state';
 import './shared/pix3-toolbar';
@@ -18,8 +18,7 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(OperationService)
   private readonly operationService!: OperationService;
 
-  // Inject command used to load the startup scene
-  @inject(LoadSceneCommand) private readonly loadSceneCommand!: LoadSceneCommand;
+  // No longer injecting LoadSceneCommand; using LoadSceneOperation with OperationService
   // project open handled by <pix3-welcome>
 
   @state()
@@ -159,7 +158,7 @@ export class Pix3EditorShell extends ComponentBase {
       if (process.env.NODE_ENV === 'development') {
         console.debug('[Pix3Editor] Loading startup scene', { pending });
       }
-      await this.loadSceneCommand.execute({ filePath: pending });
+  await this.operationService.invoke(new LoadSceneOperation({ filePath: pending }));
     }
   }
 

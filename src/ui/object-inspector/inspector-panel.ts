@@ -4,8 +4,7 @@ import { appState } from '@/state';
 import type { NodeBase } from '@/core/scene/nodes/NodeBase';
 import { Node3D } from '@/core/scene/nodes/Node3D';
 import { Sprite2D } from '@/core/scene/nodes/2D/Sprite2D';
-import { UpdateObjectPropertyCommand } from '@/core/commands/UpdateObjectPropertyCommand';
-import { wrapCommand } from '@/core/commands/CommandOperationAdapter';
+import { UpdateObjectPropertyOperation } from '@/core/operations/UpdateObjectPropertyOperation';
 import { OperationService } from '@/core/operations/OperationService';
 
 import '../shared/pix3-panel';
@@ -215,14 +214,14 @@ export class InspectorPanel extends ComponentBase {
     this.nameValue = input.value;
 
     if (this.primaryNode) {
-      const command = new UpdateObjectPropertyCommand({
+      const op = new UpdateObjectPropertyOperation({
         nodeId: this.primaryNode.nodeId,
         propertyPath: 'name',
         value: input.value,
       });
 
       try {
-        await this.operationService.invokeAndPush(wrapCommand(command));
+        await this.operationService.invokeAndPush(op);
       } catch (error) {
         console.error('[InspectorPanel] Failed to execute name update command', error);
       }
@@ -234,14 +233,14 @@ export class InspectorPanel extends ComponentBase {
     this.visibleValue = checkbox.checked;
 
     if (this.primaryNode) {
-      const command = new UpdateObjectPropertyCommand({
+      const op = new UpdateObjectPropertyOperation({
         nodeId: this.primaryNode.nodeId,
         propertyPath: 'visible',
         value: checkbox.checked,
       });
 
       try {
-        await this.operationService.invokeAndPush(wrapCommand(command));
+        await this.operationService.invokeAndPush(op);
       } catch (error) {
         console.error('[InspectorPanel] Failed to execute visibility update command', error);
         // Revert the UI state on error
@@ -313,14 +312,14 @@ export class InspectorPanel extends ComponentBase {
   ) {
     if (!this.primaryNode) return;
 
-    const command = new UpdateObjectPropertyCommand({
+    const op = new UpdateObjectPropertyOperation({
       nodeId: this.primaryNode.nodeId,
       propertyPath: `${field}.${axis}`,
       value: value,
     });
 
     try {
-      await this.operationService.invokeAndPush(wrapCommand(command));
+      await this.operationService.invokeAndPush(op);
     } catch (error) {
       console.error('[InspectorPanel] Failed to execute transform update command', error);
     }
