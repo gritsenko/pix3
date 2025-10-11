@@ -48,8 +48,7 @@ pix3-panel {
   border-radius: 0.15rem;
   background: transparent;
   border: none;
-  transition:
-    background 120ms ease;
+  transition: background 120ms ease;
 }
 
 .tree-node__content:hover {
