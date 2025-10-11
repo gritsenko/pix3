@@ -296,7 +296,10 @@ export class ViewportRendererService {
         case 'glbmodel': {
           // Placeholder: real GLB loading should be implemented via ResourceManager/Three.js loader
           // For now, visualize as a box until asset system is wired.
-          const mesh = this.createMeshForNode(node, { geometry: 'box', material: { color: '#77cc77' } });
+          const mesh = this.createMeshForNode(node, {
+            geometry: 'box',
+            material: { color: '#77cc77' },
+          });
           if (mesh) container.add(mesh);
           break;
         }

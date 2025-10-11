@@ -1,4 +1,3 @@
-
 export const THEME_IDS = ['dark', 'light', 'high-contrast'] as const;
 
 export type ThemeName = (typeof THEME_IDS)[number];

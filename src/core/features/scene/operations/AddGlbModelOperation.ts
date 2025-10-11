@@ -1,4 +1,9 @@
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/operations/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/operations/Operation';
 import { SceneManager } from '@/core/scene/SceneManager';
 import { ViewportRendererService } from '@/core/rendering/ViewportRendererService';
 import { GlbModel } from '@/core/scene/nodes/3D/GlbModel';
@@ -27,7 +32,9 @@ export class AddGlbModelOperation implements Operation<OperationInvokeResult> {
 
   async perform(context: OperationContext): Promise<OperationInvokeResult> {
     const { container, state } = context;
-    const sceneManager = container.getService<SceneManager>(container.getOrCreateToken(SceneManager));
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
+    );
     const sceneGraph = sceneManager.getActiveSceneGraph();
     if (!sceneGraph) {
       return { didMutate: false };
@@ -52,7 +59,9 @@ export class AddGlbModelOperation implements Operation<OperationInvokeResult> {
 
     // Determine parent
     const preferredParentId = this.params.parentId ?? state.selection.primaryNodeId ?? null;
-    const parent: NodeBase | null = preferredParentId ? sceneGraph.nodeMap.get(preferredParentId) ?? null : null;
+    const parent: NodeBase | null = preferredParentId
+      ? (sceneGraph.nodeMap.get(preferredParentId) ?? null)
+      : null;
 
     if (parent) {
       parent.adoptChild(node);
@@ -70,7 +79,9 @@ export class AddGlbModelOperation implements Operation<OperationInvokeResult> {
     }
 
     try {
-      const vr = container.getService<ViewportRendererService>(container.getOrCreateToken(ViewportRendererService));
+      const vr = container.getService<ViewportRendererService>(
+        container.getOrCreateToken(ViewportRendererService)
+      );
       vr.setSceneGraph(sceneGraph, { preserveCamera: true });
     } catch {}
 
@@ -94,7 +105,9 @@ export class AddGlbModelOperation implements Operation<OperationInvokeResult> {
             if (descriptor) descriptor.isDirty = true;
           }
           try {
-            const vr = container.getService<ViewportRendererService>(container.getOrCreateToken(ViewportRendererService));
+            const vr = container.getService<ViewportRendererService>(
+              container.getOrCreateToken(ViewportRendererService)
+            );
             vr.setSceneGraph(sceneGraph, { preserveCamera: true });
           } catch {}
         },
@@ -111,7 +124,9 @@ export class AddGlbModelOperation implements Operation<OperationInvokeResult> {
             if (descriptor) descriptor.isDirty = true;
           }
           try {
-            const vr = container.getService<ViewportRendererService>(container.getOrCreateToken(ViewportRendererService));
+            const vr = container.getService<ViewportRendererService>(
+              container.getOrCreateToken(ViewportRendererService)
+            );
             vr.setSceneGraph(sceneGraph, { preserveCamera: true });
           } catch {}
         },

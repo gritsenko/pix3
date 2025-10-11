@@ -1,4 +1,9 @@
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/operations/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/operations/Operation';
 import type { AppStateSnapshot } from '@/state';
 
 export interface SelectObjectParams {
@@ -107,9 +112,10 @@ export class SelectObjectOperation implements Operation<OperationInvokeResult> {
       }
       current.add(nodeId);
       const ids = Array.from(current);
-      const newPrimary = makePrimary || !snapshot.selection.primaryNodeId
-        ? nodeId
-        : snapshot.selection.primaryNodeId;
+      const newPrimary =
+        makePrimary || !snapshot.selection.primaryNodeId
+          ? nodeId
+          : snapshot.selection.primaryNodeId;
       return { newNodeIds: ids, newPrimaryNodeId: newPrimary };
     }
 

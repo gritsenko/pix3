@@ -1,4 +1,9 @@
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/operations/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/operations/Operation';
 import { appState } from '@/state';
 import { SceneManager } from '@/core/scene/SceneManager';
 import { SceneValidationError } from '@/core/scene/SceneLoader';
@@ -28,8 +33,12 @@ export class LoadSceneOperation implements Operation<OperationInvokeResult> {
     const { container } = context;
     const { filePath } = this.params;
 
-    const resources = container.getService<ResourceManager>(container.getOrCreateToken(ResourceManager));
-    const sceneManager = container.getService<SceneManager>(container.getOrCreateToken(SceneManager));
+    const resources = container.getService<ResourceManager>(
+      container.getOrCreateToken(ResourceManager)
+    );
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
+    );
 
     appState.scenes.loadState = 'loading';
     appState.scenes.loadError = null;
@@ -40,7 +49,12 @@ export class LoadSceneOperation implements Operation<OperationInvokeResult> {
 
       const activeId = this.params.sceneId ?? appState.scenes.activeSceneId ?? 'startup-scene';
       const existing = appState.scenes.descriptors[activeId] ?? null;
-      const sceneName = this.deriveSceneName(resources, filePath, graph.metadata ?? {}, existing?.name);
+      const sceneName = this.deriveSceneName(
+        resources,
+        filePath,
+        graph.metadata ?? {},
+        existing?.name
+      );
       if (!existing) {
         appState.scenes.descriptors[activeId] = {
           id: activeId,
@@ -72,7 +86,9 @@ export class LoadSceneOperation implements Operation<OperationInvokeResult> {
       };
       appState.scenes.loadState = 'ready';
       appState.scenes.lastLoadedAt = Date.now();
-      appState.scenes.pendingScenePaths = appState.scenes.pendingScenePaths.filter(p => p !== filePath);
+      appState.scenes.pendingScenePaths = appState.scenes.pendingScenePaths.filter(
+        p => p !== filePath
+      );
       appState.project.lastOpenedScenePath = filePath;
 
       return { didMutate: true };

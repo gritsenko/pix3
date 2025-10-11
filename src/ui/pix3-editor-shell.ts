@@ -33,7 +33,7 @@ export class Pix3EditorShell extends ComponentBase {
 
   connectedCallback(): void {
     super.connectedCallback();
-    
+
     // Setup keyboard shortcuts
     this.keyboardHandler = this.handleKeyboardShortcuts.bind(this);
     window.addEventListener('keydown', this.keyboardHandler);
@@ -158,7 +158,7 @@ export class Pix3EditorShell extends ComponentBase {
       if (process.env.NODE_ENV === 'development') {
         console.debug('[Pix3Editor] Loading startup scene', { pending });
       }
-  await this.operationService.invoke(new LoadSceneOperation({ filePath: pending }));
+      await this.operationService.invoke(new LoadSceneOperation({ filePath: pending }));
     }
   }
 

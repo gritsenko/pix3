@@ -107,7 +107,7 @@ export class SceneLoader {
       });
     }
 
-  switch (definition.type) {
+    switch (definition.type) {
       case 'Sprite2D': {
         const { position, scale, rotation, texturePath, ...rest } = baseProps.properties as Record<
           string,

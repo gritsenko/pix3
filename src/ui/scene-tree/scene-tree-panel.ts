@@ -38,9 +38,7 @@ export class SceneTreePanel extends ComponentBase {
   private activeSceneId: string | null = appState.scenes.activeSceneId;
 
   @state()
-  private hierarchy: SceneTreeNode[] = this.buildTreeNodes(
-    this.resolveActiveHierarchyNodes()
-  );
+  private hierarchy: SceneTreeNode[] = this.buildTreeNodes(this.resolveActiveHierarchyNodes());
 
   @state()
   private selectedNodeIds: string[] = [...appState.selection.nodeIds];
@@ -219,11 +217,7 @@ export class SceneTreePanel extends ComponentBase {
           @click=${(event: Event) => this.onSelectNode(event, node.id)}
         >
           ${expanderTemplate}
-          <span
-            class="tree-node__icon"
-            title=${node.type}
-            aria-label=${node.type}
-          >
+          <span class="tree-node__icon" title=${node.type} aria-label=${node.type}>
             ${this.renderNodeIcon(node.treeIcon)}
           </span>
           <span class="tree-node__label">
@@ -263,8 +257,6 @@ export class SceneTreePanel extends ComponentBase {
     }
     return 'Scene hierarchy will appear here once a project is loaded.';
   }
-
-
 
   private getNodeTooltip(node: SceneTreeNode): string {
     if (node.instancePath) {
@@ -313,7 +305,7 @@ export class SceneTreePanel extends ComponentBase {
     });
 
     try {
-  await this.operationService.invokeAndPush(op);
+      await this.operationService.invokeAndPush(op);
       // Selection state will be automatically updated via subscription
       console.log(`Selected node: ${nodeId}`, {
         additive: isAdditive,

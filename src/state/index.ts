@@ -24,11 +24,7 @@ export const resetAppState = (): void => {
   appState.telemetry = defaults.telemetry;
 };
 
-export {
-  DEFAULT_THEME,
-  THEME_IDS,
-  createInitialAppState,
-} from './AppState';
+export { DEFAULT_THEME, THEME_IDS, createInitialAppState } from './AppState';
 
 export type {
   AppState,

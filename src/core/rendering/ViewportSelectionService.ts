@@ -20,7 +20,6 @@ import { SceneManager } from '@/core/scene/SceneManager';
 import { NodeBase } from '@/core/scene/nodes/NodeBase';
 import { UpdateObjectPropertyOperation } from '@/core/features/properties/operations/UpdateObjectPropertyOperation';
 
-
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 
 /**

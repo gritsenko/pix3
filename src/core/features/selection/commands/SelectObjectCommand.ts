@@ -1,6 +1,14 @@
-import { CommandBase, type CommandExecutionResult, type CommandMetadata, type CommandContext } from '@/core/commands/command';
+import {
+  CommandBase,
+  type CommandExecutionResult,
+  type CommandMetadata,
+  type CommandContext,
+} from '@/core/commands/command';
 import { OperationService } from '@/core/operations/OperationService';
-import { SelectObjectOperation, type SelectObjectParams } from '@/core/features/selection/operations/SelectObjectOperation';
+import {
+  SelectObjectOperation,
+  type SelectObjectParams,
+} from '@/core/features/selection/operations/SelectObjectOperation';
 
 export interface SelectObjectExecutePayload {}
 
@@ -19,7 +27,9 @@ export class SelectObjectCommand extends CommandBase<SelectObjectExecutePayload,
     this.params = params;
   }
 
-  async execute(context: CommandContext): Promise<CommandExecutionResult<SelectObjectExecutePayload>> {
+  async execute(
+    context: CommandContext
+  ): Promise<CommandExecutionResult<SelectObjectExecutePayload>> {
     const operations = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );
@@ -29,7 +39,10 @@ export class SelectObjectCommand extends CommandBase<SelectObjectExecutePayload,
   }
 }
 
-export const createSelectObjectCommand = (params: SelectObjectParams) => new SelectObjectCommand(params);
+export const createSelectObjectCommand = (params: SelectObjectParams) =>
+  new SelectObjectCommand(params);
 export const selectObject = (nodeId: string | null) => new SelectObjectCommand({ nodeId });
-export const toggleObjectSelection = (nodeId: string) => new SelectObjectCommand({ nodeId, additive: true });
-export const selectObjectRange = (nodeId: string) => new SelectObjectCommand({ nodeId, range: true });
+export const toggleObjectSelection = (nodeId: string) =>
+  new SelectObjectCommand({ nodeId, additive: true });
+export const selectObjectRange = (nodeId: string) =>
+  new SelectObjectCommand({ nodeId, range: true });

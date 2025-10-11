@@ -1,5 +1,10 @@
 import { MathUtils, Vector3 } from 'three';
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/operations/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/operations/Operation';
 import { NodeBase } from '@/core/scene/nodes/NodeBase';
 import { Node3D } from '@/core/scene/nodes/Node3D';
 import { Sprite2D } from '@/core/scene/nodes/2D/Sprite2D';
@@ -30,7 +35,9 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     const { container, state } = context;
     const { nodeId, propertyPath, value } = this.params;
 
-    const sceneManager = container.getService<SceneManager>(container.getOrCreateToken(SceneManager));
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
+    );
     const sceneGraph = sceneManager.getActiveSceneGraph();
     if (!sceneGraph) {
       return { didMutate: false };
@@ -61,7 +68,9 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     }
 
     try {
-      const vr = container.getService<ViewportRendererService>(container.getOrCreateToken(ViewportRendererService));
+      const vr = container.getService<ViewportRendererService>(
+        container.getOrCreateToken(ViewportRendererService)
+      );
       const isTransform = this.isTransformProperty(propertyPath);
       const didUpdateInPlace = isTransform ? vr.updateNodeTransform(node) : false;
       if (!didUpdateInPlace) {
@@ -82,7 +91,9 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
             if (descriptor) descriptor.isDirty = true;
           }
           try {
-            const vr = container.getService<ViewportRendererService>(container.getOrCreateToken(ViewportRendererService));
+            const vr = container.getService<ViewportRendererService>(
+              container.getOrCreateToken(ViewportRendererService)
+            );
             const isTransform = this.isTransformProperty(propertyPath);
             const didUpdateInPlace = isTransform ? vr.updateNodeTransform(node) : false;
             if (!didUpdateInPlace) {
@@ -98,7 +109,9 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
             if (descriptor) descriptor.isDirty = true;
           }
           try {
-            const vr = container.getService<ViewportRendererService>(container.getOrCreateToken(ViewportRendererService));
+            const vr = container.getService<ViewportRendererService>(
+              container.getOrCreateToken(ViewportRendererService)
+            );
             const isTransform = this.isTransformProperty(propertyPath);
             const didUpdateInPlace = isTransform ? vr.updateNodeTransform(node) : false;
             if (!didUpdateInPlace) {
@@ -174,7 +187,8 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     if (parts.length === 1) {
       const property = parts[0];
       if (property === 'visible') {
-        if (typeof value !== 'boolean') return { isValid: false, reason: 'Visible must be boolean' };
+        if (typeof value !== 'boolean')
+          return { isValid: false, reason: 'Visible must be boolean' };
       } else if (property === 'name') {
         if (typeof value !== 'string') return { isValid: false, reason: 'Name must be string' };
       }
