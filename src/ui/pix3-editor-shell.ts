@@ -1,8 +1,8 @@
 import { subscribe } from 'valtio/vanilla';
 
 import { ComponentBase, customElement, html, inject, property, state } from '@/fw';
-import { LayoutManagerService } from '@/core/layout/LayoutManager';
-import { LoadSceneOperation } from '@/core/features/scene/operations/LoadSceneOperation';
+import { LayoutManagerService } from '@/core/LayoutManager';
+import { LoadSceneOperation } from '@/features/scene/operations/LoadSceneOperation';
 import { OperationService } from '@/core/operations/OperationService';
 import { appState } from '@/state';
 import './shared/pix3-toolbar';

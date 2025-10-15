@@ -7,9 +7,9 @@ import feather from 'feather-icons';
 
 import { ComponentBase, customElement, html, state, inject } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
-import { SelectObjectOperation } from '@/core/features/selection/operations/SelectObjectOperation';
+import { SelectObjectOperation } from '@/features/selection/operations/SelectObjectOperation';
 import { OperationService } from '@/core/operations/OperationService';
-import type { NodeBase } from '@/core/scene/nodes/NodeBase';
+import { NodeBase } from '@/core/NodeBase';
 
 import '../shared/pix3-panel';
 import './scene-tree-panel.ts.css';
@@ -107,16 +107,29 @@ export class SceneTreePanel extends ComponentBase {
   private syncSceneState(): void {
     const nextSceneId = appState.scenes.activeSceneId;
     const sceneChanged = this.activeSceneId !== nextSceneId;
+    const nextLoadState = appState.scenes.loadState;
+    const nextLoadError = appState.scenes.loadError;
+    const nextDescriptor = this.resolveActiveSceneDescriptor();
+    const nextHierarchyRoots = this.resolveActiveHierarchyNodes();
+    
+    // Only rebuild tree if scene changed, load state changed, or hierarchy changed
+    const needsRebuild = sceneChanged || 
+                         this.loadState !== nextLoadState ||
+                         this.loadError !== nextLoadError ||
+                         nextHierarchyRoots !== this.resolveActiveHierarchyNodes();
 
     this.activeSceneId = nextSceneId;
-    this.activeScene = this.resolveActiveSceneDescriptor();
-    this.hierarchy = this.buildTreeNodes(this.resolveActiveHierarchyNodes());
-    this.loadState = appState.scenes.loadState;
-    this.loadError = appState.scenes.loadError;
+    this.activeScene = nextDescriptor;
+    this.loadState = nextLoadState;
+    this.loadError = nextLoadError;
+
+    if (needsRebuild) {
+      this.hierarchy = this.buildTreeNodes(nextHierarchyRoots);
+    }
 
     if (sceneChanged) {
       this.collapsedNodeIds = new Set();
-    } else if (this.collapsedNodeIds.size > 0) {
+    } else if (this.collapsedNodeIds.size > 0 && needsRebuild) {
       const validIds = new Set<string>();
       this.collectNodeIds(this.hierarchy, validIds);
       const pruned = new Set([...this.collapsedNodeIds].filter(id => validIds.has(id)));
@@ -162,7 +175,8 @@ export class SceneTreePanel extends ComponentBase {
       treeColor: node.treeColor,
       treeIcon: node.treeIcon,
       instancePath: node.instancePath,
-      children: this.buildTreeNodes(node.children),
+      // Only include NodeBase children, filter out Three.js objects like Mesh, Light, etc.
+      children: this.buildTreeNodes(node.children.filter(child => child instanceof NodeBase)),
     }));
   }
 

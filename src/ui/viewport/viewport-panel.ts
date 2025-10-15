@@ -1,6 +1,5 @@
 import { ComponentBase, customElement, html, inject, subscribe, state, css, unsafeCSS } from '@/fw';
 import { ViewportRendererService, type TransformMode } from '@/core/rendering';
-import { SceneManager } from '@/core/scene';
 import { appState } from '@/state';
 import styles from './viewport-panel.ts.css?raw';
 @customElement('pix3-viewport-panel')
@@ -9,8 +8,7 @@ export class ViewportPanel extends ComponentBase {
 
   @inject(ViewportRendererService)
   private readonly viewportRenderer!: ViewportRendererService;
-  @inject(SceneManager)
-  private readonly sceneManager!: SceneManager;
+
 
   @state()
   private transformMode: TransformMode = 'translate';
@@ -121,20 +119,7 @@ export class ViewportPanel extends ComponentBase {
   }
 
   private syncViewportScene(): void {
-    const { loadState, activeSceneId } = appState.scenes;
-    const primaryGraph = activeSceneId ? this.sceneManager.getSceneGraph(activeSceneId) : null;
-    const fallbackGraph = this.sceneManager.getActiveSceneGraph();
-    const graph = primaryGraph ?? fallbackGraph;
-
-    if (graph) {
-      const preserveCamera = this.viewportRenderer.hasActiveSceneGraph();
-      this.viewportRenderer.setSceneGraph(graph, { preserveCamera });
-      return;
-    }
-
-    if (loadState === 'ready' && !this.viewportRenderer.hasActiveSceneGraph()) {
-      this.viewportRenderer.setSceneGraph(null);
-    }
+    // Renderer now auto-attaches active scene via subscription; nothing to do here
   }
 
   private handleTransformModeChange(mode: TransformMode): void {

@@ -1,6 +1,6 @@
 import { injectable, inject } from '@/fw/di';
 import { OperationService } from '@/core/operations/OperationService';
-import { LoadSceneOperation } from '@/core/features/scene/operations/LoadSceneOperation';
+import { LoadSceneOperation } from '@/features/scene/operations/LoadSceneOperation';
 import { AddGlbModelOperation } from '@/core/features/scene/operations/AddGlbModelOperation';
 
 export interface AssetActivation {
