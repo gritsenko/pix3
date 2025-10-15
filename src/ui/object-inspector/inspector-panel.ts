@@ -5,7 +5,7 @@ import type { NodeBase } from '@/core/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { UpdateObjectPropertyOperation } from '@/features/properties/UpdateObjectPropertyOperation';
-import { OperationService } from '@/core/OperationService';
+import { OperationService } from '@/services/OperationService';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';

@@ -5,7 +5,7 @@ import {
   type HistoryEntryInit,
   type HistoryEntryMetadata,
   type HistorySnapshot,
-} from './HistoryManager';
+} from '../core/HistoryManager';
 import {
   createOperationContext,
   snapshotOperationState,
@@ -15,7 +15,7 @@ import {
   type OperationInvokeOptions,
   type OperationInvokeResult,
   type OperationMetadata,
-} from './Operation';
+} from '../core/Operation';
 import { appState, type AppState, type AppStateSnapshot } from '@/state';
 
 export type OperationEvent =

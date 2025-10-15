@@ -1,5 +1,5 @@
 import { injectable, inject } from '@/fw/di';
-import { OperationService } from '@/core/OperationService';
+import { OperationService } from '@/services/OperationService';
 import { LoadSceneOperation } from '@/features/scene/LoadSceneOperation';
 
 export interface AssetActivation {

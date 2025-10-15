@@ -3,7 +3,7 @@ import { subscribe } from 'valtio/vanilla';
 import { ComponentBase, customElement, html, inject, property, state } from '@/fw';
 import { LayoutManagerService } from '@/core/LayoutManager';
 import { LoadSceneOperation } from '@/features/scene/LoadSceneOperation';
-import { OperationService } from '@/core/OperationService';
+import { OperationService } from '@/services/OperationService';
 import { appState } from '@/state';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';

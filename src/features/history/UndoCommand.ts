@@ -5,7 +5,7 @@ import {
   type CommandContext,
   type CommandPreconditionResult,
 } from '@/core/command';
-import { OperationService } from '@/core/OperationService';
+import { OperationService } from '@/services/OperationService';
 
 export class UndoCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
