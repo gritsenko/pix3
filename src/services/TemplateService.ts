@@ -1,6 +1,6 @@
 import { injectable } from '@/fw/di';
 
-import startupScene from './templates/startup-scene.pix3scene?raw';
+import startupScene from '../templates/startup-scene.pix3scene?raw';
 
 export type TemplateScheme = 'templ';
 
@@ -29,7 +29,7 @@ const sceneTemplates: SceneTemplateDescriptor[] = [
 ];
 
 @injectable()
-export class BaseTemplateService {
+export class TemplateService {
   private readonly sceneTemplateMap = new Map<string, SceneTemplateDescriptor>();
 
   constructor() {

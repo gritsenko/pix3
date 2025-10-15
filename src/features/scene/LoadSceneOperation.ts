@@ -7,7 +7,7 @@ import type {
 import { appState } from '@/state';
 import { SceneManager } from '@/core/SceneManager';
 import { SceneValidationError } from '@/core/SceneLoader';
-import type { SceneGraph } from '@/core/types';
+import type { SceneGraph } from '@/core/SceneManager';
 import { ResourceManager } from '@/services/ResourceManager';
 
 export interface LoadSceneParams {

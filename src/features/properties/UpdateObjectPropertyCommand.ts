@@ -4,11 +4,11 @@ import {
   type CommandMetadata,
   type CommandContext,
 } from '@/core/command';
-import { OperationService } from '@/core/operations/OperationService';
+import { OperationService } from '@/core/OperationService';
 import {
   UpdateObjectPropertyOperation,
   type UpdateObjectPropertyParams,
-} from '@/features/properties/operations/UpdateObjectPropertyOperation';
+} from '@/features/properties/UpdateObjectPropertyOperation';
 import { SceneManager } from '@/core/SceneManager';
 
 export interface UpdateObjectPropertyExecutePayload {}

@@ -9,7 +9,7 @@ import { NodeBase } from '@/core/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { SceneManager } from '@/core/SceneManager';
-import { ViewportRendererService } from '@/core/rendering/ViewportRendererService';
+import { ViewportRendererService } from '@/services/ViewportRenderService';
 
 export interface UpdateObjectPropertyParams {
   nodeId: string;

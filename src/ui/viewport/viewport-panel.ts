@@ -1,7 +1,8 @@
 import { ComponentBase, customElement, html, inject, subscribe, state, css, unsafeCSS } from '@/fw';
-import { ViewportRendererService, type TransformMode } from '@/core/rendering';
 import { appState } from '@/state';
 import styles from './viewport-panel.ts.css?raw';
+import { ViewportRendererService, type TransformMode } from '@/services/ViewportRenderService';
+
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
   static useShadowDom = true;

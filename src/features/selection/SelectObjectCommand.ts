@@ -4,11 +4,11 @@ import {
   type CommandMetadata,
   type CommandContext,
 } from '@/core/command';
-import { OperationService } from '@/core/operations/OperationService';
+import { OperationService } from '@/core/OperationService';
 import {
   SelectObjectOperation,
   type SelectObjectParams,
-} from '@/features/selection/operations/SelectObjectOperation';
+} from '@/features/selection/SelectObjectOperation';
 
 export interface SelectObjectExecutePayload {}
 

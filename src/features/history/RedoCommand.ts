@@ -5,14 +5,14 @@ import {
   type CommandContext,
   type CommandPreconditionResult,
 } from '@/core/command';
-import { OperationService } from '@/core/operations/OperationService';
+import { OperationService } from '@/core/OperationService';
 
-export class UndoCommand extends CommandBase<void, void> {
+export class RedoCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
-    id: 'edit.undo',
-    title: 'Undo',
-    description: 'Undo the last action',
-    keywords: ['undo', 'revert', 'history'],
+    id: 'edit.redo',
+    title: 'Redo',
+    description: 'Redo the last undone action',
+    keywords: ['redo', 'history'],
   };
 
   private readonly operations: OperationService;
@@ -23,10 +23,10 @@ export class UndoCommand extends CommandBase<void, void> {
   }
 
   preconditions(_context: CommandContext): CommandPreconditionResult {
-    if (!this.operations.history.canUndo) {
+    if (!this.operations.history.canRedo) {
       return {
         canExecute: false,
-        reason: 'No actions available to undo',
+        reason: 'No actions available to redo',
         scope: 'service',
         recoverable: false,
       };
@@ -36,7 +36,7 @@ export class UndoCommand extends CommandBase<void, void> {
   }
 
   async execute(_context: CommandContext): Promise<CommandExecutionResult<void>> {
-    const success = await this.operations.undo();
+    const success = await this.operations.redo();
 
     return {
       didMutate: success,

@@ -1,11 +1,11 @@
 import { ComponentBase, customElement, html, state, subscribe, inject } from '@/fw';
-import { SceneManager } from '@/core/scene';
+import { SceneManager } from '@/core/SceneManager';
 import { appState } from '@/state';
 import type { NodeBase } from '@/core/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
-import { UpdateObjectPropertyOperation } from '@/features/properties/operations/UpdateObjectPropertyOperation';
-import { OperationService } from '@/core/operations/OperationService';
+import { UpdateObjectPropertyOperation } from '@/features/properties/UpdateObjectPropertyOperation';
+import { OperationService } from '@/core/OperationService';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';

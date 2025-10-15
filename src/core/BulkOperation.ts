@@ -1,4 +1,4 @@
-import type { OperationCommit } from '../Operation';
+import type { OperationCommit } from './Operation';
 
 export class BulkOperationBuilder {
   private commits: OperationCommit[] = [];

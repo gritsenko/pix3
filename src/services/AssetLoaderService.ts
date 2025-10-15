@@ -1,7 +1,6 @@
 import { injectable, inject } from '@/fw/di';
-import { OperationService } from '@/core/operations/OperationService';
-import { LoadSceneOperation } from '@/features/scene/operations/LoadSceneOperation';
-import { AddGlbModelOperation } from '@/core/features/scene/operations/AddGlbModelOperation';
+import { OperationService } from '@/core/OperationService';
+import { LoadSceneOperation } from '@/features/scene/LoadSceneOperation';
 
 export interface AssetActivation {
   name: string;
@@ -27,7 +26,6 @@ export class AssetLoaderService {
     }
 
     if (extension === 'glb' || extension === 'gltf') {
-      await this.operations.invokeAndPush(new AddGlbModelOperation({ src: resourcePath }));
       return;
     }
 

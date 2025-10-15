@@ -1,7 +1,7 @@
 import { inject, injectable } from '@/fw/di';
 
 import { FileSystemAPIError, FileSystemAPIService } from './FileSystemAPIService';
-import { BaseTemplateService } from './BaseTemplateService';
+import { TemplateService } from './TemplateService';
 
 const RES_SCHEME = 'res';
 const TEMPLATE_SCHEME = 'templ';
@@ -15,8 +15,8 @@ export class ResourceManager {
   @inject(FileSystemAPIService)
   private readonly fileSystem!: FileSystemAPIService;
 
-  @inject(BaseTemplateService)
-  private readonly templateService!: BaseTemplateService;
+  @inject(TemplateService)
+  private readonly templateService!: TemplateService;
 
   async readText(resource: string, options: ReadResourceOptions = {}): Promise<string> {
     const scheme = this.getScheme(resource);
