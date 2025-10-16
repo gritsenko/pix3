@@ -5,7 +5,7 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { NodeBase } from '@/core/NodeBase';
+import { NodeBase } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { SceneManager } from '@/core/SceneManager';

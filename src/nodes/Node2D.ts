@@ -1,6 +1,6 @@
 import { MathUtils, Vector2 } from 'three';
 
-import { NodeBase, type NodeBaseProps } from '../core/NodeBase';
+import { NodeBase, type NodeBaseProps } from './NodeBase';
 
 export interface Node2DProps extends Omit<NodeBaseProps, 'type'> {
   position?: Vector2;
@@ -21,13 +21,5 @@ export class Node2D extends NodeBase {
     const rotationDegrees = props.rotation ?? 0;
     const rotationRadians = MathUtils.degToRad(rotationDegrees);
     this.rotation.set(0, 0, rotationRadians);
-  }
-
-  get treeColor(): string {
-    return '#96cbf6ff'; // blue
-  }
-
-  get treeIcon(): string {
-    return 'square';
   }
 }

@@ -1,6 +1,6 @@
 import { Euler, Vector3 } from 'three';
 
-import { NodeBase, type NodeBaseProps } from '../core/NodeBase';
+import { NodeBase, type NodeBaseProps } from './NodeBase';
 
 export interface Node3DProps extends Omit<NodeBaseProps, 'type'> {
   position?: Vector3;

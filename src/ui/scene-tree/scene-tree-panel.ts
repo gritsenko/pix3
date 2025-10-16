@@ -7,7 +7,8 @@ import feather from 'feather-icons';
 
 import { ComponentBase, customElement, html, state } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
-import { NodeBase } from '@/core/NodeBase';
+import { NodeBase } from '@/nodes/NodeBase';
+import { getNodeVisuals } from './node-visuals.helper';
 
 import '../shared/pix3-panel';
 import './scene-tree-panel.ts.css';
@@ -164,16 +165,19 @@ export class SceneTreePanel extends ComponentBase {
    * Converts NodeBase instances to SceneTreeNode view models.
    */
   private buildTreeNodes(nodes: NodeBase[]): SceneTreeNode[] {
-    return nodes.map(node => ({
-      id: node.nodeId,
-      name: node.name,
-      type: node.type,
-      treeColor: node.treeColor,
-      treeIcon: node.treeIcon,
-      instancePath: node.instancePath,
-      // Only include NodeBase children, filter out Three.js objects like Mesh, Light, etc.
-      children: this.buildTreeNodes(node.children.filter(child => child instanceof NodeBase)),
-    }));
+    return nodes.map(node => {
+      const { color, icon } = getNodeVisuals(node);
+      return {
+        id: node.nodeId,
+        name: node.name,
+        type: node.type,
+        treeColor: color,
+        treeIcon: icon,
+        instancePath: node.instancePath,
+        // Only include NodeBase children, filter out Three.js objects like Mesh, Light, etc.
+        children: this.buildTreeNodes(node.children.filter(child => child instanceof NodeBase)),
+      };
+    });
   }
 
   private collectNodeIds(nodes: SceneTreeNode[], target: Set<string>): void {

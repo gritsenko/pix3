@@ -12,12 +12,4 @@ export class GlbModel extends Node3D {
     this.src = props.src ?? null;
     // Note: actual GLB loading is handled by rendering/services layer; this node only stores metadata.
   }
-
-  override get treeColor(): string {
-    return '#a0e9a0'; // green-ish for models
-  }
-
-  override get treeIcon(): string {
-    return 'package';
-  }
 }

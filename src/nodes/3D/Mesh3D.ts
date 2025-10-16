@@ -42,14 +42,6 @@ export class Mesh3D extends Node3D {
     this._material = material;
   }
 
-  override get treeIcon(): string {
-    return 'box'; // feather icon for mesh/geometry
-  }
-
-  override get treeColor(): string {
-    return '#4e8df5'; // blue for meshes
-  }
-
   dispose(): void {
     try { this._geometry?.dispose(); } catch {}
     try { (this._material as unknown as { dispose?: () => void })?.dispose?.(); } catch {}

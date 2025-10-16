@@ -11,8 +11,4 @@ export class Sprite2D extends Node2D {
     super(props, 'Sprite2D');
     this.texturePath = props.texturePath ?? null;
   }
-
-  override get treeIcon(): string {
-    return 'image';
-  }
 }

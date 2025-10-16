@@ -2,7 +2,7 @@ import { parse } from 'yaml';
 import { Euler, MathUtils, Vector2, Vector3 } from 'three';
 
 import { injectable } from '@/fw/di';
-import { NodeBase, type NodeBaseProps } from '@/core/NodeBase';
+import { NodeBase, type NodeBaseProps } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { GlbModel } from '@/nodes/3D/GlbModel';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';

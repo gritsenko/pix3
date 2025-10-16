@@ -1,4 +1,4 @@
-import type { NodeBase } from '@/core/NodeBase';
+import type { NodeBase } from '@/nodes/NodeBase';
 import { injectable } from '@/fw/di';       
 export type TransformMode = 'translate' | 'rotate' | 'scale';
 

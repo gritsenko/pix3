@@ -17,12 +17,4 @@ export class DirectionalLightNode extends Node3D {
     this.light.castShadow = true;
     this.add(this.light);
   }
-
-  override get treeIcon(): string {
-    return 'sun'; // feather icon for directional light
-  }
-
-  override get treeColor(): string {
-    return '#ffeb99'; // yellowish for lights
-  }
 }

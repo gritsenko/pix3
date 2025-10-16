@@ -1,6 +1,6 @@
 import { injectable, inject } from '@/fw/di';
 import { SceneLoader, type ParseSceneOptions } from './SceneLoader';
-import type { NodeBase } from './NodeBase';
+import type { NodeBase } from '../nodes/NodeBase';
 
 export interface SceneGraph {
   version: string;
