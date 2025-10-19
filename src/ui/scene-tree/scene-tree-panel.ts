@@ -1,42 +1,17 @@
-import type { TemplateResult } from 'lit';
 import { subscribe } from 'valtio/vanilla';
-import { classMap } from 'lit/directives/class-map.js';
-import { ifDefined } from 'lit/directives/if-defined.js';
-import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
-import feather from 'feather-icons';
 
-import { ComponentBase, customElement, html, state, inject } from '@/fw';
+import { ComponentBase, customElement, html, state } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
 import { NodeBase } from '@/nodes/NodeBase';
 import { getNodeVisuals } from './node-visuals.helper';
-import { CommandDispatcher } from '@/services';
-import {
-  selectObject,
-  toggleObjectSelection,
-  selectObjectRange,
-} from '@/features/selection/SelectObjectCommand';
+import type { SceneTreeNode } from './scene-tree-node';
 
 import '../shared/pix3-panel';
+import './scene-tree-node';
 import './scene-tree-panel.ts.css';
-
-/**
- * View model for scene tree nodes - UI-specific representation.
- */
-interface SceneTreeNode {
-  id: string;
-  name: string;
-  type: string;
-  treeColor: string;
-  treeIcon: string;
-  instancePath: string | null;
-  children: SceneTreeNode[];
-}
 
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {
-  @inject(CommandDispatcher)
-  private readonly commandDispatcher!: CommandDispatcher;
-
   @state()
   private activeScene: SceneDescriptor | null = this.resolveActiveSceneDescriptor();
 
@@ -94,14 +69,24 @@ export class SceneTreePanel extends ComponentBase {
         actions-label="Scene tree controls"
       >
         ${activeSceneName ? html`<span slot="subtitle">${activeSceneName}</span>` : null}
-        <div class="tree-container">
+        <div class="tree-container" @toggle-node=${this.onToggleNode.bind(this)}>
           ${hasHierarchy
             ? html`<ul
                 class="tree-root"
                 role="tree"
                 aria-label=${this.getTreeAriaLabel(activeSceneName)}
               >
-                ${this.hierarchy.map((node, index) => this.renderNode(node, 1, index === 0))}
+                ${this.hierarchy.map(
+                  (node, index) =>
+                    html`<pix3-scene-tree-node
+                      .node=${node}
+                      .level=${1}
+                      .selectedNodeIds=${this.selectedNodeIds}
+                      .primaryNodeId=${this.primaryNodeId}
+                      .collapsedNodeIds=${this.collapsedNodeIds}
+                      ?focusable=${index === 0}
+                    ></pix3-scene-tree-node>`
+                )}
               </ul>`
             : html`<p class="panel-placeholder">${this.getPlaceholderMessage()}</p>`}
         </div>
@@ -198,69 +183,6 @@ export class SceneTreePanel extends ComponentBase {
     }
   }
 
-  private renderNode(node: SceneTreeNode, level: number, focusable = false): TemplateResult {
-    const hasChildren = node.children.length > 0;
-    const isCollapsed = hasChildren && this.collapsedNodeIds.has(node.id);
-    const isSelected = this.selectedNodeIds.includes(node.id);
-    const isPrimary = this.primaryNodeId === node.id;
-
-    const contentClasses = classMap({
-      'tree-node__content': true,
-      'tree-node__content--selected': isSelected,
-      'tree-node__content--primary': isPrimary,
-    });
-
-    const expanderClasses = classMap({
-      'tree-node__expander': true,
-      'tree-node__expander--visible': hasChildren,
-      'tree-node__expander--collapsed': hasChildren && isCollapsed,
-      'tree-node__expander--button': hasChildren,
-    });
-
-    const expanderTemplate = hasChildren
-      ? html`<button
-          type="button"
-          class=${expanderClasses}
-          aria-label=${this.getToggleLabel(node.name, isCollapsed)}
-          @click=${(event: Event) => this.onToggleNode(event, node.id)}
-        ></button>`
-      : html`<span class=${expanderClasses} aria-hidden="true"></span>`;
-
-    return html`
-      <li class="tree-node" role="none">
-        <div
-          class=${contentClasses}
-          role="treeitem"
-          aria-level=${level}
-          aria-selected=${isSelected ? 'true' : 'false'}
-          aria-expanded=${ifDefined(hasChildren ? (isCollapsed ? 'false' : 'true') : undefined)}
-          tabindex=${focusable ? '0' : '-1'}
-          data-node-id=${node.id}
-          title=${this.getNodeTooltip(node)}
-          @click=${(event: Event) => this.onSelectNode(event, node.id)}
-        >
-          ${expanderTemplate}
-          <span class="tree-node__icon" title=${node.type} aria-label=${node.type}>
-            ${this.renderNodeIcon(node.treeIcon)}
-          </span>
-          <span class="tree-node__label">
-            <span class="tree-node__header">
-              <span class="tree-node__name" style="color: ${node.treeColor};">${node.name}</span>
-            </span>
-            ${node.instancePath
-              ? html`<span class="tree-node__instance">${node.instancePath}</span>`
-              : null}
-          </span>
-        </div>
-        ${hasChildren && !isCollapsed
-          ? html`<ul class="tree-children" role="group">
-              ${node.children.map(child => this.renderNode(child, level + 1))}
-            </ul>`
-          : null}
-      </li>
-    `;
-  }
-
   private getTreeAriaLabel(activeSceneName: string | null): string {
     if (activeSceneName) {
       return `Scene nodes for ${activeSceneName}`;
@@ -281,65 +203,15 @@ export class SceneTreePanel extends ComponentBase {
     return 'Scene hierarchy will appear here once a project is loaded.';
   }
 
-  private getNodeTooltip(node: SceneTreeNode): string {
-    if (node.instancePath) {
-      return `${node.name} · ${node.type} · ${node.instancePath}`;
-    }
-    return `${node.name} · ${node.type}`;
-  }
-
-  private getToggleLabel(nodeName: string, isCollapsed: boolean): string {
-    return isCollapsed ? `Expand ${nodeName}` : `Collapse ${nodeName}`;
-  }
-
-  private renderNodeIcon(iconName: string): TemplateResult {
-    const icon = feather.icons[iconName as keyof typeof feather.icons];
-    if (!icon) {
-      console.warn(`[SceneTreePanel] Icon not found: ${iconName}`);
-      return html`${unsafeSVG(feather.icons['box'].toSvg({ width: 16, height: 16 }))}`;
-    }
-    return html`${unsafeSVG(icon.toSvg({ width: 16, height: 16 }))}`;
-  }
-
-  private onToggleNode(event: Event, nodeId: string): void {
-    event.stopPropagation();
+  private onToggleNode(event: CustomEvent): void {
+    const { nodeId, isCollapsed } = event.detail;
     const next = new Set(this.collapsedNodeIds);
-    if (next.has(nodeId)) {
-      next.delete(nodeId);
-    } else {
+    if (isCollapsed) {
       next.add(nodeId);
+    } else {
+      next.delete(nodeId);
     }
     this.collapsedNodeIds = next;
-  }
-
-  private async onSelectNode(event: Event, nodeId: string): Promise<void> {
-    event.stopPropagation();
-
-    // Determine selection behavior based on modifier keys
-    const mouseEvent = event as MouseEvent;
-    const isAdditive = mouseEvent.ctrlKey || mouseEvent.metaKey;
-    const isRange = mouseEvent.shiftKey;
-
-    // Execute selection command via dispatcher
-    const command = isRange
-      ? selectObjectRange(nodeId)
-      : isAdditive
-        ? toggleObjectSelection(nodeId)
-        : selectObject(nodeId);
-
-    try {
-      const didMutate = await this.commandDispatcher.execute(command);
-      // Selection state will be automatically updated via subscription
-      if (didMutate) {
-        console.log(`Selected node: ${nodeId}`, {
-          additive: isAdditive,
-          range: isRange,
-          selectedCount: appState.selection.nodeIds.length,
-        });
-      }
-    } catch (error) {
-      console.error('[SceneTreePanel] Failed to execute selection command', error);
-    }
   }
 }
 
