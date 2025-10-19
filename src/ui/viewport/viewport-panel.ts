@@ -2,6 +2,8 @@ import { ComponentBase, customElement, html, inject, subscribe, state, css, unsa
 import { appState } from '@/state';
 import styles from './viewport-panel.ts.css?raw';
 import { ViewportRendererService, type TransformMode } from '@/services/ViewportRenderService';
+import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { selectObject } from '@/features/selection/SelectObjectCommand';
 
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
@@ -9,6 +11,9 @@ export class ViewportPanel extends ComponentBase {
 
   @inject(ViewportRendererService)
   private readonly viewportRenderer!: ViewportRendererService;
+
+  @inject(CommandDispatcher)
+  private readonly commandDispatcher!: CommandDispatcher;
 
   @state()
   private transformMode: TransformMode = 'translate';
@@ -28,6 +33,10 @@ export class ViewportPanel extends ComponentBase {
 
   private canvas?: HTMLCanvasElement;
   private disposeSceneSubscription?: () => void;
+  private pointerDownPos?: { x: number; y: number };
+  private pointerDownTime?: number;
+  private isDragging = false;
+  private readonly dragThreshold = 5; // pixels
 
   connectedCallback() {
     super.connectedCallback();
@@ -39,6 +48,10 @@ export class ViewportPanel extends ComponentBase {
 
     // Add keyboard shortcuts for transform modes
     this.addEventListener('keydown', this.handleKeyDown);
+    // Add pointer handlers for object selection (only on tap/click, not drag)
+    this.addEventListener('pointerdown', this.handleCanvasPointerDown);
+    this.addEventListener('pointermove', this.handleCanvasPointerMove);
+    this.addEventListener('pointerup', this.handleCanvasPointerUp);
   }
 
   disconnectedCallback() {
@@ -49,6 +62,12 @@ export class ViewportPanel extends ComponentBase {
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
     this.removeEventListener('keydown', this.handleKeyDown);
+    this.removeEventListener('pointerdown', this.handleCanvasPointerDown);
+    this.removeEventListener('pointermove', this.handleCanvasPointerMove);
+    this.removeEventListener('pointerup', this.handleCanvasPointerUp);
+    this.pointerDownPos = undefined;
+    this.pointerDownTime = undefined;
+    this.isDragging = false;
   }
 
   protected firstUpdated(): void {
@@ -147,6 +166,80 @@ export class ViewportPanel extends ComponentBase {
         this.handleTransformModeChange('scale');
         break;
     }
+  };
+
+  private handleCanvasPointerDown = (event: PointerEvent): void => {
+    // Only handle pointer down on the canvas
+    if (event.target !== this) {
+      return;
+    }
+
+    // Record the position and time for drag detection
+    this.pointerDownPos = { x: event.clientX, y: event.clientY };
+    this.pointerDownTime = Date.now();
+    this.isDragging = false;
+  };
+
+  private handleCanvasPointerMove = (event: PointerEvent): void => {
+    // Only process if pointer was pressed down
+    if (!this.pointerDownPos || !this.pointerDownTime) {
+      return;
+    }
+
+    // Calculate distance moved since pointer down
+    const dx = event.clientX - this.pointerDownPos.x;
+    const dy = event.clientY - this.pointerDownPos.y;
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    // If distance exceeds threshold, mark as dragging (camera manipulation)
+    if (distance > this.dragThreshold) {
+      this.isDragging = true;
+    }
+  };
+
+  private handleCanvasPointerUp = (event: PointerEvent): void => {
+    // Only handle pointer up on the canvas
+    if (event.target !== this) {
+      return;
+    }
+
+    if (!this.canvas) {
+      return;
+    }
+
+    // Only select if this was a tap (not a drag)
+    if (!this.isDragging) {
+      // Get canvas position and dimensions
+      const rect = this.canvas.getBoundingClientRect();
+      const canvasWidth = rect.width;
+      const canvasHeight = rect.height;
+
+      // Convert pointer event coordinates to canvas-relative coordinates
+      const pointerX = event.clientX - rect.left;
+      const pointerY = event.clientY - rect.top;
+
+      // Normalize to 0-1 range
+      const normalizedX = pointerX / canvasWidth;
+      const normalizedY = pointerY / canvasHeight;
+
+      // Raycast to find object under pointer
+      const hitNode = this.viewportRenderer.raycastObject(normalizedX, normalizedY);
+
+      if (hitNode) {
+        // Dispatch SelectObjectCommand with the hit node
+        const command = selectObject(hitNode.nodeId);
+        this.commandDispatcher.execute(command);
+      } else {
+        // Pointer up on empty space - deselect all
+        const command = selectObject(null);
+        this.commandDispatcher.execute(command);
+      }
+    }
+
+    // Clean up pointer tracking
+    this.pointerDownPos = undefined;
+    this.pointerDownTime = undefined;
+    this.isDragging = false;
   };
 
   static styles = css`

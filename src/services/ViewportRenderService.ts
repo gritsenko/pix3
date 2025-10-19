@@ -7,7 +7,7 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { NodeBase } from '@/nodes/NodeBase';
+import { NodeBase } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager } from '@/core/SceneManager';
@@ -116,6 +116,60 @@ export class ViewportRendererService {
     if (mode) {
       // Mode stored for future implementation
     }
+  }
+
+  /**
+   * Raycast from camera through screen position and find the deepest NodeBase object.
+   * @param screenX Normalized screen X coordinate (0 to 1)
+   * @param screenY Normalized screen Y coordinate (0 to 1)
+   * @returns The deepest NodeBase object under the pointer, or null if none found
+   */
+  raycastObject(screenX: number, screenY: number): NodeBase | null {
+    if (!this.scene || !this.camera || !this.renderer) {
+      return null;
+    }
+
+    // Create raycaster and convert screen coordinates to normalized device coordinates
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+
+    // Convert from screen coordinates (0-1) to NDC (-1 to 1)
+    mouse.x = screenX * 2 - 1;
+    mouse.y = -(screenY * 2 - 1);
+
+    // Cast ray from camera through mouse position
+    raycaster.setFromCamera(mouse, this.camera);
+
+    // Get all objects in the scene
+    const sceneObjects: THREE.Object3D[] = [];
+    this.scene.traverse(obj => {
+      if (obj instanceof NodeBase) {
+        sceneObjects.push(obj);
+      }
+    });
+
+    // Raycast against all objects
+    const intersects = raycaster.intersectObjects(sceneObjects, true);
+
+    if (intersects.length === 0) {
+      return null;
+    }
+
+    // Find the deepest NodeBase in the hierarchy
+    // Start from the closest intersection and traverse up to find the deepest NodeBase ancestor
+    for (const intersection of intersects) {
+      let current: THREE.Object3D | null = intersection.object;
+
+      // Traverse up the hierarchy to find the deepest NodeBase
+      while (current) {
+        if (current instanceof NodeBase) {
+          return current;
+        }
+        current = current.parent;
+      }
+    }
+
+    return null;
   }
 
   updateNodeTransform(node: NodeBase): void {
