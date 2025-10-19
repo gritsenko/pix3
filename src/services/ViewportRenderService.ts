@@ -32,15 +32,12 @@ export class ViewportRendererService {
   constructor() {}
 
   initialize(canvas: HTMLCanvasElement): void {
-    console.log('[VP] initialize start');
-
     // Create Three.js renderer
     this.renderer = new THREE.WebGLRenderer({
       canvas,
       antialias: true,
       alpha: true,
     });
-    console.log('[VP] renderer created');
 
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(0x13161b, 1);
@@ -48,13 +45,11 @@ export class ViewportRendererService {
     // Create scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x13161b);
-    console.log('[VP] scene created');
 
     // Create camera
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 10000);
     this.camera.position.set(5, 5, 5);
     this.camera.lookAt(0, 0, 0);
-    console.log('[VP] camera created');
 
     // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -63,22 +58,18 @@ export class ViewportRendererService {
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(5, 10, 7);
     this.scene.add(directionalLight);
-    console.log('[VP] lights added');
 
     // Add grid helper for reference
     const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
     this.scene.add(gridHelper);
-    console.log('[VP] grid added');
 
     // Start render loop
     this.startRenderLoop();
-    console.log('[VP] render loop started');
 
     // Poll active scene ID for changes (avoid subscribing to entire scenes object to prevent feedback loops)
     const checkSceneChanges = () => {
       const currentSceneId = appState.scenes.activeSceneId;
       if (currentSceneId !== this.lastActiveSceneId) {
-        console.log('[VP] active scene changed from', this.lastActiveSceneId, 'to', currentSceneId);
         this.lastActiveSceneId = currentSceneId;
         this.syncSceneContent();
       }
@@ -87,20 +78,15 @@ export class ViewportRendererService {
     // Check scene changes every frame
     const pollInterval = setInterval(checkSceneChanges, 100);
     this.disposers.push(() => clearInterval(pollInterval));
-    console.log('[VP] scene poll added');
 
     // Subscribe to selection changes
     const unsubscribeSelection = subscribe(appState.selection, () => {
-      console.log('[VP] selection subscription fired');
       this.updateSelection();
     });
     this.disposers.push(unsubscribeSelection);
-    console.log('[VP] selection subscription added');
 
     // Initial sync
-    console.log('[VP] calling initial syncSceneContent');
     checkSceneChanges();
-    console.log('[VP] initialize complete');
   }
 
   resize(width: number, height: number): void {
@@ -133,109 +119,101 @@ export class ViewportRendererService {
   }
 
   updateSelection(): void {
-    console.log('[VP] updateSelection START');
-
-    // Clear previous selection visualization
+    // Clear previous selection boxes and dispose their Three.js resources
     for (const box of this.selectionBoxes.values()) {
-      this.scene?.remove(box);
+      if (this.scene) {
+        this.scene.remove(box);
+      }
+      // Dispose Three.js resources to prevent memory leaks
+      box.geometry.dispose();
+      if (box.material instanceof THREE.Material) {
+        box.material.dispose();
+      }
     }
     this.selectionBoxes.clear();
-    console.log('[VP] cleared old boxes');
+
+    // Extra safety: remove any lingering selection boxes from the scene
+    // (in case of reference mismatches)
+    if (this.scene) {
+      const toRemove: THREE.Object3D[] = [];
+      this.scene.children.forEach(child => {
+        if ((child as any).userData?.isSelectionBox) {
+          toRemove.push(child);
+        }
+      });
+      toRemove.forEach(child => {
+        this.scene?.remove(child);
+      });
+    }
 
     // Get selected node IDs from app state
     const { nodeIds } = appState.selection;
     const activeSceneId = appState.scenes.activeSceneId;
-    console.log('[VP] selected nodes:', nodeIds.length, 'scene:', activeSceneId);
 
     if (!activeSceneId) {
-      console.log('[VP] no active scene');
       return;
     }
 
-    console.log('[VP] getting scene graph');
     const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
     if (!sceneGraph) {
-      console.log('[VP] no scene graph');
       return;
     }
 
-    // Clear previous selection
+    // Clear previous selection object tracking
     this.selectedObjects.clear();
 
     // Add selection boxes for selected nodes
-    console.log('[VP] processing', nodeIds.length, 'selected nodes');
     for (const nodeId of nodeIds) {
-      console.log('[VP]   finding node', nodeId);
       const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
       if (node && node instanceof Node3D) {
         this.selectedObjects.add(node);
 
-        // Create and add selection box
+        // Create bounding box visualization
         const box = new THREE.Box3().setFromObject(node);
         const helper = new THREE.Box3Helper(box, new THREE.Color(0x00ff00));
+        
+        // Mark as selection box for cleanup
+        helper.userData.selectionBoxId = nodeId;
+        helper.userData.isSelectionBox = true;
+        
         this.selectionBoxes.set(nodeId, helper);
         this.scene?.add(helper);
-        console.log('[VP]   added box for', nodeId);
       }
     }
-    console.log('[VP] updateSelection COMPLETE');
   }
 
   private syncSceneContent(): void {
-    console.log('[VP] syncSceneContent START');
-
     try {
-      console.log('[VP] getting active scene');
       const activeSceneId = appState.scenes.activeSceneId;
-      console.log('[VP] active scene id:', activeSceneId);
 
       if (!this.scene || !activeSceneId) {
-        console.log('[VP] no scene or id, returning');
         return;
       }
 
-      console.log('[VP] getting scene graph');
       const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
-      console.log('[VP] scene graph:', sceneGraph ? 'got it' : 'null');
-
       if (!sceneGraph) {
-        console.log('[VP] no graph, returning');
         return;
       }
 
-      console.log('[VP] finding objects to remove');
       // Remove all root nodes from scene (except lights and helpers)
       const objectsToRemove: THREE.Object3D[] = [];
       this.scene.children.forEach(child => {
-        // Keep lights, camera helpers, and grid
+        // Keep lights and grid
         if (!(child instanceof THREE.Light) && !(child instanceof THREE.GridHelper)) {
           objectsToRemove.push(child);
         }
       });
 
-      console.log('[VP] removing', objectsToRemove.length, 'objects');
       objectsToRemove.forEach(obj => this.scene!.remove(obj));
 
-      console.log('[VP] adding', sceneGraph.rootNodes.length, 'root nodes');
       // Add scene graph root nodes
-      sceneGraph.rootNodes.forEach((node, idx) => {
-        console.log(
-          '[VP]   node',
-          idx,
-          'parent:',
-          node.parent ? 'yes' : 'no',
-          'type:',
-          node instanceof Node3D
-        );
+      sceneGraph.rootNodes.forEach(node => {
         if (node instanceof Node3D && !node.parent) {
-          console.log('[VP]   adding node', idx);
           this.scene!.add(node);
         }
       });
-
-      console.log('[VP] syncSceneContent COMPLETE');
     } catch (err) {
-      console.error('[VP] error in syncSceneContent:', err);
+      console.error('[ViewportRenderer] Error syncing scene content:', err);
     }
   }
 
