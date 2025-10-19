@@ -5,10 +5,12 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
 import feather from 'feather-icons';
 
-import { ComponentBase, customElement, html, state } from '@/fw';
+import { ComponentBase, customElement, html, state, inject } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
 import { NodeBase } from '@/nodes/NodeBase';
 import { getNodeVisuals } from './node-visuals.helper';
+import { CommandDispatcher } from '@/services';
+import { selectObject, toggleObjectSelection, selectObjectRange } from '@/features/selection/SelectObjectCommand';
 
 import '../shared/pix3-panel';
 import './scene-tree-panel.ts.css';
@@ -28,6 +30,9 @@ interface SceneTreeNode {
 
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {
+  @inject(CommandDispatcher)
+  private readonly commandDispatcher!: CommandDispatcher;
+
   @state()
   private activeScene: SceneDescriptor | null = this.resolveActiveSceneDescriptor();
 
@@ -307,28 +312,30 @@ export class SceneTreePanel extends ComponentBase {
     event.stopPropagation();
 
     // Determine selection behavior based on modifier keys
-    // const mouseEvent = event as MouseEvent;
-    // const isAdditive = mouseEvent.ctrlKey || mouseEvent.metaKey;
-    // const isRange = mouseEvent.shiftKey;
+    const mouseEvent = event as MouseEvent;
+    const isAdditive = mouseEvent.ctrlKey || mouseEvent.metaKey;
+    const isRange = mouseEvent.shiftKey;
 
-    // // Execute selection command via dispatcher
-    // const op = new SelectObjectOperation({
-    //   nodeId,
-    //   additive: isAdditive,
-    //   range: isRange,
-    // });
+    // Execute selection command via dispatcher
+    const command = isRange
+      ? selectObjectRange(nodeId)
+      : isAdditive
+        ? toggleObjectSelection(nodeId)
+        : selectObject(nodeId);
 
-    // try {
-    //   await this.operationService.invokeAndPush(op);
-    //   // Selection state will be automatically updated via subscription
-    //   console.log(`Selected node: ${nodeId}`, {
-    //     additive: isAdditive,
-    //     range: isRange,
-    //     selectedCount: appState.selection.nodeIds.length,
-    //   });
-    // } catch (error) {
-    //   console.error('[SceneTreePanel] Failed to execute selection command', error);
-    // }
+    try {
+      const didMutate = await this.commandDispatcher.execute(command);
+      // Selection state will be automatically updated via subscription
+      if (didMutate) {
+        console.log(`Selected node: ${nodeId}`, {
+          additive: isAdditive,
+          range: isRange,
+          selectedCount: appState.selection.nodeIds.length,
+        });
+      }
+    } catch (error) {
+      console.error('[SceneTreePanel] Failed to execute selection command', error);
+    }
   }
 }
 

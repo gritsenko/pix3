@@ -16,3 +16,5 @@ export { ResourceManager, type ReadResourceOptions } from './ResourceManager';
 export { FocusRingService, type FocusRingServiceOptions } from './FocusRingService';
 export { ProjectService, resolveProjectService } from './ProjectService';
 export { AssetLoaderService, type AssetActivation } from './AssetLoaderService';
+export { CommandDispatcher, resolveCommandDispatcher } from './CommandDispatcher';
+

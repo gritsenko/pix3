@@ -110,13 +110,34 @@ export class OperationService {
     operation: Operation<TInvokeResult>,
     options: OperationInvokeOptions = {}
   ): Promise<boolean> {
+    console.debug('[OperationService] invokeAndPush: Starting operation', {
+      operationId: operation.metadata.id,
+      operationTitle: operation.metadata.title,
+    });
+
     const execution = await this.executeOperation(operation, options);
     let pushed = false;
     try {
       if (execution.result.didMutate && execution.result.commit) {
+        console.debug('[OperationService] invokeAndPush: Operation mutated, pushing to history', {
+          operationId: execution.metadata.id,
+          commitLabel: execution.result.commit.label,
+          coalesceKey: options.coalesceKey ?? execution.metadata.coalesceKey,
+        });
         this.pushToHistory(execution.metadata, execution.result.commit, options);
         execution.context.state.operations.lastUndoableCommandId = execution.metadata.id;
         pushed = true;
+        console.debug('[OperationService] invokeAndPush: Successfully pushed to history', {
+          operationId: execution.metadata.id,
+          canUndo: this.history.canUndo,
+          canRedo: this.history.canRedo,
+        });
+      } else {
+        console.debug('[OperationService] invokeAndPush: Operation did not mutate or has no commit', {
+          operationId: execution.metadata.id,
+          didMutate: execution.result.didMutate,
+          hasCommit: !!execution.result.commit,
+        });
       }
     } finally {
       this.completeOperation(
@@ -267,10 +288,23 @@ export class OperationService {
       const currentUndoEntries = this.history.snapshot().undoEntries;
       const previous = currentUndoEntries[currentUndoEntries.length - 1];
       if (previous?.metadata.coalesceKey === coalesceKey) {
+        console.debug('[OperationService] pushToHistory: Coalescing operation with previous', {
+          operationId: metadata.id,
+          coalesceKey,
+          previousCommandId: previous.metadata.commandId,
+        });
         this.history.replaceLast(entryInit);
         return;
       }
     }
+
+    console.debug('[OperationService] pushToHistory: Pushing new history entry', {
+      operationId: metadata.id,
+      label: entryMetadata.label,
+      coalesceKey,
+      hasUndo: !!commit.undo,
+      hasRedo: !!commit.redo,
+    });
 
     this.history.push(entryInit);
   }
@@ -299,6 +333,11 @@ export class OperationService {
   }
 
   private beginOperation(metadata: OperationMetadata, state: AppState): void {
+    console.debug('[OperationService] beginOperation: Starting', {
+      operationId: metadata.id,
+      operationTitle: metadata.title,
+      pendingCount: state.operations.pendingCommandCount + 1,
+    });
     state.operations.pendingCommandCount = Math.max(0, state.operations.pendingCommandCount + 1);
     state.operations.isExecuting = true;
     state.operations.lastCommandId = metadata.id;
@@ -311,6 +350,13 @@ export class OperationService {
     didMutate: boolean,
     pushedToHistory: boolean
   ): void {
+    console.debug('[OperationService] completeOperation: Finishing', {
+      operationId: metadata.id,
+      operationTitle: metadata.title,
+      didMutate,
+      pushedToHistory,
+      pendingCount: Math.max(0, state.operations.pendingCommandCount - 1),
+    });
     state.operations.pendingCommandCount = Math.max(0, state.operations.pendingCommandCount - 1);
     state.operations.isExecuting = state.operations.pendingCommandCount > 0;
     if (didMutate) {
@@ -329,6 +375,12 @@ export class OperationService {
   }
 
   private failOperation(metadata: OperationMetadata, state: AppState, error: unknown): void {
+    console.error('[OperationService] failOperation: Operation failed', {
+      operationId: metadata.id,
+      operationTitle: metadata.title,
+      error,
+      pendingCount: Math.max(0, state.operations.pendingCommandCount - 1),
+    });
     state.operations.pendingCommandCount = Math.max(0, state.operations.pendingCommandCount - 1);
     state.operations.isExecuting = state.operations.pendingCommandCount > 0;
     this.emit({ type: 'operation:failed', metadata, error, timestamp: Date.now() });
