@@ -10,7 +10,6 @@ export class ViewportPanel extends ComponentBase {
   @inject(ViewportRendererService)
   private readonly viewportRenderer!: ViewportRendererService;
 
-
   @state()
   private transformMode: TransformMode = 'translate';
   private readonly resizeObserver = new ResizeObserver(entries => {

@@ -1,9 +1,6 @@
 import { injectable, inject } from '@/fw/di';
 import { OperationService } from '@/services/OperationService';
-import {
-  LoadSceneOperation,
-  type LoadSceneParams,
-} from '@/features/scene/LoadSceneOperation';
+import { LoadSceneOperation, type LoadSceneParams } from '@/features/scene/LoadSceneOperation';
 
 export interface LoadSceneCommandParams {
   filePath: string; // res:// path

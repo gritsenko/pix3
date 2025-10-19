@@ -10,7 +10,11 @@ import { appState, type SceneDescriptor } from '@/state';
 import { NodeBase } from '@/nodes/NodeBase';
 import { getNodeVisuals } from './node-visuals.helper';
 import { CommandDispatcher } from '@/services';
-import { selectObject, toggleObjectSelection, selectObjectRange } from '@/features/selection/SelectObjectCommand';
+import {
+  selectObject,
+  toggleObjectSelection,
+  selectObjectRange,
+} from '@/features/selection/SelectObjectCommand';
 
 import '../shared/pix3-panel';
 import './scene-tree-panel.ts.css';
@@ -112,12 +116,13 @@ export class SceneTreePanel extends ComponentBase {
     const nextLoadError = appState.scenes.loadError;
     const nextDescriptor = this.resolveActiveSceneDescriptor();
     const nextHierarchyRoots = this.resolveActiveHierarchyNodes();
-    
+
     // Only rebuild tree if scene changed, load state changed, or hierarchy changed
-    const needsRebuild = sceneChanged || 
-                         this.loadState !== nextLoadState ||
-                         this.loadError !== nextLoadError ||
-                         nextHierarchyRoots !== this.resolveActiveHierarchyNodes();
+    const needsRebuild =
+      sceneChanged ||
+      this.loadState !== nextLoadState ||
+      this.loadError !== nextLoadError ||
+      nextHierarchyRoots !== this.resolveActiveHierarchyNodes();
 
     this.activeSceneId = nextSceneId;
     this.activeScene = nextDescriptor;

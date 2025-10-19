@@ -9,6 +9,12 @@ import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
 import type { SceneGraph } from './SceneManager';
 
+import { Mesh3D } from '@/nodes/3D/Mesh3D';
+
+import { Camera3D } from '@/nodes/3D/Camera3D';
+
+import { Node2D } from '@/nodes/Node2D';
+
 const ZERO_VECTOR3 = new Vector3(0, 0, 0);
 const UNIT_VECTOR3 = new Vector3(1, 1, 1);
 const ZERO_VECTOR2 = new Vector2(0, 0);
@@ -39,6 +45,30 @@ export interface SceneDocument {
   description?: string;
   metadata?: Record<string, unknown>;
   root: SceneNodeDefinition[];
+}
+
+export interface Mesh3DProperties {
+  geometry?: string;
+  size?: [number, number, number];
+  material?: { color?: string; roughness?: number; metalness?: number; type?: string };
+}
+
+export interface Camera3DProperties {
+  projection?: 'perspective' | 'orthographic';
+  fov?: number;
+  near?: number;
+  far?: number;
+}
+
+export interface DirectionalLightNodeProperties {
+  color?: string;
+  intensity?: number;
+}
+
+export interface Node2DProperties {
+  position?: Vector2 | [number, number];
+  scale?: Vector2 | [number, number];
+  rotation?: number;
 }
 
 export interface ParseSceneOptions {
@@ -125,8 +155,6 @@ export class SceneLoader {
       });
     }
 
-    const kind = (definition.properties as Record<string, unknown> | undefined)?.kind;
-
     switch (definition.type) {
       case 'Sprite2D': {
         const { position, scale, rotation, texturePath, ...rest } = baseProps.properties as Record<
@@ -146,31 +174,7 @@ export class SceneLoader {
         return new NodeBase({ ...baseProps, type: 'Group' });
       case 'Node3D':
       case undefined: {
-        // Respect kind hint for Node3D types
-        const propsRec = (baseProps.properties ?? {}) as Record<string, unknown>;
-        const parsed = this.parseNode3DTransforms(propsRec);
-        const lcKind = typeof kind === 'string' ? kind.toLowerCase() : '';
-        if (lcKind === 'mesh') {
-          return new Node3D({
-            ...baseProps,
-            properties: parsed.restProps,
-            position: parsed.position,
-            rotation: parsed.rotation,
-            rotationOrder: parsed.rotationOrder,
-            scale: parsed.scale,
-          });
-        } else if (lcKind === 'directionallight') {
-          return new DirectionalLightNode({
-            ...baseProps,
-            properties: parsed.restProps,
-            position: parsed.position,
-            rotation: parsed.rotation,
-            rotationOrder: parsed.rotationOrder,
-            scale: parsed.scale,
-            color: (propsRec.color as string) ?? '#ffffff',
-            intensity: (propsRec.intensity as number) ?? 1,
-          });
-        }
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
         return new Node3D({
           ...baseProps,
           properties: parsed.restProps,
@@ -178,6 +182,66 @@ export class SceneLoader {
           rotation: parsed.rotation,
           rotationOrder: parsed.rotationOrder,
           scale: parsed.scale,
+        });
+      }
+      case 'Node2D': {
+        const props = baseProps.properties as Node2DProperties;
+        const { position, scale, rotation, ...rest } = props;
+        return new Node2D({
+          ...baseProps,
+          properties: rest,
+          position: this.readVector2(props.position, ZERO_VECTOR2),
+          scale: this.readVector2(props.scale, UNIT_VECTOR2),
+          rotation: props.rotation ?? 0,
+        });
+      }
+      case 'Mesh3D': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const propsRec = baseProps.properties as Record<string, unknown>;
+        const geometry = this.asString(propsRec.geometry) ?? 'box';
+        const size = this.readVector3(propsRec.size, UNIT_VECTOR3);
+        const material = this.asRecord(propsRec.material);
+        const materialColor = this.asString(material?.color) ?? '#4e8df5';
+        return new Mesh3D({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          geometry,
+          size: [size.x, size.y, size.z],
+          material: { color: materialColor },
+        });
+      }
+      case 'DirectionalLightNode': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as DirectionalLightNodeProperties;
+        return new DirectionalLightNode({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          color: props.color ?? '#ffffff',
+          intensity: props.intensity ?? 1,
+        });
+      }
+      case 'Camera3D': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as Camera3DProperties;
+        return new Camera3D({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          projection: props.projection ?? 'perspective',
+          fov: props.fov ?? 60,
+          near: props.near ?? 0.1,
+          far: props.far ?? 1000,
         });
       }
       case 'GlbModel': {

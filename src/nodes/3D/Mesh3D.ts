@@ -43,7 +43,11 @@ export class Mesh3D extends Node3D {
   }
 
   dispose(): void {
-    try { this._geometry?.dispose(); } catch {}
-    try { (this._material as unknown as { dispose?: () => void })?.dispose?.(); } catch {}
+    try {
+      this._geometry?.dispose();
+    } catch {}
+    try {
+      (this._material as unknown as { dispose?: () => void })?.dispose?.();
+    } catch {}
   }
 }

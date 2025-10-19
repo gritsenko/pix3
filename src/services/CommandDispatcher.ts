@@ -41,10 +41,7 @@ export class CommandDispatcher {
       const result = await command.execute(context);
       return result.didMutate;
     } catch (error) {
-      console.error(
-        `[CommandDispatcher] Command execution failed: ${command.metadata.id}`,
-        error
-      );
+      console.error(`[CommandDispatcher] Command execution failed: ${command.metadata.id}`, error);
       throw error;
     }
   }
@@ -70,7 +67,10 @@ export class CommandDispatcher {
     try {
       return await Promise.resolve(command.preconditions(context));
     } catch (error) {
-      console.error(`[CommandDispatcher] Preconditions check failed: ${command.metadata.id}`, error);
+      console.error(
+        `[CommandDispatcher] Preconditions check failed: ${command.metadata.id}`,
+        error
+      );
       return { canExecute: false, reason: 'Preconditions check failed', scope: 'service' };
     }
   }
