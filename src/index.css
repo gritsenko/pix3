@@ -29,6 +29,16 @@ a {
   color: inherit;
 }
 
+/* Consistent header font styles */
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+}
+
 #app,
 body > pix3-editor {
   height: 100%;

@@ -26,7 +26,12 @@ pix3-welcome {
   pointer-events: auto;
 }
 .welcome-card h2 {
+  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
   margin: 0 0 0.25rem 0;
+}
+.welcome-card h3 {
+  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  margin: 0.5rem 0 0.25rem 0;
 }
 .welcome-card p {
   margin: 0 0 1rem 0;

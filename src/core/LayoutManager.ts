@@ -49,7 +49,7 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
     content: [
       {
         type: 'column',
-        width: 25,
+        width: 20,
         content: [
           {
             type: 'component',
@@ -80,7 +80,7 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
       },
       {
         type: 'component',
-        width: 25,
+        width: 30,
         componentType: PANEL_COMPONENT_TYPES.inspector,
         title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.inspector],
         isClosable: false,

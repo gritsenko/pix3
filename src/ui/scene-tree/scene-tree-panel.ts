@@ -86,7 +86,6 @@ export class SceneTreePanel extends ComponentBase {
 
     return html`
       <pix3-panel
-        panel-title="Scene Tree"
         panel-description="Browse and organise the hierarchy of nodes in the active scene."
         actions-label="Scene tree controls"
       >

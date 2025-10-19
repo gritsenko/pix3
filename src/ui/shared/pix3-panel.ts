@@ -1,12 +1,18 @@
-import { ComponentBase, customElement, html, inject, property } from '@/fw';
+import { ComponentBase, customElement, html, inject, property, css, unsafeCSS } from '@/fw';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { FocusRingService } from '@/services/FocusRingService';
-import './pix3-panel.ts.css';
+import styles from './pix3-panel.ts.css?raw';
 
 let panelCounter = 0;
 
 @customElement('pix3-panel')
 export class Pix3Panel extends ComponentBase {
+  static useShadowDom = true;
+
+  static styles = css`
+    ${unsafeCSS(styles)}
+  `;
+
   @property({ attribute: 'panel-title' })
   title = '';
 
@@ -67,28 +73,31 @@ export class Pix3Panel extends ComponentBase {
       : undefined;
 
     const ariaDescribedBy = descriptionId ? descriptionId : undefined;
+    const hasHeader = this.title || (this.renderRoot as any)?.querySelector?.('[slot="actions"]');
 
     return html`
       <section
         class="panel"
         role=${this.panelRole}
-        aria-labelledby=${headerId}
+        aria-labelledby=${ifDefined(hasHeader ? headerId : undefined)}
         aria-describedby=${ifDefined(ariaDescribedBy)}
       >
-        <header id=${headerId} class="panel__header" tabindex="0">
-          <div class="panel__heading">
-            <span class="panel__title">${this.title}</span>
-            <slot name="subtitle" class="panel__subtitle"></slot>
-          </div>
-          <div
-            class="panel__actions"
-            data-panel-actions
-            role="toolbar"
-            aria-label=${this.actionsLabel}
-          >
-            <slot name="actions"></slot>
-          </div>
-        </header>
+        ${hasHeader
+          ? html`<header id=${headerId} class="panel__header" tabindex="0">
+              <div class="panel__heading">
+                <span class="panel__title">${this.title}</span>
+                <slot name="subtitle" class="panel__subtitle"></slot>
+              </div>
+              <div
+                class="panel__actions"
+                data-panel-actions
+                role="toolbar"
+                aria-label=${this.actionsLabel}
+              >
+                <slot name="actions"></slot>
+              </div>
+            </header>`
+          : null}
         ${this.description
           ? html`<p id=${ifDefined(descriptionId)} class="panel__description">
               ${this.description}

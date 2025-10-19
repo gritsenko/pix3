@@ -330,7 +330,6 @@ export class InspectorPanel extends ComponentBase {
 
     return html`
       <pix3-panel
-        panel-title="Inspector"
         panel-role="form"
         panel-description="Adjust properties for the currently selected node."
         actions-label="Inspector actions"

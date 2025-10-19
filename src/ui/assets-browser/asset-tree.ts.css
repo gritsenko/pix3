@@ -8,13 +8,14 @@
   overflow: auto;
   min-height: 0; /* allow flex children to shrink */
   display: block;
-  padding-right: 0.25rem;
+  padding-right: 0;
+  box-sizing: border-box;
   /* Themed scrollbar matching panel dark scheme */
 }
 
 /* WebKit-based browsers */
 .tree::-webkit-scrollbar {
-  width: 12px;
+  width: 8px;
   background: transparent;
 }
 
@@ -147,6 +148,8 @@
   padding: 0.25rem;
   border-bottom: 1px solid rgba(255, 255, 255, 0.02);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.01), transparent);
+  box-sizing: border-box;
+  width: 100%;
 }
 
 .tb-btn {

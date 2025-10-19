@@ -8,7 +8,7 @@ pix3-panel {
 }
 
 .inspector-body {
-  padding: 1rem;
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -27,6 +27,7 @@ pix3-panel {
 }
 
 .section-title {
+  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
   font-size: 0.95rem;
   font-weight: 600;
   margin: 0 0 0.25rem 0;
@@ -106,6 +107,7 @@ pix3-panel {
 }
 
 .subsection-title {
+  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
   font-size: 0.85rem;
   font-weight: 600;
   margin: 0 0 0.5rem 0;

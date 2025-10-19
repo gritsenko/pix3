@@ -50,6 +50,7 @@
 }
 
 .panel__title {
+  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
   font-size: 0.78rem;
   font-weight: 600;
   letter-spacing: 0.08em;
@@ -72,7 +73,7 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 1rem;
+  padding: 0;
   font-size: 0.9rem;
   backdrop-filter: blur(8px);
 }

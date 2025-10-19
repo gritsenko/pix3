@@ -19,7 +19,6 @@ export class AssetBrowserPanel extends ComponentBase {
   protected render() {
     return html`
       <pix3-panel
-        panel-title="Asset Browser"
         panel-description="Open a project to browse textures, models, and prefabs."
         actions-label="Asset browser actions"
         @asset-activate=${this.onAssetActivate}

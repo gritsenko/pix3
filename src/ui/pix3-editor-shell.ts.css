@@ -23,6 +23,7 @@ pix3-toolbar {
 
 .product-title {
   margin: 0;
+  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
   font-size: 0.85rem;
   font-weight: 600;
   letter-spacing: 0.05em;
