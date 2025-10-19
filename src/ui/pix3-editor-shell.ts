@@ -177,10 +177,10 @@ export class Pix3EditorShell extends ComponentBase {
   private renderToolbar() {
     return html`
       <pix3-toolbar aria-label="Editor toolbar">
-        <span slot="start" class="product-title" role="heading" aria-level="1"> Pix3 Editor </span>
         <div class="toolbar-content">
           <!-- Layout presets removed: layout defaults to the gameplay engineer configuration -->
         </div>
+        <span slot="actions" class="product-title" role="heading" aria-level="1"> Pix3 </span>
         <pix3-toolbar-button
           slot="actions"
           aria-label="Open command palette"
