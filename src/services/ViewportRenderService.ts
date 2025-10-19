@@ -6,6 +6,7 @@
  * This separation ensures clean UI state management and proper undo/redo support.
  */
 import * as THREE from 'three';
+import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { NodeBase } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { injectable, inject } from '@/fw/di';
@@ -23,6 +24,7 @@ export class ViewportRendererService {
   private renderer?: THREE.WebGLRenderer;
   private scene?: THREE.Scene;
   private camera?: THREE.PerspectiveCamera;
+  private orbitControls?: OrbitControls;
   private selectedObjects = new Set<THREE.Object3D>();
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
   private animationId?: number;
@@ -62,6 +64,14 @@ export class ViewportRendererService {
     // Add grid helper for reference
     const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
     this.scene.add(gridHelper);
+
+    // Initialize OrbitControls
+    this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.orbitControls.enableDamping = true;
+    this.orbitControls.dampingFactor = 0.05;
+    this.orbitControls.autoRotate = false;
+    this.orbitControls.enableZoom = true;
+    this.orbitControls.enablePan = true;
 
     // Start render loop
     this.startRenderLoop();
@@ -235,6 +245,9 @@ export class ViewportRendererService {
       this.animationId = requestAnimationFrame(render);
 
       if (this.renderer && this.scene && this.camera) {
+        // Update orbit controls
+        this.orbitControls?.update();
+
         // Only update selection boxes every few frames to avoid performance issues
         if ((this.animationId || 0) % 10 === 0) {
           try {
@@ -267,6 +280,9 @@ export class ViewportRendererService {
       cancelAnimationFrame(this.animationId);
     }
 
+    // Dispose orbit controls
+    this.orbitControls?.dispose();
+
     // Dispose Three.js resources
     this.selectionBoxes.forEach(box => {
       box.geometry.dispose();
@@ -296,5 +312,6 @@ export class ViewportRendererService {
     this.renderer = undefined;
     this.scene = undefined;
     this.camera = undefined;
+    this.orbitControls = undefined;
   }
 }
