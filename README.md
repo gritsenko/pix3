@@ -50,20 +50,91 @@ Pix3 follows a modern, modular architecture:
 
 ```
 src/
-├── components/     # UI components extending ComponentBase
-├── core/          # Core business logic
-│   ├── commands/  # Command pattern implementations  
-│   ├── operations/# Operation abstractions
-│   ├── history/   # Undo/redo management
-│   ├── layout/    # Panel layout management
-│   ├── plugins/   # Plugin system
-│   └── scene/     # Scene graph and node management
-├── fw/           # Framework utilities (ComponentBase, DI, etc.)
-├── plugins/      # Built-in and custom plugins
-├── rendering/    # Rendering pipeline and abstractions
-├── services/     # Injectable services
-├── state/        # Global state management
-└── styles/       # Shared styles and themes
+├── core/          # Core business logic and managers
+│   ├── BulkOperation.ts
+│   ├── command.ts
+│   ├── HistoryManager.ts
+│   ├── LayoutManager.ts
+│   ├── Operation.ts
+│   ├── SceneLoader.ts
+│   └── SceneManager.ts
+├── features/      # Feature-specific commands and operations
+│   ├── history/
+│   │   ├── RedoCommand.ts
+│   │   └── UndoCommand.ts
+│   ├── properties/
+│   │   ├── UpdateObjectPropertyCommand.ts
+│   │   └── UpdateObjectPropertyOperation.ts
+│   ├── scene/
+│   │   ├── LoadSceneCommand.ts
+│   │   └── LoadSceneOperation.ts
+│   └── selection/
+│       ├── SelectObjectCommand.ts
+│       └── SelectObjectOperation.ts
+├── fw/            # Framework utilities (ComponentBase, DI, etc.)
+│   ├── component-base.ts
+│   ├── di.ts
+│   ├── from-query.ts
+│   ├── index.ts
+│   └── layout-component-base.ts
+├── nodes/         # Node definitions for scene graph
+│   ├── Node2D.ts
+│   ├── Node3D.ts
+│   ├── NodeBase.ts
+│   ├── 2D/
+│   │   └── Sprite2D.ts
+│   └── 3D/
+│       ├── Camera3D.ts
+│       ├── DirectionalLightNode.ts
+│       ├── GlbModel.ts
+│       └── Mesh3D.ts
+├── services/      # Injectable services
+│   ├── AssetLoaderService.ts
+│   ├── CommandDispatcher.ts
+│   ├── FileSystemAPIService.ts
+│   ├── FocusRingService.ts
+│   ├── index.ts
+│   ├── OperationService.ts
+│   ├── ProjectService.ts
+│   ├── ResourceManager.ts
+│   ├── TemplateService.ts
+│   └── ViewportRenderService.ts
+├── state/         # Valtio state definitions
+│   ├── AppState.ts
+│   └── index.ts
+├── templates/     # Project templates
+│   ├── pix3-logo.png
+│   └── startup-scene.pix3scene
+└── ui/            # Lit components extending ComponentBase
+    ├── pix3-editor-shell.ts
+    ├── pix3-editor-shell.ts.css
+    ├── assets-browser/
+    │   ├── asset-browser-panel.ts
+    │   ├── asset-browser-panel.ts.css
+    │   └── asset-tree.ts
+    │       └── asset-tree.ts.css
+    ├── object-inspector/
+    │   ├── inspector-panel.ts
+    │   └── inspector-panel.ts.css
+    ├── scene-tree/
+    │   ├── node-visuals.helper.ts
+    │   ├── scene-tree-node.ts
+    │   ├── scene-tree-node.ts.css
+    │   ├── scene-tree-panel.ts
+    │   └── scene-tree-panel.ts.css
+    ├── shared/
+    │   ├── pix3-panel.ts
+    │   ├── pix3-panel.ts.css
+    │   ├── pix3-toolbar-button.ts
+    │   ├── pix3-toolbar-button.ts.css
+    │   ├── pix3-toolbar.ts
+    │   └── pix3-toolbar.ts.css
+    ├── viewport/
+    │   ├── viewport-panel.ts
+    │   └── viewport-panel.ts.css
+    └── welcome/
+        ├── pix3-welcome.ts
+        └── pix3-welcome.ts.css
 ```
 
 ## 📋 Development Guidelines

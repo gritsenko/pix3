@@ -24,6 +24,7 @@ flowchart LR
     K["PluginManager"]
     L["Plugin State Management"]
     Q["Commands (thin wrappers)"]
+    S["Message Bus"]
   end
 
   subgraph Services
@@ -33,7 +34,7 @@ flowchart LR
 
   subgraph Rendering
     O["Three.js Pipeline (Perspective + Ortho Pass)"]
-    R["Viewport Panel (ResizeObserver)"]
+    R["ViewportRenderService"]
   end
 
   A ---|renders| D
@@ -44,6 +45,7 @@ flowchart LR
   C -->|reads| G
   E -->|reads| G
   Q -->|invokes operations| H
+  Q -->|emits events| S
   H -->|mutates via operations| G
   I -->|tracks| H
   J -->|loads/parses| G
@@ -57,8 +59,9 @@ flowchart LR
   %% UI can also call operations directly for tool flows
   A -.direct ops for tools.- H
 
+  S -->|notifies| A
+
   O -->|reads scene nodes| J
-  P -->|renders 2D nodes| J
 ```
 
 ## Roles

@@ -240,37 +240,91 @@ root:
 ├── dist/                     # Build output (generated)
 ├── public/                   # Static assets (logo, icons)
 ├── src/
-│   ├── core/                 # Core architecture (operations-first, history, layout)
-│   │   ├── features/
-│   │   │   ├── selection/
-│   │   │   │   ├── commands/
-│   │   │   │   └── operations/
-│   │   │   ├── properties/
-│   │   │   │   ├── commands/
-│   │   │   │   └── operations/
-│   │   │   ├── scene/
-│   │   │   │   ├── commands/
-│   │   │   │   └── operations/
-│   │   │   └── history/
-│   │   │       └── commands/   # Undo/Redo thin commands
-│   │   ├── operations/         # OperationService, base types, events
-│   │   ├── history/            # HistoryManager & undo/redo wiring
-│   │   ├── layout/             # Golden Layout integration
-│   │   └── scene/              # Scene-related managers & parsing
+│   ├── core/                 # Core business logic and managers
+│   │   ├── BulkOperation.ts
+│   │   ├── command.ts
+│   │   ├── HistoryManager.ts
+│   │   ├── LayoutManager.ts
+│   │   ├── Operation.ts
+│   │   ├── SceneLoader.ts
+│   │   └── SceneManager.ts
+│   ├── features/             # Feature-specific commands and operations
+│   │   ├── history/
+│   │   │   ├── RedoCommand.ts
+│   │   │   └── UndoCommand.ts
+│   │   ├── properties/
+│   │   │   ├── UpdateObjectPropertyCommand.ts
+│   │   │   └── UpdateObjectPropertyOperation.ts
+│   │   ├── scene/
+│   │   │   ├── LoadSceneCommand.ts
+│   │   │   └── LoadSceneOperation.ts
+│   │   └── selection/
+│   │       ├── SelectObjectCommand.ts
+│   │       └── SelectObjectOperation.ts
 │   ├── fw/                   # Framework utilities (ComponentBase, DI, helpers)
-│   ├── plugins/              # First-party & sample plugins
-│   │   └── pix3-basic-tools-plugin/
-│   ├── rendering/            # Active Three.js renderer services & helpers
-│   ├── services/             # File system, resource, project services
+│   │   ├── component-base.ts
+│   │   ├── di.ts
+│   │   ├── from-query.ts
+│   │   ├── index.ts
+│   │   └── layout-component-base.ts
+│   ├── nodes/                # Node definitions for scene graph
+│   │   ├── Node2D.ts
+│   │   ├── Node3D.ts
+│   │   ├── NodeBase.ts
+│   │   ├── 2D/
+│   │   │   └── Sprite2D.ts
+│   │   └── 3D/
+│   │       ├── Camera3D.ts
+│   │       ├── DirectionalLightNode.ts
+│   │       ├── GlbModel.ts
+│   │       └── Mesh3D.ts
+│   ├── services/             # Injectable services
+│   │   ├── AssetLoaderService.ts
+│   │   ├── CommandDispatcher.ts
+│   │   ├── FileSystemAPIService.ts
+│   │   ├── FocusRingService.ts
+│   │   ├── index.ts
+│   │   ├── OperationService.ts
+│   │   ├── ProjectService.ts
+│   │   ├── ResourceManager.ts
+│   │   ├── TemplateService.ts
+│   │   └── ViewportRenderService.ts
 │   ├── state/                # Valtio app state definitions
-│   ├── styles/               # Global stylesheets / design tokens
-│   ├── ui/                   # UI components (panels, shells, feature UIs)
+│   │   ├── AppState.ts
+│   │   └── index.ts
+│   ├── templates/            # Project templates
+│   │   ├── pix3-logo.png
+│   │   └── startup-scene.pix3scene
+│   ├── ui/                   # Lit components extending ComponentBase
+│   │   ├── pix3-editor-shell.ts
+│   │   ├── pix3-editor-shell.ts.css
 │   │   ├── assets-browser/
+│   │   │   ├── asset-browser-panel.ts
+│   │   │   ├── asset-browser-panel.ts.css
+│   │   │   └── asset-tree.ts
+│   │   │       └── asset-tree.ts.css
 │   │   ├── object-inspector/
+│   │   │   ├── inspector-panel.ts
+│   │   │   └── inspector-panel.ts.css
 │   │   ├── scene-tree/
+│   │   │   ├── node-visuals.helper.ts
+│   │   │   ├── scene-tree-node.ts
+│   │   │   ├── scene-tree-node.ts.css
+│   │   │   ├── scene-tree-panel.ts
+│   │   │   └── scene-tree-panel.ts.css
 │   │   ├── shared/
+│   │   │   ├── pix3-panel.ts
+│   │   │   ├── pix3-panel.ts.css
+│   │   │   ├── pix3-toolbar-button.ts
+│   │   │   ├── pix3-toolbar-button.ts.css
+│   │   │   ├── pix3-toolbar.ts
+│   │   │   └── pix3-toolbar.ts.css
 │   │   ├── viewport/
+│   │   │   ├── viewport-panel.ts
+│   │   │   └── viewport-panel.ts.css
 │   │   └── welcome/
+│   │       ├── pix3-welcome.ts
+│   │       └── pix3-welcome.ts.css
 │   ├── index.css             # Global CSS entry
 │   └── main.ts               # Application entry point
 ├── index.html
