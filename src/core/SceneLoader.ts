@@ -1,7 +1,8 @@
 import { parse } from 'yaml';
 import { Euler, MathUtils, Vector2, Vector3 } from 'three';
 
-import { injectable } from '@/fw/di';
+import { injectable, inject } from '@/fw/di';
+import { ResourceManager } from '@/services/ResourceManager';
 import { NodeBase, type NodeBaseProps } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { GlbModel } from '@/nodes/3D/GlbModel';
@@ -77,6 +78,9 @@ export interface ParseSceneOptions {
 
 @injectable()
 export class SceneLoader {
+  @inject(ResourceManager)
+  private readonly resourceManager!: ResourceManager;
+
   constructor() {}
 
   parseScene(sceneText: string, options: ParseSceneOptions = {}): SceneGraph {
@@ -246,7 +250,17 @@ export class SceneLoader {
       }
       case 'GlbModel': {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
-        const src = this.asString((baseProps.properties ?? {})['src']) ?? null;
+        let src = this.asString((baseProps.properties ?? {})['src']) ?? null;
+        
+        // Normalize template and resource URIs to their actual paths/URLs
+        if (src) {
+          try {
+            src = this.resourceManager.normalize(src);
+          } catch (error) {
+            console.warn(`[SceneLoader] Failed to normalize resource URI "${src}":`, error);
+          }
+        }
+        
         return new GlbModel({
           ...baseProps,
           properties: parsed.restProps,

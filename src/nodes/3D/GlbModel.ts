@@ -10,6 +10,6 @@ export class GlbModel extends Node3D {
   constructor(props: GlbModelProps) {
     super(props, 'GlbModel');
     this.src = props.src ?? null;
-    // Note: actual GLB loading is handled by rendering/services layer; this node only stores metadata.
+    
   }
 }

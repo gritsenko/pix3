@@ -42,7 +42,13 @@ export class ResourceManager {
       return this.fileSystem.normalizeResourcePath(resource);
     }
     if (scheme === TEMPLATE_SCHEME) {
-      return resource.replace(/^templ:\/\//i, '');
+      // For binary templates, resolve to the actual URL
+      try {
+        return this.templateService.resolveBinaryTemplateUrl(resource);
+      } catch {
+        // If not a binary template, strip the scheme
+        return resource.replace(/^templ:\/\//i, '');
+      }
     }
     return resource;
   }

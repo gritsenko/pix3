@@ -43,6 +43,12 @@ root:
           transform:
             position: [0, 0.5, 0]
             rotationEuler: [0, 45, 0]
+      - id: demo-glb
+        type: GlbModel
+        name: Demo Glb
+        properties:
+          src: 'templ://test_model.glb'
+          size: [1, 1, 1]
   - id: ui-layer
     type: Node2D
     name: UI Layer
@@ -51,7 +57,7 @@ root:
         type: Sprite2D
         name: Logo Sprite
         properties:
-          source: "res://pix3-logo.png"
+          source: "templ://pix3-logo.png"
           pivot: [0.5, 0.5]
           size: [256, 256]
           opacity: 1
