@@ -2,8 +2,9 @@ import { subscribe } from 'valtio/vanilla';
 
 import { ComponentBase, customElement, html, inject, property, state } from '@/fw';
 import { LayoutManagerService } from '@/core/LayoutManager';
-import { LoadSceneOperation } from '@/features/scene/LoadSceneOperation';
 import { OperationService } from '@/services/OperationService';
+import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { appState } from '@/state';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
@@ -18,7 +19,9 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(OperationService)
   private readonly operationService!: OperationService;
 
-  // No longer injecting LoadSceneCommand; using LoadSceneOperation with OperationService
+  @inject(CommandDispatcher)
+  private readonly commandDispatcher!: CommandDispatcher;
+
   // project open handled by <pix3-welcome>
 
   @state()
@@ -52,6 +55,16 @@ export class Pix3EditorShell extends ComponentBase {
             this.shellReady = true;
             this.requestUpdate();
           });
+        }
+
+        // Load pending startup scene once project is ready
+        const pending = appState.scenes.pendingScenePaths[0];
+        if (pending) {
+          if (process.env.NODE_ENV === 'development') {
+            console.debug('[Pix3Editor] Loading startup scene', { pending });
+          }
+          const command = new LoadSceneCommand({ filePath: pending });
+          void this.commandDispatcher.execute(command);
         }
       }
     });
@@ -148,17 +161,16 @@ export class Pix3EditorShell extends ComponentBase {
     if (appState.project.status === 'ready') {
       await this.layoutManager.initialize(host);
       this.shellReady = true;
-    }
 
-    // Kick off loading of the pending startup scene (first in queue) if any
-    const pending = appState.scenes.pendingScenePaths[0];
-    if (pending) {
-      // Ensure FileSystemAPIService resource prefix logic is available
-      // Debug log for startup load
-      if (process.env.NODE_ENV === 'development') {
-        console.debug('[Pix3Editor] Loading startup scene', { pending });
+      // Load pending startup scene if project is already ready
+      const pending = appState.scenes.pendingScenePaths[0];
+      if (pending) {
+        if (process.env.NODE_ENV === 'development') {
+          console.debug('[Pix3Editor] Loading startup scene', { pending });
+        }
+        const command = new LoadSceneCommand({ filePath: pending });
+        await this.commandDispatcher.execute(command);
       }
-      await this.operationService.invoke(new LoadSceneOperation({ filePath: pending }));
     }
   }
 

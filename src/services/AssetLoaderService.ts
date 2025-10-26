@@ -1,6 +1,6 @@
 import { injectable, inject } from '@/fw/di';
-import { OperationService } from '@/services/OperationService';
-import { LoadSceneOperation } from '@/features/scene/LoadSceneOperation';
+import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { Object3D, AnimationClip } from 'three';
@@ -15,8 +15,8 @@ export interface AssetActivation {
 
 @injectable()
 export class AssetLoaderService {
-  @inject(OperationService)
-  private readonly operations!: OperationService;
+  @inject(CommandDispatcher)
+  private readonly commandDispatcher!: CommandDispatcher;
 
   async handleActivation(payload: AssetActivation): Promise<void> {
     const { extension, resourcePath } = payload;
@@ -24,7 +24,8 @@ export class AssetLoaderService {
 
     if (extension === 'pix3scene') {
       const sceneId = this.deriveSceneId(resourcePath);
-      await this.operations.invoke(new LoadSceneOperation({ filePath: resourcePath, sceneId }));
+      const command = new LoadSceneCommand({ filePath: resourcePath, sceneId });
+      await this.commandDispatcher.execute(command);
       return;
     }
 
@@ -45,6 +46,24 @@ export class AssetLoaderService {
       return { scene: clonedScene, animations: clonedAnimations };
     } catch (error) {
       console.error(`Failed to load GLTF: ${src}`, error);
+      return null;
+    }
+  }
+
+  async loadGltfFromBlob(blob: Blob): Promise<{ scene: Object3D; animations: AnimationClip[] } | null> {
+    try {
+      const loader = new GLTFLoader();
+      const url = URL.createObjectURL(blob);
+      try {
+        const gltf = await loader.loadAsync(url);
+        const clonedScene = SkeletonUtils.clone(gltf.scene);
+        const clonedAnimations = gltf.animations.map((clip: AnimationClip) => clip.clone());
+        return { scene: clonedScene, animations: clonedAnimations };
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Failed to load GLTF from blob', error);
       return null;
     }
   }

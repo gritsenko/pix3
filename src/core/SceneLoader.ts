@@ -83,7 +83,7 @@ export class SceneLoader {
 
   constructor() {}
 
-  parseScene(sceneText: string, options: ParseSceneOptions = {}): SceneGraph {
+  async parseScene(sceneText: string, options: ParseSceneOptions = {}): Promise<SceneGraph> {
     let document: SceneDocument;
     try {
       document = parse(sceneText) as SceneDocument;
@@ -98,7 +98,7 @@ export class SceneLoader {
     const rootNodes: NodeBase[] = [];
 
     for (const definition of document.root ?? []) {
-      const rootNode = this.instantiateNode(
+      const rootNode = await this.instantiateNode(
         definition,
         null,
         nodeIndex,
@@ -116,19 +116,19 @@ export class SceneLoader {
     };
   }
 
-  private instantiateNode(
+  private async instantiateNode(
     definition: SceneNodeDefinition,
     parent: NodeBase | null,
     index: Map<string, NodeBase>,
     sceneIdentifier: string
-  ): NodeBase {
+  ): Promise<NodeBase> {
     if (index.has(definition.id)) {
       throw new SceneValidationError(`Duplicate node id "${definition.id}" detected.`, [
         sceneIdentifier,
       ]);
     }
 
-    const node = this.createNodeFromDefinition(definition);
+    const node = await this.createNodeFromDefinition(definition);
     index.set(node.nodeId, node);
 
     if (parent) {
@@ -137,13 +137,13 @@ export class SceneLoader {
 
     const childDefinitions = definition.children ?? [];
     for (const childDef of childDefinitions) {
-      this.instantiateNode(childDef, node, index, sceneIdentifier);
+      await this.instantiateNode(childDef, node, index, sceneIdentifier);
     }
 
     return node;
   }
 
-  private createNodeFromDefinition(definition: SceneNodeDefinition): NodeBase {
+  private async createNodeFromDefinition(definition: SceneNodeDefinition): Promise<NodeBase> {
     const baseProps: NodeBaseProps = {
       id: definition.id,
       name: definition.name,
@@ -252,16 +252,22 @@ export class SceneLoader {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
         let src = this.asString((baseProps.properties ?? {})['src']) ?? null;
         
-        // Normalize template and resource URIs to their actual paths/URLs
+        // Load GLB/GLTF mesh and animations from resource manager
+        let meshData: { scene: any; animations: any[] } | null = null;
         if (src) {
           try {
             src = this.resourceManager.normalize(src);
+            const blob = await this.resourceManager.readBlob(src);
+            meshData = await this.loadGltfFromBlob(blob);
+            if (!meshData) {
+              console.warn(`[SceneLoader] Failed to load GLB model from "${src}"`);
+            }
           } catch (error) {
-            console.warn(`[SceneLoader] Failed to normalize resource URI "${src}":`, error);
+            console.warn(`[SceneLoader] Error loading GLB model from "${src}":`, error);
           }
         }
         
-        return new MeshInstance({
+        const meshInstance = new MeshInstance({
           ...baseProps,
           properties: parsed.restProps,
           position: parsed.position,
@@ -270,6 +276,14 @@ export class SceneLoader {
           scale: parsed.scale,
           src,
         });
+
+        // Populate mesh data if successfully loaded
+        if (meshData) {
+          (meshInstance as any).scene = meshData.scene;
+          (meshInstance as any).animations = meshData.animations;
+        }
+
+        return meshInstance;
       }
       default:
         return new NodeBase({ ...baseProps, type: definition.type });
@@ -417,5 +431,26 @@ export class SceneLoader {
 
   private asString(value: unknown): string | undefined {
     return typeof value === 'string' ? value : undefined;
+  }
+
+  private async loadGltfFromBlob(blob: Blob): Promise<{ scene: any; animations: any[] } | null> {
+    try {
+      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
+      const SkeletonUtils = await import('three/examples/jsm/utils/SkeletonUtils.js');
+      
+      const loader = new GLTFLoader();
+      const url = URL.createObjectURL(blob);
+      try {
+        const gltf = await loader.loadAsync(url);
+        const clonedScene = SkeletonUtils.clone(gltf.scene);
+        const clonedAnimations = gltf.animations.map((clip: any) => clip.clone());
+        return { scene: clonedScene, animations: clonedAnimations };
+      } finally {
+        URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('[SceneLoader] Failed to load GLTF from blob', error);
+      return null;
+    }
   }
 }

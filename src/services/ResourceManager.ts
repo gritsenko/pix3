@@ -36,6 +36,30 @@ export class ResourceManager {
     }
   }
 
+  async readBlob(resource: string, options: ReadResourceOptions = {}): Promise<Blob> {
+    const scheme = this.getScheme(resource);
+
+    switch (scheme) {
+      case TEMPLATE_SCHEME:
+        // For binary templates, resolve to the actual URL and fetch as blob
+        try {
+          const url = this.templateService.resolveBinaryTemplateUrl(resource);
+          return await this.fetchBlob(url);
+        } catch {
+          throw new Error(`Failed to resolve binary template URI: ${resource}`);
+        }
+      case RES_SCHEME:
+        return await this.readProjectResourceBlob(resource, options.allowNetworkFallback !== false);
+      case 'http':
+      case 'https':
+        return await this.fetchBlob(resource);
+      case '':
+        return await this.fetchBlob(resource);
+      default:
+        throw new Error(`Unsupported resource scheme: ${scheme || '(none)'}`);
+    }
+  }
+
   normalize(resource: string): string {
     const scheme = this.getScheme(resource);
     if (scheme === RES_SCHEME) {
@@ -83,6 +107,40 @@ export class ResourceManager {
       throw new Error(`HTTP ${response.status} while fetching ${url}`);
     }
     return await response.text();
+  }
+
+  private async fetchBlob(url: string): Promise<Blob> {
+    const response = await fetch(url, { cache: 'no-cache' });
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status} while fetching blob from ${url}`);
+    }
+    return await response.blob();
+  }
+
+  private async readProjectResourceBlob(
+    resource: string,
+    allowNetworkFallback: boolean
+  ): Promise<Blob> {
+    try {
+      const fileHandle = await this.fileSystem.getFileHandle(resource, { mode: 'read' });
+      const file = await fileHandle.getFile();
+      return new Blob([await file.arrayBuffer()], { type: file.type });
+    } catch (error) {
+      if (error instanceof FileSystemAPIError) {
+        if (!allowNetworkFallback) {
+          throw error;
+        }
+        if (error.code !== 'not-initialized' && error.code !== 'not-found') {
+          throw error;
+        }
+      } else if (!allowNetworkFallback) {
+        throw error;
+      }
+    }
+
+    const normalizedPath = this.fileSystem.normalizeResourcePath(resource);
+    const requestUrl = this.buildPublicUrl(normalizedPath);
+    return await this.fetchBlob(requestUrl);
   }
 
   private buildPublicUrl(relativePath: string): string {

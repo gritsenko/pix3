@@ -2,7 +2,7 @@ import { Node3D, type Node3DProps } from '@/nodes/Node3D';
 import { AnimationClip } from 'three';
 
 export interface MeshInstanceProps extends Omit<Node3DProps, 'type'> {
-  src?: string | null; // res:// or http(s) path to .glb/.gltf
+  src?: string | null; // res:// or tmpl:// path to .glb/.gltf
 }
 
 export class MeshInstance extends Node3D {
