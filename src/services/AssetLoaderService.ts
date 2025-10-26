@@ -1,6 +1,9 @@
 import { injectable, inject } from '@/fw/di';
 import { OperationService } from '@/services/OperationService';
 import { LoadSceneOperation } from '@/features/scene/LoadSceneOperation';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
+import { Object3D, AnimationClip } from 'three';
 
 export interface AssetActivation {
   name: string;
@@ -31,6 +34,19 @@ export class AssetLoaderService {
 
     // TODO: other asset types (images -> Sprite2D, audio, prefabs, etc.)
     console.info('[AssetLoaderService] No handler for asset type', payload);
+  }
+
+  async loadGltfToMeshInstance(src: string): Promise<{ scene: Object3D; animations: AnimationClip[] } | null> {
+    try {
+      const loader = new GLTFLoader();
+      const gltf = await loader.loadAsync(src);
+      const clonedScene = SkeletonUtils.clone(gltf.scene);
+      const clonedAnimations = gltf.animations.map((clip: AnimationClip) => clip.clone());
+      return { scene: clonedScene, animations: clonedAnimations };
+    } catch (error) {
+      console.error(`Failed to load GLTF: ${src}`, error);
+      return null;
+    }
   }
 
   private deriveSceneId(resourcePath: string): string {

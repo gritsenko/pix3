@@ -45,7 +45,7 @@ export class LoadSceneOperation implements Operation<OperationInvokeResult> {
 
     try {
       const sceneText = await resources.readText(filePath);
-      const graph = sceneManager.parseScene(sceneText, { filePath });
+      const graph = await sceneManager.parseScene(sceneText, { filePath });
 
       const activeId = this.params.sceneId ?? appState.scenes.activeSceneId ?? 'startup-scene';
       const existing = appState.scenes.descriptors[activeId] ?? null;

@@ -4,7 +4,7 @@ import { Node3D } from '@/nodes/Node3D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { Camera3D } from '@/nodes/3D/Camera3D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
-import { GlbModel } from '@/nodes/3D/GlbModel';
+import { MeshInstance } from '@/nodes/3D/MeshInstance';
 import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
 
 // Color constants for node types
@@ -27,7 +27,7 @@ export function getNodeVisuals(node: NodeBase): { color: string; icon: string } 
   if (node instanceof DirectionalLightNode) {
     return { color: NODE_3D_COLOR, icon: 'sun' };
   }
-  if (node instanceof GlbModel) {
+  if (node instanceof MeshInstance) {
     return { color: NODE_3D_COLOR, icon: 'package' };
   }
   if (node instanceof GeometryMesh) {

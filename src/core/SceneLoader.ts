@@ -5,7 +5,7 @@ import { injectable, inject } from '@/fw/di';
 import { ResourceManager } from '@/services/ResourceManager';
 import { NodeBase, type NodeBaseProps } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
-import { GlbModel } from '@/nodes/3D/GlbModel';
+import { MeshInstance } from '@/nodes/3D/MeshInstance';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
 import type { SceneGraph } from './SceneManager';
@@ -261,7 +261,7 @@ export class SceneLoader {
           }
         }
         
-        return new GlbModel({
+        return new MeshInstance({
           ...baseProps,
           properties: parsed.restProps,
           position: parsed.position,

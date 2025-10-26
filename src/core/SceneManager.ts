@@ -19,8 +19,8 @@ export class SceneManager {
 
   constructor() {}
 
-  parseScene(sceneText: string, options: ParseSceneOptions = {}): SceneGraph {
-    return this.sceneLoader.parseScene(sceneText, options);
+  async parseScene(sceneText: string, options: ParseSceneOptions = {}): Promise<SceneGraph> {
+    return await this.sceneLoader.parseScene(sceneText, options);
   }
 
   setActiveSceneGraph(sceneId: string, graph: SceneGraph): void {

@@ -86,7 +86,7 @@ src/
 │   └── 3D/
 │       ├── Camera3D.ts
 │       ├── DirectionalLightNode.ts
-│       ├── GlbModel.ts
+│       ├── MeshInstance.ts
 │       └── GeometryMesh.ts
 ├── services/      # Injectable services
 │   ├── AssetLoaderService.ts
