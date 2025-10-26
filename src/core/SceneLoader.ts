@@ -2,7 +2,6 @@ import { parse } from 'yaml';
 import { Euler, MathUtils, Vector2, Vector3 } from 'three';
 
 import { injectable, inject } from '@/fw/di';
-import { ResourceManager } from '@/services/ResourceManager';
 import { NodeBase, type NodeBaseProps } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { MeshInstance } from '@/nodes/3D/MeshInstance';
@@ -15,6 +14,7 @@ import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
 import { Camera3D } from '@/nodes/3D/Camera3D';
 
 import { Node2D } from '@/nodes/Node2D';
+import { AssetLoader } from './AssetLoader';
 
 const ZERO_VECTOR3 = new Vector3(0, 0, 0);
 const UNIT_VECTOR3 = new Vector3(1, 1, 1);
@@ -78,8 +78,8 @@ export interface ParseSceneOptions {
 
 @injectable()
 export class SceneLoader {
-  @inject(ResourceManager)
-  private readonly resourceManager!: ResourceManager;
+  @inject(AssetLoader)
+  private readonly assetLoader!: AssetLoader;
 
   constructor() {}
 
@@ -248,24 +248,9 @@ export class SceneLoader {
           far: props.far ?? 1000,
         });
       }
-      case 'GlbModel': {
+      case 'MeshInstance': {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
         let src = this.asString((baseProps.properties ?? {})['src']) ?? null;
-        
-        // Load GLB/GLTF mesh and animations from resource manager
-        let meshData: { scene: any; animations: any[] } | null = null;
-        if (src) {
-          try {
-            src = this.resourceManager.normalize(src);
-            const blob = await this.resourceManager.readBlob(src);
-            meshData = await this.loadGltfFromBlob(blob);
-            if (!meshData) {
-              console.warn(`[SceneLoader] Failed to load GLB model from "${src}"`);
-            }
-          } catch (error) {
-            console.warn(`[SceneLoader] Error loading GLB model from "${src}":`, error);
-          }
-        }
         
         const meshInstance = new MeshInstance({
           ...baseProps,
@@ -277,10 +262,27 @@ export class SceneLoader {
           src,
         });
 
-        // Populate mesh data if successfully loaded
-        if (meshData) {
-          (meshInstance as any).scene = meshData.scene;
-          (meshInstance as any).animations = meshData.animations;
+        // Load GLB/GLTF mesh and animations from resource manager
+        if (src) {
+          try {
+            const assetLoaderResult = await this.assetLoader.loadAsset(src);
+            const loadedNode = assetLoaderResult.node;
+            
+            // Add the loaded geometry to the mesh instance
+            if (loadedNode.children && loadedNode.children.length > 0) {
+              // Transfer children from loaded node to mesh instance
+              for (const child of loadedNode.children) {
+                meshInstance.add(child);
+              }
+            }
+            
+            // Transfer animations if available
+            if ('animations' in loadedNode && Array.isArray(loadedNode.animations)) {
+              meshInstance.animations = loadedNode.animations;
+            }
+          } catch (error) {
+            console.warn(`[SceneLoader] Error loading GLB model from "${src}":`, error);
+          }
         }
 
         return meshInstance;
@@ -433,24 +435,4 @@ export class SceneLoader {
     return typeof value === 'string' ? value : undefined;
   }
 
-  private async loadGltfFromBlob(blob: Blob): Promise<{ scene: any; animations: any[] } | null> {
-    try {
-      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
-      const SkeletonUtils = await import('three/examples/jsm/utils/SkeletonUtils.js');
-      
-      const loader = new GLTFLoader();
-      const url = URL.createObjectURL(blob);
-      try {
-        const gltf = await loader.loadAsync(url);
-        const clonedScene = SkeletonUtils.clone(gltf.scene);
-        const clonedAnimations = gltf.animations.map((clip: any) => clip.clone());
-        return { scene: clonedScene, animations: clonedAnimations };
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('[SceneLoader] Failed to load GLTF from blob', error);
-      return null;
-    }
-  }
 }

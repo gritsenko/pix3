@@ -13,11 +13,19 @@ export interface AssetActivation {
   extension: string; // lowercase without dot
 }
 
+/**
+ * AssetFileActivationService handles opening asset files from the project tree.
+ * It dispatches appropriate commands based on file type (e.g., LoadSceneCommand for .pix3scene files).
+ */
 @injectable()
-export class AssetLoaderService {
+export class AssetFileActivationService {
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
 
+  /**
+   * Handle activation of an asset file from the project tree.
+   * @param payload File activation details including extension and resource path
+   */
   async handleActivation(payload: AssetActivation): Promise<void> {
     const { extension, resourcePath } = payload;
     if (!resourcePath) return;
@@ -34,7 +42,7 @@ export class AssetLoaderService {
     }
 
     // TODO: other asset types (images -> Sprite2D, audio, prefabs, etc.)
-    console.info('[AssetLoaderService] No handler for asset type', payload);
+    console.info('[AssetFileActivationService] No handler for asset type', payload);
   }
 
   async loadGltfToMeshInstance(src: string): Promise<{ scene: Object3D; animations: AnimationClip[] } | null> {

@@ -1,5 +1,5 @@
 import { ComponentBase, customElement, html, inject } from '@/fw';
-import { AssetLoaderService, type AssetActivation } from '@/services';
+import { AssetFileActivationService, type AssetActivation } from '@/services';
 
 import '../shared/pix3-panel';
 import './asset-tree';
@@ -7,13 +7,13 @@ import './asset-browser-panel.ts.css';
 
 @customElement('pix3-asset-browser-panel')
 export class AssetBrowserPanel extends ComponentBase {
-  @inject(AssetLoaderService)
-  private readonly assetLoader!: AssetLoaderService;
+  @inject(AssetFileActivationService)
+  private readonly assetFileActivation!: AssetFileActivationService;
 
   private onAssetActivate = async (e: Event) => {
     const detail = (e as CustomEvent<AssetActivation>).detail;
     if (!detail) return;
-    await this.assetLoader.handleActivation(detail);
+    await this.assetFileActivation.handleActivation(detail);
   };
 
   protected render() {
