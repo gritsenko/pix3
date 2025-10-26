@@ -10,7 +10,7 @@ import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
 import type { SceneGraph } from './SceneManager';
 
-import { Mesh3D } from '@/nodes/3D/Mesh3D';
+import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
 
 import { Camera3D } from '@/nodes/3D/Camera3D';
 
@@ -48,7 +48,7 @@ export interface SceneDocument {
   root: SceneNodeDefinition[];
 }
 
-export interface Mesh3DProperties {
+export interface GeometryMeshProperties {
   geometry?: string;
   size?: [number, number, number];
   material?: { color?: string; roughness?: number; metalness?: number; type?: string };
@@ -199,14 +199,14 @@ export class SceneLoader {
           rotation: props.rotation ?? 0,
         });
       }
-      case 'Mesh3D': {
+      case 'GeometryMesh': {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
         const propsRec = baseProps.properties as Record<string, unknown>;
         const geometry = this.asString(propsRec.geometry) ?? 'box';
         const size = this.readVector3(propsRec.size, UNIT_VECTOR3);
         const material = this.asRecord(propsRec.material);
         const materialColor = this.asString(material?.color) ?? '#4e8df5';
-        return new Mesh3D({
+        return new GeometryMesh({
           ...baseProps,
           properties: parsed.restProps,
           position: parsed.position,

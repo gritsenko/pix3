@@ -32,7 +32,7 @@ root:
             position: [5, 8, 3]
             rotationEuler: [-45, 35, 0]
       - id: demo-box
-        type: Mesh3D
+        type: GeometryMesh
         name: Demo Box
         properties:
           geometry: box

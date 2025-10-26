@@ -1,18 +1,18 @@
 import { BoxGeometry, Mesh, MeshStandardMaterial, Color, BufferGeometry, Material } from 'three';
 import { Node3D, type Node3DProps } from '@/nodes/Node3D';
 
-export interface Mesh3DProps extends Omit<Node3DProps, 'type'> {
+export interface GeometryMeshProps extends Omit<Node3DProps, 'type'> {
   geometry?: string;
   size?: [number, number, number];
   material?: { color?: string; roughness?: number; metalness?: number };
 }
 
-export class Mesh3D extends Node3D {
+export class GeometryMesh extends Node3D {
   private _geometry?: BufferGeometry;
   private _material?: Material;
 
-  constructor(props: Mesh3DProps) {
-    super(props, 'Mesh3D');
+  constructor(props: GeometryMeshProps) {
+    super(props, 'GeometryMesh');
 
     const geometryKind = (props.geometry ?? 'box').toLowerCase();
     const size = props.size ?? [1, 1, 1];
