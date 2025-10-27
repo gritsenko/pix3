@@ -72,39 +72,37 @@ export class AssetLoader {
   ): Promise<AssetLoaderResult> {
     try {
       const blob = await this.resources.readBlob(resourcePath);
+      const arrayBuffer = await blob.arrayBuffer();
+      
       const loader = new GLTFLoader();
       
-      // Create blob URL - this allows GLTFLoader to properly resolve embedded textures
-      const url = URL.createObjectURL(blob);
+      // Use parse() instead of loadAsync() with an empty resource path
+      // This prevents GLTFLoader from trying to resolve external resources
+      const gltf = await new Promise<any>((resolve, reject) => {
+        loader.parse(
+          arrayBuffer,
+          '', // Empty resource path - all data is embedded in GLB
+          (result) => resolve(result),
+          (error) => reject(error)
+        );
+      });
       
-      try {
-        const gltf = await loader.loadAsync(url);
-        
-        // Don't revoke URL yet! Textures may still be loading.
-        const animations = gltf.animations.map((clip: AnimationClip) => clip.clone());
+      const animations = gltf.animations.map((clip: AnimationClip) => clip.clone());
 
-        const finalNodeId = nodeId || crypto.randomUUID();
-        const finalNodeName = nodeName || 'mesh';
+      const finalNodeId = nodeId || crypto.randomUUID();
+      const finalNodeName = nodeName || 'mesh';
 
-        const meshInstance = new MeshInstance({
-          id: finalNodeId,
-          name: finalNodeName,
-          src: resourcePath,
-        });
+      const meshInstance = new MeshInstance({
+        id: finalNodeId,
+        name: finalNodeName,
+        src: resourcePath,
+      });
 
-        // Add loaded geometry to the instance
-        meshInstance.add(gltf.scene);
-        meshInstance.animations = animations;
-        
-        // Store blob URL for cleanup when mesh is disposed
-        (meshInstance as any)._blobUrl = url;
+      // Add loaded geometry to the instance
+      meshInstance.add(gltf.scene);
+      meshInstance.animations = animations;
 
-        return { node: meshInstance };
-      } catch (loadError) {
-        // Only revoke URL if loading failed
-        URL.revokeObjectURL(url);
-        throw loadError;
-      }
+      return { node: meshInstance };
     } catch (error) {
       console.error(`[AssetLoader] Failed to load GLTF: ${resourcePath}`, error);
       throw new Error(
