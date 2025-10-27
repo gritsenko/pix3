@@ -1,6 +1,6 @@
 # Pix3 Architecture Diagram
 
-This document contains a high-level architecture diagram for Pix3 and notes about viewing and exporting diagrams in VS Code. It reflects the current operations-first model where the OperationService is the single entry point for mutations and history.
+This document contains a high-level architecture diagram for Pix3 and notes about viewing and exporting diagrams in VS Code. It reflects the current operations-first model where the CommandDispatcher Service is the primary entry point for all actions, ensuring consistent lifecycle management and preconditions checking.
 
 ## Mermaid diagram
 
@@ -23,6 +23,7 @@ flowchart LR
     J["SceneManager"]
     K["PluginManager"]
     L["Plugin State Management"]
+    P["CommandDispatcher Service"]
     Q["Commands (thin wrappers)"]
     S["Message Bus"]
   end
@@ -44,20 +45,21 @@ flowchart LR
 
   C -->|reads| G
   E -->|reads| G
+  P -->|executes commands| Q
   Q -->|invokes operations| H
   Q -->|emits events| S
   H -->|mutates via operations| G
   I -->|tracks| H
   J -->|loads/parses| G
-  K -->|registers commands| H
+  K -->|registers commands| P
   L -->|manages plugin state| G
 
   G -->|persists layout| M
   H -->|emits| N
   J -->|loads scenes| M
 
-  %% UI can also call operations directly for tool flows
-  A -.direct ops for tools.- H
+  %% All actions go through CommandDispatcher
+  A -->|uses| P
 
   S -->|notifies| A
 

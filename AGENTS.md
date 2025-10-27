@@ -34,8 +34,9 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 ### Commands and Operations
 - **Operations** are first-class, encapsulate all mutation logic
 - Implement `perform()` returning OperationCommit with `undo()`/`redo()` closures
-- **OperationService** is single gateway: `invoke(op)`, `invokeAndPush(op)`, `undo()`, `redo()`
-- **Commands** are thin wrappers: `preconditions()` → `execute()` → OperationService
+- **OperationService** is the gateway for executing operations: `invoke(op)`, `invokeAndPush(op)`, `undo()`, `redo()`
+- **CommandDispatcher Service** is the primary entry point for all actions. All UI and tools must use Commands via CommandDispatcher to ensure consistent lifecycle management, preconditions checking, and telemetry.
+- **Commands** are thin wrappers: `preconditions()` → `execute()` → OperationService via CommandDispatcher
 - Commands never implement their own undo/redo logic
 
 ## File Structure Conventions
@@ -45,6 +46,7 @@ src/
   fw/                      # Framework utilities (DI, ComponentBase)
   state/                   # Valtio state definitions
   core/                    # Core business logic and managers
+    AssetLoader.ts
     BulkOperation.ts
     command.ts
     HistoryManager.ts
@@ -74,9 +76,11 @@ src/
     3D/
       Camera3D.ts
       DirectionalLightNode.ts
-      MeshInstance.ts
       GeometryMesh.ts
+      GlbModel.ts
+      MeshInstance.ts
   services/                # Injectable services
+    AssetFileActivationService.ts
     AssetLoaderService.ts
     CommandDispatcher.ts
     FileSystemAPIService.ts
@@ -90,6 +94,7 @@ src/
   templates/               # Project templates
     pix3-logo.png
     startup-scene.pix3scene
+    test_model.glb
   ui/                      # Lit components extending ComponentBase
     pix3-editor-shell.ts
     pix3-editor-shell.ts.css
@@ -164,11 +169,12 @@ src/
 
 1. **Never mutate `appState` directly** - always use Operations via OperationService
 2. **Follow operations-first model** - Operations handle all mutations, Commands are thin wrappers
-3. **Use ComponentBase** for all Lit components, not LitElement directly
-4. **Import from `@/` aliases** - never use relative paths for core imports
-5. **Separate styles** - each component has corresponding `.css` file
-6. **Light DOM by default** - use shadow DOM only when explicitly needed
-7. **Singleton services** - register with ServiceContainer, implement dispose()
-8. **Cross-reference specification** - check `docs/pix3-specification.md` for architectural decisions
+3. **Use CommandDispatcher Service for all actions** - All UI and tools must perform actions via Commands through CommandDispatcher instead of directly invoking operations
+4. **Use ComponentBase** for all Lit components, not LitElement directly
+5. **Import from `@/` aliases** - never use relative paths for core imports
+6. **Separate styles** - each component has corresponding `.css` file
+7. **Light DOM by default** - use shadow DOM only when explicitly needed
+8. **Singleton services** - register with ServiceContainer, implement dispose()
+9. **Cross-reference specification** - check `docs/pix3-specification.md` for architectural decisions
 
 Always verify architectural decisions against the specification before implementing features.

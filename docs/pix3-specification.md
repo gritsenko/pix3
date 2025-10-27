@@ -1,8 +1,8 @@
 # Pix3 — Technical Specification
 
-Version: 1.8
+Version: 1.9
 
-Date: 2025-10-05
+Date: 2025-10-27
 
 ## 1. Introduction
 
@@ -68,7 +68,7 @@ Non-Chromium browsers (Firefox, Safari) are out of scope for MVP but should degr
 The application will be built on the principles of unidirectional data flow and clear separation of concerns.
 
 - State: A centralized store based on Valtio, serving as the single source of truth. It is passive and contains no business logic.
-- Commands and Operations: Operations are first-class, encapsulating business logic and state mutations. The OperationService is the only gateway to perform, undo, and redo changes. Commands exist as thin wrappers that validate context and then invoke operations via OperationService. UI and tools may also invoke operations directly when appropriate.
+- Commands and Operations: Operations are first-class, encapsulating business logic and state mutations. The OperationService is the gateway for executing operations, but all actions must be initiated via Commands through the CommandDispatcher Service. Commands are thin wrappers that validate context and invoke operations via OperationService. UI and tools should use CommandDispatcher to ensure consistent lifecycle management.
 - Core Managers: Classes that manage the main aspects of the editor (HistoryManager, SceneManager, PluginManager). They orchestrate the execution of commands.
 - Services: An infrastructure layer for interacting with the outside world (FileSystemAPIService). They do not contain business logic.
 - UI Components: "Dumb" components built on top of the project's fw helpers. Prefer extending `ComponentBase` (which wraps LitElement and provides a configurable render root) and use the `inject` decorator from `fw/di` for services instead of wiring dependencies manually. This ensures consistent DOM mode (light vs shadow), simpler service wiring, and a single recommended pattern across the project.
@@ -122,7 +122,7 @@ Notes:
 - **OperationService:** Central orchestrator. Methods: `invoke(op)`, `invokeAndPush(op)` to also record history, `undo()`, `redo()`. Maintains bounded stacks (default 100 items), clears redo on new pushes, supports coalescing, and emits typed events for UI updates and telemetry.
 - **Operation Contract:** `perform()` returns an `OperationCommit` with `undo`/`redo` closures. Optionally includes metadata like affected nodes and structure flags for efficient scene diffing.
 - **Bulk operations:** Tools can compose granular operations into one undo step via a helper that produces a single coalesced commit.
-- **UI/Tools Integration:** UI panels and tools may call operations directly through OperationService. Commands are optional thin facades for palette/shortcut integration and should never carry undo logic.
+- **UI/Tools Integration:** All actions in the application must be performed via Commands through the CommandDispatcher Service. Commands are thin wrappers that validate context and invoke operations via OperationService. UI panels and tools should use CommandDispatcher to execute commands, ensuring consistent lifecycle management, preconditions checking, and telemetry. Direct invocation of operations via OperationService is discouraged and should be replaced with appropriate commands.
 - **Telemetry Hooks:** All mutations flow through OperationService, making it the ideal hook for analytics, autosave, and sync.
 
 ### 4.4 Rendering Architecture Notes
@@ -136,15 +136,15 @@ Notes:
 
 The repository contains a working MVP scaffold and a small, functional rendering pipeline. The list below summarizes concrete items already implemented in the codebase and points to the primary files so maintainers can quickly find the behavior.
 
-- Viewport rendering: a Three.js-based viewport is implemented and exposed via `ViewportRendererService` (`src/rendering/ViewportRendererService.ts`). It provides a perspective pass (3D) plus an orthographic overlay pass for HUD/crosshair rendering.
+- Viewport rendering: a Three.js-based viewport is implemented and exposed via `ViewportRenderService` (`src/services/ViewportRenderService.ts`). It provides a perspective pass (3D) plus an orthographic overlay pass for HUD/crosshair rendering.
 - DPI / resize handling: the renderer and viewport panel now correctly handle device pixel ratio (DPR) and layout resizing to produce pixel-perfect output. Key files:
-  - `src/rendering/ViewportRendererService.ts` — DPR-aware resize logic, explicit canvas CSS sizing, overlay camera aspect updates, and DPR/layout polling in the render loop.
-  - `src/components/viewport/viewport-panel.ts` — observes the canvas with `ResizeObserver` and initializes the renderer with the measured canvas size.
+  - `src/services/ViewportRenderService.ts` — DPR-aware resize logic, explicit canvas CSS sizing, overlay camera aspect updates, and DPR/layout polling in the render loop.
+  - `src/ui/viewport/viewport-panel.ts` — observes the canvas with `ResizeObserver` and initializes the renderer with the measured canvas size.
 - Controls and demo scene: orbit controls, demo cube, lighting and helper axes are wired in the viewport service for a visible default scene (`setupDemoScene`, `setupControls`).
-- Scene parsing and validation: `SceneManager` parses `.pix3scene` YAML files and validates them with AJV. A recent type-safe fix was applied for AJV error pointer handling (`src/core/scene/SceneManager.ts`).
+- Scene parsing and validation: `SceneManager` parses `.pix3scene` YAML files and validates them with AJV. A recent type-safe fix was applied for AJV error pointer handling (`src/core/SceneManager.ts`).
 - Build and dev tooling: Vite + TypeScript project is configured with dev (`npm run dev`), build (`npm run build`) and tests (Vitest) present in the repo. CI-friendly scripts exist in `package.json`.
-- Panels and layout: Golden Layout-based shell and panels exist and are wired to the DI container (`src/components/*`, `src/core/layout/`). The `pix3-viewport-panel` component mounts the canvas and coordinates renderer initialization.
-- Operations-first history: UI invokes operations via `OperationService`. Commands are thin wrappers that delegate to operations. Undo/redo commands delegate to `OperationService.undo()`/`redo()`.
+- Panels and layout: Golden Layout-based shell and panels exist and are wired to the DI container (`src/ui/*`, `src/core/LayoutManager.ts`). The `pix3-viewport-panel` component mounts the canvas and coordinates renderer initialization.
+- Operations-first history: All actions are performed via Commands through the CommandDispatcher Service. Commands are thin wrappers that delegate to operations via OperationService. Undo/redo commands delegate to `OperationService.undo()`/`redo()`.
 
 Known gaps / next work items
 
@@ -241,6 +241,7 @@ root:
 ├── public/                   # Static assets (logo, icons)
 ├── src/
 │   ├── core/                 # Core business logic and managers
+│   │   ├── AssetLoader.ts
 │   │   ├── BulkOperation.ts
 │   │   ├── command.ts
 │   │   ├── HistoryManager.ts
@@ -276,9 +277,11 @@ root:
 │   │   └── 3D/
 │   │       ├── Camera3D.ts
 │   │       ├── DirectionalLightNode.ts
-│   │       ├── MeshInstance.ts
-│   │       └── GeometryMesh.ts
+│   │       ├── GeometryMesh.ts
+│   │       ├── GlbModel.ts
+│   │       └── MeshInstance.ts
 │   ├── services/             # Injectable services
+│   │   ├── AssetFileActivationService.ts
 │   │   ├── AssetLoaderService.ts
 │   │   ├── CommandDispatcher.ts
 │   │   ├── FileSystemAPIService.ts
@@ -294,7 +297,8 @@ root:
 │   │   └── index.ts
 │   ├── templates/            # Project templates
 │   │   ├── pix3-logo.png
-│   │   └── startup-scene.pix3scene
+│   │   ├── startup-scene.pix3scene
+│   │   └── test_model.glb
 │   ├── ui/                   # Lit components extending ComponentBase
 │   │   ├── pix3-editor-shell.ts
 │   │   ├── pix3-editor-shell.ts.css
@@ -347,6 +351,7 @@ root:
 - **1.5 (2025-09-26):** Added target platforms, non-functional requirements, detailed architecture contracts, validation rules, and roadmap updates. Synced guidance on `fw` helpers.
 - **1.7 (2025-10-01):** Removed PixiJS dual-engine plan; consolidated rendering to single Three.js pipeline (perspective + orthographic). Updated project structure, removed obsolete adapter references, clarified rendering notes.
 - **1.8 (2025-10-05):** Adopted operations-first model. Commands are thin wrappers that delegate to `OperationService`. UI invokes operations directly. Code organized into `core/features/*/{commands,operations}`. Deprecated `CommandOperationAdapter` in documentation.
+- **1.9 (2025-10-27):** Updated project structure to match current codebase. Emphasized use of CommandDispatcher Service for all actions instead of direct operation invocation. Updated architecture to require all UI and tools to use Commands via CommandDispatcher for consistent lifecycle management.
 
 ## 11. Plugin State Management
 

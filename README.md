@@ -42,7 +42,7 @@ Pix3 follows a modern, modular architecture:
 
 - **Frontend**: TypeScript + Vite + Lit Web Components
 - **State Management**: Valtio reactive proxies
-- **3D Rendering**: Three.js with PixiJS overlay support
+- **3D Rendering**: Three.js single-engine pipeline
 - **UI Layout**: Golden Layout dockable panels
 - **Dependency Injection**: Custom DI container with decorators
 
@@ -51,6 +51,7 @@ Pix3 follows a modern, modular architecture:
 ```
 src/
 ├── core/          # Core business logic and managers
+│   ├── AssetLoader.ts
 │   ├── BulkOperation.ts
 │   ├── command.ts
 │   ├── HistoryManager.ts
@@ -86,9 +87,11 @@ src/
 │   └── 3D/
 │       ├── Camera3D.ts
 │       ├── DirectionalLightNode.ts
-│       ├── MeshInstance.ts
-│       └── GeometryMesh.ts
+│       ├── GeometryMesh.ts
+│       ├── GlbModel.ts
+│       └── MeshInstance.ts
 ├── services/      # Injectable services
+│   ├── AssetFileActivationService.ts
 │   ├── AssetLoaderService.ts
 │   ├── CommandDispatcher.ts
 │   ├── FileSystemAPIService.ts
@@ -104,7 +107,8 @@ src/
 │   └── index.ts
 ├── templates/     # Project templates
 │   ├── pix3-logo.png
-│   └── startup-scene.pix3scene
+│   ├── startup-scene.pix3scene
+│   └── test_model.glb
 └── ui/            # Lit components extending ComponentBase
     ├── pix3-editor-shell.ts
     ├── pix3-editor-shell.ts.css
@@ -155,6 +159,7 @@ src/
 
 ### State Management
 - Use Valtio proxies for reactive state
+- All actions must be performed via Commands through the CommandDispatcher Service
 - Commands are the **only** code allowed to modify state
 - Follow command lifecycle: `preconditions()` → `execute()` → `postCommit()`
 
