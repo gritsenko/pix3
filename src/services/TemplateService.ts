@@ -1,12 +1,12 @@
 import { injectable } from '@/fw/di';
 
 import startupScene from '../templates/startup-scene.pix3scene?raw';
-import testModelGlb from '../templates/test_model.glb?url';
+import testModelGlb from '../templates/Duck.glb?url';
 
 export type TemplateScheme = 'templ';
 
 type SceneTemplateId = 'startup-scene' | 'default';
-type BinaryTemplateId = 'test_model.glb';
+type BinaryTemplateId = 'Duck.glb';
 
 interface SceneTemplateDescriptor {
   readonly id: SceneTemplateId;
@@ -37,7 +37,7 @@ const sceneTemplates: SceneTemplateDescriptor[] = [
 
 const binaryTemplates: BinaryTemplateDescriptor[] = [
   {
-    id: 'test_model.glb',
+    id: 'Duck.glb',
     url: testModelGlb,
   },
 ];

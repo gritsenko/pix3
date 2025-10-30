@@ -3,6 +3,7 @@ import { ResourceManager } from '@/services/ResourceManager';
 import { SceneManager } from '@/core/SceneManager';
 import { SceneValidationError } from '@/core/SceneLoader';
 import type { SceneGraph } from '@/core/SceneManager';
+import { ref } from 'valtio/vanilla';
 import {
   CommandBase,
   type CommandContext,
@@ -105,7 +106,8 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
       state.scenes.hierarchies[activeId] = {
         version: graph.version ?? null,
         description: graph.description ?? null,
-        rootNodes: graph.rootNodes,
+        // Store Three.js nodes as non-proxied references to avoid DOM Illegal invocation errors
+        rootNodes: ref(graph.rootNodes),
         metadata: graph.metadata ?? {},
       };
       state.scenes.loadState = 'ready';
