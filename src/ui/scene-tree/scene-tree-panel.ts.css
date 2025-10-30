@@ -13,6 +13,7 @@ pix3-panel {
   min-height: 100%;
   font-size: 0.75rem; /* More compact, matches asset tree */
   color: rgba(245, 247, 250, 0.88);
+  overflow: auto;
 }
 
 .tree-root,

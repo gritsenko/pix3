@@ -178,3 +178,16 @@ src/
 9. **Cross-reference specification** - check `docs/pix3-specification.md` for architectural decisions
 
 Always verify architectural decisions against the specification before implementing features.
+
+## Additional Agent Instructions
+
+### Dev Server
+- The development server is always started manually by the developer on `localhost:5173`.
+- Agents must not attempt to start the dev server themselves.
+
+### Browser Interaction
+- Agents can use the `#browsermcp` MCP server to interact with the app.
+- Logs and snapshots can be read using the MCP browser tools.
+
+### Default Scene Loading
+- After the page is refreshed, the agent should click on the first recent project in the list to load the default scene.

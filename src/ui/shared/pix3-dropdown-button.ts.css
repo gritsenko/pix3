@@ -1,0 +1,126 @@
+:host {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border-radius: 0.5rem;
+  background: var(--pix3-toolbar-button-background, rgba(60, 68, 82, 0.32));
+  color: var(--pix3-toolbar-button-foreground, rgba(245, 247, 250, 0.95));
+  cursor: pointer;
+  user-select: none;
+  transition:
+    background 120ms ease,
+    box-shadow 120ms ease,
+    transform 120ms ease;
+  position: relative;
+}
+
+:host(:focus-visible) {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(94, 194, 255, 0.85);
+}
+
+:host(:hover) {
+  background: rgba(82, 94, 114, 0.48);
+  transform: translateY(-1px);
+}
+
+:host([disabled]) {
+  cursor: not-allowed;
+  opacity: 0.55;
+  box-shadow: none;
+  transform: none;
+}
+
+.dropdown__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.2rem;
+}
+
+.dropdown__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.dropdown__caret {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
+:host([icon-only]) .dropdown__caret {
+  display: none;
+}
+
+.dropdown__menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 12rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem 0;
+  background: var(--pix3-dropdown-background, rgba(26, 29, 35, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.4rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 10000;
+}
+
+.dropdown__item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  background: none;
+  border: none;
+  color: var(--pix3-dropdown-item-foreground, rgba(245, 247, 250, 0.92));
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+  transition: background 120ms ease;
+  gap: 0.5rem;
+}
+
+.dropdown__item:hover:not(.dropdown__item--disabled) {
+  background: rgba(48, 164, 255, 0.15);
+}
+
+.dropdown__item:focus-visible {
+  outline: none;
+  background: rgba(48, 164, 255, 0.2);
+}
+
+.dropdown__item--disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+.dropdown__item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  font-size: 0.9rem;
+}
+
+.dropdown__item-label {
+  flex: 1;
+  min-width: 0;
+}
+
+.dropdown__divider {
+  height: 1px;
+  margin: 0.25rem 0;
+  background: rgba(255, 255, 255, 0.08);
+}

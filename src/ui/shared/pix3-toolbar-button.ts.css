@@ -20,6 +20,11 @@
     transform 120ms ease;
 }
 
+:host([icon-only]) {
+  min-width: 2rem;
+  padding: 0.4rem;
+}
+
 :host(:focus-visible) {
   outline: none;
   box-shadow: 0 0 0 2px rgba(94, 194, 255, 0.85);
@@ -47,4 +52,8 @@
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
+}
+
+:host([icon-only]) .toolbar-button {
+  gap: 0;
 }

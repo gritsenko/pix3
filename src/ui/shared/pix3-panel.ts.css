@@ -18,6 +18,14 @@
   overflow: hidden;
 }
 
+.panel__toolbar-slot {
+  display: block;
+  flex-shrink: 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
+  z-index: 10;
+}
+
 :host([accent='primary']) .panel {
   border-color: rgba(48, 164, 255, 0.45);
   box-shadow:

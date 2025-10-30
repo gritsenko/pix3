@@ -1,4 +1,4 @@
-import { ComponentBase, customElement, html, inject, property, css, unsafeCSS } from '@/fw';
+import { ComponentBase, customElement, html, inject, property, state, css, unsafeCSS } from '@/fw';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { FocusRingService } from '@/services/FocusRingService';
 import styles from './pix3-panel.ts.css?raw';
@@ -28,11 +28,27 @@ export class Pix3Panel extends ComponentBase {
   @property({ attribute: 'accent', reflect: true })
   accent: 'default' | 'primary' | 'warning' = 'default';
 
+  @state()
+  private hasBodyContent = false;
+
   @inject(FocusRingService)
   private readonly focusRing!: FocusRingService;
 
   private cleanupActions?: () => void;
   private readonly instanceId = panelCounter++;
+
+  private onSlotChange(): void {
+    const slot = (this.renderRoot as any)?.querySelector?.('slot:not([name])');
+    if (!slot) {
+      this.hasBodyContent = false;
+      return;
+    }
+    const nodes = slot.assignedNodes({ flatten: true }).filter((node: Node) => {
+      // Filter out whitespace-only text nodes
+      return node.nodeType !== Node.TEXT_NODE || (node.textContent?.trim() ?? '').length > 0;
+    });
+    this.hasBodyContent = nodes.length > 0;
+  }
 
   disconnectedCallback(): void {
     this.cleanupActions?.();
@@ -46,6 +62,17 @@ export class Pix3Panel extends ComponentBase {
 
   protected updated(): void {
     this.ensureActionsFocusController();
+    this.attachSlotChangeListener();
+  }
+
+  private attachSlotChangeListener(): void {
+    const slot = (this.renderRoot as any)?.querySelector?.('slot:not([name])');
+    if (slot && !slot.__hasChangeListener) {
+      slot.addEventListener('slotchange', () => this.onSlotChange());
+      slot.__hasChangeListener = true;
+      // Initial check
+      this.onSlotChange();
+    }
   }
 
   private ensureActionsFocusController(): void {
@@ -82,6 +109,7 @@ export class Pix3Panel extends ComponentBase {
         aria-labelledby=${ifDefined(hasHeader ? headerId : undefined)}
         aria-describedby=${ifDefined(ariaDescribedBy)}
       >
+        <slot name="toolbar" class="panel__toolbar-slot"></slot>
         ${hasHeader
           ? html`<header id=${headerId} class="panel__header" tabindex="0">
               <div class="panel__heading">
@@ -98,13 +126,13 @@ export class Pix3Panel extends ComponentBase {
               </div>
             </header>`
           : null}
-        ${this.description
+        ${this.description && !this.hasBodyContent
           ? html`<p id=${ifDefined(descriptionId)} class="panel__description">
               ${this.description}
             </p>`
           : null}
         <div class="panel__body">
-          <slot></slot>
+          <slot @slotchange=${this.onSlotChange.bind(this)}></slot>
         </div>
         <footer class="panel__footer">
           <slot name="footer"></slot>

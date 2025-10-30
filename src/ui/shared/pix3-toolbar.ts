@@ -1,9 +1,13 @@
-import { ComponentBase, customElement, html, inject, property } from '@/fw';
+import { ComponentBase, customElement, html, inject, property, css, unsafeCSS } from '@/fw';
 import { FocusRingService } from '@/services/FocusRingService';
-import './pix3-toolbar.ts.css';
+import styles from './pix3-toolbar.ts.css?raw';
 
 @customElement('pix3-toolbar')
 export class Pix3Toolbar extends ComponentBase {
+  static useShadowDom = true;
+  static styles = css`
+    ${unsafeCSS(styles)}
+  `;
   @property({ attribute: 'aria-label' })
   label = 'Editor toolbar';
 

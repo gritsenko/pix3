@@ -12,6 +12,9 @@ export class Pix3ToolbarButton extends ComponentBase {
   @property({ attribute: 'aria-label' })
   label: string | null = null;
 
+  @property({ type: Boolean, reflect: true })
+  iconOnly = false;
+
   connectedCallback(): void {
     super.connectedCallback();
     this.setAttribute('role', 'button');

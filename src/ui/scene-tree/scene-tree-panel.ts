@@ -7,6 +7,8 @@ import { getNodeVisuals } from './node-visuals.helper';
 import type { SceneTreeNode } from './scene-tree-node';
 
 import '../shared/pix3-panel';
+import '../shared/pix3-toolbar';
+import '../shared/pix3-dropdown-button';
 import './scene-tree-node';
 import './scene-tree-panel.ts.css';
 
@@ -69,6 +71,19 @@ export class SceneTreePanel extends ComponentBase {
         actions-label="Scene tree controls"
       >
         ${activeSceneName ? html`<span slot="subtitle">${activeSceneName}</span>` : null}
+        <pix3-toolbar slot="toolbar" label="Scene tree controls">
+          <pix3-dropdown-button
+            icon="+"
+            aria-label="Create node"
+            .items=${[
+              { id: 'box', label: 'Box', icon: '📦' },
+              { id: 'sphere', label: 'Sphere', icon: '⚪' },
+              { id: 'camera', label: 'Camera', icon: '📷' },
+              { id: 'light', label: 'Light', icon: '💡' },
+            ]}
+            @item-select=${this.onCreateNode}
+          ></pix3-dropdown-button>
+        </pix3-toolbar>
         <div class="tree-container" @toggle-node=${this.onToggleNode.bind(this)}>
           ${hasHierarchy
             ? html`<ul
@@ -212,6 +227,12 @@ export class SceneTreePanel extends ComponentBase {
       next.delete(nodeId);
     }
     this.collapsedNodeIds = next;
+  }
+
+  private onCreateNode(event: CustomEvent): void {
+    const { id } = event.detail;
+    // Placeholder for creating a node based on the selected type
+    console.log(`Create ${id} node`);
   }
 }
 
