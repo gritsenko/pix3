@@ -1,9 +1,7 @@
 import { injectable, inject } from '@/fw/di';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import * as SkeletonUtils from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { Object3D, AnimationClip } from 'three';
+import { AddModelCommand } from '@/features/scene/AddModelCommand';
 
 export interface AssetActivation {
   name: string;
@@ -27,7 +25,7 @@ export class AssetFileActivationService {
    * @param payload File activation details including extension and resource path
    */
   async handleActivation(payload: AssetActivation): Promise<void> {
-    const { extension, resourcePath } = payload;
+    const { extension, resourcePath, name } = payload;
     if (!resourcePath) return;
 
     if (extension === 'pix3scene') {
@@ -38,42 +36,13 @@ export class AssetFileActivationService {
     }
 
     if (extension === 'glb' || extension === 'gltf') {
+      const command = new AddModelCommand({ modelPath: resourcePath, modelName: name });
+      await this.commandDispatcher.execute(command);
       return;
     }
 
     // TODO: other asset types (images -> Sprite2D, audio, prefabs, etc.)
     console.info('[AssetFileActivationService] No handler for asset type', payload);
-  }
-
-  async loadGltfToMeshInstance(src: string): Promise<{ scene: Object3D; animations: AnimationClip[] } | null> {
-    try {
-      const loader = new GLTFLoader();
-      const gltf = await loader.loadAsync(src);
-      const clonedScene = SkeletonUtils.clone(gltf.scene);
-      const clonedAnimations = gltf.animations.map((clip: AnimationClip) => clip.clone());
-      return { scene: clonedScene, animations: clonedAnimations };
-    } catch (error) {
-      console.error(`Failed to load GLTF: ${src}`, error);
-      return null;
-    }
-  }
-
-  async loadGltfFromBlob(blob: Blob): Promise<{ scene: Object3D; animations: AnimationClip[] } | null> {
-    try {
-      const loader = new GLTFLoader();
-      const url = URL.createObjectURL(blob);
-      try {
-        const gltf = await loader.loadAsync(url);
-        const clonedScene = SkeletonUtils.clone(gltf.scene);
-        const clonedAnimations = gltf.animations.map((clip: AnimationClip) => clip.clone());
-        return { scene: clonedScene, animations: clonedAnimations };
-      } finally {
-        URL.revokeObjectURL(url);
-      }
-    } catch (error) {
-      console.error('Failed to load GLTF from blob', error);
-      return null;
-    }
   }
 
   private deriveSceneId(resourcePath: string): string {
