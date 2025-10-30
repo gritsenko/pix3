@@ -77,9 +77,6 @@ export class SceneTreePanel extends ComponentBase {
             aria-label="Create node"
             .items=${[
               { id: 'box', label: 'Box', icon: '📦' },
-              { id: 'sphere', label: 'Sphere', icon: '⚪' },
-              { id: 'camera', label: 'Camera', icon: '📷' },
-              { id: 'light', label: 'Light', icon: '💡' },
             ]}
             @item-select=${this.onCreateNode}
           ></pix3-dropdown-button>
