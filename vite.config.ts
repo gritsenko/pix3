@@ -15,4 +15,11 @@ export default defineConfig({
       '@/fw': resolve(__dirname, 'src/fw'),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+  },
 });
