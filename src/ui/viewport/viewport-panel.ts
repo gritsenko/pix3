@@ -16,7 +16,7 @@ export class ViewportPanel extends ComponentBase {
   private readonly commandDispatcher!: CommandDispatcher;
 
   @state()
-  private transformMode: TransformMode = 'translate';
+  private transformMode: TransformMode = 'select';
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
     if (!entry) {
@@ -114,18 +114,27 @@ export class ViewportPanel extends ComponentBase {
   private renderTransformToolbar() {
     const transformModes: Array<{ mode: TransformMode; icon: string; label: string; key: string }> =
       [
+        { mode: 'select', icon: '↖', label: 'Select (Q)', key: 'Q' },
         { mode: 'translate', icon: '↔', label: 'Move (W)', key: 'W' },
         { mode: 'rotate', icon: '⟳', label: 'Rotate (E)', key: 'E' },
         { mode: 'scale', icon: '⤢', label: 'Scale (R)', key: 'R' },
       ];
 
     return html`
-      <div class="transform-toolbar">
+      <div class="transform-toolbar" stop-propagation>
         ${transformModes.map(
           ({ mode, icon, label }) => html`
             <button
               class="toolbar-button ${this.transformMode === mode ? 'toolbar-button--active' : ''}"
-              @click=${() => this.handleTransformModeChange(mode)}
+              
+              @pointerup=${(e: PointerEvent) => {
+                e.stopPropagation();
+              }}
+
+              @click=${(e: PointerEvent) => {
+                e.stopPropagation();
+                this.handleTransformModeChange(mode);
+              }}
               title=${label}
               aria-label=${label}
             >
@@ -153,6 +162,10 @@ export class ViewportPanel extends ComponentBase {
     }
 
     switch (event.key.toLowerCase()) {
+      case 'q':
+        event.preventDefault();
+        this.handleTransformModeChange('select');
+        break;
       case 'w':
         event.preventDefault();
         this.handleTransformModeChange('translate');
@@ -169,6 +182,11 @@ export class ViewportPanel extends ComponentBase {
   };
 
   private handleCanvasPointerDown = (event: PointerEvent): void => {
+    // Ignore pointer events from toolbar buttons
+    if ((event.target as HTMLElement)?.closest?.('.toolbar-button') || (event.target as HTMLElement)?.closest?.('.transform-toolbar')) {
+      return;
+    }
+
     // Only handle pointer down on the canvas
     if (event.target !== this) {
       return;
@@ -198,6 +216,14 @@ export class ViewportPanel extends ComponentBase {
   };
 
   private handleCanvasPointerUp = (event: PointerEvent): void => {
+    // Ignore pointer events from toolbar buttons
+    if ((event.target as HTMLElement)?.closest?.('.toolbar-button') || (event.target as HTMLElement)?.closest?.('.transform-toolbar')) {
+      this.pointerDownPos = undefined;
+      this.pointerDownTime = undefined;
+      this.isDragging = false;
+      return;
+    }
+
     // Only handle pointer up on the canvas
     if (event.target !== this) {
       return;

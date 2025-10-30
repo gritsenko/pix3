@@ -15,7 +15,7 @@ import { SceneManager } from '@/core/SceneManager';
 import { appState } from '@/state';
 import { subscribe } from 'valtio/vanilla';
 
-export type TransformMode = 'translate' | 'rotate' | 'scale';
+export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 
 @injectable()
 export class ViewportRendererService {
@@ -28,6 +28,7 @@ export class ViewportRendererService {
   private orbitControls?: OrbitControls;
   private transformControls?: TransformControls;
   private transformGizmo?: THREE.Object3D;
+  private currentTransformMode: TransformMode = 'select';
   private selectedObjects = new Set<THREE.Object3D>();
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
   private animationId?: number;
@@ -71,7 +72,7 @@ export class ViewportRendererService {
     // Initialize OrbitControls
     this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
     this.orbitControls.enableDamping = true;
-    this.orbitControls.dampingFactor = 0.05;
+    this.orbitControls.dampingFactor = 0.3;
     this.orbitControls.autoRotate = false;
     this.orbitControls.enableZoom = true;
     this.orbitControls.enablePan = true;
@@ -79,6 +80,7 @@ export class ViewportRendererService {
     // Initialize TransformControls for object manipulation
     this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
     this.transformControls.setMode('translate'); // Default to translate mode
+    this.transformControls.size = 0.6; // Make gizmos smaller/thinner (default is 1)
 
     // When dragging with transform controls, disable orbit controls
     this.transformControls.addEventListener('dragging-changed', (event: any) => {
@@ -138,8 +140,49 @@ export class ViewportRendererService {
 
   setTransformMode(mode: TransformMode): void {
     // Set the transform mode for the gizmo
-    if (this.transformControls) {
+    this.currentTransformMode = mode;
+    
+    if (mode === 'select') {
+      // In select mode, hide the transform gizmo
+      if (this.transformGizmo && this.scene) {
+        this.scene.remove(this.transformGizmo);
+        this.transformGizmo = undefined;
+      }
+      // Detach from current object
+      if (this.transformControls) {
+        this.transformControls.detach();
+      }
+    } else if (this.transformControls) {
+      // In transform modes, set the mode on TransformControls
       this.transformControls.setMode(mode);
+      
+      // Reattach to the selected object if there is one
+      const { nodeIds } = appState.selection;
+      const activeSceneId = appState.scenes.activeSceneId;
+      
+      if (nodeIds.length > 0 && activeSceneId) {
+        const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
+        if (sceneGraph) {
+          // Find the first selected node
+          const firstSelectedNodeId = nodeIds[0];
+          const firstSelectedNode = this.findNodeById(firstSelectedNodeId, sceneGraph.rootNodes);
+          
+          if (firstSelectedNode && firstSelectedNode instanceof Node3D) {
+            // Attach transform controls to the selected object
+            this.transformControls.attach(firstSelectedNode);
+            
+            // Add the transform gizmo to the scene
+            if (this.scene) {
+              this.transformGizmo = this.transformControls.getHelper();
+              this.transformGizmo.userData.isTransformGizmo = true;
+              this.transformGizmo.traverse(child => {
+                child.userData.isTransformGizmo = true;
+              });
+              this.scene.add(this.transformGizmo);
+            }
+          }
+        }
+      }
     }
   }
 
@@ -288,7 +331,8 @@ export class ViewportRendererService {
     }
 
     // Attach transform controls to the first selected node if any
-    if (firstSelectedNode && this.transformControls && this.scene) {
+    // (but only if not in select mode)
+    if (firstSelectedNode && this.transformControls && this.scene && this.currentTransformMode !== 'select') {
       this.transformControls.attach(firstSelectedNode);
 
       // Get and add the transform gizmo to the scene
