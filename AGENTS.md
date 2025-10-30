@@ -26,9 +26,11 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 
 ### State Management (Valtio)
 - Global state in `appState` proxy from `src/state/AppState.ts` - never mutate directly
+- State includes UI, scenes metadata, selection (node IDs), and operations lifecycle
+- **Nodes are NOT in reactive state** — they are managed by `SceneManager` and stored in `SceneGraph` objects. Node references sync to state only as IDs in `SceneHierarchyState.rootNodes` (for UI consumption of tree structure)
 - All mutations flow through Operations via OperationService
 - Commands are thin wrappers that invoke operations
-- UI subscribes via `subscribe(appState.section, callback)`
+- UI subscribes via `subscribe(appState.section, callback)` for reactive updates
 - Use `snapshot(appState)` for read-only checks
 
 ### Commands and Operations
@@ -43,17 +45,15 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 
 ```
 src/
-  fw/                      # Framework utilities (DI, ComponentBase)
-  state/                   # Valtio state definitions
   core/                    # Core business logic and managers
     AssetLoader.ts
     BulkOperation.ts
-    command.ts
+    command.ts             # Command/Operation base contracts
     HistoryManager.ts
     LayoutManager.ts
     Operation.ts
     SceneLoader.ts
-    SceneManager.ts
+    SceneManager.ts        # Owns SceneGraph and Node lifecycle (non-reactive)
   features/                # Feature-specific commands and operations
     history/
       RedoCommand.ts
@@ -63,14 +63,19 @@ src/
       UpdateObjectPropertyOperation.ts
     scene/
       LoadSceneCommand.ts
-      LoadSceneOperation.ts
     selection/
       SelectObjectCommand.ts
       SelectObjectOperation.ts
-  nodes/                   # Node definitions for scene graph
+  fw/                      # Framework utilities (DI, ComponentBase)
+    component-base.ts
+    di.ts
+    from-query.ts
+    index.ts
+    layout-component-base.ts
+  nodes/                   # Node definitions (NOT in reactive state)
     Node2D.ts
     Node3D.ts
-    NodeBase.ts
+    NodeBase.ts            # Extends Three.js Object3D; purely data/logic
     2D/
       Sprite2D.ts
     3D/
@@ -82,15 +87,18 @@ src/
   services/                # Injectable services
     AssetFileActivationService.ts
     AssetLoaderService.ts
-    CommandDispatcher.ts
+    CommandDispatcher.ts   # Primary entry point for all actions
     FileSystemAPIService.ts
     FocusRingService.ts
     index.ts
-    OperationService.ts
+    OperationService.ts    # Executes operations; gateway for mutations
     ProjectService.ts
     ResourceManager.ts
     TemplateService.ts
     ViewportRenderService.ts
+  state/                   # Valtio reactive state (UI, metadata, selection only)
+    AppState.ts
+    index.ts
   templates/               # Project templates
     pix3-logo.png
     startup-scene.pix3scene
@@ -167,15 +175,16 @@ src/
 
 ## Critical Rules for AI Agents
 
-1. **Never mutate `appState` directly** - always use Operations via OperationService
-2. **Follow operations-first model** - Operations handle all mutations, Commands are thin wrappers
-3. **Use CommandDispatcher Service for all actions** - All UI and tools must perform actions via Commands through CommandDispatcher instead of directly invoking operations
-4. **Use ComponentBase** for all Lit components, not LitElement directly
-5. **Import from `@/` aliases** - never use relative paths for core imports
-6. **Separate styles** - each component has corresponding `.css` file
-7. **Light DOM by default** - use shadow DOM only when explicitly needed
-8. **Singleton services** - register with ServiceContainer, implement dispose()
-9. **Cross-reference specification** - check `docs/pix3-specification.md` for architectural decisions
+1. **Never mutate `appState` directly** — always use Operations via OperationService
+2. **Follow operations-first model** — Operations handle all mutations, Commands are thin wrappers
+3. **Use CommandDispatcher Service for all actions** — All UI and tools must perform actions via Commands through CommandDispatcher instead of directly invoking operations
+4. **Nodes are NOT reactive state** — they live in `SceneGraph` (managed by `SceneManager`), not `appState`. State tracks node IDs for selection/hierarchy reference only
+5. **Use ComponentBase** for all Lit components, not LitElement directly
+6. **Import from `@/` aliases** — never use relative paths for core imports
+7. **Separate styles** — each component has corresponding `.css` file
+8. **Light DOM by default** — use shadow DOM only when explicitly needed
+9. **Singleton services** — register with ServiceContainer, implement dispose()
+10. **Cross-reference specification** — check `docs/pix3-specification.md` for architectural decisions
 
 Always verify architectural decisions against the specification before implementing features.
 

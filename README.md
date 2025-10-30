@@ -38,13 +38,23 @@
 
 ## 🏗️ Architecture
 
-Pix3 follows a modern, modular architecture:
+Pix3 follows a modern, modular operations-first architecture:
 
-- **Frontend**: TypeScript + Vite + Lit Web Components
-- **State Management**: Valtio reactive proxies
-- **3D Rendering**: Three.js single-engine pipeline
-- **UI Layout**: Golden Layout dockable panels
-- **Dependency Injection**: Custom DI container with decorators
+- **Frontend**: TypeScript + Vite + Lit Web Components using `ComponentBase`
+- **State Management**: Valtio reactive proxies for UI, scenes metadata, and selection
+- **Node Management**: SceneManager + SceneGraph for non-reactive node data (extends Three.js Object3D)
+- **3D Rendering**: Three.js single-engine pipeline (3D perspective + 2D orthographic overlay)
+- **UI Layout**: Golden Layout for dockable, resizable panels
+- **Dependency Injection**: Custom DI container with `@injectable()` and `@inject()` decorators
+- **Command Pattern**: Operations-first model with Commands as thin wrappers via CommandDispatcher Service
+
+### Key Architecture Principles
+
+- **Operations-First**: All state mutations flow through Operations executed by OperationService
+- **Commands via CommandDispatcher**: All UI actions must use Commands through CommandDispatcher Service
+- **Nodes NOT in State**: Nodes are managed by SceneManager in SceneGraph objects (not Valtio). State tracks only node IDs for selection/hierarchy
+- **Unidirectional Flow**: UI → CommandDispatcher → Operations → State → UI subscription updates
+- **Reactive State Only**: AppState contains only UI state, scenes metadata, and selection IDs
 
 ### Project Structure
 
@@ -53,12 +63,12 @@ src/
 ├── core/          # Core business logic and managers
 │   ├── AssetLoader.ts
 │   ├── BulkOperation.ts
-│   ├── command.ts
+│   ├── command.ts             # Command/Operation base contracts
 │   ├── HistoryManager.ts
 │   ├── LayoutManager.ts
 │   ├── Operation.ts
 │   ├── SceneLoader.ts
-│   └── SceneManager.ts
+│   └── SceneManager.ts        # Owns SceneGraph and Node lifecycle (non-reactive)
 ├── features/      # Feature-specific commands and operations
 │   ├── history/
 │   │   ├── RedoCommand.ts
@@ -67,21 +77,20 @@ src/
 │   │   ├── UpdateObjectPropertyCommand.ts
 │   │   └── UpdateObjectPropertyOperation.ts
 │   ├── scene/
-│   │   ├── LoadSceneCommand.ts
-│   │   └── LoadSceneOperation.ts
+│   │   └── LoadSceneCommand.ts
 │   └── selection/
 │       ├── SelectObjectCommand.ts
 │       └── SelectObjectOperation.ts
 ├── fw/            # Framework utilities (ComponentBase, DI, etc.)
-│   ├── component-base.ts
-│   ├── di.ts
+│   ├── component-base.ts      # Extends LitElement with light DOM default
+│   ├── di.ts                  # Dependency injection container
 │   ├── from-query.ts
 │   ├── index.ts
 │   └── layout-component-base.ts
-├── nodes/         # Node definitions for scene graph
+├── nodes/         # Node definitions (NOT in reactive state)
 │   ├── Node2D.ts
 │   ├── Node3D.ts
-│   ├── NodeBase.ts
+│   ├── NodeBase.ts            # Extends Three.js Object3D
 │   ├── 2D/
 │   │   └── Sprite2D.ts
 │   └── 3D/
@@ -93,17 +102,17 @@ src/
 ├── services/      # Injectable services
 │   ├── AssetFileActivationService.ts
 │   ├── AssetLoaderService.ts
-│   ├── CommandDispatcher.ts
+│   ├── CommandDispatcher.ts   # Primary entry point for all actions
 │   ├── FileSystemAPIService.ts
 │   ├── FocusRingService.ts
 │   ├── index.ts
-│   ├── OperationService.ts
+│   ├── OperationService.ts    # Executes operations; gateway for mutations
 │   ├── ProjectService.ts
 │   ├── ResourceManager.ts
 │   ├── TemplateService.ts
 │   └── ViewportRenderService.ts
-├── state/         # Valtio state definitions
-│   ├── AppState.ts
+├── state/         # Valtio reactive state (UI, metadata, selection only)
+│   ├── AppState.ts            # Defines reactive state shape
 │   └── index.ts
 ├── templates/     # Project templates
 │   ├── pix3-logo.png
@@ -115,8 +124,8 @@ src/
     ├── assets-browser/
     │   ├── asset-browser-panel.ts
     │   ├── asset-browser-panel.ts.css
-    │   └── asset-tree.ts
-    │       └── asset-tree.ts.css
+    │   ├── asset-tree.ts
+    │   └── asset-tree.ts.css
     ├── object-inspector/
     │   ├── inspector-panel.ts
     │   └── inspector-panel.ts.css
@@ -143,25 +152,34 @@ src/
 
 ## 📋 Development Guidelines
 
+### State Management & Operations
+- **AppState** (Valtio): Contains only UI state, scenes metadata, and selection node IDs
+- **SceneGraph** (SceneManager): Owns all Node instances; non-reactive and managed separately
+- **Operations**: Encapsulate all mutations; return OperationCommit with undo/redo closures
+- **Commands**: Thin wrappers that validate preconditions and invoke operations via OperationService
+- **CommandDispatcher**: Primary entry point for all user actions; ensures consistent lifecycle, preconditions, telemetry
+
+### Component Architecture
+- Extend `ComponentBase` (not raw LitElement) for all Lit components
+- Use light DOM by default for global style integration
+- Split styles into separate `[component].ts.css` files
+- Use `@inject()` decorator for dependency injection
+- Components are "dumb" — they read from state and dispatch commands
+
 ### Coding Standards
 - Use TypeScript strict mode with decorators
-- Extend `ComponentBase` for UI components
-- Use `@inject()` decorator for dependency injection
-- Follow command pattern for state mutations
-- Emit telemetry events for user interactions
+- All actions must use Commands through CommandDispatcher
+- Never mutate `appState` directly
+- Services implement `@injectable()` and `dispose()` methods
+- Import from `@/` aliases, never relative paths for core code
 
 ### File Conventions
-- `*.component.ts` - UI components
-- `*.service.ts` - Injectable services
 - `*.command.ts` - Command implementations
+- `*.operation.ts` - Operation implementations
+- `*.service.ts` - Injectable services
 - `*.spec.ts` / `*.test.ts` - Test files
+- `[component].ts.css` - Component styles
 - `index.ts` - Barrel exports
-
-### State Management
-- Use Valtio proxies for reactive state
-- All actions must be performed via Commands through the CommandDispatcher Service
-- Commands are the **only** code allowed to modify state
-- Follow command lifecycle: `preconditions()` → `execute()` → `postCommit()`
 
 ## 🧪 Testing & Quality
 

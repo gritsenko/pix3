@@ -67,13 +67,15 @@ Non-Chromium browsers (Firefox, Safari) are out of scope for MVP but should degr
 
 The application will be built on the principles of unidirectional data flow and clear separation of concerns.
 
-- State: A centralized store based on Valtio, serving as the single source of truth. It is passive and contains no business logic.
-- Commands and Operations: Operations are first-class, encapsulating business logic and state mutations. The OperationService is the gateway for executing operations, but all actions must be initiated via Commands through the CommandDispatcher Service. Commands are thin wrappers that validate context and invoke operations via OperationService. UI and tools should use CommandDispatcher to ensure consistent lifecycle management.
-- Core Managers: Classes that manage the main aspects of the editor (HistoryManager, SceneManager, PluginManager). They orchestrate the execution of commands.
-- Services: An infrastructure layer for interacting with the outside world (FileSystemAPIService). They do not contain business logic.
-- UI Components: "Dumb" components built on top of the project's fw helpers. Prefer extending `ComponentBase` (which wraps LitElement and provides a configurable render root) and use the `inject` decorator from `fw/di` for services instead of wiring dependencies manually. This ensures consistent DOM mode (light vs shadow), simpler service wiring, and a single recommended pattern across the project.
-- Message Bus: A lightweight pub/sub bus to bridge state updates, commands, and plugins without coupling. Commands emit events describing mutations; UI components subscribe via typed channels.
-- Rendering Layer: A single Three.js pipeline drives both perspective (3D) and orthographic (2D) passes. UI / HUD style 2D elements are rendered using an orthographic camera, sprites, and mesh-based primitives—no secondary PixiJS adapter.
+- **State**: A centralized Valtio proxy (`appState`), serving as the single source of truth for UI, scenes metadata, and selection. It is passive and contains no business logic.
+- **Nodes**: Scene nodes (inheriting from Three.js Object3D) are managed by `SceneManager` in `SceneGraph` objects. **Nodes are not stored in reactive state** — only node IDs are tracked in state for selection and hierarchy reference. This separation reduces reactivity overhead and keeps node mutations fast.
+- **Operations**: First-class objects encapsulating business logic and state mutations. The `OperationService` is the gateway for executing operations, but all actions must be initiated via **Commands** through the `CommandDispatcher` Service.
+- **Commands**: Thin wrappers that validate context (`preconditions()`) and invoke operations via `OperationService`. Commands are registered and discovered via metadata for the command palette. Commands never implement their own undo/redo.
+- **CommandDispatcher**: Primary entry point for all user actions. Ensures consistent lifecycle management, preconditions checking, and telemetry for all commands.
+- **Core Managers**: Classes that orchestrate the main aspects of the editor (HistoryManager, SceneManager, LayoutManager). They manage their respective domains and emit events.
+- **Services**: Infrastructure layer for interacting with the outside world (FileSystemAPIService, ViewportRenderService). They implement `dispose()` and are registered with DI.
+- **UI Components**: "Dumb" components extending `ComponentBase` from `src/fw`. They subscribe to state changes, render based on snapshots, and dispatch commands via CommandDispatcher rather than mutating state directly.
+- **Message Bus**: Optional typed pub/sub for bridging state updates, commands, and plugins without tight coupling.
 
 ### Recommended component pattern
 
@@ -104,10 +106,11 @@ Notes:
 
 - **Operation Lifecycle (source of truth):** An operation implements `perform(context)` and returns an `OperationCommit` object containing closures for `undo()`/`redo()` and metadata for coalescing. OperationService executes operations, pushes commits to history when requested, emits telemetry, and is solely responsible for undo/redo.
 - **Command Lifecycle (thin wrappers):** `preconditions()` → `execute()`; commands delegate to OperationService to invoke operations and never implement their own undo/redo. They remain idempotent and emit telemetry via OperationService.
+- **SceneGraph & Node Lifecycle:** `SceneManager` owns a `SceneGraph` per loaded scene. Each `SceneGraph` contains a `nodeMap` (for fast lookup) and `rootNodes` array. Nodes extend Three.js `Object3D` and are **not stored in Valtio state**. State only maintains node IDs for selection and hierarchy reference via `SceneHierarchyState.rootNodes`.
 - **HistoryManager Contract:** Maintains a bounded stack of command snapshots, integrates with collaborative locking, and exposes `canUndo`/`canRedo` signals to the UI.
-- **SceneManager Contract:** Responsible for parsing `.pix3scene` files, resolving instances, applying overrides, and emitting change diffs for viewport renderers.
 - **PluginManager Contract:** Discovers plugins (`manifest.json` with `capabilities`), validates signatures, and sandboxes command registrations per namespace.
 - **Service Layer:** Services implement `dispose()` and must be registered via DI. Singleton services load lazily on first injection.
+- **CommandDispatcher Contract:** Executes all commands; invokes preconditions, executes, and handles telemetry. All user actions route through CommandDispatcher.
 
 ### 4.2 Glossary
 
@@ -119,10 +122,10 @@ Notes:
 
 ### 4.3 Operations-first Pipeline
 
-- **OperationService:** Central orchestrator. Methods: `invoke(op)`, `invokeAndPush(op)` to also record history, `undo()`, `redo()`. Maintains bounded stacks (default 100 items), clears redo on new pushes, supports coalescing, and emits typed events for UI updates and telemetry.
-- **Operation Contract:** `perform()` returns an `OperationCommit` with `undo`/`redo` closures. Optionally includes metadata like affected nodes and structure flags for efficient scene diffing.
+- **OperationService:** Central orchestrator for operations. Methods: `invoke(op)`, `invokeAndPush(op)` (also record history), `undo()`, `redo()`. Maintains bounded stacks (default 100 items), clears redo on new pushes, supports coalescing, and emits typed events for UI updates and telemetry.
+- **Operation Contract:** `perform()` returns an `OperationCommit` with `undo`/`redo` closures. Optionally includes metadata like affected node IDs and structure flags for efficient scene diffing.
 - **Bulk operations:** Tools can compose granular operations into one undo step via a helper that produces a single coalesced commit.
-- **UI/Tools Integration:** All actions in the application must be performed via Commands through the CommandDispatcher Service. Commands are thin wrappers that validate context and invoke operations via OperationService. UI panels and tools should use CommandDispatcher to execute commands, ensuring consistent lifecycle management, preconditions checking, and telemetry. Direct invocation of operations via OperationService is discouraged and should be replaced with appropriate commands.
+- **CommandDispatcher:** Primary entry point for all actions. All UI panels and tools must use CommandDispatcher to execute commands, ensuring consistent lifecycle management, preconditions checking, and telemetry. Direct invocation of operations via OperationService is discouraged and should be replaced with appropriate commands.
 - **Telemetry Hooks:** All mutations flow through OperationService, making it the ideal hook for analytics, autosave, and sync.
 
 ### 4.4 Rendering Architecture Notes
@@ -134,26 +137,27 @@ Notes:
 
 ## Implementation status (current repository state)
 
-The repository contains a working MVP scaffold and a small, functional rendering pipeline. The list below summarizes concrete items already implemented in the codebase and points to the primary files so maintainers can quickly find the behavior.
+The repository contains a working MVP scaffold with a functional rendering pipeline and operations-first architecture. The list below summarizes concrete items already implemented and points to primary files for reference.
 
-- Viewport rendering: a Three.js-based viewport is implemented and exposed via `ViewportRenderService` (`src/services/ViewportRenderService.ts`). It provides a perspective pass (3D) plus an orthographic overlay pass for HUD/crosshair rendering.
-- DPI / resize handling: the renderer and viewport panel now correctly handle device pixel ratio (DPR) and layout resizing to produce pixel-perfect output. Key files:
-  - `src/services/ViewportRenderService.ts` — DPR-aware resize logic, explicit canvas CSS sizing, overlay camera aspect updates, and DPR/layout polling in the render loop.
-  - `src/ui/viewport/viewport-panel.ts` — observes the canvas with `ResizeObserver` and initializes the renderer with the measured canvas size.
-- Controls and demo scene: orbit controls, demo cube, lighting and helper axes are wired in the viewport service for a visible default scene (`setupDemoScene`, `setupControls`).
-- Scene parsing and validation: `SceneManager` parses `.pix3scene` YAML files and validates them with AJV. A recent type-safe fix was applied for AJV error pointer handling (`src/core/SceneManager.ts`).
-- Build and dev tooling: Vite + TypeScript project is configured with dev (`npm run dev`), build (`npm run build`) and tests (Vitest) present in the repo. CI-friendly scripts exist in `package.json`.
-- Panels and layout: Golden Layout-based shell and panels exist and are wired to the DI container (`src/ui/*`, `src/core/LayoutManager.ts`). The `pix3-viewport-panel` component mounts the canvas and coordinates renderer initialization.
-- Operations-first history: All actions are performed via Commands through the CommandDispatcher Service. Commands are thin wrappers that delegate to operations via OperationService. Undo/redo commands delegate to `OperationService.undo()`/`redo()`.
+### Implemented Features
 
-Known gaps / next work items
+- **Architecture Foundation**: Operations-first pattern with OperationService as the gateway. Commands are thin wrappers delegating to operations. CommandDispatcher Service is the primary entry point for all actions. All UI and tools use Commands via CommandDispatcher for consistent lifecycle management, preconditions checking, and telemetry.
+- **State Management**: Valtio-based AppState containing UI state, scenes metadata (file paths, names, load states), selection (node IDs), and operation metadata. Nodes are explicitly NOT stored in reactive state.
+- **SceneGraph & Node Lifecycle**: `SceneManager` owns `SceneGraph` objects per scene. Each graph contains a `nodeMap` (fast lookup by ID) and `rootNodes` array. Nodes extend Three.js `Object3D` and are purely data/logic structures. State only tracks node IDs for selection and hierarchy UI consumption.
+- **Dependency Injection**: Custom DI container with `@injectable()` and `@inject()` decorators. Services implement `dispose()` and are registered with `ServiceContainer` (singleton by default). `ComponentBase` provides consistent `@inject()` support.
+- **Viewport Rendering**: Three.js-based `ViewportRenderService` with perspective pass (3D) plus orthographic overlay pass (HUD/gizmos). DPR-aware resize handling with ResizeObserver. Orbit controls and demo scene included.
+- **Scene Parsing & Validation**: `SceneManager` parses `.pix3scene` YAML files and validates with AJV. Type-safe error handling for validation failures.
+- **Build & Dev Tooling**: Vite + TypeScript project with ESLint, Prettier, Vitest, and CI workflows. Dev (`npm run dev`), build (`npm run build`), test (`npm run test`), and lint scripts functional.
+- **UI Components**: Golden Layout-based shell. Panels (Scene Tree, Viewport, Inspector, Asset Browser) implemented with `ComponentBase`. All components extend `ComponentBase` and use light DOM by default. Styles separated into `[component].ts.css` files.
+- **Command Execution**: Features implemented for selection (SelectObjectCommand/Operation), scene loading (LoadSceneCommand), and history (RedoCommand/UndoCommand). All use Operations via OperationService and CommandDispatcher.
 
-- (Removed) Previous plan for a PixiJS overlay adapter has been deprecated; the orthographic Three.js pass provides sufficient 2D capability for MVP.
-- Fixed-pixel overlay: if you want an overlay that always measures N screen pixels (for UI chrome or pixel-perfect guides) we can add a small helper to compute orthographic bounds from pixel size or render HUD via HTML overlay.
-- Tests: unit/integration tests exist for core managers, but adding an integration test that asserts resize/DPR behavior for `ViewportRendererService` would be valuable.
-- Performance tuning: production build emits a chunk-size warning for some bundles; consider code-splitting large optional modules (e.g., plugin packs) to reduce initial bundle size.
+### Known Gaps / Next Work Items
 
-If you want I can: 1) add a small integration test for the renderer resize behavior, 2) implement a fixed-pixel overlay option, or 3) add a small README entry documenting the renderer lifecycle and where to hook scene data. Tell me which and I will implement it.
+- **Tests**: Unit tests exist for core managers and commands. Integration tests for renderer DPR/resize behavior would strengthen confidence.
+- **Performance Tuning**: Production build has chunk-size warnings. Code-splitting large optional modules would reduce initial bundle size.
+- **Fixed-Pixel Overlays**: If pixel-perfect UI chrome or guides are needed, a small helper to compute orthographic bounds from screen pixels could be added.
+- **Plugin System**: Plugin manifest validation and sandboxing are on the roadmap but not yet implemented.
+- **Collaborative Features**: Shared sessions and live cursors (post-MVP).
 
 ## 5. Scene File Format (*.pix3scene)
 
@@ -243,12 +247,12 @@ root:
 │   ├── core/                 # Core business logic and managers
 │   │   ├── AssetLoader.ts
 │   │   ├── BulkOperation.ts
-│   │   ├── command.ts
+│   │   ├── command.ts        # Command/Operation base contracts
 │   │   ├── HistoryManager.ts
 │   │   ├── LayoutManager.ts
 │   │   ├── Operation.ts
 │   │   ├── SceneLoader.ts
-│   │   └── SceneManager.ts
+│   │   └── SceneManager.ts   # Owns SceneGraph and Node lifecycle (non-reactive)
 │   ├── features/             # Feature-specific commands and operations
 │   │   ├── history/
 │   │   │   ├── RedoCommand.ts
@@ -257,21 +261,20 @@ root:
 │   │   │   ├── UpdateObjectPropertyCommand.ts
 │   │   │   └── UpdateObjectPropertyOperation.ts
 │   │   ├── scene/
-│   │   │   ├── LoadSceneCommand.ts
-│   │   │   └── LoadSceneOperation.ts
+│   │   │   └── LoadSceneCommand.ts
 │   │   └── selection/
 │   │       ├── SelectObjectCommand.ts
 │   │       └── SelectObjectOperation.ts
 │   ├── fw/                   # Framework utilities (ComponentBase, DI, helpers)
-│   │   ├── component-base.ts
-│   │   ├── di.ts
+│   │   ├── component-base.ts # Extends LitElement with light DOM default
+│   │   ├── di.ts             # Dependency injection container
 │   │   ├── from-query.ts
 │   │   ├── index.ts
 │   │   └── layout-component-base.ts
-│   ├── nodes/                # Node definitions for scene graph
+│   ├── nodes/                # Node definitions (NOT in reactive state)
 │   │   ├── Node2D.ts
 │   │   ├── Node3D.ts
-│   │   ├── NodeBase.ts
+│   │   ├── NodeBase.ts       # Extends Three.js Object3D; purely data/logic
 │   │   ├── 2D/
 │   │   │   └── Sprite2D.ts
 │   │   └── 3D/
@@ -283,17 +286,17 @@ root:
 │   ├── services/             # Injectable services
 │   │   ├── AssetFileActivationService.ts
 │   │   ├── AssetLoaderService.ts
-│   │   ├── CommandDispatcher.ts
+│   │   ├── CommandDispatcher.ts  # Primary entry point for all actions
 │   │   ├── FileSystemAPIService.ts
 │   │   ├── FocusRingService.ts
 │   │   ├── index.ts
-│   │   ├── OperationService.ts
+│   │   ├── OperationService.ts   # Executes operations; gateway for mutations
 │   │   ├── ProjectService.ts
 │   │   ├── ResourceManager.ts
 │   │   ├── TemplateService.ts
 │   │   └── ViewportRenderService.ts
-│   ├── state/                # Valtio app state definitions
-│   │   ├── AppState.ts
+│   ├── state/                # Valtio app state definitions (UI, metadata, selection only)
+│   │   ├── AppState.ts       # Defines reactive state shape; no Nodes here
 │   │   └── index.ts
 │   ├── templates/            # Project templates
 │   │   ├── pix3-logo.png
@@ -305,8 +308,8 @@ root:
 │   │   ├── assets-browser/
 │   │   │   ├── asset-browser-panel.ts
 │   │   │   ├── asset-browser-panel.ts.css
-│   │   │   └── asset-tree.ts
-│   │   │       └── asset-tree.ts.css
+│   │   │   ├── asset-tree.ts
+│   │   │   └── asset-tree.ts.css
 │   │   ├── object-inspector/
 │   │   │   ├── inspector-panel.ts
 │   │   │   └── inspector-panel.ts.css
@@ -329,14 +332,6 @@ root:
 │   │   └── welcome/
 │   │       ├── pix3-welcome.ts
 │   │       └── pix3-welcome.ts.css
-│   ├── index.css             # Global CSS entry
-│   └── main.ts               # Application entry point
-├── index.html
-├── package.json
-├── tsconfig.json
-├── vite.config.ts
-└── vitest.config.ts
-
 ```
 
 ## 9. Roadmap and Milestones
@@ -351,7 +346,7 @@ root:
 - **1.5 (2025-09-26):** Added target platforms, non-functional requirements, detailed architecture contracts, validation rules, and roadmap updates. Synced guidance on `fw` helpers.
 - **1.7 (2025-10-01):** Removed PixiJS dual-engine plan; consolidated rendering to single Three.js pipeline (perspective + orthographic). Updated project structure, removed obsolete adapter references, clarified rendering notes.
 - **1.8 (2025-10-05):** Adopted operations-first model. Commands are thin wrappers that delegate to `OperationService`. UI invokes operations directly. Code organized into `core/features/*/{commands,operations}`. Deprecated `CommandOperationAdapter` in documentation.
-- **1.9 (2025-10-27):** Updated project structure to match current codebase. Emphasized use of CommandDispatcher Service for all actions instead of direct operation invocation. Updated architecture to require all UI and tools to use Commands via CommandDispatcher for consistent lifecycle management.
+- **1.9 (2025-10-27):** Updated to reflect current architecture where Nodes are NOT in reactive state. Nodes are managed by SceneManager in SceneGraph objects. State contains only UI, scenes metadata, and selection IDs. CommandDispatcher Service is the primary entry point for all actions. Updated project structure section to annotate (non-reactive) for nodes and clarify state boundaries. Enhanced implementation status with current feature list.
 
 ## 11. Plugin State Management
 
