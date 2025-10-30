@@ -1,10 +1,12 @@
 import { subscribe } from 'valtio/vanilla';
 
-import { ComponentBase, customElement, html, state } from '@/fw';
+import { ComponentBase, customElement, html, state, inject } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
 import { NodeBase } from '@/nodes/NodeBase';
 import { getNodeVisuals } from './node-visuals.helper';
 import type { SceneTreeNode } from './scene-tree-node';
+import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { CreateBoxCommand } from '@/features/scene/CreateBoxCommand';
 
 import '../shared/pix3-panel';
 import '../shared/pix3-toolbar';
@@ -14,6 +16,9 @@ import './scene-tree-panel.ts.css';
 
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {
+  @inject(CommandDispatcher)
+  private readonly commandDispatcher!: CommandDispatcher;
+
   @state()
   private activeScene: SceneDescriptor | null = this.resolveActiveSceneDescriptor();
 
@@ -38,6 +43,7 @@ export class SceneTreePanel extends ComponentBase {
   @state()
   private loadError: string | null = appState.scenes.loadError;
 
+  private lastHierarchyRef: NodeBase[] | null = null;
   private disposeSceneSubscription?: () => void;
   private disposeSelectionSubscription?: () => void;
 
@@ -114,17 +120,21 @@ export class SceneTreePanel extends ComponentBase {
     const nextDescriptor = this.resolveActiveSceneDescriptor();
     const nextHierarchyRoots = this.resolveActiveHierarchyNodes();
 
+    // Detect if hierarchy reference changed (new array was assigned)
+    const hierarchyChanged = this.lastHierarchyRef !== nextHierarchyRoots;
+
     // Only rebuild tree if scene changed, load state changed, or hierarchy changed
     const needsRebuild =
       sceneChanged ||
       this.loadState !== nextLoadState ||
       this.loadError !== nextLoadError ||
-      nextHierarchyRoots !== this.resolveActiveHierarchyNodes();
+      hierarchyChanged;
 
     this.activeSceneId = nextSceneId;
     this.activeScene = nextDescriptor;
     this.loadState = nextLoadState;
     this.loadError = nextLoadError;
+    this.lastHierarchyRef = nextHierarchyRoots;
 
     if (needsRebuild) {
       this.hierarchy = this.buildTreeNodes(nextHierarchyRoots);
@@ -226,10 +236,23 @@ export class SceneTreePanel extends ComponentBase {
     this.collapsedNodeIds = next;
   }
 
-  private onCreateNode(event: CustomEvent): void {
+  private async onCreateNode(event: CustomEvent): Promise<void> {
     const { id } = event.detail;
-    // Placeholder for creating a node based on the selected type
-    console.log(`Create ${id} node`);
+
+    // Only handle 'box' type for now
+    if (id === 'box') {
+      const command = new CreateBoxCommand({
+        boxName: 'Box',
+        size: [1, 1, 1],
+        color: '#4e8df5',
+      });
+
+      try {
+        await this.commandDispatcher.execute(command);
+      } catch (error) {
+        console.error('[SceneTreePanel] Failed to create box:', error);
+      }
+    }
   }
 }
 

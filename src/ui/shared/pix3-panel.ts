@@ -47,7 +47,12 @@ export class Pix3Panel extends ComponentBase {
       // Filter out whitespace-only text nodes
       return node.nodeType !== Node.TEXT_NODE || (node.textContent?.trim() ?? '').length > 0;
     });
-    this.hasBodyContent = nodes.length > 0;
+    const newHasBodyContent = nodes.length > 0;
+    
+    // Only update state if the value actually changed to avoid unnecessary renders
+    if (newHasBodyContent !== this.hasBodyContent) {
+      this.hasBodyContent = newHasBodyContent;
+    }
   }
 
   disconnectedCallback(): void {
@@ -58,21 +63,6 @@ export class Pix3Panel extends ComponentBase {
 
   protected firstUpdated(): void {
     this.ensureActionsFocusController();
-  }
-
-  protected updated(): void {
-    this.ensureActionsFocusController();
-    this.attachSlotChangeListener();
-  }
-
-  private attachSlotChangeListener(): void {
-    const slot = (this.renderRoot as any)?.querySelector?.('slot:not([name])');
-    if (slot && !slot.__hasChangeListener) {
-      slot.addEventListener('slotchange', () => this.onSlotChange());
-      slot.__hasChangeListener = true;
-      // Initial check
-      this.onSlotChange();
-    }
   }
 
   private ensureActionsFocusController(): void {

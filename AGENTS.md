@@ -195,7 +195,8 @@ Always verify architectural decisions against the specification before implement
 - Agents must not attempt to start the dev server themselves.
 
 ### Browser Interaction
-- Agents can use the `#browsermcp` MCP server to interact with the app.
+- Agents can use the `#browsermcp` MCP server to navigate pages and interact with the app.
+- Never launch url's directly use MCP to navigate necessary page.
 - Logs and snapshots can be read using the MCP browser tools.
 
 ### Default Scene Loading

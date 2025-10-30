@@ -95,6 +95,13 @@ export class ViewportRendererService {
     });
     this.disposers.push(unsubscribeSelection);
 
+    // Subscribe to hierarchy changes to detect node structure mutations
+    // This handles cases where operations affect node structure (e.g., adding/removing nodes)
+    const unsubscribeHierarchies = subscribe(appState.scenes.hierarchies, () => {
+      this.syncSceneContent();
+    });
+    this.disposers.push(unsubscribeHierarchies);
+
     // Initial sync
     checkSceneChanges();
   }
