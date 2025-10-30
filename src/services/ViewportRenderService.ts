@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { NodeBase } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { injectable, inject } from '@/fw/di';
@@ -25,6 +26,8 @@ export class ViewportRendererService {
   private scene?: THREE.Scene;
   private camera?: THREE.PerspectiveCamera;
   private orbitControls?: OrbitControls;
+  private transformControls?: TransformControls;
+  private transformGizmo?: THREE.Object3D;
   private selectedObjects = new Set<THREE.Object3D>();
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
   private animationId?: number;
@@ -73,6 +76,22 @@ export class ViewportRendererService {
     this.orbitControls.enableZoom = true;
     this.orbitControls.enablePan = true;
 
+    // Initialize TransformControls for object manipulation
+    this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
+    this.transformControls.setMode('translate'); // Default to translate mode
+
+    // When dragging with transform controls, disable orbit controls
+    this.transformControls.addEventListener('dragging-changed', (event: any) => {
+      if (this.orbitControls) {
+        this.orbitControls.enabled = !event.value;
+      }
+    });
+
+    // Update selection box when transform control object changes
+    this.transformControls.addEventListener('objectChange', () => {
+      this.updateSelectionBoxes();
+    });
+
     // Start render loop
     this.startRenderLoop();
 
@@ -118,10 +137,9 @@ export class ViewportRendererService {
   }
 
   setTransformMode(mode: TransformMode): void {
-    // Store the mode for future use in transform controls
-    // This can be used when implementing gizmos for transformations
-    if (mode) {
-      // Mode stored for future implementation
+    // Set the transform mode for the gizmo
+    if (this.transformControls) {
+      this.transformControls.setMode(mode);
     }
   }
 
@@ -190,6 +208,17 @@ export class ViewportRendererService {
   }
 
   updateSelection(): void {
+    // Detach transform controls from previous object
+    if (this.transformControls) {
+      this.transformControls.detach();
+    }
+
+    // Remove previous transform gizmo from scene
+    if (this.transformGizmo && this.scene) {
+      this.scene.remove(this.transformGizmo);
+      this.transformGizmo = undefined;
+    }
+
     // Clear previous selection boxes and dispose their Three.js resources
     for (const box of this.selectionBoxes.values()) {
       if (this.scene) {
@@ -208,7 +237,7 @@ export class ViewportRendererService {
     if (this.scene) {
       const toRemove: THREE.Object3D[] = [];
       this.scene.children.forEach(child => {
-        if ((child as any).userData?.isSelectionBox) {
+        if ((child as any).userData?.isSelectionBox || (child as any).userData?.isTransformGizmo) {
           toRemove.push(child);
         }
       });
@@ -233,11 +262,17 @@ export class ViewportRendererService {
     // Clear previous selection object tracking
     this.selectedObjects.clear();
 
-    // Add selection boxes for selected nodes
+    // Add selection boxes for selected nodes and attach transform controls to the first one
+    let firstSelectedNode: Node3D | null = null;
     for (const nodeId of nodeIds) {
       const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
       if (node && node instanceof Node3D) {
         this.selectedObjects.add(node);
+
+        // Track the first selected node for transform controls
+        if (!firstSelectedNode) {
+          firstSelectedNode = node;
+        }
 
         // Create bounding box visualization
         const box = new THREE.Box3().setFromObject(node);
@@ -250,6 +285,19 @@ export class ViewportRendererService {
         this.selectionBoxes.set(nodeId, helper);
         this.scene?.add(helper);
       }
+    }
+
+    // Attach transform controls to the first selected node if any
+    if (firstSelectedNode && this.transformControls && this.scene) {
+      this.transformControls.attach(firstSelectedNode);
+
+      // Get and add the transform gizmo to the scene
+      this.transformGizmo = this.transformControls.getHelper();
+      this.transformGizmo.userData.isTransformGizmo = true;
+      this.transformGizmo.traverse(child => {
+        child.userData.isTransformGizmo = true;
+      });
+      this.scene.add(this.transformGizmo);
     }
   }
 
@@ -301,6 +349,20 @@ export class ViewportRendererService {
     return null;
   }
 
+  private updateSelectionBoxes(): void {
+    // Update all selection boxes to follow their objects during transform
+    for (const [nodeId, box] of this.selectionBoxes.entries()) {
+      const sceneGraph = this.sceneManager.getActiveSceneGraph();
+      if (sceneGraph) {
+        const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
+        if (node && node instanceof Node3D) {
+          const newBox = new THREE.Box3().setFromObject(node);
+          box.box.copy(newBox);
+        }
+      }
+    }
+  }
+
   private startRenderLoop(): void {
     const render = () => {
       this.animationId = requestAnimationFrame(render);
@@ -344,6 +406,9 @@ export class ViewportRendererService {
     // Dispose orbit controls
     this.orbitControls?.dispose();
 
+    // Dispose transform controls
+    this.transformControls?.dispose();
+
     // Dispose Three.js resources
     this.selectionBoxes.forEach(box => {
       box.geometry.dispose();
@@ -374,5 +439,7 @@ export class ViewportRendererService {
     this.scene = undefined;
     this.camera = undefined;
     this.orbitControls = undefined;
+    this.transformControls = undefined;
+    this.transformGizmo = undefined;
   }
 }
