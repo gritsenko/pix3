@@ -1,40 +1,141 @@
-# Copilot Instructions
+# Pix3 Editor - AI Agent Guidelines
 
-These guardrails help generate consistent code and documentation for the Pix3 editor. Treat them as authoritative unless the specification (`docs/pix3-specification.md`) or maintainers request an exception. Pix3 uses an operations-first model where OperationService is the single gateway for mutations and history.
+Based on the authoritative copilot instructions for Pix3 development. These guidelines ensure consistent code generation and adherence to project architecture patterns.
 
 ## Project Overview
 
-- **Pix3** is a browser-based editor for building HTML5 scenes that blend 2D and 3D layers, targeting playable ads and interactive experiences.
-- **Target stack**: TypeScript + Vite, Lit web components with custom `fw` utilities, Valtio for reactive state, Three.js for 3D rendering, Golden Layout for dockable panels.
-- **Source of truth**: `docs/pix3-specification.md` (v1.8, 2025-10-05) contains all requirements, architecture decisions, and MVP roadmap.
-- **Target users**: Scene composers, gameplay developers, ad producers.
+- **Pix3** is a browser-based editor for HTML5 scenes blending 2D and 3D layers
+- **Target stack**: TypeScript + Vite, Lit web components, Valtio state, Three.js, Golden Layout
+- **Architecture model**: Operations-first with OperationService as single mutation gateway
+- **Source of truth**: `docs/pix3-specification.md` (v1.8, 2025-10-05)
 
 ## Essential Architecture Patterns
 
 ### Component System
-- Extend `ComponentBase` from `src/fw` instead of raw `LitElement`. It defaults to **light DOM** for global style integration.
-- Use shadow DOM only when needed: `static useShadowDom = true` in your component class.
-- Import helpers from `src/fw`: `customElement`, `property`, `state`, `css`, `html`, `inject`.
-- Split component styles into separate CSS files: `[component].ts.css`, and import them into the component file (e.g., `pix3-welcome.ts` imports `pix3-welcome.ts.css`).
-- Import from core folders using @ aliases (e.g., `@/fw`, `@/state`, `@/core`, `@/services`) instead of relative paths.
+- Extend `ComponentBase` from `src/fw` (not raw `LitElement`)
+- Default to **light DOM** for global style integration
+- Use shadow DOM only when explicitly needed: `static useShadowDom = true`
+- Import helpers from `src/fw`: `customElement`, `property`, `state`, `css`, `html`, `inject`
+- Split styles into separate CSS files: `[component].ts.css`
+- Use @ aliases for core imports: `@/fw`, `@/state`, `@/core`, `@/services`
 
 ### Dependency Injection
-- Services use `@injectable()` decorator and must expose `dispose()` method for cleanup.
-- Inject services into components/commands via `@inject(ServiceClass)` - requires `reflect-metadata` polyfill.
-- Register services with `ServiceContainer` - singleton by default, transient optional.
+- Services use `@injectable()` decorator with `dispose()` method
+- Inject services via `@inject(ServiceClass)` (requires reflect-metadata)
+- Register services with `ServiceContainer` (singleton by default)
 
 ### State Management (Valtio)
-- Global state lives in `appState` proxy from `src/state/AppState.ts` — never mutate directly.
-- Mutations flow through Operations executed via OperationService. Commands are thin wrappers that invoke operations. Managers may update state directly only for non-interactive, non-history flows.
-- UI subscribes to state changes via `subscribe(appState.section, callback)`.
-- Use `snapshot(appState)` for read-only checks in command preconditions or operation validation.
+- Global state in `appState` proxy from `src/state/AppState.ts` - never mutate directly
+- State includes UI, scenes metadata, selection (node IDs), and operations lifecycle
+- **Nodes are NOT in reactive state** — they are managed by `SceneManager` and stored in `SceneGraph` objects. Node references sync to state only as IDs in `SceneHierarchyState.rootNodes` (for UI consumption of tree structure)
+- All mutations flow through Operations via OperationService
+- Commands are thin wrappers that invoke operations
+- UI subscribes via `subscribe(appState.section, callback)` for reactive updates
+- Use `snapshot(appState)` for read-only checks
 
 ### Commands and Operations
-- Operations are first-class and encapsulate all mutation logic. Implement `perform()` and return an OperationCommit with `undo()`/`redo()` closures and optional metadata for coalescing and scene diffing.
-- OperationService is the single gateway: `invoke(op)`, `invokeAndPush(op)`, `undo()`, `redo()`.
-- Commands are thin wrappers: `preconditions()` → `execute()`; they never implement their own undo/redo. They validate context and call OperationService with operations. Register via metadata for the command palette.
+- **Operations** are first-class, encapsulate all mutation logic
+- Implement `perform()` returning OperationCommit with `undo()`/`redo()` closures
+- **OperationService** is the gateway for executing operations: `invoke(op)`, `invokeAndPush(op)`, `undo()`, `redo()`
+- **CommandDispatcher Service** is the primary entry point for all actions. All UI and tools must use Commands via CommandDispatcher to ensure consistent lifecycle management, preconditions checking, and telemetry.
+- **Commands** are thin wrappers: `preconditions()` → `execute()` → OperationService via CommandDispatcher
+- Commands never implement their own undo/redo logic
 
-## Critical Development Setup
+## File Structure Conventions
+
+```
+src/
+  core/                    # Core business logic and managers
+    AssetLoader.ts
+    BulkOperation.ts
+    command.ts             # Command/Operation base contracts
+    HistoryManager.ts
+    LayoutManager.ts
+    Operation.ts
+    SceneLoader.ts
+    SceneManager.ts        # Owns SceneGraph and Node lifecycle (non-reactive)
+  features/                # Feature-specific commands and operations
+    history/
+      RedoCommand.ts
+      UndoCommand.ts
+    properties/
+      UpdateObjectPropertyCommand.ts
+      UpdateObjectPropertyOperation.ts
+    scene/
+      LoadSceneCommand.ts
+    selection/
+      SelectObjectCommand.ts
+      SelectObjectOperation.ts
+  fw/                      # Framework utilities (DI, ComponentBase)
+    component-base.ts
+    di.ts
+    from-query.ts
+    index.ts
+    layout-component-base.ts
+  nodes/                   # Node definitions (NOT in reactive state)
+    Node2D.ts
+    Node3D.ts
+    NodeBase.ts            # Extends Three.js Object3D; purely data/logic
+    2D/
+      Sprite2D.ts
+    3D/
+      Camera3D.ts
+      DirectionalLightNode.ts
+      GeometryMesh.ts
+      GlbModel.ts
+      MeshInstance.ts
+  services/                # Injectable services
+    AssetFileActivationService.ts
+    AssetLoaderService.ts
+    CommandDispatcher.ts   # Primary entry point for all actions
+    FileSystemAPIService.ts
+    FocusRingService.ts
+    index.ts
+    OperationService.ts    # Executes operations; gateway for mutations
+    ProjectService.ts
+    ResourceManager.ts
+    TemplateService.ts
+    ViewportRenderService.ts
+  state/                   # Valtio reactive state (UI, metadata, selection only)
+    AppState.ts
+    index.ts
+  templates/               # Project templates
+    pix3-logo.png
+    startup-scene.pix3scene
+    test_model.glb
+  ui/                      # Lit components extending ComponentBase
+    pix3-editor-shell.ts
+    pix3-editor-shell.ts.css
+    assets-browser/
+      asset-browser-panel.ts
+      asset-browser-panel.ts.css
+      asset-tree.ts
+      asset-tree.ts.css
+    object-inspector/
+      inspector-panel.ts
+      inspector-panel.ts.css
+    scene-tree/
+      node-visuals.helper.ts
+      scene-tree-node.ts
+      scene-tree-node.ts.css
+      scene-tree-panel.ts
+      scene-tree-panel.ts.css
+    shared/
+      pix3-panel.ts
+      pix3-panel.ts.css
+      pix3-toolbar-button.ts
+      pix3-toolbar-button.ts.css
+      pix3-toolbar.ts
+      pix3-toolbar.ts.css
+    viewport/
+      viewport-panel.ts
+      viewport-panel.ts.css
+    welcome/
+      pix3-welcome.ts
+      pix3-welcome.ts.css
+```
+
+## Development Requirements
 
 ### Required TypeScript Config
 ```json
@@ -46,70 +147,43 @@ These guardrails help generate consistent code and documentation for the Pix3 ed
 }
 ```
 
-### Development Commands
+### Key Development Commands
 - `npm run dev` - Vite dev server with hot reload
 - `npm run test` - Vitest unit tests (co-located `.spec.ts` files)
 - `npm run build` - TypeScript compilation + Vite production build
 - `npm run lint` - ESLint with Lit/a11y plugins
 
-### Entry Point Flow
-1. `src/main.ts` imports `reflect-metadata`, Golden Layout CSS, and registers all components
-2. `index.html` renders `<pix3-editor>` shell component
-3. Shell initializes Golden Layout (single default layout by default) and wires keyboard shortcuts to `OperationService.undo()` / `redo()`
-
-## File Structure Conventions
-
-```
-src/
-  fw/                      # Framework utilities (DI, ComponentBase)
-  state/                   # Valtio state definitions
-  core/
-    features/
-      selection/
-        commands/
-        operations/
-      properties/
-        commands/
-        operations/
-      scene/
-        commands/
-        operations/
-      history/
-        commands/         # Undo/Redo thin commands
-    operations/           # OperationService, base types, events
-    history/              # HistoryManager (bounded stacks)
-    layout/               # Golden Layout integration
-  ui/                     # Lit components extending ComponentBase
-    welcome/
-    scene-tree/
-    viewport/
-    object-inspector/
-    assets-browser/
-  services/               # Injectable services (FileSystem API, etc.)
-```
-
 ## Scene File Format (.pix3scene)
-- **YAML format** with `version`, node hierarchy under `root:`, unique node `id` fields.
-- Asset references use `res://` prefix (relative to project root).
-- Scene instances support property overrides.
-- Validation via AJV schemas in `SceneManager`.
-
-## Testing Patterns
-- Unit tests with Vitest, using `vi.fn()` for mocks and `beforeEach()` cleanup.
-- Prefer testing operation lifecycle and OperationService integration over command-owned undo.
-- Validate operation `perform()`, commit `undo()`/`redo()` closures, coalescing (when applicable), and HistoryManager behavior.
-- Test thin commands for preconditions and delegation to OperationService.
+- YAML format with version, node hierarchy under `root:`
+- Unique node `id` fields required
+- Asset references use `res://` prefix
+- Property overrides supported
+- AJV schema validation in `SceneManager`
 
 ## Performance & Quality Gates
-- Target ≥85 FPS viewport rendering, <6s cold start, <80ms command latency
-- WCAG 2.1 AA compliance (keyboard nav, ARIA attributes, high-contrast themes)
-- Chromium-only for MVP (show compatibility warning for other browsers)
+- Target ≥85 FPS viewport rendering
+- <6s cold start, <80ms command latency
+- WCAG 2.1 AA compliance (keyboard nav, ARIA, high-contrast)
+- Chromium-only for MVP
 
 ## Key Integration Points
 - **Golden Layout**: Panel management
-- **File System Access API**: Direct project folder access, no upload/download
+- **File System Access API**: Direct project access
 - **Valtio**: Reactive state with automatic UI updates
-- **Three.js**: Single-engine rendering; orthographic overlay for 2D/HUD in the same pipeline
+- **Three.js**: Single-engine rendering with orthographic overlay
 - **Plugin system**: Sandboxed extensions via manifest validation
 
-Always cross-check architectural decisions against `docs/pix3-specification.md` before implementing features.
+## Critical Rules for AI Agents
+
+1. **Never mutate `appState` directly** — always use Operations via OperationService
+2. **Follow operations-first model** — Operations handle all mutations, Commands are thin wrappers
+3. **Use CommandDispatcher Service for all actions** — All UI and tools must perform actions via Commands through CommandDispatcher instead of directly invoking operations
+4. **Nodes are NOT reactive state** — they live in `SceneGraph` (managed by `SceneManager`), not `appState`. State tracks node IDs for selection/hierarchy reference only
+5. **Use ComponentBase** for all Lit components, not LitElement directly
+6. **Import from `@/` aliases** — never use relative paths for core imports
+7. **Separate styles** — each component has corresponding `.css` file
+8. **Light DOM by default** — use shadow DOM only when explicitly needed
+9. **Singleton services** — register with ServiceContainer, implement dispose()
+10. **Cross-reference specification** — check `docs/pix3-specification.md` for architectural decisions
+
+Always verify architectural decisions against the specification before implementing features.
