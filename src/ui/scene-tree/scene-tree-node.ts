@@ -56,6 +56,12 @@ export class SceneTreeNodeComponent extends ComponentBase {
   @state()
   private isCollapsed: boolean = false;
 
+  @state()
+  private dragOverPosition: 'top' | 'inside' | 'bottom' | null = null;
+
+  @state()
+  private isDragging: boolean = false;
+
   updated(): void {
     this.isCollapsed = this.collapsedNodeIds.has(this.node.id);
   }
@@ -69,6 +75,10 @@ export class SceneTreeNodeComponent extends ComponentBase {
       'tree-node__content': true,
       'tree-node__content--selected': isSelected,
       'tree-node__content--primary': isPrimary,
+      'tree-node__content--dragging': this.isDragging,
+      'tree-node__content--drag-over-top': this.dragOverPosition === 'top',
+      'tree-node__content--drag-over-inside': this.dragOverPosition === 'inside',
+      'tree-node__content--drag-over-bottom': this.dragOverPosition === 'bottom',
     });
 
     const expanderClasses = classMap({
@@ -99,6 +109,12 @@ export class SceneTreeNodeComponent extends ComponentBase {
           data-node-id=${this.node.id}
           title=${this.getNodeTooltip(this.node)}
           @click=${(event: Event) => this.onSelectNode(event)}
+          @dragstart=${(event: DragEvent) => this.onDragStart(event)}
+          @dragend=${(event: DragEvent) => this.onDragEnd(event)}
+          @dragover=${(event: DragEvent) => this.onDragOver(event)}
+          @dragleave=${(event: DragEvent) => this.onDragLeave(event)}
+          @drop=${(event: DragEvent) => this.onDrop(event)}
+          draggable="true"
         >
           ${expanderTemplate}
           <span class="tree-node__icon" title=${this.node.type} aria-label=${this.node.type}>
@@ -196,6 +212,112 @@ export class SceneTreeNodeComponent extends ComponentBase {
     } catch (error) {
       console.error('[SceneTreeNode] Failed to execute selection command', error);
     }
+  }
+
+  private onDragStart(event: DragEvent): void {
+    event.stopPropagation();
+    this.isDragging = true;
+    
+    if (event.dataTransfer) {
+      event.dataTransfer.effectAllowed = 'move';
+      event.dataTransfer.setData('application/x-scene-tree-node', this.node.id);
+      // Set a visual feedback image
+      const img = new Image();
+      img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="16" height="16"%3E%3Crect width="16" height="16" fill="%235ec2ff" opacity="0.3"/%3E%3C/svg%3E';
+      event.dataTransfer.setDragImage(img, 0, 0);
+    }
+  }
+
+  private onDragEnd(event: DragEvent): void {
+    event.stopPropagation();
+    this.isDragging = false;
+    this.dragOverPosition = null;
+  }
+
+  private onDragOver(event: DragEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'move';
+    }
+
+    // Determine the drop position based on cursor position
+    const element = event.currentTarget as HTMLElement;
+    const rect = element.getBoundingClientRect();
+    const relativeY = event.clientY - rect.top;
+    const thresholdPercent = 0.33;
+
+    if (relativeY < rect.height * thresholdPercent) {
+      this.dragOverPosition = 'top';
+    } else if (relativeY > rect.height * (1 - thresholdPercent)) {
+      this.dragOverPosition = 'bottom';
+    } else {
+      this.dragOverPosition = 'inside';
+    }
+  }
+
+  private onDragLeave(event: DragEvent): void {
+    event.stopPropagation();
+    // Only clear if we're actually leaving this element
+    if (event.target === event.currentTarget) {
+      this.dragOverPosition = null;
+    }
+  }
+
+  private async onDrop(event: DragEvent): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const draggedNodeId = event.dataTransfer?.getData('application/x-scene-tree-node');
+    if (!draggedNodeId) {
+      return;
+    }
+
+    // Prevent dropping a node on itself
+    if (draggedNodeId === this.node.id) {
+      this.dragOverPosition = null;
+      return;
+    }
+
+    // Capture the drop position before clearing it
+    const dropPosition = this.dragOverPosition;
+    this.dragOverPosition = null;
+
+    try {
+      // Determine the action based on drop position
+      if (dropPosition === 'inside' || dropPosition === null) {
+        // Drop inside as child
+        await this.performReparent(draggedNodeId, this.node.id, -1);
+      } else if (dropPosition === 'top') {
+        // Drop before this node (same parent, earlier index)
+        await this.performReparent(draggedNodeId, this.node.id, 'before');
+      } else if (dropPosition === 'bottom') {
+        // Drop after this node (same parent, later index)
+        await this.performReparent(draggedNodeId, this.node.id, 'after');
+      }
+    } catch (error) {
+      console.error('[SceneTreeNode] Failed to reparent node:', error);
+    }
+  }
+
+  private async performReparent(
+    draggedNodeId: string,
+    targetNodeId: string,
+    position: 'before' | 'after' | number
+  ): Promise<void> {
+    // This will be handled by the parent panel to access the scene graph
+    this.dispatchEvent(
+      new CustomEvent('node-drop', {
+        detail: {
+          draggedNodeId,
+          targetNodeId,
+          position,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 }
 

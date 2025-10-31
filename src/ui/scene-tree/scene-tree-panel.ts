@@ -7,6 +7,9 @@ import { getNodeVisuals } from './node-visuals.helper';
 import type { SceneTreeNode } from './scene-tree-node';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { CreateBoxCommand } from '@/features/scene/CreateBoxCommand';
+import { ReparentNodeCommand } from '@/features/scene/ReparentNodeCommand';
+import { SceneManager } from '@/core/SceneManager';
+import { ServiceContainer } from '@/fw/di';
 
 import '../shared/pix3-panel';
 import '../shared/pix3-toolbar';
@@ -87,7 +90,7 @@ export class SceneTreePanel extends ComponentBase {
             @item-select=${this.onCreateNode}
           ></pix3-dropdown-button>
         </pix3-toolbar>
-        <div class="tree-container" @toggle-node=${this.onToggleNode.bind(this)}>
+        <div class="tree-container" @toggle-node=${this.onToggleNode.bind(this)} @node-drop=${this.onNodeDrop.bind(this)}>
           ${hasHierarchy
             ? html`<ul
                 class="tree-root"
@@ -252,6 +255,71 @@ export class SceneTreePanel extends ComponentBase {
       } catch (error) {
         console.error('[SceneTreePanel] Failed to create box:', error);
       }
+    }
+  }
+
+  private async onNodeDrop(event: CustomEvent): Promise<void> {
+    const { draggedNodeId, targetNodeId, position } = event.detail;
+
+    console.log('[SceneTreePanel] onNodeDrop:', { draggedNodeId, targetNodeId, position });
+
+    // Get scene information
+    const sceneId = appState.scenes.activeSceneId;
+    if (!sceneId) {
+      console.log('[SceneTreePanel] No active scene');
+      return;
+    }
+
+    const container = ServiceContainer.getInstance();
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
+    );
+
+    const sceneGraph = sceneManager.getSceneGraph(sceneId);
+    if (!sceneGraph) {
+      console.log('[SceneTreePanel] No scene graph');
+      return;
+    }
+
+    // Find the target node
+    const targetNode = sceneGraph.nodeMap.get(targetNodeId);
+    if (!targetNode) {
+      console.log('[SceneTreePanel] Target node not found:', targetNodeId);
+      return;
+    }
+
+    let newParentId: string | null = null;
+    let newIndex: number = -1;
+
+    if (position === 'before' || position === 'after') {
+      // Drop before/after: use target's parent as new parent
+      if (targetNode.parentNode) {
+        newParentId = targetNode.parentNode.nodeId;
+        const targetIndex = targetNode.parentNode.children.indexOf(targetNode);
+        newIndex = position === 'before' ? targetIndex : targetIndex + 1;
+      } else {
+        // Target is at root level
+        const targetIndex = sceneGraph.rootNodes.indexOf(targetNode);
+        newIndex = position === 'before' ? targetIndex : targetIndex + 1;
+      }
+    } else {
+      // Drop inside: use target as parent
+      newParentId = targetNodeId;
+      newIndex = -1; // Append
+    }
+
+    console.log('[SceneTreePanel] Executing reparent:', { draggedNodeId, newParentId, newIndex, position });
+
+    try {
+      const command = new ReparentNodeCommand({
+        nodeId: draggedNodeId,
+        newParentId,
+        newIndex,
+      });
+
+      await this.commandDispatcher.execute(command);
+    } catch (error) {
+      console.error('[SceneTreePanel] Failed to reparent node:', error);
     }
   }
 }

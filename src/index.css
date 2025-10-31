@@ -67,3 +67,157 @@ body > pix3-editor {
   scrollbar-width: thin;
   scrollbar-color: rgba(80, 80, 80, 0.7) rgba(0, 0, 0, 0.25);
 }
+
+/* ========================================
+   GoldenLayout Tab Styling with Top Stripe
+   ======================================== */
+
+/* Tab headers container */
+.lm_header {
+  background: linear-gradient(to bottom, #1f2229, #1a1d23);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  padding: 0;
+  display: flex;
+  align-items: stretch;
+  height: 24px;
+  min-height: 24px;
+}
+
+/* Tab content/title area */
+.lm_tab {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 12px;
+  margin: 0;
+  cursor: pointer;
+  background: linear-gradient(to bottom, #252a32, #1f2329);
+  color: rgba(243, 244, 246, 0.6);
+  font-size: 0.875rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Top stripe indicator for inactive tabs */
+.lm_tab::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, rgba(251, 146, 60, 0.15), rgba(251, 146, 60, 0.05));
+  transition: all 0.2s ease;
+}
+
+/* Active tab styling */
+.lm_tab.lm_active {
+  background: linear-gradient(to bottom, #2d3139, #262c33);
+  color: #f3f4f6;
+  padding: 6px 10px;
+  font-weight: 400;
+}
+
+/* Active tab top stripe - more prominent */
+.lm_tab.lm_active::before {
+  height: 2px;
+  background: linear-gradient(90deg, rgba(255, 176, 112, 0.687), rgba(255, 157, 86, 0.582));
+  box-shadow: 0 0 12px rgba(251, 146, 60, 0.2);
+}
+
+/* Hover state for inactive tabs */
+.lm_tab:not(.lm_active):hover {
+  background: linear-gradient(to bottom, #2d3139, #262c33);
+  color: rgba(243, 244, 246, 0.85);
+}
+
+/* Hover state for active tabs */
+.lm_tab.lm_active:hover {
+  background: linear-gradient(to bottom, #333841, #2c3238);
+}
+
+/* Tab close button */
+.lm_close_tab {
+  margin-left: 8px;
+  padding: 2px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  opacity: 0.5;
+  transition: all 0.15s ease;
+}
+
+.lm_close_tab:hover {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Drag indicator styling */
+.lm_tab.lm_selected::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: rgba(251, 146, 60, 0.5);
+}
+
+/* Tab drag state */
+.lm_tab.lm_dragging {
+  opacity: 0.8;
+  transform: scale(0.95);
+}
+
+/* Focus state for accessibility */
+.lm_tab:focus {
+  outline: 1px solid rgba(251, 146, 60, 0.5);
+  outline-offset: -1px;
+}
+
+/* Stack header (container for tabs) */
+.lm_stack {
+  background: #1a1d23;
+}
+
+/* Content area background */
+.lm_content {
+  background: #13161b;
+}
+
+/* Splitter styling */
+.lm_splitter {
+  background: rgba(0, 0, 0, 0.3);
+  transition: background 0.15s ease;
+}
+
+.lm_splitter:hover {
+  background: rgba(251, 146, 60, 0.15);
+}
+
+.lm_splitter.lm_vertical {
+  cursor: col-resize;
+  width: 6px;
+}
+
+.lm_splitter.lm_horizontal {
+  cursor: row-resize;
+  height: 6px;
+}
+
+/* Prevent text selection during drag */
+.lm_dragSource,
+.lm_ghostDragSource {
+  user-select: none;
+  -webkit-user-select: none;
+}
