@@ -17,3 +17,4 @@ export { FocusRingService, type FocusRingServiceOptions } from './FocusRingServi
 export { ProjectService, resolveProjectService } from './ProjectService';
 export { AssetFileActivationService, type AssetActivation } from './AssetFileActivationService';
 export { CommandDispatcher, resolveCommandDispatcher } from './CommandDispatcher';
+export { LoggingService, type LogLevel, type LogEntry, type LogListener } from './LoggingService';

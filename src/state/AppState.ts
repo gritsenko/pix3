@@ -66,6 +66,7 @@ export interface PanelVisibilityState {
   viewport: boolean;
   inspector: boolean;
   assetBrowser: boolean;
+  logs: boolean;
 }
 
 export interface UIState {
@@ -136,6 +137,7 @@ export const createInitialAppState = (): AppState => ({
       viewport: true,
       inspector: true,
       assetBrowser: true,
+      logs: true,
     },
   },
   operations: {

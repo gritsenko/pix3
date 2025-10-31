@@ -7,6 +7,7 @@ const PANEL_COMPONENT_TYPES = {
   viewport: 'viewport',
   inspector: 'inspector',
   assetBrowser: 'asset-browser',
+  logs: 'logs',
 } as const;
 
 export type PanelComponentType = (typeof PANEL_COMPONENT_TYPES)[keyof typeof PANEL_COMPONENT_TYPES];
@@ -16,6 +17,7 @@ const PANEL_TAG_NAMES: Record<PanelComponentType, keyof HTMLElementTagNameMap> =
   [PANEL_COMPONENT_TYPES.viewport]: 'pix3-viewport-panel',
   [PANEL_COMPONENT_TYPES.inspector]: 'pix3-inspector-panel',
   [PANEL_COMPONENT_TYPES.assetBrowser]: 'pix3-asset-browser-panel',
+  [PANEL_COMPONENT_TYPES.logs]: 'pix3-logs-panel',
 };
 
 const PANEL_DISPLAY_TITLES: Record<PanelComponentType, string> = {
@@ -23,6 +25,7 @@ const PANEL_DISPLAY_TITLES: Record<PanelComponentType, string> = {
   [PANEL_COMPONENT_TYPES.viewport]: 'Viewport',
   [PANEL_COMPONENT_TYPES.inspector]: 'Inspector',
   [PANEL_COMPONENT_TYPES.assetBrowser]: 'Asset Browser',
+  [PANEL_COMPONENT_TYPES.logs]: 'Logs',
 };
 
 const DEFAULT_PANEL_VISIBILITY: PanelVisibilityState = {
@@ -30,6 +33,7 @@ const DEFAULT_PANEL_VISIBILITY: PanelVisibilityState = {
   viewport: true,
   inspector: true,
   assetBrowser: true,
+  logs: true,
 };
 
 const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
@@ -67,17 +71,30 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
         ],
       },
       {
-        type: 'stack',
+        type: 'column',
         width: 50,
         content: [
           {
+            type: 'stack',
+            content: [
+              {
+                type: 'component',
+                componentType: PANEL_COMPONENT_TYPES.viewport,
+                title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.viewport],
+                isClosable: false,
+              },
+            ],
+          },
+          {
             type: 'component',
-            componentType: PANEL_COMPONENT_TYPES.viewport,
-            title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.viewport],
-            isClosable: false,
+            componentType: PANEL_COMPONENT_TYPES.logs,
+            title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.logs],
+            height: 25,
+            isClosable: true,
           },
         ],
       },
+
       {
         type: 'component',
         width: 30,

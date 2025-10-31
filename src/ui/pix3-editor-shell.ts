@@ -9,6 +9,7 @@ import { appState } from '@/state';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './welcome/pix3-welcome';
+import './logs/logs-panel';
 import './pix3-editor-shell.ts.css';
 
 @customElement('pix3-editor')

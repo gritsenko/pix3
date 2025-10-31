@@ -17,6 +17,7 @@ import {
   type OperationMetadata,
 } from '../core/Operation';
 import { appState, type AppState, type AppStateSnapshot } from '@/state';
+import { LoggingService } from './LoggingService';
 
 export type OperationEvent =
   | {
@@ -67,10 +68,14 @@ export class OperationService {
   private readonly state: AppState;
   private readonly listeners = new Set<OperationEventListener>();
   private readonly disposeHistorySubscription: () => void;
+  private readonly logger: LoggingService;
 
   constructor(historyManager?: HistoryManager, state: AppState = appState) {
     this.history = historyManager ?? new HistoryManager();
     this.state = state;
+    this.logger = ServiceContainer.getInstance().getService<LoggingService>(
+      ServiceContainer.getInstance().getOrCreateToken(LoggingService)
+    );
     this.disposeHistorySubscription = this.history.subscribe(snapshot => {
       this.emit({
         type: 'history:changed',
@@ -110,7 +115,7 @@ export class OperationService {
     operation: Operation<TInvokeResult>,
     options: OperationInvokeOptions = {}
   ): Promise<boolean> {
-    console.debug('[OperationService] invokeAndPush: Starting operation', {
+    this.logger.debug('invokeAndPush: Starting operation', {
       operationId: operation.metadata.id,
       operationTitle: operation.metadata.title,
     });
@@ -119,7 +124,7 @@ export class OperationService {
     let pushed = false;
     try {
       if (execution.result.didMutate && execution.result.commit) {
-        console.debug('[OperationService] invokeAndPush: Operation mutated, pushing to history', {
+        this.logger.debug('invokeAndPush: Operation mutated, pushing to history', {
           operationId: execution.metadata.id,
           commitLabel: execution.result.commit.label,
           coalesceKey: options.coalesceKey ?? execution.metadata.coalesceKey,
@@ -127,14 +132,14 @@ export class OperationService {
         this.pushToHistory(execution.metadata, execution.result.commit, options);
         execution.context.state.operations.lastUndoableCommandId = execution.metadata.id;
         pushed = true;
-        console.debug('[OperationService] invokeAndPush: Successfully pushed to history', {
+        this.logger.debug('invokeAndPush: Successfully pushed to history', {
           operationId: execution.metadata.id,
           canUndo: this.history.canUndo,
           canRedo: this.history.canRedo,
         });
       } else {
-        console.debug(
-          '[OperationService] invokeAndPush: Operation did not mutate or has no commit',
+        this.logger.debug(
+          'invokeAndPush: Operation did not mutate or has no commit',
           {
             operationId: execution.metadata.id,
             didMutate: execution.result.didMutate,
@@ -291,7 +296,7 @@ export class OperationService {
       const currentUndoEntries = this.history.snapshot().undoEntries;
       const previous = currentUndoEntries[currentUndoEntries.length - 1];
       if (previous?.metadata.coalesceKey === coalesceKey) {
-        console.debug('[OperationService] pushToHistory: Coalescing operation with previous', {
+        this.logger.debug('pushToHistory: Coalescing operation with previous', {
           operationId: metadata.id,
           coalesceKey,
           previousCommandId: previous.metadata.commandId,
@@ -301,7 +306,7 @@ export class OperationService {
       }
     }
 
-    console.debug('[OperationService] pushToHistory: Pushing new history entry', {
+    this.logger.debug('pushToHistory: Pushing new history entry', {
       operationId: metadata.id,
       label: entryMetadata.label,
       coalesceKey,
@@ -336,7 +341,7 @@ export class OperationService {
   }
 
   private beginOperation(metadata: OperationMetadata, state: AppState): void {
-    console.debug('[OperationService] beginOperation: Starting', {
+    this.logger.debug('beginOperation: Starting', {
       operationId: metadata.id,
       operationTitle: metadata.title,
       pendingCount: state.operations.pendingCommandCount + 1,
@@ -353,7 +358,7 @@ export class OperationService {
     didMutate: boolean,
     pushedToHistory: boolean
   ): void {
-    console.debug('[OperationService] completeOperation: Finishing', {
+    this.logger.debug('completeOperation: Finishing', {
       operationId: metadata.id,
       operationTitle: metadata.title,
       didMutate,
@@ -378,7 +383,7 @@ export class OperationService {
   }
 
   private failOperation(metadata: OperationMetadata, state: AppState, error: unknown): void {
-    console.error('[OperationService] failOperation: Operation failed', {
+    this.logger.error('failOperation: Operation failed', {
       operationId: metadata.id,
       operationTitle: metadata.title,
       error,
