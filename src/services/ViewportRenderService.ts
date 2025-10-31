@@ -8,12 +8,15 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
+import { MathUtils } from 'three';
 import { NodeBase } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager } from '@/core/SceneManager';
+import { OperationService } from '@/services/OperationService';
 import { appState } from '@/state';
 import { subscribe } from 'valtio/vanilla';
+import { TransformCompleteOperation, type TransformState } from '@/features/properties/TransformCompleteOperation';
 
 export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 
@@ -21,6 +24,9 @@ export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 export class ViewportRendererService {
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
+
+  @inject(OperationService)
+  private readonly operationService!: OperationService;
 
   private renderer?: THREE.WebGLRenderer;
   private scene?: THREE.Scene;
@@ -33,6 +39,7 @@ export class ViewportRendererService {
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
   private animationId?: number;
   private disposers: Array<() => void> = [];
+  private transformStartStates = new Map<string, { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }>();
   private lastActiveSceneId: string | null = null;
 
   constructor() {}
@@ -87,11 +94,21 @@ export class ViewportRendererService {
       if (this.orbitControls) {
         this.orbitControls.enabled = !event.value;
       }
+      
+      // Track transform start state when dragging begins
+      if (event.value && this.transformControls?.object) {
+        this.captureTransformStartState(this.transformControls.object);
+      }
     });
 
     // Update selection box when transform control object changes
     this.transformControls.addEventListener('objectChange', () => {
       this.updateSelectionBoxes();
+    });
+
+    // Handle transform completion (when mouse is released)
+    this.transformControls.addEventListener('mouseUp', () => {
+      this.handleTransformCompleted();
     });
 
     // Start render loop
@@ -439,6 +456,80 @@ export class ViewportRendererService {
     };
 
     render();
+  }
+
+  private captureTransformStartState(obj: THREE.Object3D): void {
+    if (!(obj instanceof Node3D)) {
+      return;
+    }
+
+    const nodeId = obj.nodeId;
+    this.transformStartStates.set(nodeId, {
+      position: obj.position.clone(),
+      rotation: obj.rotation.clone(),
+      scale: obj.scale.clone(),
+    });
+  }
+
+  private async handleTransformCompleted(): Promise<void> {
+    if (!this.transformControls?.object || !(this.transformControls.object instanceof Node3D)) {
+      this.transformStartStates.clear();
+      return;
+    }
+
+    const node = this.transformControls.object;
+    const nodeId = node.nodeId;
+    const startState = this.transformStartStates.get(nodeId);
+
+    if (!startState) {
+      this.transformStartStates.clear();
+      return;
+    }
+
+    try {
+      // Build current state
+      const currentState: TransformState = {
+        position: {
+          x: node.position.x,
+          y: node.position.y,
+          z: node.position.z,
+        },
+        rotation: {
+          x: MathUtils.radToDeg(node.rotation.x),
+          y: MathUtils.radToDeg(node.rotation.y),
+          z: MathUtils.radToDeg(node.rotation.z),
+        },
+        scale: {
+          x: node.scale.x,
+          y: node.scale.y,
+          z: node.scale.z,
+        },
+      };
+
+      // Convert start state rotation to degrees for comparison
+      const previousState: TransformState = {
+        position: startState.position,
+        rotation: {
+          x: MathUtils.radToDeg(startState.rotation.x),
+          y: MathUtils.radToDeg(startState.rotation.y),
+          z: MathUtils.radToDeg(startState.rotation.z),
+        },
+        scale: startState.scale,
+      };
+
+      // Create and push transform operation with before/after states
+      const operation = new TransformCompleteOperation({
+        nodeId,
+        previousState,
+        currentState,
+      });
+
+      await this.operationService.invokeAndPush(operation);
+    } catch (error) {
+      console.error('[ViewportRenderer] Error handling transform completion:', error);
+    } finally {
+      this.transformStartStates.clear();
+    }
   }
 
   dispose(): void {
