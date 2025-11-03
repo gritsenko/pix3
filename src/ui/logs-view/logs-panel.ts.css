@@ -1,0 +1,165 @@
+.logs-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 12px;
+  background-color: #1e1e1e;
+  color: #d4d4d4;
+}
+
+.logs-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #3e3e42;
+  background-color: #252526;
+  flex-shrink: 0;
+}
+
+.logs-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.level-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.level-toggle input[type='checkbox'] {
+  cursor: pointer;
+}
+
+.level-toggle label {
+  cursor: pointer;
+  font-weight: 500;
+  user-select: none;
+}
+
+.level-toggle.debug label {
+  color: #858585;
+}
+
+.level-toggle.info label {
+  color: #4ec9b0;
+}
+
+.level-toggle.warn label {
+  color: #ce9178;
+}
+
+.level-toggle.error label {
+  color: #f48771;
+}
+
+.clear-btn {
+  padding: 4px 8px;
+  background-color: #3e3e42;
+  border: 1px solid #555;
+  border-radius: 3px;
+  color: #d4d4d4;
+  cursor: pointer;
+  font-size: 11px;
+  transition: background-color 0.2s;
+  margin-left: auto;
+}
+
+.clear-btn:hover {
+  background-color: #4e4e52;
+}
+
+.logs-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 0;
+}
+
+.logs-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.log-entry {
+  padding: 4px 12px;
+  border-bottom: 1px solid #2d2d30;
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  line-height: 1.4;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.log-entry:hover {
+  background-color: #2d2d30;
+}
+
+.log-entry.debug {
+  color: #858585;
+}
+
+.log-entry.info {
+  color: #4ec9b0;
+}
+
+.log-entry.warn {
+  color: #ce9178;
+}
+
+.log-entry.error {
+  color: #f48771;
+}
+
+.log-level {
+  flex-shrink: 0;
+  width: 40px;
+  font-weight: bold;
+  text-align: left;
+}
+
+.log-message {
+  flex: 1;
+  word-break: break-word;
+}
+
+.log-timestamp {
+  flex-shrink: 0;
+  width: 80px;
+  text-align: right;
+  font-size: 10px;
+  color: #858585;
+}
+
+.logs-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #858585;
+  font-style: italic;
+}
+
+/* Scrollbar styling */
+.logs-content::-webkit-scrollbar {
+  width: 12px;
+}
+
+.logs-content::-webkit-scrollbar-track {
+  background: #1e1e1e;
+}
+
+.logs-content::-webkit-scrollbar-thumb {
+  background: #424242;
+  border-radius: 6px;
+}
+
+.logs-content::-webkit-scrollbar-thumb:hover {
+  background: #4e4e52;
+}
