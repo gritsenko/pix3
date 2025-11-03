@@ -4,6 +4,7 @@ import styles from './viewport-panel.ts.css?raw';
 import { ViewportRendererService, type TransformMode } from '@/services/ViewportRenderService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
+import renderTransformToolbar from './transform-toolbar';
 
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
@@ -105,46 +106,12 @@ export class ViewportPanel extends ComponentBase {
         <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>
         <div class="overlay" aria-hidden="true">
           <!-- Transform Toolbar -->
-          <div class="toolbar-overlay">${this.renderTransformToolbar()}</div>
+          <div class="toolbar-overlay">${renderTransformToolbar(this.transformMode, (m) => this.handleTransformModeChange(m))}</div>
         </div>
       </section>
     `;
   }
-
-  private renderTransformToolbar() {
-    const transformModes: Array<{ mode: TransformMode; icon: string; label: string; key: string }> =
-      [
-        { mode: 'select', icon: '↖', label: 'Select (Q)', key: 'Q' },
-        { mode: 'translate', icon: '↔', label: 'Move (W)', key: 'W' },
-        { mode: 'rotate', icon: '⟳', label: 'Rotate (E)', key: 'E' },
-        { mode: 'scale', icon: '⤢', label: 'Scale (R)', key: 'R' },
-      ];
-
-    return html`
-      <div class="transform-toolbar" stop-propagation>
-        ${transformModes.map(
-          ({ mode, icon, label }) => html`
-            <button
-              class="toolbar-button ${this.transformMode === mode ? 'toolbar-button--active' : ''}"
-              
-              @pointerup=${(e: PointerEvent) => {
-                e.stopPropagation();
-              }}
-
-              @click=${(e: PointerEvent) => {
-                e.stopPropagation();
-                this.handleTransformModeChange(mode);
-              }}
-              title=${label}
-              aria-label=${label}
-            >
-              ${icon}
-            </button>
-          `
-        )}
-      </div>
-    `;
-  }
+ 
 
   private syncViewportScene(): void {
     // Renderer now auto-attaches active scene via subscription; nothing to do here

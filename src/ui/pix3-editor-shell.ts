@@ -6,6 +6,7 @@ import { OperationService } from '@/services/OperationService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { appState } from '@/state';
+import { ProjectService } from '@/services';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './welcome/pix3-welcome';
@@ -16,6 +17,9 @@ import './pix3-editor-shell.ts.css';
 export class Pix3EditorShell extends ComponentBase {
   @inject(LayoutManagerService)
   private readonly layoutManager!: LayoutManagerService;
+
+  @inject(ProjectService)
+  private readonly projectService!: ProjectService;
 
   @inject(OperationService)
   private readonly operationService!: OperationService;
@@ -50,6 +54,15 @@ export class Pix3EditorShell extends ComponentBase {
     subscribe(appState.project, () => {
       // if project becomes ready and layout has not been initialized, initialize it
       if (appState.project.status === 'ready') {
+        // ensure URL reflects editor state so HMR / page reload keeps us in the editor
+        try {
+          if (typeof window !== 'undefined' && window.location.hash !== '#editor') {
+            // Use replaceState to avoid creating extra history entries during normal opens
+            history.replaceState(null, '', '#editor');
+          }
+        } catch {
+          // ignore
+        }
         const host = this.renderRoot.querySelector<HTMLDivElement>('.layout-host');
         if (host && !this.shellReady) {
           void this.layoutManager.initialize(host).then(() => {
@@ -69,6 +82,25 @@ export class Pix3EditorShell extends ComponentBase {
         }
       }
     });
+
+    // If the app was reloaded (HMR) and the URL indicates the editor, try to auto-open
+    // the most recent project so the shell will initialize and avoid showing the welcome UI.
+    try {
+      if (typeof window !== 'undefined' && window.location.hash === '#editor') {
+        // If a project is not already open, attempt to open the most recent one (best-effort).
+        if (appState.project.status !== 'ready') {
+          const recents = this.projectService.getRecentProjects();
+          if (recents && recents.length > 0) {
+            // Don't block the UI; attempt to open the most recent project in background.
+            void this.projectService.openRecentProject(recents[0]).catch(() => {
+              // If auto-open fails (permission denied or no handle), we'll keep showing welcome.
+            });
+          }
+        }
+      }
+    } catch {
+      // ignore environment where window/history isn't available
+    }
 
     // Listen for the welcome component signaling that project is ready so
     // the shell can remove it from the DOM and proceed with layout initialization.
@@ -190,46 +222,17 @@ export class Pix3EditorShell extends ComponentBase {
   private renderToolbar() {
     return html`
       <pix3-toolbar aria-label="Editor toolbar">
-        <div class="toolbar-content">
-          <!-- Layout presets removed: layout defaults to the gameplay engineer configuration -->
+        <div class="toolbar-start">
+        <span slot="actions" class="product-title" role="heading" aria-level="1"> 
+          Pix3 
+        </span>
         </div>
-        <span slot="actions" class="product-title" role="heading" aria-level="1"> Pix3 </span>
-        <pix3-toolbar-button
-          slot="actions"
-          aria-label="Open command palette"
-          @click=${this.onCommandPaletteRequest}
-        >
-          Palette
-        </pix3-toolbar-button>
-        <pix3-toolbar-button
-          slot="actions"
-          aria-label="Reset editor layout"
-          ?disabled=${!this.isLayoutReady}
-          @click=${this.onLayoutResetRequest}
-        >
-          Layout
-        </pix3-toolbar-button>
+        <div class="toolbar-content">
+          <span > Project: ${appState.project.projectName} </span>
+        </div>
       </pix3-toolbar>
     `;
   }
-
-  private onCommandPaletteRequest = (): void => {
-    this.dispatchEvent(
-      new CustomEvent('pix3-command-palette-requested', {
-        bubbles: true,
-        composed: true,
-        detail: { source: 'shell-toolbar' },
-      })
-    );
-  };
-
-  private onLayoutResetRequest = (): void => {
-    void this.layoutManager.resetLayout();
-  };
-
-  // Note: project open is handled by <pix3-welcome> to keep shell concerns minimal.
-
-  // layout presets removed; editor uses single default layout
 }
 
 declare global {
