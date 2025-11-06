@@ -2,6 +2,36 @@
    load them as a separate asset. The selectors reference the host element
    by tag name to emulate the previous :host rules. */
 
+@keyframes logoBounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.95);
+  }
+  85% {
+    transform: scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes backgroundFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
 pix3-welcome {
   display: block;
   position: relative;
@@ -15,41 +45,104 @@ pix3-welcome {
   height: 100%;
   z-index: 99999;
   pointer-events: auto;
+  background-image: url('/splash.jpg');
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  animation: backgroundFadeIn 1.2s ease-out forwards;
+  animation-delay: 0.5s;
+  opacity: 0;
 }
 .welcome-card {
-  background: rgba(24, 28, 34, 0.96);
-  padding: 1.25rem 1.5rem;
-  border-radius: 0.6rem;
-  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.6);
-  max-width: 36rem;
+  background: rgba(24, 28, 34, 0.6);
+  padding: 3rem 2.5rem;
+  border-radius: 1rem;
+  /* box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8); */
+  max-width: 50rem;
   color: #f7fafc;
   pointer-events: auto;
+  text-align: center;
+  /* blur */
+  backdrop-filter: blur(4px);
 }
-.welcome-card h2 {
-  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
-  margin: 0 0 0.25rem 0;
+.welcome-header {
+  margin-bottom: 2rem;
 }
-.welcome-card h3 {
-  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
-  margin: 0.5rem 0 0.25rem 0;
+.welcome-logo {
+  max-width: 230px;
+  height: auto;
+  display: block;
+  margin: 0 auto 1rem auto;
+  animation: logoBounceIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
-.welcome-card p {
-  margin: 0 0 1rem 0;
-  color: rgba(247, 250, 252, 0.78);
+
+.welcome-actions-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  margin-bottom: 2rem;
 }
-.open-btn {
-  background: linear-gradient(180deg, #4fb3ff, #1f9aff);
-  color: #06202b;
-  border: none;
-  padding: 0.5rem 0.85rem;
-  border-radius: 0.4rem;
+.action-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  aspect-ratio: auto;
+  height: 120px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(79, 179, 255, 0.3);
+  border-radius: 0.8rem;
   cursor: pointer;
-  font-weight: 700;
+  color: #f7fafc;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
   pointer-events: auto;
+  padding: 1rem;
+}
+.action-btn:hover {
+  background: rgba(79, 179, 255, 0.15);
+  border-color: rgba(79, 179, 255, 0.5);
+  box-shadow: 0 0 20px rgba(79, 179, 255, 0.2);
+}
+.action-btn:active {
+  transform: scale(0.98);
+}
+.action-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  color: rgba(79, 179, 255, 0.8);
+}
+.action-label {
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.3;
 }
 .recent-list {
-  margin-top: 1rem;
+  margin-top: 2rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
   color: rgba(247, 250, 252, 0.7);
+}
+.recent-list h3 {
+  font-family: 'Inter', 'SF Pro Text', 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(247, 250, 252, 0.8);
 }
 .recent-list ul {
   list-style: none;
@@ -61,48 +154,58 @@ pix3-welcome {
 .recent-item {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.8rem;
   width: 100%;
-  background: transparent;
-  border: none;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   color: inherit;
   text-align: left;
-  padding: 0.45rem;
-  border-radius: 0.35rem;
+  padding: 0.75rem;
+  border-radius: 0.5rem;
   cursor: pointer;
   pointer-events: auto;
+  transition: all 0.2s ease;
+  font-size: 0.9rem;
+  font-weight: 500;
 }
 .recent-item:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(79, 179, 255, 0.15);
+  border-color: rgba(79, 179, 255, 0.3);
 }
 .folder-icon {
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
+  color: rgba(79, 179, 255, 0.8);
 }
 .recent-name {
   flex: 1;
   font-weight: 600;
+  color: #f7fafc;
 }
 .recent-time {
-  color: rgba(247, 250, 252, 0.6);
-  font-size: 0.85rem;
+  color: rgba(247, 250, 252, 0.5);
+  font-size: 0.8rem;
 }
 .recent-remove {
   background: transparent;
   border: none;
-  padding: 0.25rem;
-  margin-left: 0.25rem;
+  padding: 0.5rem;
+  margin-left: 0.5rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 0.25rem;
+  border-radius: 0.35rem;
   cursor: pointer;
-  color: inherit;
+  color: rgba(247, 250, 252, 0.6);
+  transition: all 0.2s ease;
+  flex-shrink: 0;
 }
 .recent-remove:hover {
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.1);
+  color: #f7fafc;
 }
 .recent-remove:focus {
-  outline: 2px solid rgba(99, 102, 241, 0.6);
+  outline: 2px solid rgba(79, 179, 255, 0.6);
   outline-offset: 2px;
 }

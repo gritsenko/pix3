@@ -133,10 +133,23 @@ export class Pix3Welcome extends ComponentBase {
     return html`
       <div class="welcome-root" role="region" aria-label="Welcome">
         <div class="welcome-card">
-          <h2>Welcome to Pix3</h2>
-          <p>Open a project folder to get started.</p>
-          <div class="welcome-actions">
-            <button @click=${this.onOpen} class="open-btn">Open folder</button>
+          <div class="welcome-header">
+            <img src="/splash-logo.png" alt="Pix3" class="welcome-logo" />
+          </div>
+
+          <div class="welcome-actions-grid">
+            <div class="action-column">
+              <button @click=${this.onOpen} class="action-btn">
+                <span class="action-icon">${this.folderSvg()}</span>
+                <span class="action-label">Open Project</span>
+              </button>
+            </div>
+            <div class="action-column">
+              <button class="action-btn">
+                <span class="action-icon">${this.plusSvg()}</span>
+                <span class="action-label">Start New Project</span>
+              </button>
+            </div>
           </div>
 
           ${this.recents.length
@@ -174,6 +187,21 @@ export class Pix3Welcome extends ComponentBase {
         </div>
       </div>
     `;
+  }
+
+  private plusSvg() {
+    return html`<svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden
+    >
+      <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5" />
+      <path d="M10 6V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      <path d="M6 10H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+    </svg>`;
   }
 
   private folderSvg() {
