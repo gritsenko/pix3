@@ -1,0 +1,125 @@
+.main-menu {
+  position: relative;
+  display: inline-block;
+}
+
+.pix3-menu-portal {
+  all: unset;
+  position: fixed;
+  z-index: 999999;
+}
+
+.menu-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  height: 32px;
+  padding: 0 8px;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.2s ease;
+}
+
+.menu-trigger:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.menu-trigger:active,
+.menu-trigger[aria-expanded="true"] {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
+.menu-logo {
+  height: 28px;
+  width: auto;
+  object-fit: contain;
+}
+
+.menu-dropdown {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  z-index: 999999;
+  min-width: 200px;
+  overflow: hidden;
+}
+
+.menu-section {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.menu-section:first-child {
+  padding-top: 8px;
+}
+
+.menu-section:last-child {
+  padding-bottom: 8px;
+}
+
+.section-label {
+  padding: 8px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: #6b7280;
+  user-select: none;
+}
+
+.section-items {
+  display: flex;
+  flex-direction: column;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: #1f2937;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.menu-item:hover:not(.menu-item--disabled) {
+  background-color: #f3f4f6;
+}
+
+.menu-item:active:not(.menu-item--disabled) {
+  background-color: #e5e7eb;
+}
+
+.menu-item--disabled {
+  color: #d1d5db;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.menu-item-label {
+  flex: 1;
+  text-align: left;
+}
+
+.menu-item-shortcut {
+  margin-left: 12px;
+  font-size: 12px;
+  color: #9ca3af;
+  white-space: nowrap;
+}
+
+.menu-divider {
+  height: 1px;
+  background-color: #e5e7eb;
+  margin: 4px 0;
+}

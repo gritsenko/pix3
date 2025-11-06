@@ -9,6 +9,7 @@ import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
+import './shared/pix3-main-menu';
 import './welcome/pix3-welcome';
 import './logs-view/logs-panel';
 import './pix3-editor-shell.ts.css';
@@ -223,12 +224,10 @@ export class Pix3EditorShell extends ComponentBase {
     return html`
       <pix3-toolbar aria-label="Editor toolbar">
         <div class="toolbar-start">
-        <span slot="actions" class="product-title" role="heading" aria-level="1"> 
-          Pix3 
-        </span>
+          <pix3-main-menu slot="actions"></pix3-main-menu>
         </div>
         <div class="toolbar-content">
-          <span > Project: ${appState.project.projectName} </span>
+          <span> Project: ${appState.project.projectName} </span>
         </div>
       </pix3-toolbar>
     `;
