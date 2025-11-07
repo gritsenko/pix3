@@ -185,6 +185,7 @@ src/
 8. **Light DOM by default** — use shadow DOM only when explicitly needed
 9. **Singleton services** — register with ServiceContainer, implement dispose()
 10. **Cross-reference specification** — check `docs/pix3-specification.md` for architectural decisions
+11. **Avoid bloat documentation** — Do NOT create detailed changelog or bloat MD files. Project is still in prototype stage. Only update existing docs (README.md, AGENTS.md, architecture.md, pix3-specification.md). Keep documentation minimal and focused on active development.
 
 Always verify architectural decisions against the specification before implementing features.
 
@@ -193,6 +194,13 @@ Always verify architectural decisions against the specification before implement
 ### Dev Server
 - The development server is always started manually by the developer on `localhost:5173`.
 - Agents must not attempt to start the dev server themselves.
+
+### Command-Driven Menu System
+- Commands opt into the menu via metadata properties: `menuPath`, `shortcut`, `addToMenu`
+- Register commands with `CommandRegistry` in editor shell at app startup
+- Menu is generated automatically from registered commands — no hardcoded menu structure
+- To add a command to menu: set metadata properties and register with registry
+- Menu items execute commands through `CommandDispatcher` for consistent lifecycle
 
 ### Browser Interaction
 - Agents can use the `#browsermcp` MCP server to navigate pages, read logs and make screenshots.

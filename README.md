@@ -181,6 +181,56 @@ src/
 - `[component].ts.css` - Component styles
 - `index.ts` - Barrel exports
 
+## 🎯 Command-Driven Menu System
+
+The menu is generated from registered commands with metadata. Commands opt-in via `addToMenu: true` property.
+
+### Command Metadata Properties
+```typescript
+interface CommandMetadata {
+  id: CommandId;                    // Unique identifier
+  title: string;                    // Display label
+  menuPath?: string;                // Menu section ('edit', 'file', 'view', 'help')
+  shortcut?: string;                // Display shortcut ('⌘Z', 'Ctrl+S')
+  addToMenu?: boolean;              // Include in main menu
+  menuOrder?: number;               // Sort order (lower = earlier; default: registration order)
+  // ... other properties
+}
+```
+
+### Adding a Command to Menu
+
+1. **Set metadata properties**:
+   ```typescript
+   readonly metadata: CommandMetadata = {
+     id: 'file.new',
+     title: 'New Project',
+     menuPath: 'file',
+     shortcut: '⌘N',
+     addToMenu: true,
+     menuOrder: 0,  // Optional: controls sort order
+   };
+   ```
+
+2. **Register in editor shell** (`src/ui/pix3-editor-shell.ts`):
+   ```typescript
+   this.commandRegistry.register(new NewProjectCommand(dependencies));
+   ```
+
+3. **Menu updates automatically** — no component changes needed
+
+### Menu Item Ordering
+- Items in each menu section are sorted by `menuOrder` first
+- Commands without `menuOrder` are sorted by registration order
+- This ensures consistent menu layouts regardless of registration order
+- Example: Undo (`menuOrder: 0`) always appears before Redo (`menuOrder: 1`)
+
+### Current Implementation
+- Undo/Redo commands with menu metadata and shortcuts
+- CommandRegistry service manages registration and menu building
+- Pix3MainMenu generates sections from registered commands
+- Menu items execute commands via CommandDispatcher
+
 ## 🧪 Testing & Quality
 
 - **Unit Tests**: Vitest for command logic, services, and utilities

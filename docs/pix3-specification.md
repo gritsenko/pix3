@@ -72,6 +72,7 @@ The application will be built on the principles of unidirectional data flow and 
 - **Operations**: First-class objects encapsulating business logic and state mutations. The `OperationService` is the gateway for executing operations, but all actions must be initiated via **Commands** through the `CommandDispatcher` Service.
 - **Commands**: Thin wrappers that validate context (`preconditions()`) and invoke operations via `OperationService`. Commands are registered and discovered via metadata for the command palette. Commands never implement their own undo/redo.
 - **CommandDispatcher**: Primary entry point for all user actions. Ensures consistent lifecycle management, preconditions checking, and telemetry for all commands.
+- **Command Metadata**: Commands declare menu integration via metadata properties: `menuPath` (menu section), `shortcut` (display), and `addToMenu` (inclusion flag). Menu is generated from registered commands, not hardcoded.
 - **Core Managers**: Classes that orchestrate the main aspects of the editor (HistoryManager, SceneManager, LayoutManager). They manage their respective domains and emit events.
 - **Services**: Infrastructure layer for interacting with the outside world (FileSystemAPIService, ViewportRenderService). They implement `dispose()` and are registered with DI.
 - **UI Components**: "Dumb" components extending `ComponentBase` from `src/fw`. They subscribe to state changes, render based on snapshots, and dispatch commands via CommandDispatcher rather than mutating state directly.

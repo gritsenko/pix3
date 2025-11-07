@@ -1,23 +1,16 @@
-import { ComponentBase, customElement, html, state, unsafeCSS } from '@/fw';
+import { ComponentBase, customElement, html, inject, state, unsafeCSS } from '@/fw';
+import { CommandRegistry, type MenuSection } from '@/services/CommandRegistry';
+import { CommandDispatcher } from '@/services/CommandDispatcher';
 import styles from './pix3-main-menu.ts.css?raw';
-
-export interface MenuSection {
-  id: string;
-  label: string;
-  items: MenuItem[];
-}
-
-export interface MenuItem {
-  id: string;
-  label: string;
-  icon?: string;
-  disabled?: boolean;
-  divider?: boolean;
-  shortcut?: string;
-}
 
 @customElement('pix3-main-menu')
 export class Pix3MainMenu extends ComponentBase {
+  @inject(CommandRegistry)
+  private readonly commandRegistry!: CommandRegistry;
+
+  @inject(CommandDispatcher)
+  private readonly commandDispatcher!: CommandDispatcher;
+
   // Use light DOM (default) to avoid clipping issues with absolutely positioned dropdowns
   @state()
   private activeSection: string | null = null;
@@ -25,56 +18,15 @@ export class Pix3MainMenu extends ComponentBase {
   @state()
   private menuOpenedByClick = false;
 
-  private menuSections: MenuSection[] = [
-    {
-      id: 'file',
-      label: 'File',
-      items: [
-        { id: 'new', label: 'New Project', shortcut: '⌘N' },
-        { id: 'open', label: 'Open Project', shortcut: '⌘O' },
-        { id: 'recent', label: 'Recent Projects' },
-        { divider: true, id: 'file-divider-1', label: '' },
-        { id: 'save', label: 'Save', shortcut: '⌘S' },
-        { id: 'save-as', label: 'Save As...', shortcut: '⌘⇧S' },
-        { divider: true, id: 'file-divider-2', label: '' },
-        { id: 'close', label: 'Close Project' },
-      ],
-    },
-    {
-      id: 'edit',
-      label: 'Edit',
-      items: [
-        { id: 'undo', label: 'Undo', shortcut: '⌘Z' },
-        { id: 'redo', label: 'Redo', shortcut: '⌘⇧Z' },
-        { divider: true, id: 'edit-divider-1', label: '' },
-        { id: 'cut', label: 'Cut', shortcut: '⌘X' },
-        { id: 'copy', label: 'Copy', shortcut: '⌘C' },
-        { id: 'paste', label: 'Paste', shortcut: '⌘V' },
-      ],
-    },
-    {
-      id: 'view',
-      label: 'View',
-      items: [
-        { id: 'zoom-in', label: 'Zoom In', shortcut: '⌘+' },
-        { id: 'zoom-out', label: 'Zoom Out', shortcut: '⌘-' },
-        { id: 'zoom-reset', label: 'Reset Zoom', shortcut: '⌘0' },
-      ],
-    },
-    {
-      id: 'help',
-      label: 'Help',
-      items: [
-        { id: 'docs', label: 'Documentation' },
-        { id: 'about', label: 'About Pix3' },
-      ],
-    },
-  ];
+  @state()
+  private menuSections: MenuSection[] = [];
 
   private portalElement: HTMLElement | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
+    // Load menu sections from registry
+    this.menuSections = this.commandRegistry.buildMenuSections();
     document.addEventListener('click', this.handleDocumentClick);
   }
 
@@ -171,17 +123,15 @@ export class Pix3MainMenu extends ComponentBase {
             ${section.items
               .map(
                 item =>
-                  item.divider
-                    ? `<div class="menu-divider" role="separator"></div>`
-                    : `<button
-                        role="menuitem"
-                        class="menu-item ${item.disabled ? 'menu-item--disabled' : ''}"
-                        ${item.disabled ? 'disabled' : ''}
-                        data-menu-item="${item.id}"
-                      >
-                        <span class="menu-item-label">${item.label}</span>
-                        ${item.shortcut ? `<span class="menu-item-shortcut">${item.shortcut}</span>` : ''}
-                      </button>`
+                  `<button
+                      role="menuitem"
+                      class="menu-item"
+                      data-menu-item="${item.id}"
+                      data-command-id="${item.commandId}"
+                    >
+                      <span class="menu-item-label">${item.label}</span>
+                      ${item.shortcut ? `<span class="menu-item-shortcut">${item.shortcut}</span>` : ''}
+                    </button>`
               )
               .join('')}
           </div>
@@ -193,14 +143,15 @@ export class Pix3MainMenu extends ComponentBase {
   private attachPortalEventListeners(): void {
     if (!this.portalElement) return;
 
-    const menuItems = this.portalElement.querySelectorAll<HTMLElement>('.menu-item:not([disabled])');
+    const menuItems = this.portalElement.querySelectorAll<HTMLElement>('.menu-item');
     menuItems.forEach(item => {
       item.addEventListener('click', e => {
         e.preventDefault();
         e.stopPropagation();
-        const itemId = item.getAttribute('data-menu-item');
-        if (itemId) {
-          this.selectMenuItem(itemId);
+        const menuItemId = item.getAttribute('data-menu-item');
+        const commandId = item.getAttribute('data-command-id');
+        if (menuItemId && commandId) {
+          void this.executeMenuItem(commandId);
         }
       });
     });
@@ -214,7 +165,16 @@ export class Pix3MainMenu extends ComponentBase {
         }
       });
     }
-  };
+  }
+
+  private async executeMenuItem(commandId: string): Promise<void> {
+    const command = this.commandRegistry.getCommand(commandId);
+    if (command) {
+      await this.commandDispatcher.execute(command);
+    }
+    this.activeSection = null;
+    this.menuOpenedByClick = false;
+  }
 
   private handleDocumentClick = (event: MouseEvent) => {
     const target = event.target as Node;
@@ -242,18 +202,6 @@ export class Pix3MainMenu extends ComponentBase {
       this.activeSection = null;
     }
   };
-
-  private selectMenuItem = (itemId: string) => {
-    this.dispatchEvent(
-      new CustomEvent('menu-item-select', {
-        detail: { itemId },
-        bubbles: true,
-        composed: true,
-      })
-    );
-    this.activeSection = null;
-    this.menuOpenedByClick = false;
-  }
 
   private handleKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {

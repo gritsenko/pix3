@@ -13,6 +13,10 @@ export class RedoCommand extends CommandBase<void, void> {
     title: 'Redo',
     description: 'Redo the last undone action',
     keywords: ['redo', 'history'],
+    menuPath: 'edit',
+    shortcut: '⌘⇧Z',
+    addToMenu: true,
+    menuOrder: 1,
   };
 
   private readonly operations: OperationService;

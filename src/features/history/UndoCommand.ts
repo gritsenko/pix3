@@ -13,6 +13,10 @@ export class UndoCommand extends CommandBase<void, void> {
     title: 'Undo',
     description: 'Undo the last action',
     keywords: ['undo', 'revert', 'history'],
+    menuPath: 'edit',
+    shortcut: '⌘Z',
+    addToMenu: true,
+    menuOrder: 0,
   };
 
   private readonly operations: OperationService;

@@ -4,7 +4,10 @@ import { ComponentBase, customElement, html, inject, property, state } from '@/f
 import { LayoutManagerService } from '@/core/LayoutManager';
 import { OperationService } from '@/services/OperationService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { CommandRegistry } from '@/services/CommandRegistry';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
+import { UndoCommand } from '@/features/history/UndoCommand';
+import { RedoCommand } from '@/features/history/RedoCommand';
 import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import './shared/pix3-toolbar';
@@ -28,6 +31,9 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
 
+  @inject(CommandRegistry)
+  private readonly commandRegistry!: CommandRegistry;
+
   // project open handled by <pix3-welcome>
 
   @state()
@@ -42,6 +48,11 @@ export class Pix3EditorShell extends ComponentBase {
 
   connectedCallback(): void {
     super.connectedCallback();
+
+    // Register history commands
+    const undoCommand = new UndoCommand(this.operationService);
+    const redoCommand = new RedoCommand(this.operationService);
+    this.commandRegistry.registerMany(undoCommand, redoCommand);
 
     // Setup keyboard shortcuts
     this.keyboardHandler = this.handleKeyboardShortcuts.bind(this);

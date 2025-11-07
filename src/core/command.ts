@@ -21,6 +21,25 @@ export interface CommandMetadata {
   readonly title: string;
   readonly description?: string;
   readonly keywords?: readonly string[];
+  /**
+   * Menu path for grouping in the app menu (e.g., 'edit' for Edit menu).
+   * Commands with this property and addToMenu=true will appear in the main menu.
+   */
+  readonly menuPath?: string;
+  /**
+   * Keyboard shortcut display string (e.g., '⌘Z', 'Ctrl+Z').
+   * Used to display shortcuts in menus; actual key handling is separate.
+   */
+  readonly shortcut?: string;
+  /**
+   * Flag to indicate this command should be added to the main menu.
+   */
+  readonly addToMenu?: boolean;
+  /**
+   * Menu item sort order within its section. Lower values appear first.
+   * If not specified, registration order is used.
+   */
+  readonly menuOrder?: number;
 }
 
 /**
