@@ -2,9 +2,11 @@ import { ComponentBase, customElement, html, inject, property, state } from '@/f
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
 import feather from 'feather-icons';
+import { subscribe } from 'valtio/vanilla';
 import type { FileDescriptor } from '@/services/FileSystemAPIService';
 import { ProjectService } from '@/services/ProjectService';
 import { ResourceManager } from '@/services/ResourceManager';
+import { appState } from '@/state';
 import './asset-tree.ts.css';
 
 type Node = {
@@ -33,8 +35,29 @@ export class AssetTree extends ComponentBase {
   @state()
   private selectedPath: string | null = null;
 
+  private disposeSubscription?: () => void;
+
   protected async firstUpdated(): Promise<void> {
     await this.loadRoot();
+    // Subscribe to project file refresh signal
+    this.disposeSubscription = subscribe(appState.project, async () => {
+      const modifiedDir = appState.project.lastModifiedDirectoryPath;
+      console.debug('[AssetTree] Project file refresh signal received', {
+        modifiedDirectory: modifiedDir,
+      });
+      if (modifiedDir) {
+        // Refresh only the affected directory
+        await this.refreshDirectory(modifiedDir);
+      } else {
+        // If no specific directory indicated, refresh root
+        await this.loadRoot();
+      }
+    });
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+    this.disposeSubscription?.();
   }
 
   private async listDirectory(path: string): Promise<FileDescriptor[]> {
@@ -59,6 +82,49 @@ export class AssetTree extends ComponentBase {
           Number(b.kind === 'directory') - Number(a.kind === 'directory') ||
           a.name.localeCompare(b.name)
       );
+  }
+
+  private async refreshDirectory(targetPath: string): Promise<void> {
+    // Find and refresh only the specific directory node
+    const refreshNode = async (nodes: Node[]): Promise<boolean> => {
+      for (const node of nodes) {
+        if (node.path === targetPath && node.kind === 'directory') {
+          // Reload this directory's children
+          console.debug('[AssetTree] Refreshing directory', { path: targetPath });
+          const entries = await this.listDirectory(node.path);
+          node.children = entries
+            .map(e => ({
+              name: e.name,
+              path: e.path,
+              kind: e.kind,
+              children: e.kind === 'directory' ? null : [],
+            }))
+            .sort(
+              (a, b) =>
+                Number(b.kind === 'directory') - Number(a.kind === 'directory') ||
+                a.name.localeCompare(b.name)
+            );
+          // Trigger update
+          this.tree = [...this.tree];
+          return true;
+        }
+        // Recursively search in children
+        if (node.children && node.children.length > 0) {
+          if (await refreshNode(node.children)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    };
+
+    const found = await refreshNode(this.tree);
+    if (!found) {
+      console.debug('[AssetTree] Directory not found in tree, refreshing root', {
+        targetPath,
+      });
+      await this.loadRoot();
+    }
   }
 
   private async expandNode(node: Node): Promise<void> {

@@ -50,6 +50,10 @@ export interface ProjectState {
   recentProjects: string[];
   /** Last opened scene file relative to the project root. */
   lastOpenedScenePath: string | null;
+  /** Signal counter incremented when project files change (triggers asset explorer refresh). */
+  fileRefreshSignal: number;
+  /** Directory path that was modified (e.g., 'Scenes' or 'Assets'). Used to refresh only affected folders. */
+  lastModifiedDirectoryPath: string | null;
 }
 
 export interface SelectionState {
@@ -112,6 +116,8 @@ export const createInitialAppState = (): AppState => ({
     errorMessage: null,
     recentProjects: [],
     lastOpenedScenePath: null,
+    fileRefreshSignal: 0,
+    lastModifiedDirectoryPath: null,
   },
   scenes: {
     activeSceneId: null,

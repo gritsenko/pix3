@@ -352,6 +352,43 @@ export class FileSystemAPIService {
       throw this.normalizeError(error, `Failed to write file at ${path}`);
     }
   }
+
+  /**
+   * Check if a fileHandle is within the project directory.
+   * Uses isSameEntry API if available to verify containment.
+   */
+  async isHandleInProject(fileHandle: FileSystemFileHandle): Promise<boolean> {
+    try {
+      if (!this.directoryHandle) {
+        return false;
+      }
+
+      const projectDirWithEntries = this.directoryHandle as FileSystemDirectoryHandle & {
+        resolve?: (handle: FileSystemHandle) => Promise<string[]>;
+      };
+
+      if (projectDirWithEntries.resolve) {
+        try {
+          // resolve() returns the path from project root to the file
+          const pathSegments = await projectDirWithEntries.resolve(fileHandle);
+          console.debug('[FileSystemAPIService] File is within project', {
+            pathSegments,
+            isInProject: pathSegments && pathSegments.length > 0,
+          });
+          return !!(pathSegments && pathSegments.length > 0);
+        } catch (error) {
+          // resolve not supported or file is outside project
+          console.debug('[FileSystemAPIService] Unable to resolve file path relative to project', { error });
+          return false;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      console.debug('[FileSystemAPIService] Error checking if handle is in project', { error });
+      return false;
+    }
+  }
 }
 
 export const resolveFileSystemAPIService = (): FileSystemAPIService => {

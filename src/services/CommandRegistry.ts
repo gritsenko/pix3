@@ -93,8 +93,8 @@ export class CommandRegistry {
 
     // Convert map to MenuSection array with standard section labels
     const sectionLabels: Record<string, string> = {
-      edit: 'Edit',
       file: 'File',
+      edit: 'Edit',
       view: 'View',
       help: 'Help',
     };

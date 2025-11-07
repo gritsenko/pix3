@@ -1,0 +1,149 @@
+version: 1.0.0
+metadata:
+  author: Pix3 Auto Template
+  created: 2025-09-27
+  description: Starter scene with box, light, camera and logo sprite
+root:
+  - id: environment-root
+    type: Node3D
+    name: Environment Root
+    properties:
+      position:
+        - 0
+        - 0
+        - 0
+      rotation:
+        - 0
+        - 0
+        - 0
+      scale:
+        - 1
+        - 1
+        - 1
+    children:
+      - id: main-camera
+        type: Camera3D
+        name: Main Camera
+        properties:
+          projection: perspective
+          fov: 60
+          near: 0.1
+          far: 1000
+          position:
+            - 0
+            - 2
+            - 6
+          rotation:
+            - -10
+            - 0
+            - 0
+          scale:
+            - 1
+            - 1
+            - 1
+        children: []
+      - id: key-light
+        type: DirectionalLight
+        name: Key Light
+        properties:
+          intensity: 1.2
+          color: "#ffffff"
+          position:
+            - 5
+            - 8
+            - 3
+          rotation:
+            - -45
+            - 35
+            - 0
+          scale:
+            - 1
+            - 1
+            - 1
+        children: []
+      - id: demo-box
+        type: GeometryMesh
+        name: Demo Box
+        properties:
+          geometry: box
+          size:
+            - 1
+            - 1
+            - 1
+          material:
+            type: standard
+            color: "#ff00ff"
+          position:
+            - 0
+            - 0.5
+            - 0
+          rotation:
+            - 0
+            - 45
+            - 0
+          scale:
+            - 1
+            - 1
+            - 1
+        children: []
+      - id: demo-glb
+        type: MeshInstance
+        name: Demo Glb
+        properties:
+          src: templ://Duck.glb
+          size:
+            - 1
+            - 1
+            - 1
+          position:
+            - 0
+            - 0
+            - 0
+          rotation:
+            - 0
+            - 0
+            - 0
+          scale:
+            - 1
+            - 1
+            - 1
+        children: []
+  - id: ui-layer
+    type: Node2D
+    name: UI Layer
+    properties:
+      position:
+        - 0
+        - 0
+      scale:
+        - 1
+        - 1
+      rotation:
+        - 0
+        - 0
+        - 0
+        - XYZ
+    children:
+      - id: logo-sprite
+        type: Sprite2D
+        name: Logo Sprite
+        properties:
+          source: templ://pix3-logo.png
+          pivot:
+            - 0.5
+            - 0.5
+          size:
+            - 256
+            - 256
+          opacity: 1
+          position:
+            - 0
+            - 0
+          scale:
+            - 1
+            - 1
+          rotation:
+            - 0
+            - 0
+            - 0
+            - XYZ

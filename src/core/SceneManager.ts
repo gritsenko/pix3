@@ -1,5 +1,6 @@
 import { injectable, inject } from '@/fw/di';
 import { SceneLoader, type ParseSceneOptions } from './SceneLoader';
+import { SceneSaver } from './SceneSaver';
 import type { NodeBase } from '../nodes/NodeBase';
 
 export interface SceneGraph {
@@ -13,6 +14,7 @@ export interface SceneGraph {
 @injectable()
 export class SceneManager {
   @inject(SceneLoader) private readonly sceneLoader!: SceneLoader;
+  @inject(SceneSaver) private readonly sceneSaver!: SceneSaver;
 
   private readonly sceneGraphs = new Map<string, SceneGraph>();
   private activeSceneId: string | null = null;
@@ -21,6 +23,10 @@ export class SceneManager {
 
   async parseScene(sceneText: string, options: ParseSceneOptions = {}): Promise<SceneGraph> {
     return await this.sceneLoader.parseScene(sceneText, options);
+  }
+
+  serializeScene(graph: SceneGraph): string {
+    return this.sceneSaver.serializeScene(graph);
   }
 
   setActiveSceneGraph(sceneId: string, graph: SceneGraph): void {

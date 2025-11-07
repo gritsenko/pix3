@@ -6,6 +6,7 @@ import { OperationService } from '@/services/OperationService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { CommandRegistry } from '@/services/CommandRegistry';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
+import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
 import { UndoCommand } from '@/features/history/UndoCommand';
 import { RedoCommand } from '@/features/history/RedoCommand';
 import { appState } from '@/state';
@@ -49,10 +50,11 @@ export class Pix3EditorShell extends ComponentBase {
   connectedCallback(): void {
     super.connectedCallback();
 
-    // Register history commands
+    // Register history commands and scene commands
+    const saveAsCommand = new SaveAsSceneCommand();
     const undoCommand = new UndoCommand(this.operationService);
     const redoCommand = new RedoCommand(this.operationService);
-    this.commandRegistry.registerMany(undoCommand, redoCommand);
+    this.commandRegistry.registerMany(undoCommand, redoCommand, saveAsCommand);
 
     // Setup keyboard shortcuts
     this.keyboardHandler = this.handleKeyboardShortcuts.bind(this);
