@@ -20,7 +20,10 @@ export interface MenuItem {
 export class Pix3MainMenu extends ComponentBase {
   // Use light DOM (default) to avoid clipping issues with absolutely positioned dropdowns
   @state()
-  private isOpen = false;
+  private activeSection: string | null = null;
+
+  @state()
+  private menuOpenedByClick = false;
 
   private menuSections: MenuSection[] = [
     {
@@ -87,7 +90,7 @@ export class Pix3MainMenu extends ComponentBase {
 
   protected updated(): void {
     this.ensureMenuFocusGroup();
-    if (this.isOpen) {
+    if (this.activeSection) {
       this.createPortal();
       this.updateMenuPosition();
     } else {
@@ -113,7 +116,7 @@ export class Pix3MainMenu extends ComponentBase {
   }
 
   private ensureMenuFocusGroup(): void {
-    if (!this.isOpen) {
+    if (!this.activeSection) {
       return;
     }
 
@@ -130,7 +133,9 @@ export class Pix3MainMenu extends ComponentBase {
 
   private updateMenuPosition = () => {
     setTimeout(() => {
-      const trigger = this.querySelector('.menu-trigger') as HTMLElement;
+      if (!this.activeSection) return;
+
+      const trigger = this.querySelector(`.menu-section-button[data-section="${this.activeSection}"]`) as HTMLElement;
       
       if (!trigger || !this.portalElement) return;
 
@@ -154,35 +159,33 @@ export class Pix3MainMenu extends ComponentBase {
   };
 
   private renderMenuToString(): string {
+    if (!this.activeSection) return '';
+
+    const section = this.menuSections.find(s => s.id === this.activeSection);
+    if (!section) return '';
+
     return `
-      <div class="menu-dropdown" role="menu">
-        ${this.menuSections
-          .map(
-            section => `
-          <div class="menu-section" role="group" aria-label="${section.label}">
-            <div class="section-label">${section.label}</div>
-            <div class="section-items">
-              ${section.items
-                .map(
-                  item =>
-                    item.divider
-                      ? `<div class="menu-divider" role="separator"></div>`
-                      : `<button
-                          role="menuitem"
-                          class="menu-item ${item.disabled ? 'menu-item--disabled' : ''}"
-                          ${item.disabled ? 'disabled' : ''}
-                          data-menu-item="${item.id}"
-                        >
-                          <span class="menu-item-label">${item.label}</span>
-                          ${item.shortcut ? `<span class="menu-item-shortcut">${item.shortcut}</span>` : ''}
-                        </button>`
-                )
-                .join('')}
-            </div>
+      <div class="menu-dropdown" role="menu" onmouseleave="this.dispatchEvent(new CustomEvent('menu-mouseleave', {bubbles: true}))">
+        <div class="menu-section" role="group" aria-label="${section.label}">
+          <div class="section-items">
+            ${section.items
+              .map(
+                item =>
+                  item.divider
+                    ? `<div class="menu-divider" role="separator"></div>`
+                    : `<button
+                        role="menuitem"
+                        class="menu-item ${item.disabled ? 'menu-item--disabled' : ''}"
+                        ${item.disabled ? 'disabled' : ''}
+                        data-menu-item="${item.id}"
+                      >
+                        <span class="menu-item-label">${item.label}</span>
+                        ${item.shortcut ? `<span class="menu-item-shortcut">${item.shortcut}</span>` : ''}
+                      </button>`
+              )
+              .join('')}
           </div>
-        `
-          )
-          .join('')}
+        </div>
       </div>
     `;
   }
@@ -201,17 +204,43 @@ export class Pix3MainMenu extends ComponentBase {
         }
       });
     });
+
+    // Add mouse leave handler for the dropdown
+    const dropdown = this.portalElement.querySelector('.menu-dropdown');
+    if (dropdown) {
+      dropdown.addEventListener('menu-mouseleave', () => {
+        if (!this.menuOpenedByClick && this.activeSection !== null) {
+          this.activeSection = null;
+        }
+      });
+    }
   };
 
   private handleDocumentClick = (event: MouseEvent) => {
     const target = event.target as Node;
-    if (!this.contains(target) && this.isOpen) {
-      this.isOpen = false;
+    if (!this.contains(target) && this.activeSection) {
+      this.activeSection = null;
+      this.menuOpenedByClick = false;
     }
   };
 
-  private toggleMenu = () => {
-    this.isOpen = !this.isOpen;
+  private toggleSection = (sectionId: string) => {
+    this.activeSection = this.activeSection === sectionId ? null : sectionId;
+    this.menuOpenedByClick = this.activeSection !== null;
+  };
+
+  private handleSectionHover = (sectionId: string) => {
+    // Only allow hover to open menus if a menu is already open (either by click or hover)
+    if (this.activeSection !== null) {
+      this.activeSection = sectionId;
+    }
+  };
+
+  private handleSectionMouseLeave = () => {
+    // Don't close on mouse leave if opened by click - let document click handle it
+    if (!this.menuOpenedByClick && this.activeSection !== null) {
+      this.activeSection = null;
+    }
   };
 
   private selectMenuItem = (itemId: string) => {
@@ -222,13 +251,14 @@ export class Pix3MainMenu extends ComponentBase {
         composed: true,
       })
     );
-    this.isOpen = false;
+    this.activeSection = null;
+    this.menuOpenedByClick = false;
   }
 
   private handleKeydown = (event: KeyboardEvent) => {
     if (event.key === 'Escape') {
       event.preventDefault();
-      this.isOpen = false;
+      this.activeSection = null;
     }
   };
 
@@ -238,15 +268,24 @@ export class Pix3MainMenu extends ComponentBase {
         ${unsafeCSS(styles)}
       </style>
       <div class="main-menu" @keydown=${this.handleKeydown}>
-        <button
-          class="menu-trigger"
-          @click=${this.toggleMenu}
-          aria-label="Menu"
-          aria-haspopup="menu"
-          aria-expanded=${this.isOpen}
-        >
-          <img src="/splash-logo.png" alt="Pix3" class="menu-logo" />
-        </button>
+        <div class="menu-bar">
+          <img src="/menu-logo.png" alt="Pix3" class="menu-logo" />
+          ${this.menuSections.map(
+            section => html`
+              <button
+                class="menu-section-button ${this.activeSection === section.id ? 'menu-section-button--active' : ''}"
+                data-section=${section.id}
+                @click=${() => this.toggleSection(section.id)}
+                @mouseenter=${() => this.handleSectionHover(section.id)}
+                @mouseleave=${this.handleSectionMouseLeave}
+                aria-haspopup="menu"
+                aria-expanded=${this.activeSection === section.id}
+              >
+                ${section.label}
+              </button>
+            `
+          )}
+        </div>
       </div>
     `;
   }
