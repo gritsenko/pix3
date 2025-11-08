@@ -18,9 +18,4 @@ export { ProjectService, resolveProjectService } from './ProjectService';
 export { AssetFileActivationService, type AssetActivation } from './AssetFileActivationService';
 export { CommandDispatcher, resolveCommandDispatcher } from './CommandDispatcher';
 export { LoggingService, type LogLevel, type LogEntry, type LogListener } from './LoggingService';
-export {
-  CommandRegistry,
-  type CommandMenuItem,
-  type MenuSection,
-} from './CommandRegistry';
-
+export { CommandRegistry, type CommandMenuItem, type MenuSection } from './CommandRegistry';

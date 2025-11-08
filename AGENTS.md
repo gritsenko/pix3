@@ -18,6 +18,7 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - Import helpers from `src/fw`: `customElement`, `property`, `state`, `css`, `html`, `inject`
 - Split styles into separate CSS files: `[component].ts.css`
 - Use @ aliases for core imports: `@/fw`, `@/state`, `@/core`, `@/services`
+- **Light DOM CSS**: use component tag selector (e.g., `pix3-toolbar-button`) and attribute selectors instead of `:host` (which only works in shadow DOM)
 
 ### Dependency Injection
 - Services use `@injectable()` decorator with `dispose()` method

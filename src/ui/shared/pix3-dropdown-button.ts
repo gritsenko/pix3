@@ -1,4 +1,5 @@
 import { ComponentBase, customElement, html, property, state } from '@/fw';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
 import './pix3-dropdown-button.ts.css';
 
 export interface DropdownItem {
@@ -140,7 +141,7 @@ export class Pix3DropdownButton extends ComponentBase {
   protected render() {
     return html`
       <div class="dropdown__trigger">
-        <span class="dropdown__icon">${this.icon}</span>
+        <span class="dropdown__icon">${unsafeHTML(this.icon)}</span>
         <svg viewBox="0 0 12 12" class="dropdown__caret" aria-hidden="true">
           <path
             d="M3 4L6 7L9 4"
@@ -165,7 +166,7 @@ export class Pix3DropdownButton extends ComponentBase {
                       @click=${() => this.selectItem(item)}
                     >
                       ${item.icon
-                        ? html`<span class="dropdown__item-icon">${item.icon}</span>`
+                        ? html`<span class="dropdown__item-icon">${unsafeHTML(item.icon)}</span>`
                         : null}
                       <span class="dropdown__item-label">${item.label}</span>
                     </button>`}`

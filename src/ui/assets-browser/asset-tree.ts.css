@@ -1,4 +1,4 @@
-:host {
+asset-tree {
   display: block;
   height: 100%;
 }
@@ -23,6 +23,7 @@
   padding: 0.25rem 0.5rem;
   border-radius: 0.25rem;
   cursor: pointer;
+  user-select: none;
 }
 
 .icon {

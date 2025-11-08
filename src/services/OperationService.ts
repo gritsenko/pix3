@@ -138,14 +138,11 @@ export class OperationService {
           canRedo: this.history.canRedo,
         });
       } else {
-        this.logger.debug(
-          'invokeAndPush: Operation did not mutate or has no commit',
-          {
-            operationId: execution.metadata.id,
-            didMutate: execution.result.didMutate,
-            hasCommit: !!execution.result.commit,
-          }
-        );
+        this.logger.debug('invokeAndPush: Operation did not mutate or has no commit', {
+          operationId: execution.metadata.id,
+          didMutate: execution.result.didMutate,
+          hasCommit: !!execution.result.commit,
+        });
       }
     } finally {
       this.completeOperation(

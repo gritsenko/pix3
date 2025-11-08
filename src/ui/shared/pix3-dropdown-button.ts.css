@@ -1,4 +1,4 @@
-:host {
+pix3-dropdown-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -17,21 +17,26 @@
   position: relative;
 }
 
-:host(:focus-visible) {
+pix3-dropdown-button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px rgba(94, 194, 255, 0.85);
 }
 
-:host(:hover) {
+pix3-dropdown-button:hover:not([disabled]) {
   background: rgba(82, 94, 114, 0.48);
   transform: translateY(-1px);
 }
 
-:host([disabled]) {
+pix3-dropdown-button:active:not([disabled]) {
+  transform: translateY(0);
+}
+
+pix3-dropdown-button[disabled] {
   cursor: not-allowed;
   opacity: 0.55;
   box-shadow: none;
   transform: none;
+  pointer-events: none;
 }
 
 .dropdown__trigger {
@@ -56,7 +61,7 @@
   opacity: 0.7;
 }
 
-:host([icon-only]) .dropdown__caret {
+pix3-dropdown-button[icon-only] .dropdown__caret {
   display: none;
 }
 
@@ -90,7 +95,12 @@
 }
 
 .dropdown__item:hover:not(.dropdown__item--disabled) {
-  background: rgba(48, 164, 255, 0.15);
+  background: rgba(48, 164, 255, 0.2);
+  cursor: pointer;
+}
+
+.dropdown__item:active:not(.dropdown__item--disabled) {
+  background: rgba(48, 164, 255, 0.25);
 }
 
 .dropdown__item:focus-visible {

@@ -1,4 +1,4 @@
-:host {
+pix3-toolbar-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -20,31 +20,40 @@
     transform 120ms ease;
 }
 
-:host([icon-only]) {
+pix3-toolbar-button[icon-only] {
   min-width: 2rem;
   padding: 0.4rem;
 }
 
-:host(:focus-visible) {
+pix3-toolbar-button:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px rgba(94, 194, 255, 0.85);
 }
 
-:host(:hover) {
+pix3-toolbar-button:hover:not([disabled]) {
   background: rgba(82, 94, 114, 0.48);
   transform: translateY(-1px);
 }
 
-:host([toggled]) {
+pix3-toolbar-button:active:not([disabled]) {
+  transform: translateY(0);
+}
+
+pix3-toolbar-button[toggled] {
   background: rgba(48, 164, 255, 0.3);
   box-shadow: inset 0 0 0 1px rgba(48, 164, 255, 0.48);
 }
 
-:host([disabled]) {
+pix3-toolbar-button[toggled]:hover:not([disabled]) {
+  background: rgba(48, 164, 255, 0.4);
+}
+
+pix3-toolbar-button[disabled] {
   cursor: not-allowed;
   opacity: 0.55;
   box-shadow: none;
   transform: none;
+  pointer-events: none;
 }
 
 .toolbar-button {
@@ -54,6 +63,6 @@
   gap: 0.4rem;
 }
 
-:host([icon-only]) .toolbar-button {
+pix3-toolbar-button[icon-only] .toolbar-button {
   gap: 0;
 }

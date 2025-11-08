@@ -1,12 +1,10 @@
 import { ComponentBase, customElement, html, inject, property, state } from '@/fw';
 import { ifDefined } from 'lit/directives/if-defined.js';
-import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
-import feather from 'feather-icons';
-import { subscribe } from 'valtio/vanilla';
 import type { FileDescriptor } from '@/services/FileSystemAPIService';
 import { ProjectService } from '@/services/ProjectService';
 import { ResourceManager } from '@/services/ResourceManager';
 import { appState } from '@/state';
+import { subscribe } from 'valtio/vanilla';
 import './asset-tree.ts.css';
 
 type Node = {
@@ -37,20 +35,34 @@ export class AssetTree extends ComponentBase {
 
   private disposeSubscription?: () => void;
 
+  public async createFolder(): Promise<void> {
+    await this.startCreateFolder();
+  }
+
+  public createScene(): void {
+    this.startCreateScene();
+  }
+
   protected async firstUpdated(): Promise<void> {
     await this.loadRoot();
-    // Subscribe to project file refresh signal
+    // Subscribe only to lastModifiedDirectoryPath changes (file system changes)
+    // Do not subscribe to lastOpenedScenePath (scene loading UI state)
+    let previousModifiedDir = appState.project.lastModifiedDirectoryPath;
     this.disposeSubscription = subscribe(appState.project, async () => {
       const modifiedDir = appState.project.lastModifiedDirectoryPath;
-      console.debug('[AssetTree] Project file refresh signal received', {
-        modifiedDirectory: modifiedDir,
-      });
-      if (modifiedDir) {
-        // Refresh only the affected directory
-        await this.refreshDirectory(modifiedDir);
-      } else {
-        // If no specific directory indicated, refresh root
-        await this.loadRoot();
+      // Only refresh if lastModifiedDirectoryPath actually changed
+      if (modifiedDir !== previousModifiedDir) {
+        console.debug('[AssetTree] Project file refresh signal received', {
+          modifiedDirectory: modifiedDir,
+        });
+        previousModifiedDir = modifiedDir;
+        if (modifiedDir) {
+          // Refresh only the affected directory
+          await this.refreshDirectory(modifiedDir);
+        } else {
+          // If no specific directory indicated, refresh root
+          await this.loadRoot();
+        }
       }
     });
   }
@@ -210,8 +222,6 @@ export class AssetTree extends ComponentBase {
     return normalized.startsWith('res://') ? normalized : `res://${normalized}`;
   }
 
-  // deriveSceneId moved to service-level usage; tree no longer loads scenes directly
-
   private onSelect(node: Node): void {
     this.selectedPath = node.path;
     this.dispatchEvent(
@@ -323,51 +333,6 @@ export class AssetTree extends ComponentBase {
 
   protected render() {
     return html`<div class="asset-tree-root">
-      <div class="toolbar" role="toolbar" aria-label="Assets toolbar">
-        <button
-          class="tb-btn"
-          @click=${this.onCreateFolder}
-          title="Create folder"
-          aria-label="Create folder"
-        >
-          <span class="tb-icon folder"
-            >${unsafeSVG(feather.icons['folder-plus'].toSvg({ width: 18, height: 18 }))}</span
-          >
-        </button>
-
-        <div class="tb-dropdown">
-          <button
-            class="tb-btn"
-            @click=${this.toggleCreateAssetMenu}
-            aria-haspopup="menu"
-            aria-expanded=${ifDefined(this._createAssetOpen ? 'true' : 'false')}
-            title="Create asset"
-            aria-label="Create asset"
-          >
-            <span class="tb-icon file"
-              >${unsafeSVG(feather.icons['file-plus'].toSvg({ width: 18, height: 18 }))}</span
-            >
-            <svg viewBox="0 0 12 12" class="small-caret" aria-hidden="true">
-              <path
-                d="M3 4L6 7L9 4"
-                stroke="currentColor"
-                stroke-width="1.2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                fill="none"
-              />
-            </svg>
-          </button>
-          ${this._createAssetOpen
-            ? html`<div class="menu" role="menu">
-                <button role="menuitem" class="menu-item" @click=${() => this.startCreateScene()}>
-                  Scene
-                </button>
-              </div>`
-            : null}
-        </div>
-      </div>
-
       <div class="tree" role="tree" aria-label="Assets">
         ${this.tree.length === 0
           ? html`<p class="empty">No assets</p>`
@@ -376,20 +341,7 @@ export class AssetTree extends ComponentBase {
     </div>`;
   }
 
-  private _createAssetOpen = false;
   private _editingValue: string | null = null;
-
-  private toggleCreateAssetMenu = (e: Event) => {
-    e.stopPropagation();
-    this._createAssetOpen = !this._createAssetOpen;
-    this.requestUpdate();
-  };
-
-  private onCreateFolder = (e: Event) => {
-    e.stopPropagation();
-    // initiate create-folder flow in UI
-    this.startCreateFolder();
-  };
 
   private startCreateScene(): void {
     // similar to startCreateFolder but for scene file

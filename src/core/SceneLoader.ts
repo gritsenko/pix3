@@ -251,7 +251,7 @@ export class SceneLoader {
       case 'MeshInstance': {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
         let src = this.asString((baseProps.properties ?? {})['src']) ?? null;
-        
+
         const meshInstance = new MeshInstance({
           ...baseProps,
           properties: parsed.restProps,
@@ -267,7 +267,7 @@ export class SceneLoader {
           try {
             const assetLoaderResult = await this.assetLoader.loadAsset(src);
             const loadedNode = assetLoaderResult.node;
-            
+
             // Add the loaded geometry to the mesh instance
             if (loadedNode.children && loadedNode.children.length > 0) {
               // Transfer children from loaded node to mesh instance
@@ -275,7 +275,7 @@ export class SceneLoader {
                 meshInstance.add(child);
               }
             }
-            
+
             // Transfer animations if available
             if ('animations' in loadedNode && Array.isArray(loadedNode.animations)) {
               meshInstance.animations = loadedNode.animations;
@@ -434,5 +434,4 @@ export class SceneLoader {
   private asString(value: unknown): string | undefined {
     return typeof value === 'string' ? value : undefined;
   }
-
 }

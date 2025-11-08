@@ -73,20 +73,20 @@ export class AssetLoader {
     try {
       const blob = await this.resources.readBlob(resourcePath);
       const arrayBuffer = await blob.arrayBuffer();
-      
+
       const loader = new GLTFLoader();
-      
+
       // Use parse() instead of loadAsync() with an empty resource path
       // This prevents GLTFLoader from trying to resolve external resources
       const gltf = await new Promise<any>((resolve, reject) => {
         loader.parse(
           arrayBuffer,
           '', // Empty resource path - all data is embedded in GLB
-          (result) => resolve(result),
-          (error) => reject(error)
+          result => resolve(result),
+          error => reject(error)
         );
       });
-      
+
       const animations = gltf.animations.map((clip: AnimationClip) => clip.clone());
 
       const finalNodeId = nodeId || crypto.randomUUID();

@@ -1,4 +1,4 @@
-:host {
+pix3-dropdown {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -16,17 +16,17 @@
   position: relative;
 }
 
-:host(:focus-visible) {
+pix3-dropdown:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px rgba(94, 194, 255, 0.85);
 }
 
-:host(:hover) {
+pix3-dropdown:hover {
   background: rgba(82, 94, 114, 0.48);
   transform: translateY(-1px);
 }
 
-:host([disabled]) {
+pix3-dropdown[disabled] {
   cursor: not-allowed;
   opacity: 0.55;
   box-shadow: none;
@@ -55,7 +55,7 @@
   opacity: 0.7;
 }
 
-:host([icon-only]) .dropdown__caret {
+pix3-dropdown[icon-only] .dropdown__caret {
   display: none;
 }
 

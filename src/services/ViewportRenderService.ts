@@ -16,7 +16,10 @@ import { SceneManager } from '@/core/SceneManager';
 import { OperationService } from '@/services/OperationService';
 import { appState } from '@/state';
 import { subscribe } from 'valtio/vanilla';
-import { TransformCompleteOperation, type TransformState } from '@/features/properties/TransformCompleteOperation';
+import {
+  TransformCompleteOperation,
+  type TransformState,
+} from '@/features/properties/TransformCompleteOperation';
 
 export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 
@@ -39,7 +42,10 @@ export class ViewportRendererService {
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
   private animationId?: number;
   private disposers: Array<() => void> = [];
-  private transformStartStates = new Map<string, { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }>();
+  private transformStartStates = new Map<
+    string,
+    { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }
+  >();
   private lastActiveSceneId: string | null = null;
 
   constructor() {}
@@ -94,7 +100,7 @@ export class ViewportRendererService {
       if (this.orbitControls) {
         this.orbitControls.enabled = !event.value;
       }
-      
+
       // Track transform start state when dragging begins
       if (event.value && this.transformControls?.object) {
         this.captureTransformStartState(this.transformControls.object);
@@ -158,7 +164,7 @@ export class ViewportRendererService {
   setTransformMode(mode: TransformMode): void {
     // Set the transform mode for the gizmo
     this.currentTransformMode = mode;
-    
+
     if (mode === 'select') {
       // In select mode, hide the transform gizmo
       if (this.transformGizmo && this.scene) {
@@ -172,22 +178,22 @@ export class ViewportRendererService {
     } else if (this.transformControls) {
       // In transform modes, set the mode on TransformControls
       this.transformControls.setMode(mode);
-      
+
       // Reattach to the selected object if there is one
       const { nodeIds } = appState.selection;
       const activeSceneId = appState.scenes.activeSceneId;
-      
+
       if (nodeIds.length > 0 && activeSceneId) {
         const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
         if (sceneGraph) {
           // Find the first selected node
           const firstSelectedNodeId = nodeIds[0];
           const firstSelectedNode = this.findNodeById(firstSelectedNodeId, sceneGraph.rootNodes);
-          
+
           if (firstSelectedNode && firstSelectedNode instanceof Node3D) {
             // Attach transform controls to the selected object
             this.transformControls.attach(firstSelectedNode);
-            
+
             // Add the transform gizmo to the scene
             if (this.scene) {
               this.transformGizmo = this.transformControls.getHelper();
@@ -337,11 +343,11 @@ export class ViewportRendererService {
         // Create bounding box visualization
         const box = new THREE.Box3().setFromObject(node);
         const helper = new THREE.Box3Helper(box, new THREE.Color(0x00ff00));
-        
+
         // Mark as selection box for cleanup
         helper.userData.selectionBoxId = nodeId;
         helper.userData.isSelectionBox = true;
-        
+
         this.selectionBoxes.set(nodeId, helper);
         this.scene?.add(helper);
       }
@@ -349,7 +355,12 @@ export class ViewportRendererService {
 
     // Attach transform controls to the first selected node if any
     // (but only if not in select mode)
-    if (firstSelectedNode && this.transformControls && this.scene && this.currentTransformMode !== 'select') {
+    if (
+      firstSelectedNode &&
+      this.transformControls &&
+      this.scene &&
+      this.currentTransformMode !== 'select'
+    ) {
       this.transformControls.attach(firstSelectedNode);
 
       // Get and add the transform gizmo to the scene

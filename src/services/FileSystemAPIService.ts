@@ -378,7 +378,9 @@ export class FileSystemAPIService {
           return !!(pathSegments && pathSegments.length > 0);
         } catch (error) {
           // resolve not supported or file is outside project
-          console.debug('[FileSystemAPIService] Unable to resolve file path relative to project', { error });
+          console.debug('[FileSystemAPIService] Unable to resolve file path relative to project', {
+            error,
+          });
           return false;
         }
       }
