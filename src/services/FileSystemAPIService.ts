@@ -353,6 +353,17 @@ export class FileSystemAPIService {
     }
   }
 
+  async deleteEntry(path: string): Promise<void> {
+    try {
+      const parentPath = this.getDirectoryPart(path);
+      const entryName = this.getFileName(path);
+      const parentHandle = await this.resolveDirectoryHandle(parentPath, 'readwrite');
+      await parentHandle.removeEntry(entryName, { recursive: true });
+    } catch (error) {
+      throw this.normalizeError(error, `Failed to delete entry at ${path}`);
+    }
+  }
+
   /**
    * Check if a fileHandle is within the project directory.
    * Uses isSameEntry API if available to verify containment.

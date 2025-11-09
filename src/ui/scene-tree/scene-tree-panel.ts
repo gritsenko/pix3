@@ -82,7 +82,7 @@ export class SceneTreePanel extends ComponentBase {
         ${activeSceneName ? html`<span slot="subtitle">${activeSceneName}</span>` : null}
         <pix3-toolbar slot="toolbar" label="Scene tree controls">
           <pix3-dropdown-button
-            icon="+"
+            icon="plus-circle"
             aria-label="Create node"
             .items=${[
               { id: 'box', label: 'Box', icon: '📦' },

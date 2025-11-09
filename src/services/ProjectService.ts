@@ -239,6 +239,10 @@ export class ProjectService {
     await this.fs.writeTextFile(path, contents);
   }
 
+  async deleteEntry(path: string): Promise<void> {
+    await this.fs.deleteEntry(path);
+  }
+
   listDirectory(path = '.'): Promise<FileDescriptor[]> {
     return this.fs.listDirectory(path);
   }

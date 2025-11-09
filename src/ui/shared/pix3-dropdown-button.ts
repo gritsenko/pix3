@@ -1,5 +1,6 @@
 import { ComponentBase, customElement, html, property, state } from '@/fw';
 import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import feather from 'feather-icons';
 import './pix3-dropdown-button.ts.css';
 
 export interface DropdownItem {
@@ -139,9 +140,10 @@ export class Pix3DropdownButton extends ComponentBase {
   };
 
   protected render() {
+    const iconSvg = this.getIconSvg(this.icon);
     return html`
       <div class="dropdown__trigger">
-        <span class="dropdown__icon">${unsafeHTML(this.icon)}</span>
+        <span class="dropdown__icon">${unsafeHTML(iconSvg)}</span>
         <svg viewBox="0 0 12 12" class="dropdown__caret" aria-hidden="true">
           <path
             d="M3 4L6 7L9 4"
@@ -165,15 +167,55 @@ export class Pix3DropdownButton extends ComponentBase {
                       ?disabled=${item.disabled}
                       @click=${() => this.selectItem(item)}
                     >
-                      ${item.icon
-                        ? html`<span class="dropdown__item-icon">${unsafeHTML(item.icon)}</span>`
-                        : null}
+                      ${item.icon ? html`<span class="dropdown__item-icon">${this.getItemIconSvg(item.icon)}</span>` : null}
                       <span class="dropdown__item-label">${item.label}</span>
                     </button>`}`
             )}
           </div>`
         : null}
     `;
+  }
+
+  private getIconSvg(iconName: string | null): string {
+    if (!iconName) {
+      return '';
+    }
+
+    // If it already looks like SVG, return as-is
+    if (iconName.includes('<svg') || iconName.includes('<?xml')) {
+      return iconName;
+    }
+
+    // Try to resolve as feather icon name
+    try {
+      const icon = (feather.icons as Record<string, any>)[iconName];
+      if (icon && typeof icon.toSvg === 'function') {
+        return icon.toSvg({ width: 18, height: 18 });
+      }
+    } catch (error) {
+      console.warn(`[Pix3DropdownButton] Failed to load icon: ${iconName}`, error);
+    }
+
+    return '';
+  }
+
+  private getItemIconSvg(iconName: string): ReturnType<typeof html> {
+    // If it already looks like SVG, render as unsafe HTML
+    if (iconName.includes('<svg') || iconName.includes('<?xml')) {
+      return html`${unsafeHTML(iconName)}`;
+    }
+
+    // Try to resolve as feather icon name
+    try {
+      const icon = (feather.icons as Record<string, any>)[iconName];
+      if (icon && typeof icon.toSvg === 'function') {
+        return html`${unsafeHTML(icon.toSvg({ width: 16, height: 16 }))}`;
+      }
+    } catch (error) {
+      console.warn(`[Pix3DropdownButton] Failed to load item icon: ${iconName}`, error);
+    }
+
+    return html`${unsafeHTML(iconName)}`;
   }
 }
 

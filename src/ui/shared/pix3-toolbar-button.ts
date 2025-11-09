@@ -1,4 +1,6 @@
 import { ComponentBase, customElement, html, property } from '@/fw';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import feather from 'feather-icons';
 import './pix3-toolbar-button.ts.css';
 
 @customElement('pix3-toolbar-button')
@@ -14,6 +16,9 @@ export class Pix3ToolbarButton extends ComponentBase {
 
   @property({ type: Boolean, reflect: true })
   iconOnly = false;
+
+  @property({ type: String })
+  icon: string | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -102,7 +107,23 @@ export class Pix3ToolbarButton extends ComponentBase {
   }
 
   protected render() {
-    return html`<span class="toolbar-button"><slot></slot></span>`;
+    const iconSvg = this.icon ? this.getIconSvg(this.icon) : null;
+    return html`<span class="toolbar-button">
+      ${iconSvg ? html`<span class="toolbar-icon">${unsafeHTML(iconSvg)}</span>` : null}
+      <slot></slot>
+    </span>`;
+  }
+
+  private getIconSvg(iconName: string): string | null {
+    try {
+      const icon = (feather.icons as Record<string, any>)[iconName];
+      if (icon && typeof icon.toSvg === 'function') {
+        return icon.toSvg({ width: 18, height: 18 });
+      }
+    } catch (error) {
+      console.warn(`[Pix3ToolbarButton] Failed to load icon: ${iconName}`, error);
+    }
+    return null;
   }
 }
 

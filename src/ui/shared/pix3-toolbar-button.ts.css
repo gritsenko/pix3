@@ -2,8 +2,6 @@ pix3-toolbar-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 2.25rem;
-  padding: 0.4rem 0.9rem;
   border-radius: 0.5rem;
   background: var(--pix3-toolbar-button-background, rgba(60, 68, 82, 0.32));
   color: var(--pix3-toolbar-button-foreground, rgba(245, 247, 250, 0.95));
@@ -14,15 +12,13 @@ pix3-toolbar-button {
   line-height: 1;
   cursor: pointer;
   user-select: none;
+  padding: 0;
+  width: 32px;
+  height: 32px;
   transition:
     background 120ms ease,
     box-shadow 120ms ease,
     transform 120ms ease;
-}
-
-pix3-toolbar-button[icon-only] {
-  min-width: 2rem;
-  padding: 0.4rem;
 }
 
 pix3-toolbar-button:focus-visible {

@@ -2,8 +2,8 @@ pix3-dropdown-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 2rem;
-  height: 2rem;
+  width: 42px;
+  height: 32px;
   padding: 0;
   border-radius: 0.5rem;
   background: var(--pix3-toolbar-button-background, rgba(60, 68, 82, 0.32));

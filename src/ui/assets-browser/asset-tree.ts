@@ -43,6 +43,14 @@ export class AssetTree extends ComponentBase {
     this.startCreateScene();
   }
 
+  public async deleteSelected(): Promise<void> {
+    if (!this.selectedPath) {
+      console.warn('[AssetTree] No item selected for deletion');
+      return;
+    }
+    await this.deleteEntry(this.selectedPath);
+  }
+
   protected async firstUpdated(): Promise<void> {
     await this.loadRoot();
     // Subscribe only to lastModifiedDirectoryPath changes (file system changes)
@@ -543,6 +551,28 @@ export class AssetTree extends ComponentBase {
     const removed = walk(this.tree);
     if (removed) this.tree = [...this.tree];
     return removed;
+  }
+
+  private async deleteEntry(path: string): Promise<void> {
+    try {
+      console.log('[AssetTree] Deleting entry at path:', path);
+      await this.projectService.deleteEntry(path);
+      
+      // Remove from tree UI
+      const found = this.removeNodeByPath(path);
+      if (!found) {
+        console.warn('[AssetTree] Entry not found in tree:', path);
+      }
+      
+      // Clear selection
+      this.selectedPath = null;
+      this.requestUpdate();
+      
+      console.log('[AssetTree] Entry deleted successfully:', path);
+    } catch (error) {
+      console.error('[AssetTree] Failed to delete entry:', error);
+      throw error;
+    }
   }
 
   // create-asset event no longer used here; menu directly starts creation flows
