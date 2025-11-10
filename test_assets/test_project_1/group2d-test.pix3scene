@@ -1,6 +1,3 @@
-# Pix3 Scene File (YAML)
-# Simple template loaded at startup. Contains a 3D environment root with a box mesh,
-# a directional light, a perspective camera, and a 2D UI layer with a sprite.
 version: 1.0.0
 metadata:
   author: Pix3 Auto Template
@@ -65,21 +62,32 @@ root:
             rotationEuler: [0, 0, 0]
             scale: [1, 1, 1]
         children: []
-  - id: ui-layer
+  - id: group2d-1762809544290-zkya03e
     type: Group2D
-    name: UI Layer
+    name: Group2D
     properties:
-      width: 256
-      height: 256
-      position: [0, 0]
-      scale: [1, 1]
-      rotation: 0
+      transform:
+        position: [0, 0]
+        scale: [1, 1]
+        rotation: [0, 0, 0, XYZ]
     children:
       - id: logo-sprite
         type: Sprite2D
         name: Logo Sprite
         properties:
-          texturePath: templ://pix3-logo.png
-          position: [0, 0]
-          scale: [1, 1]
-          rotation: 0
+          source: templ://pix3-logo.png
+          pivot: [0.5, 0.5]
+          size: [256, 256]
+          opacity: 1
+          transform:
+            position: [0, 0]
+            scale: [1, 1]
+            rotation: [0, 0, 0, XYZ]
+  - id: ui-layer
+    type: Node2D
+    name: UI Layer
+    properties:
+      transform:
+        position: [0, 0]
+        scale: [1, 1]
+        rotation: [0, 0, 0, XYZ]

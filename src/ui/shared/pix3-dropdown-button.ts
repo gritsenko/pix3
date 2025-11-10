@@ -25,6 +25,9 @@ export class Pix3DropdownButton extends ComponentBase {
   @property({ type: Array })
   items: DropdownItem[] = [];
 
+  @property({ type: Array })
+  groupedItems: Array<{ label: string; items: DropdownItem[] }> = [];
+
   @state()
   private isOpen = false;
 
@@ -157,20 +160,38 @@ export class Pix3DropdownButton extends ComponentBase {
       </div>
       ${this.isOpen
         ? html`<div class="dropdown__menu" role="menu">
-            ${this.items.map(
-              item =>
-                html`${item.divider
-                  ? html`<div class="dropdown__divider" role="separator"></div>`
-                  : html`<button
-                      role="menuitem"
-                      class="dropdown__item ${item.disabled ? 'dropdown__item--disabled' : ''}"
-                      ?disabled=${item.disabled}
-                      @click=${() => this.selectItem(item)}
-                    >
-                      ${item.icon ? html`<span class="dropdown__item-icon">${this.getItemIconSvg(item.icon)}</span>` : null}
-                      <span class="dropdown__item-label">${item.label}</span>
-                    </button>`}`
-            )}
+            ${this.groupedItems.length > 0
+              ? this.groupedItems.map(
+                  group =>
+                    html`<div class="dropdown__group">
+                      <div class="dropdown__group-label">${group.label}</div>
+                      ${group.items.map(
+                        item => html`<button
+                          role="menuitem"
+                          class="dropdown__item dropdown__item--grouped"
+                          @click=${() => this.selectItem(item)}
+                        >
+                          ${item.icon ? html`<span class="dropdown__item-icon">${this.getItemIconSvg(item.icon)}</span>` : null}
+                          <span class="dropdown__item-label">${item.label}</span>
+                        </button>`
+                      )}
+                    </div>`
+                )
+              : this.items.map(
+                  item =>
+                    html`${item.divider
+                      ? html`<div class="dropdown__divider" role="separator"></div>`
+                      : html`<button
+                          role="menuitem"
+                          class="dropdown__item ${item.disabled ? 'dropdown__item--disabled' : ''}"
+                          ?disabled=${item.disabled}
+                          @click=${() => this.selectItem(item)}
+                        >
+                          ${item.icon ? html`<span class="dropdown__item-icon">${this.getItemIconSvg(item.icon)}</span>` : null}
+                          <span class="dropdown__item-label">${item.label}</span>
+                        </button>`}`
+                )
+            }
           </div>`
         : null}
     `;

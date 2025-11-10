@@ -11,6 +11,8 @@ import { TransformControls } from 'three/examples/jsm/controls/TransformControls
 import { MathUtils } from 'three';
 import { NodeBase } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
+import { Group2D } from '@/nodes/2D/Group2D';
+import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager } from '@/core/SceneManager';
 import { OperationService } from '@/services/OperationService';
@@ -40,6 +42,8 @@ export class ViewportRendererService {
   private currentTransformMode: TransformMode = 'select';
   private selectedObjects = new Set<THREE.Object3D>();
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
+  private group2DMeshes = new Map<string, THREE.LineSegments>(); // Track Group2D visual representations
+  private sprite2DMeshes = new Map<string, THREE.Mesh>(); // Track Sprite2D visual representations
   private animationId?: number;
   private disposers: Array<() => void> = [];
   private transformStartStates = new Map<
@@ -356,6 +360,11 @@ export class ViewportRendererService {
 
         this.selectionBoxes.set(nodeId, helper);
         this.scene?.add(helper);
+      } else if (node && node instanceof Group2D) {
+        // For Group2D, create a rectangle selection visualisation
+        const mesh = this.createGroup2DSelectionBox(node);
+        this.group2DMeshes.set(nodeId, mesh);
+        this.scene?.add(mesh);
       }
     }
 
@@ -392,6 +401,34 @@ export class ViewportRendererService {
         return;
       }
 
+      // Clean up previous Group2D meshes
+      for (const mesh of this.group2DMeshes.values()) {
+        if (this.scene) {
+          this.scene.remove(mesh);
+        }
+        mesh.geometry.dispose();
+        if (mesh.material instanceof THREE.Material) {
+          mesh.material.dispose();
+        } else if (Array.isArray(mesh.material)) {
+          mesh.material.forEach(m => m.dispose());
+        }
+      }
+      this.group2DMeshes.clear();
+
+      // Clean up previous Sprite2D meshes
+      for (const mesh of this.sprite2DMeshes.values()) {
+        if (this.scene) {
+          this.scene.remove(mesh);
+        }
+        mesh.geometry.dispose();
+        if (mesh.material instanceof THREE.Material) {
+          mesh.material.dispose();
+        } else if (Array.isArray(mesh.material)) {
+          mesh.material.forEach(m => m.dispose());
+        }
+      }
+      this.sprite2DMeshes.clear();
+
       // Remove all root nodes from scene (except lights and helpers)
       const objectsToRemove: THREE.Object3D[] = [];
       this.scene.children.forEach(child => {
@@ -403,15 +440,166 @@ export class ViewportRendererService {
 
       objectsToRemove.forEach(obj => this.scene!.remove(obj));
 
-      // Add scene graph root nodes
+      // Add scene graph root nodes and create visual representations for Group2D
       sceneGraph.rootNodes.forEach(node => {
-        if (node instanceof Node3D && !node.parent) {
-          this.scene!.add(node);
-        }
+        this.processNodeForRendering(node);
       });
     } catch (err) {
       console.error('[ViewportRenderer] Error syncing scene content:', err);
     }
+  }
+
+  /**
+   * Process a node and its children for rendering.
+   * Creates visual representations for Group2D nodes and Sprite2D nodes.
+   */
+  private processNodeForRendering(node: NodeBase): void {
+    if (!this.scene) return;
+
+    // Add 3D nodes to the scene
+    if (node instanceof Node3D && !node.parent) {
+      this.scene.add(node);
+    }
+
+    // Create visual representation for Group2D nodes
+    if (node instanceof Group2D) {
+      const mesh = this.createGroup2DVisual(node);
+      this.group2DMeshes.set(node.nodeId, mesh);
+      this.scene.add(mesh);
+    }
+
+    // Create visual representation for Sprite2D nodes
+    if (node instanceof Sprite2D) {
+      const mesh = this.createSprite2DVisual(node);
+      this.sprite2DMeshes.set(node.nodeId, mesh);
+      this.scene.add(mesh);
+    }
+
+    // Recursively process children
+    for (const child of node.children) {
+      this.processNodeForRendering(child);
+    }
+  }
+
+  /**
+   * Create a rectangle outline visual representation for a Group2D node.
+   */
+  private createGroup2DVisual(node: Group2D): THREE.LineSegments {
+    const width = node.width;
+    const height = node.height;
+
+    // Create rectangle geometry centered at origin
+    const points: THREE.Vector3[] = [
+      new THREE.Vector3(-width / 2, -height / 2, 0),
+      new THREE.Vector3(width / 2, -height / 2, 0),
+      new THREE.Vector3(width / 2, height / 2, 0),
+      new THREE.Vector3(-width / 2, height / 2, 0),
+      new THREE.Vector3(-width / 2, -height / 2, 0), // Close the loop
+    ];
+
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+    // Create line material with 2D node color
+    const material = new THREE.LineBasicMaterial({
+      color: 0x96cbf6, // NODE_2D_COLOR
+      linewidth: 2,
+    });
+
+    const line = new THREE.LineSegments(geometry, material);
+
+    // Apply the node's transform
+    line.position.copy(node.position);
+    line.rotation.copy(node.rotation);
+    line.scale.copy(node.scale);
+
+    // Mark as editor visual
+    line.userData.isGroup2DVisual = true;
+    line.userData.nodeId = node.nodeId;
+
+    return line;
+  }
+
+  /**
+   * Create a highlighted selection box for a Group2D node.
+   */
+  private createGroup2DSelectionBox(node: Group2D): THREE.LineSegments {
+    const width = node.width;
+    const height = node.height;
+
+    // Create rectangle geometry centered at origin with highlight color
+    const points: THREE.Vector3[] = [
+      new THREE.Vector3(-width / 2, -height / 2, 0),
+      new THREE.Vector3(width / 2, -height / 2, 0),
+      new THREE.Vector3(width / 2, height / 2, 0),
+      new THREE.Vector3(-width / 2, height / 2, 0),
+      new THREE.Vector3(-width / 2, -height / 2, 0), // Close the loop
+    ];
+
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+
+    // Create line material with highlight color (green for selection)
+    const material = new THREE.LineBasicMaterial({
+      color: 0x00ff00,
+      linewidth: 3,
+    });
+
+    const line = new THREE.LineSegments(geometry, material);
+
+    // Apply the node's transform
+    line.position.copy(node.position);
+    line.rotation.copy(node.rotation);
+    line.scale.copy(node.scale);
+
+    // Mark as selection box
+    line.userData.isGroup2DSelectionBox = true;
+    line.userData.nodeId = node.nodeId;
+
+    return line;
+  }
+
+  /**
+   * Create a visual representation for a Sprite2D node.
+   * Renders the texture if available, or a placeholder rectangle if not.
+   */
+  private createSprite2DVisual(node: Sprite2D): THREE.Mesh {
+    // Default size for placeholder
+    const size = 64;
+
+    // Create a plane geometry to hold the sprite texture
+    const geometry = new THREE.PlaneGeometry(size, size);
+
+    let material: THREE.Material;
+
+    // Try to load texture if available
+    if (node.texturePath) {
+      // Try to load the texture
+      const textureLoader = new THREE.TextureLoader();
+      try {
+        const texture = textureLoader.load(node.texturePath, undefined, undefined, () => {
+          // On error, fall back to placeholder color
+        });
+        material = new THREE.MeshBasicMaterial({ map: texture });
+      } catch {
+        // Fallback to placeholder material
+        material = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+      }
+    } else {
+      // No texture path - use placeholder material (light gray)
+      material = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+    }
+
+    const mesh = new THREE.Mesh(geometry, material);
+
+    // Apply the node's transform (2D space within parent Group2D)
+    mesh.position.copy(node.position);
+    mesh.rotation.copy(node.rotation);
+    mesh.scale.copy(node.scale);
+
+    // Mark as Sprite2D visual for identification
+    mesh.userData.isSprite2DVisual = true;
+    mesh.userData.nodeId = node.nodeId;
+
+    return mesh;
   }
 
   private findNodeById(nodeId: string, nodes: NodeBase[]): NodeBase | null {
@@ -569,6 +757,17 @@ export class ViewportRendererService {
       }
     });
     this.selectionBoxes.clear();
+
+    // Dispose Group2D visual meshes
+    this.group2DMeshes.forEach(mesh => {
+      mesh.geometry.dispose();
+      if (mesh.material instanceof THREE.Material) {
+        mesh.material.dispose();
+      } else if (Array.isArray(mesh.material)) {
+        mesh.material.forEach(m => m.dispose());
+      }
+    });
+    this.group2DMeshes.clear();
 
     if (this.scene) {
       this.scene.traverse(obj => {

@@ -6,6 +6,7 @@ import { NodeBase, type NodeBaseProps } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { MeshInstance } from '@/nodes/3D/MeshInstance';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
+import { Group2D } from '@/nodes/2D/Group2D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
 import type { SceneGraph } from './SceneManager';
 
@@ -70,6 +71,11 @@ export interface Node2DProperties {
   position?: Vector2 | [number, number];
   scale?: Vector2 | [number, number];
   rotation?: number;
+}
+
+export interface Group2DProperties extends Node2DProperties {
+  width?: number;
+  height?: number;
 }
 
 export interface ParseSceneOptions {
@@ -197,6 +203,19 @@ export class SceneLoader {
           position: this.readVector2(props.position, ZERO_VECTOR2),
           scale: this.readVector2(props.scale, UNIT_VECTOR2),
           rotation: props.rotation ?? 0,
+        });
+      }
+      case 'Group2D': {
+        const props = baseProps.properties as Group2DProperties;
+        const { position, scale, rotation, width, height, ...rest } = props;
+        return new Group2D({
+          ...baseProps,
+          properties: rest,
+          position: this.readVector2(props.position, ZERO_VECTOR2),
+          scale: this.readVector2(props.scale, UNIT_VECTOR2),
+          rotation: props.rotation ?? 0,
+          width: props.width ?? 100,
+          height: props.height ?? 100,
         });
       }
       case 'GeometryMesh': {

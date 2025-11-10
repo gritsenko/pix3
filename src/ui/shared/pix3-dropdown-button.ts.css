@@ -134,3 +134,30 @@ pix3-dropdown-button[icon-only] .dropdown__caret {
   margin: 0.25rem 0;
   background: rgba(255, 255, 255, 0.08);
 }
+
+.dropdown__group {
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem 0;
+}
+
+.dropdown__group + .dropdown__group {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 0.25rem;
+  padding-top: 0.5rem;
+}
+
+.dropdown__group-label {
+  padding: 0.5rem 1rem 0.25rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(245, 247, 250, 0.6);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.25rem;
+}
+
+.dropdown__item--grouped {
+  padding-left: 2rem;
+}

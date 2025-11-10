@@ -4,8 +4,11 @@ import { appState } from '@/state';
 import type { NodeBase } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
+import { Group2D } from '@/nodes/2D/Group2D';
 import { UpdateObjectPropertyOperation } from '@/features/properties/UpdateObjectPropertyOperation';
+import { UpdateGroup2DSizeCommand } from '@/features/scene/UpdateGroup2DSizeCommand';
 import { OperationService } from '@/services/OperationService';
+import { CommandDispatcher } from '@/services/CommandDispatcher';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
@@ -22,6 +25,9 @@ export class InspectorPanel extends ComponentBase {
 
   @inject(OperationService)
   private readonly operationService!: OperationService;
+
+  @inject(CommandDispatcher)
+  private readonly commandDispatcher!: CommandDispatcher;
 
   @state()
   private selectedNodes: NodeBase[] = [];
@@ -55,6 +61,12 @@ export class InspectorPanel extends ComponentBase {
 
   @state()
   private visibleValue = true;
+
+  @state()
+  private sizeValues: Record<'width' | 'height', PropertyValue> = {
+    width: { value: '100', isValid: true },
+    height: { value: '100', isValid: true },
+  };
 
   private disposeSelectionSubscription?: () => void;
   private disposeSceneSubscription?: () => void;
@@ -159,6 +171,33 @@ export class InspectorPanel extends ComponentBase {
         y: { value: this.formatNumber(node.scale.y), isValid: true },
         z: { value: this.formatNumber(node.scale.z), isValid: true },
       };
+    } else if (node instanceof Group2D) {
+      // For Group2D, show size properties
+      this.sizeValues = {
+        width: { value: this.formatNumber(node.width), isValid: true },
+        height: { value: this.formatNumber(node.height), isValid: true },
+      };
+
+      // Position (2D)
+      this.positionValues = {
+        x: { value: this.formatNumber(node.position.x), isValid: true },
+        y: { value: this.formatNumber(node.position.y), isValid: true },
+        z: { value: this.formatNumber(node.position.z), isValid: true },
+      };
+
+      // Rotation (2D, only Z)
+      this.rotationValues = {
+        x: { value: '0', isValid: true },
+        y: { value: '0', isValid: true },
+        z: { value: this.formatNumber(this.radToDeg(node.rotation.z)), isValid: true },
+      };
+
+      // Scale (2D)
+      this.scaleValues = {
+        x: { value: this.formatNumber(node.scale.x), isValid: true },
+        y: { value: this.formatNumber(node.scale.y), isValid: true },
+        z: { value: this.formatNumber(node.scale.z), isValid: true },
+      };
     } else if (node instanceof Sprite2D) {
       // For 2D nodes, only show relevant transform properties
       this.positionValues = {
@@ -198,6 +237,10 @@ export class InspectorPanel extends ComponentBase {
       x: { value: '1', isValid: true },
       y: { value: '1', isValid: true },
       z: { value: '1', isValid: true },
+    };
+    this.sizeValues = {
+      width: { value: '100', isValid: true },
+      height: { value: '100', isValid: true },
     };
   }
 
@@ -325,6 +368,48 @@ export class InspectorPanel extends ComponentBase {
     }
   }
 
+  private handleSizeInput(dimension: 'width' | 'height', e: Event) {
+    const input = e.target as HTMLInputElement;
+    const value = input.value;
+    const num = parseFloat(value);
+    const isValid = !isNaN(num);
+
+    this.sizeValues = { ...this.sizeValues, [dimension]: { value, isValid } };
+
+    if (isValid && this.primaryNode instanceof Group2D) {
+      this.applySizeToGroup2D(dimension, num);
+    }
+  }
+
+  private handleSizeBlur(dimension: 'width' | 'height', e: Event) {
+    const input = e.target as HTMLInputElement;
+    let num = parseFloat(input.value);
+    if (isNaN(num)) num = 100;
+
+    const formattedValue = this.formatNumber(num);
+    this.sizeValues = { ...this.sizeValues, [dimension]: { value: formattedValue, isValid: true } };
+
+    if (this.primaryNode instanceof Group2D) {
+      this.applySizeToGroup2D(dimension, num);
+    }
+  }
+
+  private async applySizeToGroup2D(dimension: 'width' | 'height', value: number) {
+    if (!this.primaryNode || !(this.primaryNode instanceof Group2D)) return;
+
+    try {
+      const command = new UpdateGroup2DSizeCommand({
+        nodeId: this.primaryNode.nodeId,
+        width: dimension === 'width' ? value : this.primaryNode.width,
+        height: dimension === 'height' ? value : this.primaryNode.height,
+      });
+
+      await this.commandDispatcher.execute(command);
+    } catch (error) {
+      console.error('[InspectorPanel] Failed to execute size update command', error);
+    }
+  }
+
   protected render() {
     const hasSelection = this.selectedNodes.length > 0;
 
@@ -383,11 +468,14 @@ export class InspectorPanel extends ComponentBase {
   }
 
   private renderTransformProperties() {
-    if (!(this.primaryNode instanceof Node3D) && !(this.primaryNode instanceof Sprite2D)) {
+    if (!(this.primaryNode instanceof Node3D) && !(this.primaryNode instanceof Sprite2D) && !(this.primaryNode instanceof Group2D)) {
       return '';
     }
 
+    const isGroup2D = this.primaryNode instanceof Group2D;
+
     return html`
+      ${isGroup2D ? this.renderGroup2DSizeProperties() : ''}
       <div class="transform-section">
         <h4 class="subsection-title">Transform</h4>
 
@@ -409,6 +497,40 @@ export class InspectorPanel extends ComponentBase {
         <div class="property-group">
           <span class="property-label">Scale:</span>
           <div class="vector-input">${this.renderVectorInputs('scale', this.scaleValues)}</div>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderGroup2DSizeProperties() {
+    return html`
+      <div class="size-section">
+        <h4 class="subsection-title">Size</h4>
+        <div class="property-group">
+          <span class="property-label">Width:</span>
+          <input
+            type="number"
+            step="0.01"
+            class="property-input property-input--number ${this.sizeValues.width.isValid
+              ? ''
+              : 'property-input--invalid'}"
+            .value=${this.sizeValues.width.value}
+            @input=${(e: Event) => this.handleSizeInput('width', e)}
+            @blur=${(e: Event) => this.handleSizeBlur('width', e)}
+          />
+        </div>
+        <div class="property-group">
+          <span class="property-label">Height:</span>
+          <input
+            type="number"
+            step="0.01"
+            class="property-input property-input--number ${this.sizeValues.height.isValid
+              ? ''
+              : 'property-input--invalid'}"
+            .value=${this.sizeValues.height.value}
+            @input=${(e: Event) => this.handleSizeInput('height', e)}
+            @blur=${(e: Event) => this.handleSizeBlur('height', e)}
+          />
         </div>
       </div>
     `;

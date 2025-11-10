@@ -2,6 +2,7 @@ import { NodeBase } from '@/nodes/NodeBase';
 import { Node2D } from '@/nodes/Node2D';
 import { Node3D } from '@/nodes/Node3D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
+import { Group2D } from '@/nodes/2D/Group2D';
 import { Camera3D } from '@/nodes/3D/Camera3D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
 import { MeshInstance } from '@/nodes/3D/MeshInstance';
@@ -20,6 +21,9 @@ const NODE_3D_COLOR = '#fe9ebeff';
 export function getNodeVisuals(node: NodeBase): { color: string; icon: string } {
   if (node instanceof Sprite2D) {
     return { color: NODE_2D_COLOR, icon: 'image' };
+  }
+  if (node instanceof Group2D) {
+    return { color: NODE_2D_COLOR, icon: 'layout' };
   }
   if (node instanceof Node2D) {
     return { color: NODE_2D_COLOR, icon: 'square' };

@@ -6,7 +6,7 @@ import { NodeBase } from '@/nodes/NodeBase';
 import { getNodeVisuals } from './node-visuals.helper';
 import type { SceneTreeNode } from './scene-tree-node';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
-import { CreateBoxCommand } from '@/features/scene/CreateBoxCommand';
+import { NodeRegistry } from '@/services/NodeRegistry';
 import { ReparentNodeCommand } from '@/features/scene/ReparentNodeCommand';
 import { SceneManager } from '@/core/SceneManager';
 import { ServiceContainer } from '@/fw/di';
@@ -46,6 +46,9 @@ export class SceneTreePanel extends ComponentBase {
   @state()
   private loadError: string | null = appState.scenes.loadError;
 
+  @state()
+  private createNodeItems: Array<{ label: string; items: Array<{ id: string; label: string; icon: string; color: string }> }> = [];
+
   private lastHierarchyRef: NodeBase[] | null = null;
   private disposeSceneSubscription?: () => void;
   private disposeSelectionSubscription?: () => void;
@@ -54,6 +57,7 @@ export class SceneTreePanel extends ComponentBase {
     super.connectedCallback();
     this.syncSceneState();
     this.syncSelectionState();
+    this.syncCreateNodeItems();
     this.disposeSceneSubscription = subscribe(appState.scenes, () => {
       this.syncSceneState();
     });
@@ -84,9 +88,7 @@ export class SceneTreePanel extends ComponentBase {
           <pix3-dropdown-button
             icon="plus-circle"
             aria-label="Create node"
-            .items=${[
-              { id: 'box', label: 'Box', icon: '📦' },
-            ]}
+            .groupedItems=${this.createNodeItems}
             @item-select=${this.onCreateNode}
           ></pix3-dropdown-button>
         </pix3-toolbar>
@@ -153,6 +155,11 @@ export class SceneTreePanel extends ComponentBase {
         this.collapsedNodeIds = pruned;
       }
     }
+  }
+
+  private syncCreateNodeItems(): void {
+    const nodeRegistry = NodeRegistry.getInstance();
+    this.createNodeItems = nodeRegistry.getGroupedDropdownItems();
   }
 
   private syncSelectionState(): void {
@@ -243,19 +250,20 @@ export class SceneTreePanel extends ComponentBase {
   private async onCreateNode(event: CustomEvent): Promise<void> {
     const { id } = event.detail;
 
-    // Only handle 'box' type for now
-    if (id === 'box') {
-      const command = new CreateBoxCommand({
-        boxName: 'Box',
-        size: [1, 1, 1],
-        color: '#4e8df5',
-      });
+    const nodeRegistry = NodeRegistry.getInstance();
+    const nodeType = nodeRegistry.getNodeType(id);
+    
+    if (!nodeType) {
+      console.error('[SceneTreePanel] Unknown node type:', id);
+      return;
+    }
 
-      try {
-        await this.commandDispatcher.execute(command);
-      } catch (error) {
-        console.error('[SceneTreePanel] Failed to create box:', error);
-      }
+    try {
+      // Create the command instance and execute it
+      const command = new nodeType.commandClass();
+      await this.commandDispatcher.execute(command);
+    } catch (error) {
+      console.error('[SceneTreePanel] Failed to create node:', error);
     }
   }
 

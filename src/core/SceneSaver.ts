@@ -5,6 +5,7 @@ import { injectable } from '@/fw/di';
 import { NodeBase } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
 import { Node2D } from '@/nodes/Node2D';
+import { Group2D } from '@/nodes/2D/Group2D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
 import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
@@ -146,11 +147,24 @@ export class SceneSaver {
       }
 
       props.transform = transform;
-    } else if (node instanceof Node2D) {
+    } else if (node instanceof Group2D) {
+      // Serialize Group2D with size properties
+      props.width = node.width;
+      props.height = node.height;
+
+      // Add 2D transform
       const transform: Record<string, unknown> = {
         position: [node.position.x, node.position.y],
         scale: [node.scale.x, node.scale.y],
-        rotation: node.rotation,
+        rotation: MathUtils.radToDeg(node.rotation.z),
+      };
+      props.transform = transform;
+    } else if (node instanceof Node2D) {
+      // Generic Node2D transform
+      const transform: Record<string, unknown> = {
+        position: [node.position.x, node.position.y],
+        scale: [node.scale.x, node.scale.y],
+        rotation: MathUtils.radToDeg(node.rotation.z),
       };
 
       props.transform = transform;
