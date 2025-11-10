@@ -44,7 +44,31 @@ export class SceneSaver {
       root: rootDefinitions,
     };
 
-    const yaml = stringify(document, { indent: 2 });
+    // Custom YAML stringification to keep vectors as inline arrays
+    let yaml = stringify(document, { indent: 2 });
+    
+    // Replace expanded position arrays with inline format
+    yaml = yaml.replace(/position:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'position: [$1, $2, $3]');
+    yaml = yaml.replace(/position:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g, 'position: [$1, $2]');
+    
+    // Replace expanded rotationEuler arrays with inline format
+    yaml = yaml.replace(/rotationEuler:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'rotationEuler: [$1, $2, $3]');
+    
+    // Replace expanded scale arrays with inline format
+    yaml = yaml.replace(/scale:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'scale: [$1, $2, $3]');
+    yaml = yaml.replace(/scale:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g, 'scale: [$1, $2]');
+    
+    // Replace expanded rotation arrays with inline format (2D)
+    yaml = yaml.replace(/rotation:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- (\w+)/g, 'rotation: [$1, $2, $3, $4]');
+    yaml = yaml.replace(/rotation:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g, 'rotation: [$1, $2]');
+    
+    // Replace expanded size arrays with inline format
+    yaml = yaml.replace(/size:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'size: [$1, $2, $3]');
+    yaml = yaml.replace(/size:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g, 'size: [$1, $2]');
+    
+    // Replace expanded pivot arrays with inline format
+    yaml = yaml.replace(/pivot:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'pivot: [$1, $2]');
+    
     console.debug('[SceneSaver] Serialization complete', {
       yamlLength: yaml.length,
       rootDefinitionCount: rootDefinitions.length,
@@ -54,13 +78,21 @@ export class SceneSaver {
   }
 
   private serializeNode(node: NodeBase): SceneNodeDefinition {
+    // First, get the properties (this might modify the type for DirectionalLightNode)
+    const properties = this.serializeNodeProperties(node);
+    
     const definition: SceneNodeDefinition = {
       id: node.nodeId,
       type: node.type !== 'Group' ? node.type : undefined,
       name: node.name,
-      properties: this.serializeNodeProperties(node),
+      properties: properties,
       metadata: node.metadata && Object.keys(node.metadata).length > 0 ? node.metadata : undefined,
     };
+
+    // Ensure correct type for DirectionalLightNode
+    if (node instanceof DirectionalLightNode) {
+      definition.type = 'DirectionalLightNode';
+    }
 
     if (node.instancePath) {
       definition.instance = node.instancePath;
@@ -86,28 +118,42 @@ export class SceneSaver {
   private serializeNodeProperties(node: NodeBase): Record<string, unknown> {
     const props: Record<string, unknown> = { ...node.properties };
 
+    // Remove flat transform properties - we'll use the transform wrapper instead
+    delete props.position;
+    delete props.rotation;
+    delete props.scale;
+    delete props.rotationEuler;
+    delete props.rotationOrder;
+    delete props.transform;
+
     // Serialize 3D transforms if this is a Node3D
     if (node instanceof Node3D) {
-      props.position = [node.position.x, node.position.y, node.position.z];
-
       // Convert rotation from radians back to degrees for YAML
       const rotation = node.rotation;
-      props.rotation = [
-        MathUtils.radToDeg(rotation.x),
-        MathUtils.radToDeg(rotation.y),
-        MathUtils.radToDeg(rotation.z),
-      ];
-
-      props.scale = [node.scale.x, node.scale.y, node.scale.z];
+      const transform: Record<string, unknown> = {
+        position: [node.position.x, node.position.y, node.position.z],
+        rotationEuler: [
+          MathUtils.radToDeg(rotation.x),
+          MathUtils.radToDeg(rotation.y),
+          MathUtils.radToDeg(rotation.z),
+        ],
+        scale: [node.scale.x, node.scale.y, node.scale.z],
+      };
 
       // Add transform metadata if rotation order is not default
       if (rotation.order && rotation.order !== 'XYZ') {
-        props.transform = { rotationOrder: rotation.order };
+        transform.rotationOrder = rotation.order;
       }
+
+      props.transform = transform;
     } else if (node instanceof Node2D) {
-      props.position = [node.position.x, node.position.y];
-      props.scale = [node.scale.x, node.scale.y];
-      props.rotation = node.rotation;
+      const transform: Record<string, unknown> = {
+        position: [node.position.x, node.position.y],
+        scale: [node.scale.x, node.scale.y],
+        rotation: node.rotation,
+      };
+
+      props.transform = transform;
     }
 
     // Serialize specific node type properties
