@@ -74,11 +74,16 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       const isTransform = this.isTransformProperty(propertyPath);
       if (isTransform) {
         vr.updateNodeTransform(node);
+      } else if (propertyPath === 'visible') {
+        // Visibility change - update 2D node visuals
+        vr.updateNodeVisibility(node);
       } else {
-        // Non-transform property; no need to rebuild, just refresh selection visuals
+        // Other non-transform property; no need to rebuild, just refresh selection visuals
         vr.updateSelection();
       }
-    } catch {}
+    } catch {
+      // Silently ignore viewport renderer errors
+    }
 
     return {
       didMutate: true,
@@ -99,10 +104,14 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
             const isTransform = this.isTransformProperty(propertyPath);
             if (isTransform) {
               vr.updateNodeTransform(node);
+            } else if (propertyPath === 'visible') {
+              vr.updateNodeVisibility(node);
             } else {
               vr.updateSelection();
             }
-          } catch {}
+          } catch {
+            // Silently ignore viewport renderer errors
+          }
         },
         redo: async () => {
           this.setPropertyValue(node, propertyPath, value);
@@ -118,10 +127,14 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
             const isTransform = this.isTransformProperty(propertyPath);
             if (isTransform) {
               vr.updateNodeTransform(node);
+            } else if (propertyPath === 'visible') {
+              vr.updateNodeVisibility(node);
             } else {
               vr.updateSelection();
             }
-          } catch {}
+          } catch {
+            // Silently ignore viewport renderer errors
+          }
         },
       },
     };
@@ -197,8 +210,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
         if (typeof value !== 'boolean')
           return { isValid: false, reason: 'Visible must be boolean' };
       } else if (property === 'locked') {
-        if (typeof value !== 'boolean')
-          return { isValid: false, reason: 'Locked must be boolean' };
+        if (typeof value !== 'boolean') return { isValid: false, reason: 'Locked must be boolean' };
       } else if (property === 'name') {
         if (typeof value !== 'string') return { isValid: false, reason: 'Name must be string' };
       }

@@ -283,6 +283,41 @@ export class ViewportRendererService {
     }
   }
 
+  updateNodeVisibility(node: NodeBase): void {
+    // Handle visibility changes for 2D nodes (Group2D and Sprite2D)
+    if (node instanceof Group2D) {
+      const mesh = this.group2DMeshes.get(node.nodeId);
+      if (mesh) {
+        if (node.visible) {
+          // Show the mesh
+          if (!mesh.parent && this.scene) {
+            this.scene.add(mesh);
+          }
+        } else {
+          // Hide the mesh
+          if (mesh.parent) {
+            mesh.parent.remove(mesh);
+          }
+        }
+      }
+    } else if (node instanceof Sprite2D) {
+      const mesh = this.sprite2DMeshes.get(node.nodeId);
+      if (mesh) {
+        if (node.visible) {
+          // Show the mesh
+          if (!mesh.parent && this.scene) {
+            this.scene.add(mesh);
+          }
+        } else {
+          // Hide the mesh
+          if (mesh.parent) {
+            mesh.parent.remove(mesh);
+          }
+        }
+      }
+    }
+  }
+
   updateSelection(): void {
     // Detach transform controls from previous object
     if (this.transformControls) {
@@ -465,14 +500,20 @@ export class ViewportRendererService {
     if (node instanceof Group2D) {
       const mesh = this.createGroup2DVisual(node);
       this.group2DMeshes.set(node.nodeId, mesh);
-      this.scene.add(mesh);
+      // Only add to scene if the node is visible
+      if (node.visible) {
+        this.scene.add(mesh);
+      }
     }
 
     // Create visual representation for Sprite2D nodes
     if (node instanceof Sprite2D) {
       const mesh = this.createSprite2DVisual(node);
       this.sprite2DMeshes.set(node.nodeId, mesh);
-      this.scene.add(mesh);
+      // Only add to scene if the node is visible
+      if (node.visible) {
+        this.scene.add(mesh);
+      }
     }
 
     // Recursively process children
