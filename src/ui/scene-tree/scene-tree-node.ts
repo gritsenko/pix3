@@ -12,6 +12,7 @@ import {
   toggleObjectSelection,
   selectObjectRange,
 } from '@/features/selection/SelectObjectCommand';
+import { UpdateObjectPropertyCommand } from '@/features/properties/UpdateObjectPropertyCommand';
 
 import './scene-tree-node.ts.css';
 
@@ -25,6 +26,7 @@ export interface SceneTreeNode {
   treeColor: string;
   treeIcon: string;
   instancePath: string | null;
+  properties: Record<string, unknown>;
   children: SceneTreeNode[];
 }
 
@@ -62,8 +64,16 @@ export class SceneTreeNodeComponent extends ComponentBase {
   @state()
   private isDragging: boolean = false;
 
+  @state()
+  private isVisible: boolean = true;
+
+  @state()
+  private isLocked: boolean = false;
+
   updated(): void {
     this.isCollapsed = this.collapsedNodeIds.has(this.node.id);
+    this.isVisible = (this.node.properties?.visible as boolean) ?? true;
+    this.isLocked = (this.node.properties?.locked as boolean) ?? false;
   }
 
   protected render() {
@@ -117,12 +127,12 @@ export class SceneTreeNodeComponent extends ComponentBase {
           draggable="true"
         >
           ${expanderTemplate}
-          <span class="tree-node__icon" title=${this.node.type} aria-label=${this.node.type}>
+          <span class="tree-node__icon" title=${this.node.type} aria-label=${this.node.type} style="color: ${this.node.treeColor};">
             ${this.renderNodeIcon(this.node.treeIcon)}
           </span>
           <span class="tree-node__label">
             <span class="tree-node__header">
-              <span class="tree-node__name" style="color: ${this.node.treeColor};">
+              <span class="tree-node__name">
                 ${this.node.name}
               </span>
             </span>
@@ -130,6 +140,24 @@ export class SceneTreeNodeComponent extends ComponentBase {
               ? html`<span class="tree-node__instance">${this.node.instancePath}</span>`
               : null}
           </span>
+          <div class="tree-node__buttons">
+            <button
+              type="button"
+              class="tree-node__button tree-node__button--visible ${this.isVisible ? 'tree-node__button--active' : ''}"
+              aria-label=${this.isVisible ? `Hide ${this.node.name}` : `Show ${this.node.name}`}
+              @click=${(event: Event) => this.onToggleVisibility(event)}
+            >
+              ${this.renderToggleIcon(this.isVisible ? 'eye' : 'eye-off')}
+            </button>
+            <button
+              type="button"
+              class="tree-node__button tree-node__button--lock ${this.isLocked ? 'tree-node__button--active' : ''}"
+              aria-label=${this.isLocked ? `Unlock ${this.node.name}` : `Lock ${this.node.name}`}
+              @click=${(event: Event) => this.onToggleLock(event)}
+            >
+              ${this.renderToggleIcon(this.isLocked ? 'lock' : 'unlock')}
+            </button>
+          </div>
         </div>
         ${hasChildren && !this.isCollapsed
           ? html`<ul class="tree-children" role="group">
@@ -170,6 +198,15 @@ export class SceneTreeNodeComponent extends ComponentBase {
       return html`${unsafeSVG(feather.icons['box'].toSvg({ width: 16, height: 16 }))}`;
     }
     return html`${unsafeSVG(icon.toSvg({ width: 16, height: 16 }))}`;
+  }
+
+  private renderToggleIcon(iconName: string): TemplateResult {
+    const icon = feather.icons[iconName as keyof typeof feather.icons];
+    if (!icon) {
+      console.warn(`[SceneTreeNode] Toggle icon not found: ${iconName}`);
+      return html`${unsafeSVG(feather.icons['box'].toSvg({ width: 14, height: 14 }))}`;
+    }
+    return html`${unsafeSVG(icon.toSvg({ width: 14, height: 14 }))}`;
   }
 
   private onToggleNode(event: Event): void {
@@ -318,6 +355,42 @@ export class SceneTreeNodeComponent extends ComponentBase {
         composed: true,
       })
     );
+  }
+
+  private async onToggleVisibility(event: Event): Promise<void> {
+    event.stopPropagation();
+    
+    const newVisibleState = !this.isVisible;
+    try {
+      const command = new UpdateObjectPropertyCommand({
+        nodeId: this.node.id,
+        propertyPath: 'visible',
+        value: newVisibleState,
+      });
+      
+      await this.commandDispatcher.execute(command);
+      this.isVisible = newVisibleState;
+    } catch (error) {
+      console.error('[SceneTreeNode] Failed to toggle visibility:', error);
+    }
+  }
+
+  private async onToggleLock(event: Event): Promise<void> {
+    event.stopPropagation();
+    
+    const newLockedState = !this.isLocked;
+    try {
+      const command = new UpdateObjectPropertyCommand({
+        nodeId: this.node.id,
+        propertyPath: 'locked',
+        value: newLockedState,
+      });
+      
+      await this.commandDispatcher.execute(command);
+      this.isLocked = newLockedState;
+    } catch (error) {
+      console.error('[SceneTreeNode] Failed to toggle lock:', error);
+    }
   }
 }
 

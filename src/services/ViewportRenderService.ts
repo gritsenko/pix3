@@ -211,6 +211,7 @@ export class ViewportRendererService {
 
   /**
    * Raycast from camera through screen position and find the deepest NodeBase object.
+   * Excludes locked nodes from selection.
    * @param screenX Normalized screen X coordinate (0 to 1)
    * @param screenY Normalized screen Y coordinate (0 to 1)
    * @returns The deepest NodeBase object under the pointer, or null if none found
@@ -248,13 +249,18 @@ export class ViewportRendererService {
 
     // Find the deepest NodeBase in the hierarchy
     // Start from the closest intersection and traverse up to find the deepest NodeBase ancestor
+    // Skip locked nodes
     for (const intersection of intersects) {
       let current: THREE.Object3D | null = intersection.object;
 
       // Traverse up the hierarchy to find the deepest NodeBase
       while (current) {
         if (current instanceof NodeBase) {
-          return current;
+          // Skip locked nodes - they cannot be selected by pointer
+          const isLocked = Boolean((current as any).properties?.locked);
+          if (!isLocked) {
+            return current;
+          }
         }
         current = current.parent;
       }

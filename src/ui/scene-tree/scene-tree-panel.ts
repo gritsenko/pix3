@@ -193,6 +193,7 @@ export class SceneTreePanel extends ComponentBase {
         treeColor: color,
         treeIcon: icon,
         instancePath: node.instancePath,
+        properties: node.properties,
         // Only include NodeBase children, filter out Three.js objects like Mesh, Light, etc.
         children: this.buildTreeNodes(node.children.filter(child => child instanceof NodeBase)),
       };

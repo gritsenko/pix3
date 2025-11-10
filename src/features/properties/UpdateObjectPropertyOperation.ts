@@ -153,6 +153,9 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
         const boolValue = Boolean(value);
         node.visible = boolValue;
         node.properties.visible = boolValue;
+      } else if (property === 'locked') {
+        const boolValue = Boolean(value);
+        node.properties.locked = boolValue;
       } else if (property === 'name') {
         node.name = value as string;
       } else {
@@ -193,6 +196,9 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       if (property === 'visible') {
         if (typeof value !== 'boolean')
           return { isValid: false, reason: 'Visible must be boolean' };
+      } else if (property === 'locked') {
+        if (typeof value !== 'boolean')
+          return { isValid: false, reason: 'Locked must be boolean' };
       } else if (property === 'name') {
         if (typeof value !== 'string') return { isValid: false, reason: 'Name must be string' };
       }
