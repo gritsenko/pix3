@@ -2,11 +2,14 @@ import { injectable } from '@/fw/di';
 
 import startupScene from '../templates/startup-scene.pix3scene?raw';
 import testModelGlb from '../templates/Duck.glb?url';
+import pix3LogoUrl from '../templates/pix3-logo.png?url';
 
 export type TemplateScheme = 'templ';
 
 type SceneTemplateId = 'startup-scene' | 'default';
 type BinaryTemplateId = 'Duck.glb';
+// Add any image or binary templates which should be resolved via templ://
+type ImageTemplateId = 'pix3-logo.png';
 
 interface SceneTemplateDescriptor {
   readonly id: SceneTemplateId;
@@ -39,6 +42,10 @@ const binaryTemplates: BinaryTemplateDescriptor[] = [
   {
     id: 'Duck.glb',
     url: testModelGlb,
+  },
+  {
+    id: 'pix3-logo.png',
+    url: pix3LogoUrl,
   },
 ];
 

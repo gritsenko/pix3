@@ -16,6 +16,7 @@ import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager } from '@/core/SceneManager';
 import { OperationService } from '@/services/OperationService';
+import { ResourceManager } from '@/services/ResourceManager';
 import { appState } from '@/state';
 import { subscribe } from 'valtio/vanilla';
 import {
@@ -32,6 +33,9 @@ export class ViewportRendererService {
 
   @inject(OperationService)
   private readonly operationService!: OperationService;
+
+  @inject(ResourceManager)
+  private readonly resourceManager!: ResourceManager;
 
   private renderer?: THREE.WebGLRenderer;
   private scene?: THREE.Scene;
@@ -611,19 +615,76 @@ export class ViewportRendererService {
 
     let material: THREE.Material;
 
-    // Try to load texture if available
+    // Try to load texture if available; if it references a templ:// or res:// URL,
+    // use ResourceManager to resolve it to a Blob and create an object URL for the TextureLoader.
+    const textureLoader = new THREE.TextureLoader();
     if (node.texturePath) {
-      // Try to load the texture
-      const textureLoader = new THREE.TextureLoader();
-      try {
-        const texture = textureLoader.load(node.texturePath, undefined, undefined, () => {
-          // On error, fall back to placeholder color
-        });
-        material = new THREE.MeshBasicMaterial({ map: texture });
-      } catch {
-        // Fallback to placeholder material
-        material = new THREE.MeshBasicMaterial({ color: 0xcccccc });
-      }
+      // Use a placeholder material immediately, and patch in the texture asynchronously
+      material = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+
+      // Asynchronously resolve resource to a Blob using ResourceManager
+      (async () => {
+        const texturePath = node.texturePath as string;
+        try {
+          const blob = await this.resourceManager.readBlob(texturePath);
+          const blobUrl = URL.createObjectURL(blob);
+
+          // Load texture from object URL and patch material when loaded
+            textureLoader.load(
+            blobUrl,
+            texture => {
+              try {
+                if (material instanceof THREE.MeshBasicMaterial) {
+                  material.map = texture;
+                  material.color.set(0xffffff);
+                  material.needsUpdate = true;
+                }
+              } finally {
+                // Revoke the object URL once the texture has been decoded
+                try {
+                  URL.revokeObjectURL(blobUrl);
+                } catch {
+                  // ignore
+                }
+              }
+            },
+            undefined,
+            err => {
+              // Loading error — keep placeholder material
+              console.warn('[ViewportRenderer] Failed to load sprite texture', node.texturePath, err);
+              try {
+                URL.revokeObjectURL(blobUrl);
+              } catch {
+                // ignore
+              }
+            }
+          );
+          } catch (err) {
+            // failed to fetch blob via ResourceManager — only attempt direct load for http/https or no-scheme paths.
+            const schemeMatch = /^([a-z]+[a-z0-9+.-]*):\/\//i.exec(texturePath);
+            const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : '';
+
+            if (scheme === 'http' || scheme === 'https' || scheme === '') {
+              try {
+                const texture = textureLoader.load(texturePath, undefined, undefined, e => {
+                  console.warn('[ViewportRenderer] Direct texture load failed', node.texturePath, e);
+                });
+                if (texture) {
+                  if (material instanceof THREE.MeshBasicMaterial) {
+                    material.map = texture;
+                    material.color.set(0xffffff);
+                    material.needsUpdate = true;
+                  }
+                }
+              } catch (err2) {
+                console.warn('[ViewportRenderer] Failed to load texture for', node.texturePath, err2);
+              }
+            } else {
+              // If the scheme is templ:// or res://, avoid direct load (these schemes are handled by ResourceManager)
+              console.warn('[ViewportRenderer] Skipping direct load for unsupported scheme:', texturePath);
+            }
+          }
+      })();
     } else {
       // No texture path - use placeholder material (light gray)
       material = new THREE.MeshBasicMaterial({ color: 0xcccccc });
