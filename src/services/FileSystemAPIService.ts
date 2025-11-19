@@ -46,6 +46,32 @@ const DEFAULT_RESOURCE_PREFIX = 'res://';
 type PermissionMode = 'read' | 'readwrite';
 type PermissionState = 'prompt' | 'granted' | 'denied';
 
+// IDB Helper for Service Worker sharing
+const DB_NAME = 'pix3-db';
+const STORE_NAME = 'handles';
+const HANDLE_KEY = 'project-root';
+
+async function saveHandleToDB(handle: FileSystemDirectoryHandle): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, 1);
+    request.onupgradeneeded = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      if (!db.objectStoreNames.contains(STORE_NAME)) {
+        db.createObjectStore(STORE_NAME);
+      }
+    };
+    request.onsuccess = (event) => {
+      const db = (event.target as IDBOpenDBRequest).result;
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      store.put(handle, HANDLE_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    };
+    request.onerror = () => reject(request.error);
+  });
+}
+
 @injectable()
 export class FileSystemAPIService {
   private directoryHandle: FileSystemDirectoryHandle | null = null;
@@ -67,6 +93,9 @@ export class FileSystemAPIService {
 
   setProjectDirectory(handle: FileSystemDirectoryHandle): void {
     this.directoryHandle = handle;
+    saveHandleToDB(handle).catch((err) =>
+      this.logger?.('Failed to save project handle to IDB', err)
+    );
   }
 
   getProjectDirectory(): FileSystemDirectoryHandle | null {

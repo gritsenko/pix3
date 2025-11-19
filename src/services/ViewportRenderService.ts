@@ -40,6 +40,7 @@ export class ViewportRendererService {
   private renderer?: THREE.WebGLRenderer;
   private scene?: THREE.Scene;
   private camera?: THREE.PerspectiveCamera;
+  private orthographicCamera?: THREE.OrthographicCamera;
   private orbitControls?: OrbitControls;
   private transformControls?: TransformControls;
   private transformGizmo?: THREE.Object3D;
@@ -77,6 +78,18 @@ export class ViewportRendererService {
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 10000);
     this.camera.position.set(5, 5, 5);
     this.camera.lookAt(0, 0, 0);
+
+    // Set up camera layers: layer 0 for 3D nodes, layer 1 for 2D nodes
+    // Main perspective camera only renders 3D layer
+    this.camera.layers.disableAll();
+    this.camera.layers.enable(0);
+
+    // Create orthographic camera for 2D layer overlay
+    this.orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
+    this.orthographicCamera.position.z = 100;
+    // Orthographic camera only renders 2D layer
+    this.orthographicCamera.layers.disableAll();
+    this.orthographicCamera.layers.enable(1);
 
     // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -167,6 +180,18 @@ export class ViewportRendererService {
     this.renderer.setSize(pixelWidth, pixelHeight, false);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
+
+    // Update orthographic camera to match viewport aspect ratio
+    if (this.orthographicCamera) {
+      const aspectRatio = width / height;
+      const viewHeight = 10;
+      const viewWidth = viewHeight * aspectRatio;
+      this.orthographicCamera.left = -viewWidth / 2;
+      this.orthographicCamera.right = viewWidth / 2;
+      this.orthographicCamera.top = viewHeight / 2;
+      this.orthographicCamera.bottom = -viewHeight / 2;
+      this.orthographicCamera.updateProjectionMatrix();
+    }
   }
 
   setTransformMode(mode: TransformMode): void {
@@ -495,14 +520,16 @@ export class ViewportRendererService {
   private processNodeForRendering(node: NodeBase): void {
     if (!this.scene) return;
 
-    // Add 3D nodes to the scene
+    // Add 3D nodes to the scene with layer 0
     if (node instanceof Node3D && !node.parent) {
       this.scene.add(node);
+      node.layers.set(0); // 3D nodes use layer 0
     }
 
-    // Create visual representation for Group2D nodes
+    // Create visual representation for Group2D nodes with layer 1
     if (node instanceof Group2D) {
       const mesh = this.createGroup2DVisual(node);
+      mesh.layers.set(1); // 2D visuals use layer 1
       this.group2DMeshes.set(node.nodeId, mesh);
       // Only add to scene if the node is visible
       if (node.visible) {
@@ -510,9 +537,10 @@ export class ViewportRendererService {
       }
     }
 
-    // Create visual representation for Sprite2D nodes
+    // Create visual representation for Sprite2D nodes with layer 1
     if (node instanceof Sprite2D) {
       const mesh = this.createSprite2DVisual(node);
+      mesh.layers.set(1); // 2D visuals use layer 1
       this.sprite2DMeshes.set(node.nodeId, mesh);
       // Only add to scene if the node is visible
       if (node.visible) {
@@ -758,7 +786,13 @@ export class ViewportRendererService {
           }
         }
 
+        // Render main scene with perspective camera (3D layer only)
         this.renderer.render(this.scene, this.camera);
+
+        // Render 2D layer with orthographic camera if enabled
+        if (appState.ui.showLayer2D && this.orthographicCamera) {
+          this.renderer.render(this.scene, this.orthographicCamera);
+        }
       }
     };
 
@@ -891,6 +925,7 @@ export class ViewportRendererService {
     this.renderer = undefined;
     this.scene = undefined;
     this.camera = undefined;
+    this.orthographicCamera = undefined;
     this.orbitControls = undefined;
     this.transformControls = undefined;
     this.transformGizmo = undefined;

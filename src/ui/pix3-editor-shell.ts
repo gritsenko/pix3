@@ -5,8 +5,10 @@ import { LayoutManagerService } from '@/core/LayoutManager';
 import { OperationService } from '@/services/OperationService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { CommandRegistry } from '@/services/CommandRegistry';
+import { FileWatchService } from '@/services/FileWatchService';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
+import { ReloadSceneCommand } from '@/features/scene/ReloadSceneCommand';
 import { UndoCommand } from '@/features/history/UndoCommand';
 import { RedoCommand } from '@/features/history/RedoCommand';
 import { appState } from '@/state';
@@ -35,6 +37,9 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(CommandRegistry)
   private readonly commandRegistry!: CommandRegistry;
 
+  @inject(FileWatchService)
+  private readonly fileWatchService!: FileWatchService;
+
   // project open handled by <pix3-welcome>
 
   @state()
@@ -44,8 +49,10 @@ export class Pix3EditorShell extends ComponentBase {
   protected shellReady = false;
 
   private disposeSubscription?: () => void;
+  private disposeScenesSubscription?: () => void;
   private onWelcomeProjectReady?: (e: Event) => void;
   private keyboardHandler?: (e: KeyboardEvent) => void;
+  private watchedSceneIds = new Set<string>();
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -97,6 +104,12 @@ export class Pix3EditorShell extends ComponentBase {
       }
     });
 
+    // Subscribe to scene descriptor changes to start/stop file watching
+    this.disposeScenesSubscription = subscribe(appState.scenes, () => {
+      this.updateSceneWatchers();
+      this.updateViewportTitle();
+    });
+
     // If the app was reloaded (HMR) and the URL indicates the editor, try to auto-open
     // the most recent project so the shell will initialize and avoid showing the welcome UI.
     try {
@@ -137,6 +150,8 @@ export class Pix3EditorShell extends ComponentBase {
   disconnectedCallback(): void {
     this.disposeSubscription?.();
     this.disposeSubscription = undefined;
+    this.disposeScenesSubscription?.();
+    this.disposeScenesSubscription = undefined;
     if (this.onWelcomeProjectReady) {
       this.removeEventListener(
         'pix3-welcome:project-ready',
@@ -148,6 +163,8 @@ export class Pix3EditorShell extends ComponentBase {
       window.removeEventListener('keydown', this.keyboardHandler);
       this.keyboardHandler = undefined;
     }
+    // Stop all file watchers
+    this.fileWatchService.unwatchAll();
     super.disconnectedCallback();
   }
 
@@ -196,6 +213,87 @@ export class Pix3EditorShell extends ComponentBase {
     } catch (error) {
       console.error('[Pix3EditorShell] Failed to redo', error);
     }
+  }
+
+  /**
+   * Update file watchers based on currently loaded scenes.
+   * Starts watching new scenes with file handles, stops watching removed scenes.
+   */
+  private updateSceneWatchers(): void {
+    const currentSceneIds = new Set(Object.keys(appState.scenes.descriptors));
+
+    // Stop watching scenes that are no longer loaded
+    for (const sceneId of this.watchedSceneIds) {
+      if (!currentSceneIds.has(sceneId)) {
+        const descriptor = appState.scenes.descriptors[sceneId];
+        if (descriptor?.filePath) {
+          this.fileWatchService.unwatch(descriptor.filePath);
+        }
+        this.watchedSceneIds.delete(sceneId);
+      }
+    }
+
+    // Start watching new scenes that have file handles
+    for (const sceneId of currentSceneIds) {
+      if (!this.watchedSceneIds.has(sceneId)) {
+        const descriptor = appState.scenes.descriptors[sceneId];
+        if (descriptor?.fileHandle && descriptor?.filePath) {
+          // Only watch res:// paths (project files)
+          if (descriptor.filePath.startsWith('res://')) {
+            this.fileWatchService.watch(
+              descriptor.filePath,
+              descriptor.fileHandle,
+              descriptor.lastModifiedTime,
+              () => this.handleFileChanged(sceneId, descriptor.filePath)
+            );
+            this.watchedSceneIds.add(sceneId);
+          }
+        }
+      }
+    }
+  }
+
+  /**
+   * Update viewport tab title based on active scene name and file name.
+   */
+  private updateViewportTitle(): void {
+    const activeSceneId = appState.scenes.activeSceneId;
+    if (!activeSceneId) {
+      this.layoutManager.setViewportTitle('Viewport');
+      return;
+    }
+
+    const descriptor = appState.scenes.descriptors[activeSceneId];
+    if (!descriptor) {
+      this.layoutManager.setViewportTitle('Viewport');
+      return;
+    }
+
+    // Extract file name from path (e.g., "res://scenes/level-1.pix3scene" -> "level-1.pix3scene")
+    const normalizedPath = descriptor.filePath.replace(/\\/g, '/');
+    const segments = normalizedPath.split('/').filter(Boolean);
+    const fileName = segments.length ? segments[segments.length - 1] : descriptor.filePath;
+
+    // Use file name as viewport title (e.g., "level-1.pix3scene")
+    this.layoutManager.setViewportTitle(fileName);
+  }
+
+  /**
+   * Handle external file change detection - reload the scene.
+   */
+  private handleFileChanged(sceneId: string, filePath: string): void {
+    if (process.env.NODE_ENV === 'development') {
+      console.debug('[Pix3EditorShell] External scene file change detected', {
+        sceneId,
+        filePath,
+      });
+    }
+
+    // Execute reload command
+    const reloadCommand = new ReloadSceneCommand({ sceneId, filePath });
+    void this.commandDispatcher.execute(reloadCommand).catch((error) => {
+      console.error('[Pix3EditorShell] Failed to reload scene from external change:', error);
+    });
   }
 
   protected async firstUpdated(): Promise<void> {

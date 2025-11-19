@@ -2,6 +2,7 @@ import { inject } from '@/fw/di';
 import { ResourceManager } from '@/services/ResourceManager';
 import { SceneManager } from '@/core/SceneManager';
 import { SceneValidationError } from '@/core/SceneLoader';
+import { FileSystemAPIService } from '@/services/FileSystemAPIService';
 import type { SceneGraph } from '@/core/SceneManager';
 import { ref } from 'valtio/vanilla';
 import {
@@ -27,6 +28,7 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
 
   @inject(ResourceManager) private readonly resources!: ResourceManager;
   @inject(SceneManager) private readonly sceneManager!: SceneManager;
+  @inject(FileSystemAPIService) private readonly fileSystem!: FileSystemAPIService;
 
   private payload?: LoadSceneCommandPayload;
 
@@ -80,6 +82,24 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
         existing?.name
       );
 
+      // Try to get file handle and modification time for file watching
+      let fileHandle: FileSystemFileHandle | null = null;
+      let lastModifiedTime: number | null = null;
+
+      try {
+        // Only get handle for res:// paths (project files)
+        if (filePath.startsWith('res://')) {
+          fileHandle = await this.fileSystem.getFileHandle(filePath, { mode: 'read' });
+          const file = await fileHandle.getFile();
+          lastModifiedTime = file.lastModified;
+        }
+      } catch (error) {
+        // File handle retrieval failed, but we can still load the scene
+        console.debug('[LoadSceneCommand] Could not get file handle for watching:', error);
+      }
+
+      const storedFileHandle = fileHandle ? ref(fileHandle) : null;
+
       if (!existing) {
         state.scenes.descriptors[activeId] = {
           id: activeId,
@@ -88,6 +108,8 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
           version: graph.version ?? '1.0.0',
           isDirty: false,
           lastSavedAt: null,
+          fileHandle: storedFileHandle,
+          lastModifiedTime,
         };
         state.scenes.activeSceneId = activeId;
       } else {
@@ -97,6 +119,8 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
           name: sceneName,
           version: graph.version ?? existing.version,
           isDirty: false,
+          fileHandle: storedFileHandle,
+          lastModifiedTime,
         } as typeof existing;
         state.scenes.activeSceneId = activeId;
       }

@@ -85,13 +85,13 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
               },
             ],
           },
-          {
-            type: 'component',
-            componentType: PANEL_COMPONENT_TYPES.logs,
-            title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.logs],
-            height: 25,
-            isClosable: true,
-          },
+          // {
+          //   type: 'component',
+          //   componentType: PANEL_COMPONENT_TYPES.logs,
+          //   title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.logs],
+          //   height: 25,
+          //   isClosable: true,
+          // },
         ],
       },
 
@@ -111,6 +111,7 @@ export class LayoutManagerService {
   private layout: GoldenLayout | null = null;
   private readonly state: AppState;
   private container: HTMLElement | null = null;
+  private viewportContainer: any = null;
 
   constructor(state: AppState = appState) {
     this.state = state;
@@ -139,6 +140,15 @@ export class LayoutManagerService {
     }
 
     await this.loadDefaultLayout();
+  }
+
+  /**
+   * Update the viewport tab title to reflect the active scene name or file name.
+   */
+  setViewportTitle(title: string): void {
+    if (this.viewportContainer) {
+      this.viewportContainer.setTitle(title);
+    }
   }
 
   private async loadDefaultLayout(): Promise<void> {
@@ -191,6 +201,12 @@ export class LayoutManagerService {
     Object.entries(PANEL_TAG_NAMES).forEach(([componentType, tagName]) => {
       layout.registerComponentFactoryFunction(componentType, container => {
         container.setTitle(PANEL_DISPLAY_TITLES[componentType as PanelComponentType]);
+        
+        // Store reference to viewport container for dynamic title updates
+        if (componentType === PANEL_COMPONENT_TYPES.viewport) {
+          this.viewportContainer = container;
+        }
+        
         const element = document.createElement(tagName);
         element.setAttribute('data-panel-id', componentType);
         container.element.append(element);

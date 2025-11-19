@@ -14,6 +14,10 @@ export interface SceneDescriptor {
   version: string;
   isDirty: boolean;
   lastSavedAt: number | null;
+  /** File system handle for opened scene files (from File System Access API). */
+  fileHandle?: FileSystemFileHandle | null;
+  /** Last known modification time of the file (ms), for change detection polling. */
+  lastModifiedTime?: number | null;
 }
 
 export interface SceneHierarchyState {
@@ -79,6 +83,8 @@ export interface UIState {
   focusedPanelId: string | null;
   commandPaletteOpen: boolean;
   panelVisibility: PanelVisibilityState;
+  /** Toggle for showing the 2D orthographic layer overlay */
+  showLayer2D: boolean;
 }
 
 export interface OperationState {
@@ -145,6 +151,7 @@ export const createInitialAppState = (): AppState => ({
       assetBrowser: true,
       logs: true,
     },
+    showLayer2D: false,
   },
   operations: {
     isExecuting: false,

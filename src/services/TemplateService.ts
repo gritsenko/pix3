@@ -1,53 +1,12 @@
 import { injectable } from '@/fw/di';
 
-import startupScene from '../templates/startup-scene.pix3scene?raw';
-import testModelGlb from '../templates/Duck.glb?url';
-import pix3LogoUrl from '../templates/pix3-logo.png?url';
+import type {
+  BinaryTemplateDescriptor,
+  SceneTemplateDescriptor,
+} from './template-data';
+import { binaryTemplates, sceneTemplates } from './template-data';
 
 export type TemplateScheme = 'templ';
-
-type SceneTemplateId = 'startup-scene' | 'default';
-type BinaryTemplateId = 'Duck.glb';
-// Add any image or binary templates which should be resolved via templ://
-type ImageTemplateId = 'pix3-logo.png';
-
-interface SceneTemplateDescriptor {
-  readonly id: SceneTemplateId;
-  readonly contents: string;
-  readonly title: string;
-  readonly description?: string;
-}
-
-interface BinaryTemplateDescriptor {
-  readonly id: BinaryTemplateId;
-  readonly url: string;
-}
-
-const sceneTemplates: SceneTemplateDescriptor[] = [
-  {
-    id: 'startup-scene',
-    contents: startupScene,
-    title: 'Startup Scene',
-    description: 'Default Pix3 scene with environment root, basic lighting, camera, and UI sprite.',
-  },
-  {
-    id: 'default',
-    contents: startupScene,
-    title: 'Default Scene',
-    description: 'Fallback template used when a requested template is missing.',
-  },
-];
-
-const binaryTemplates: BinaryTemplateDescriptor[] = [
-  {
-    id: 'Duck.glb',
-    url: testModelGlb,
-  },
-  {
-    id: 'pix3-logo.png',
-    url: pix3LogoUrl,
-  },
-];
 
 @injectable()
 export class TemplateService {

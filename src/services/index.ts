@@ -19,3 +19,4 @@ export { AssetFileActivationService, type AssetActivation } from './AssetFileAct
 export { CommandDispatcher, resolveCommandDispatcher } from './CommandDispatcher';
 export { LoggingService, type LogLevel, type LogEntry, type LogListener } from './LoggingService';
 export { CommandRegistry, type CommandMenuItem, type MenuSection } from './CommandRegistry';
+export { FileWatchService } from './FileWatchService';

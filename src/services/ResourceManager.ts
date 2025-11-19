@@ -18,6 +18,24 @@ export class ResourceManager {
   @inject(TemplateService)
   private readonly templateService!: TemplateService;
 
+  constructor() {
+    this.registerServiceWorker();
+  }
+
+  private async registerServiceWorker() {
+    if ('serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.register(
+          new URL('../sw.ts', import.meta.url),
+          { type: 'module' }
+        );
+        console.log('Service Worker registered:', registration);
+      } catch (error) {
+        console.error('Service Worker registration failed:', error);
+      }
+    }
+  }
+
   async readText(resource: string, options: ReadResourceOptions = {}): Promise<string> {
     const scheme = this.getScheme(resource);
 
