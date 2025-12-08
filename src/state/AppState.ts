@@ -151,7 +151,7 @@ export const createInitialAppState = (): AppState => ({
       assetBrowser: true,
       logs: true,
     },
-    showLayer2D: false,
+    showLayer2D: true,
   },
   operations: {
     isExecuting: false,

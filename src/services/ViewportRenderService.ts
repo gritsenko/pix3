@@ -309,6 +309,22 @@ export class ViewportRendererService {
       if (!node.parent) {
         this.scene.add(node);
       }
+    } else if (node instanceof Group2D) {
+      // Update Group2D visual representation transform
+      const mesh = this.group2DMeshes.get(node.nodeId);
+      if (mesh) {
+        mesh.position.copy(node.position);
+        mesh.rotation.copy(node.rotation);
+        mesh.scale.copy(node.scale);
+      }
+    } else if (node instanceof Sprite2D) {
+      // Update Sprite2D visual representation transform
+      const mesh = this.sprite2DMeshes.get(node.nodeId);
+      if (mesh) {
+        mesh.position.copy(node.position);
+        mesh.rotation.copy(node.rotation);
+        mesh.scale.copy(node.scale);
+      }
     }
   }
 
@@ -787,11 +803,22 @@ export class ViewportRendererService {
         }
 
         // Render main scene with perspective camera (3D layer only)
+        this.renderer.autoClear = true;
         this.renderer.render(this.scene, this.camera);
 
         // Render 2D layer with orthographic camera if enabled
         if (appState.ui.showLayer2D && this.orthographicCamera) {
+          // Save and remove scene background to prevent it from overwriting 3D content
+          const savedBackground = this.scene.background;
+          this.scene.background = null;
+          
+          this.renderer.autoClear = false;
+          this.renderer.clearDepth();
           this.renderer.render(this.scene, this.orthographicCamera);
+          
+          // Restore scene background and autoClear for next frame
+          this.scene.background = savedBackground;
+          this.renderer.autoClear = true;
         }
       }
     };

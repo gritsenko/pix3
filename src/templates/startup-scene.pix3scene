@@ -81,5 +81,5 @@ root:
         properties:
           texturePath: templ://pix3-logo.png
           position: [0, 0]
-          scale: [1, 1]
+          scale: [0.01, 0.01]
           rotation: 0
