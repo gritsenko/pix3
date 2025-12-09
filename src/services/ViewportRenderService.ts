@@ -28,20 +28,9 @@ import {
   Transform2DCompleteOperation,
   type Transform2DState,
 } from '@/features/properties/Transform2DCompleteOperation';
+import { TransformTool2d, type TwoDHandle, type Active2DTransform, type Selection2DOverlay } from '@/services/TransformTool2d';
 
 export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
-type TwoDHandle =
-  | 'idle'
-  | 'move'
-  | 'rotate'
-  | 'scale-n'
-  | 'scale-s'
-  | 'scale-e'
-  | 'scale-w'
-  | 'scale-ne'
-  | 'scale-nw'
-  | 'scale-se'
-  | 'scale-sw';
 
 @injectable()
 export class ViewportRendererService {
@@ -66,26 +55,8 @@ export class ViewportRendererService {
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
   private group2DMeshes = new Map<string, THREE.LineSegments>();
   private sprite2DMeshes = new Map<string, THREE.Mesh>();
-  private selection2DOverlay?: {
-    group: THREE.Group;
-    handles: THREE.Object3D[];
-    frame: THREE.LineSegments;
-    nodeIds: string[];
-    combinedBounds: THREE.Box3;
-    centerWorld: THREE.Vector3;
-    rotationHandle?: THREE.Object3D;
-  };
-  private active2DTransform?: {
-    nodeIds: string[];
-    handle: TwoDHandle;
-    startPointerWorld: THREE.Vector3;
-    startStates: Map<string, { position: THREE.Vector3; rotation: number; scale: THREE.Vector2 }>;
-    combinedBounds: THREE.Box3;
-    startCenterWorld: THREE.Vector3;
-    anchorWorld: THREE.Vector3;
-    anchorLocal: THREE.Vector3;
-    startSize: THREE.Vector2;
-  };
+  private selection2DOverlay?: Selection2DOverlay;
+  private active2DTransform?: Active2DTransform;
   private animationId?: number;
   private disposers: Array<() => void> = [];
   private transformStartStates = new Map<
@@ -94,9 +65,11 @@ export class ViewportRendererService {
   >();
   private lastActiveSceneId: string | null = null;
   private viewportSize = { width: 0, height: 0 };
-  private readonly min2DSize = 4;
+  private transformTool2d: TransformTool2d;
 
-  constructor() {}
+  constructor() {
+    this.transformTool2d = new TransformTool2d();
+  }
 
   initialize(canvas: HTMLCanvasElement): void {
     // Create Three.js renderer
@@ -1049,102 +1022,11 @@ export class ViewportRendererService {
   }
 
   private create2DFrame(bounds: THREE.Box3): THREE.LineSegments {
-    const min = bounds.min;
-    const max = bounds.max;
-    const z = (min.z + max.z) / 2;
-    const points = [
-      new THREE.Vector3(min.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, min.y, z),
-    ];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    geometry.computeBoundingBox();
-
-    const material = new THREE.LineBasicMaterial({
-      color: 0x4e8df5,
-      linewidth: 1,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.95,
-    });
-    const frame = new THREE.LineSegments(geometry, material);
-    frame.userData.is2DFrame = true;
-    frame.renderOrder = 1000;
-    frame.layers.set(1);
-    return frame;
+    return this.transformTool2d.createFrame(bounds);
   }
 
   private create2DHandles(bounds: THREE.Box3): THREE.Object3D[] {
-    const min = bounds.min;
-    const max = bounds.max;
-    const z = (min.z + max.z) / 2;
-    const midX = (min.x + max.x) / 2;
-    const midY = (min.y + max.y) / 2;
-
-    const positions: Record<Exclude<TwoDHandle, 'idle' | 'move'>, THREE.Vector3> = {
-      'scale-nw': new THREE.Vector3(min.x, max.y, z),
-      'scale-n': new THREE.Vector3(midX, max.y, z),
-      'scale-ne': new THREE.Vector3(max.x, max.y, z),
-      'scale-e': new THREE.Vector3(max.x, midY, z),
-      'scale-se': new THREE.Vector3(max.x, min.y, z),
-      'scale-s': new THREE.Vector3(midX, min.y, z),
-      'scale-sw': new THREE.Vector3(min.x, min.y, z),
-      'scale-w': new THREE.Vector3(min.x, midY, z),
-      rotate: new THREE.Vector3(midX, max.y + Math.max(max.y - min.y, max.x - min.x) * 0.12, z),
-    };
-
-    const handleSize = 0.25;
-    const handleColor = 0x4e8df5;
-    const handleGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
-    const handleMaterial = new THREE.MeshBasicMaterial({
-      color: handleColor,
-      side: THREE.DoubleSide,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.9,
-    });
-
-    const rotationMaterial = new THREE.MeshBasicMaterial({
-      color: 0xf5b64e,
-      side: THREE.DoubleSide,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.9,
-    });
-
-    const handles: THREE.Object3D[] = [];
-    (Object.entries(positions) as Array<[Exclude<TwoDHandle, 'idle' | 'move'>, THREE.Vector3]>).forEach(
-      ([type, pos]) => {
-        const mesh = new THREE.Mesh(handleGeometry.clone(), type === 'rotate' ? rotationMaterial.clone() : handleMaterial.clone());
-        mesh.position.copy(pos);
-        mesh.userData.handleType = type;
-        mesh.renderOrder = 1100;
-        mesh.layers.set(1);
-        handles.push(mesh);
-      }
-    );
-
-    // Connect rotation handle with a thin line for affordance
-    const rotationPos = positions.rotate;
-    if (rotationPos) {
-      const lineGeom = new THREE.BufferGeometry().setFromPoints([
-        new THREE.Vector3(midX, max.y, z),
-        new THREE.Vector3(rotationPos.x, rotationPos.y, z),
-      ]);
-      const lineMat = new THREE.LineBasicMaterial({ color: 0xf5b64e, depthTest: false });
-      const connector = new THREE.Line(lineGeom, lineMat);
-      connector.renderOrder = 1050;
-      connector.layers.set(1);
-      connector.userData.handleType = 'rotate';
-      handles.push(connector);
-    }
-
-    return handles;
+    return this.transformTool2d.createHandles(bounds);
   }
 
   get2DHandleAt(screenX: number, screenY: number): TwoDHandle {
@@ -1154,42 +1036,13 @@ export class ViewportRendererService {
       return 'idle';
     }
 
-    const mouse = this.toNdc(screenX, screenY);
-    if (!mouse) {
-      return 'idle';
-    }
-
-    const raycaster = new THREE.Raycaster();
-    raycaster.setFromCamera(mouse, this.orthographicCamera);
-    const hits = raycaster.intersectObjects(this.selection2DOverlay.handles, true);
-    if (hits.length) {
-      const handleType = hits[0].object.userData?.handleType as TwoDHandle | undefined;
-      console.debug('[ViewportRenderer] get2DHandleAt: hit handle', handleType);
-      return handleType ?? 'idle';
-    }
-
-    const point = this.screenToWorld2D(screenX, screenY);
-    const bounds = this.selection2DOverlay.combinedBounds;
-    
-    if (point) {
-      const point2D = new THREE.Vector3(point.x, point.y, (bounds.min.z + bounds.max.z) / 2);
-      const inX = point.x >= bounds.min.x && point.x <= bounds.max.x;
-      const inY = point.y >= bounds.min.y && point.y <= bounds.max.y;
-      console.debug('[ViewportRenderer] get2DHandleAt: point check', {
-        point: { x: point.x.toFixed(3), y: point.y.toFixed(3), z: point.z.toFixed(3) },
-        boundsMin: { x: bounds.min.x.toFixed(3), y: bounds.min.y.toFixed(3), z: bounds.min.z.toFixed(3) },
-        boundsMax: { x: bounds.max.x.toFixed(3), y: bounds.max.y.toFixed(3), z: bounds.max.z.toFixed(3) },
-        inX, inY
-      });
-      
-      if (inX && inY) {
-        console.debug('[ViewportRenderer] get2DHandleAt: inside bounds -> move');
-        return 'move';
-      }
-    }
-
-    console.debug('[ViewportRenderer] get2DHandleAt: miss');
-    return 'idle';
+    return this.transformTool2d.getHandleAt(
+      screenX,
+      screenY,
+      this.selection2DOverlay,
+      this.orthographicCamera,
+      this.viewportSize
+    );
   }
 
   has2DTransform(): boolean {
@@ -1206,43 +1059,21 @@ export class ViewportRendererService {
     const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
     if (!sceneGraph) return;
 
-    const { nodeIds, combinedBounds, centerWorld } = this.selection2DOverlay;
-    if (nodeIds.length === 0) return;
-
-    const pointerWorld = this.screenToWorld2D(screenX, screenY);
-    if (!pointerWorld) return;
-
-    const startStates = new Map<string, { position: THREE.Vector3; rotation: number; scale: THREE.Vector2 }>();
-    for (const nodeId of nodeIds) {
-      const node = sceneGraph.nodeMap.get(nodeId);
-      if (node && node instanceof Node2D) {
-        startStates.set(nodeId, {
-          position: node.position.clone(),
-          rotation: node.rotation.z,
-          scale: new THREE.Vector2(node.scale.x, node.scale.y),
-        });
-      }
-    }
-
-    const size = combinedBounds.getSize(new THREE.Vector3());
-    const startSize = new THREE.Vector2(size.x, size.y);
-    const anchorLocal = this.getAnchorLocal(handle, startSize);
-    const anchorWorld = anchorLocal.clone().add(centerWorld);
-
-    this.active2DTransform = {
-      nodeIds,
+    const transform = this.transformTool2d.startTransform(
+      screenX,
+      screenY,
       handle,
-      startPointerWorld: pointerWorld,
-      startStates,
-      combinedBounds: combinedBounds.clone(),
-      startCenterWorld: centerWorld.clone(),
-      anchorWorld,
-      anchorLocal,
-      startSize,
-    };
+      this.selection2DOverlay,
+      sceneGraph,
+      this.orthographicCamera,
+      this.viewportSize
+    );
 
-    this.begin2DInteraction();
-    console.debug('[ViewportRenderer] start 2D transform', { handle, nodeIds, pointerWorld });
+    if (transform) {
+      this.active2DTransform = transform;
+      this.begin2DInteraction();
+      console.debug('[ViewportRenderer] start 2D transform', { handle, nodeIds: this.active2DTransform.nodeIds });
+    }
   }
 
   update2DTransform(screenX: number, screenY: number): void {
@@ -1255,97 +1086,22 @@ export class ViewportRendererService {
     const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
     if (!sceneGraph) return;
 
-    const pointerWorld = this.screenToWorld2D(screenX, screenY);
-    if (!pointerWorld) return;
+    this.transformTool2d.updateTransform(
+      screenX,
+      screenY,
+      this.active2DTransform,
+      sceneGraph,
+      this.orthographicCamera!,
+      this.viewportSize
+    );
 
-    const { handle, startPointerWorld, startStates, startCenterWorld, anchorWorld, anchorLocal, startSize } =
-      this.active2DTransform;
-
-    if (handle === 'move') {
-      const delta = pointerWorld.clone().sub(startPointerWorld);
-      for (const [nodeId, startState] of startStates) {
-        const node = sceneGraph.nodeMap.get(nodeId);
-        if (node && node instanceof Node2D) {
-          node.position.set(startState.position.x + delta.x, startState.position.y + delta.y, node.position.z);
-          this.updateNodeTransform(node);
-        }
-      }
-    } else if (handle === 'rotate') {
-      const startAngle = Math.atan2(startPointerWorld.y - startCenterWorld.y, startPointerWorld.x - startCenterWorld.x);
-      const currentAngle = Math.atan2(pointerWorld.y - startCenterWorld.y, pointerWorld.x - startCenterWorld.x);
-      const deltaAngle = currentAngle - startAngle;
-      
-      for (const [nodeId, startState] of startStates) {
-        const node = sceneGraph.nodeMap.get(nodeId);
-        if (node && node instanceof Node2D) {
-          node.rotation.set(0, 0, startState.rotation + deltaAngle);
-          
-          const offsetFromCenter = startState.position.clone().sub(startCenterWorld);
-          const rotatedOffset = new THREE.Vector3(
-            offsetFromCenter.x * Math.cos(deltaAngle) - offsetFromCenter.y * Math.sin(deltaAngle),
-            offsetFromCenter.x * Math.sin(deltaAngle) + offsetFromCenter.y * Math.cos(deltaAngle),
-            0
-          );
-          const newPosition = startCenterWorld.clone().add(rotatedOffset);
-          node.position.set(newPosition.x, newPosition.y, node.position.z);
-          this.updateNodeTransform(node);
-        }
-      }
-    } else {
-      const localPoint = pointerWorld.clone().sub(startCenterWorld);
-      let width = startSize.x;
-      let height = startSize.y;
-
-      const affectsX =
-        handle === 'scale-e' ||
-        handle === 'scale-w' ||
-        handle === 'scale-ne' ||
-        handle === 'scale-se' ||
-        handle === 'scale-nw' ||
-        handle === 'scale-sw';
-      const affectsY =
-        handle === 'scale-n' ||
-        handle === 'scale-s' ||
-        handle === 'scale-ne' ||
-        handle === 'scale-se' ||
-        handle === 'scale-nw' ||
-        handle === 'scale-sw';
-
-      if (affectsX) {
-        width = Math.max(this.min2DSize, Math.abs(localPoint.x - anchorLocal.x));
-      }
-      if (affectsY) {
-        height = Math.max(this.min2DSize, Math.abs(localPoint.y - anchorLocal.y));
-      }
-
-      const scaleFactorX = width / startSize.x;
-      const scaleFactorY = height / startSize.y;
-
-      const anchorLocalNew = this.getAnchorLocal(handle, new THREE.Vector2(width, height));
-      const newCenterWorld = anchorWorld.clone().sub(anchorLocalNew);
-
-      for (const [nodeId, startState] of startStates) {
-        const node = sceneGraph.nodeMap.get(nodeId);
-        if (node && node instanceof Node2D) {
-          const offsetFromCenter = startState.position.clone().sub(startCenterWorld);
-          const scaledOffset = new THREE.Vector3(
-            offsetFromCenter.x * scaleFactorX,
-            offsetFromCenter.y * scaleFactorY,
-            0
-          );
-          const newPos = newCenterWorld.clone().add(scaledOffset);
-          node.position.set(newPos.x, newPos.y, node.position.z);
-          node.scale.set(
-            startState.scale.x * scaleFactorX,
-            startState.scale.y * scaleFactorY,
-            1
-          );
-          this.updateNodeTransform(node);
-        }
+    // Update visuals for each transformed node
+    for (const nodeId of this.active2DTransform.nodeIds) {
+      const node = sceneGraph.nodeMap.get(nodeId);
+      if (node && node instanceof Node2D) {
+        this.updateNodeTransform(node);
       }
     }
-
-    // Gizmo positions are already updated via updateNodeTransform -> refreshGizmoPositions
   }
 
   async complete2DTransform(): Promise<void> {
@@ -1360,8 +1116,6 @@ export class ViewportRendererService {
       this.end2DInteraction();
       return;
     }
-
-    this.begin2DInteraction();
 
     for (const nodeId of nodeIds) {
       const node = sceneGraph.nodeMap.get(nodeId);
@@ -1404,15 +1158,6 @@ export class ViewportRendererService {
     return new THREE.Vector2((screenX / width) * 2 - 1, -(screenY / height) * 2 + 1);
   }
 
-  private screenToWorld2D(screenX: number, screenY: number): THREE.Vector3 | null {
-    if (!this.orthographicCamera) return null;
-    const ndc = this.toNdc(screenX, screenY);
-    if (!ndc) return null;
-    const point = new THREE.Vector3(ndc.x, ndc.y, 0);
-    point.unproject(this.orthographicCamera);
-    return point;
-  }
-
   private get2DVisual(node: Node2D): THREE.Object3D | undefined {
     if (node instanceof Group2D) {
       return this.group2DMeshes.get(node.nodeId);
@@ -1421,31 +1166,6 @@ export class ViewportRendererService {
       return this.sprite2DMeshes.get(node.nodeId);
     }
     return undefined;
-  }
-
-  private getAnchorLocal(handle: TwoDHandle, size: THREE.Vector2): THREE.Vector3 {
-    const halfW = size.x / 2;
-    const halfH = size.y / 2;
-    switch (handle) {
-      case 'scale-ne':
-        return new THREE.Vector3(-halfW, -halfH, 0);
-      case 'scale-nw':
-        return new THREE.Vector3(halfW, -halfH, 0);
-      case 'scale-se':
-        return new THREE.Vector3(-halfW, halfH, 0);
-      case 'scale-sw':
-        return new THREE.Vector3(halfW, halfH, 0);
-      case 'scale-n':
-        return new THREE.Vector3(0, -halfH, 0);
-      case 'scale-s':
-        return new THREE.Vector3(0, halfH, 0);
-      case 'scale-e':
-        return new THREE.Vector3(-halfW, 0, 0);
-      case 'scale-w':
-        return new THREE.Vector3(halfW, 0, 0);
-      default:
-        return new THREE.Vector3(-halfW, -halfH, 0);
-    }
   }
 
   private startRenderLoop(): void {
