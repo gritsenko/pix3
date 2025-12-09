@@ -1,4 +1,5 @@
 import { Object3D } from 'three';
+import type { PropertySchema } from '@/fw';
 
 export interface NodeMetadata {
   [key: string]: unknown;
@@ -67,5 +68,66 @@ export class NodeBase extends Object3D {
       }
     }
     return null;
+  }
+
+  /**
+   * Get the property schema for this node type.
+   * Defines all editable properties and their metadata for the inspector.
+   * Override in subclasses to extend with additional properties.
+   */
+  static getPropertySchema(): PropertySchema {
+    return {
+      nodeType: 'NodeBase',
+      properties: [
+        {
+          name: 'id',
+          type: 'string',
+          ui: {
+            label: 'Node ID',
+            description: 'Unique identifier for this node',
+            group: 'Base',
+            readOnly: true,
+          },
+          getValue: (node: unknown) => (node as NodeBase).nodeId,
+          setValue: () => {
+            // Read-only, no-op
+          },
+        },
+        {
+          name: 'name',
+          type: 'string',
+          ui: {
+            label: 'Name',
+            description: 'Display name for this node',
+            group: 'Base',
+          },
+          getValue: (node: unknown) => (node as NodeBase).name,
+          setValue: (node: unknown, value: unknown) => {
+            (node as NodeBase).name = String(value);
+          },
+        },
+        {
+          name: 'type',
+          type: 'string',
+          ui: {
+            label: 'Type',
+            description: 'Node type',
+            group: 'Base',
+            readOnly: true,
+          },
+          getValue: (node: unknown) => (node as NodeBase).type,
+          setValue: () => {
+            // Read-only, no-op
+          },
+        },
+      ],
+      groups: {
+        Base: {
+          label: 'Base Properties',
+          description: 'Core node properties',
+          expanded: true,
+        },
+      },
+    };
   }
 }

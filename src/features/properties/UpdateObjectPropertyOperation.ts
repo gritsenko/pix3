@@ -1,4 +1,3 @@
-import { MathUtils, Vector3 } from 'three';
 import type {
   Operation,
   OperationContext,
@@ -6,10 +5,10 @@ import type {
   OperationMetadata,
 } from '@/core/Operation';
 import { NodeBase } from '@/nodes/NodeBase';
-import { Node3D } from '@/nodes/Node3D';
-import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { SceneManager } from '@/core/SceneManager';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
+import { getNodePropertySchema } from '@/fw/property-schema-utils';
+import type { PropertyDefinition } from '@/fw';
 
 export interface UpdateObjectPropertyParams {
   nodeId: string;
@@ -48,17 +47,27 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       return { didMutate: false };
     }
 
-    const validation = this.validatePropertyUpdate(node, propertyPath, value);
+    // Get property schema and definition
+    const schema = getNodePropertySchema(node);
+    const propDef = schema.properties.find(p => p.name === propertyPath);
+    if (!propDef) {
+      return { didMutate: false };
+    }
+
+    const validation = this.validatePropertyUpdate(node, propDef, value);
     if (!validation.isValid) {
+      console.warn('[UpdateObjectPropertyOperation] Validation failed:', validation.reason);
       return { didMutate: false };
     }
 
-    const previousValue = this.getPropertyValue(node, propertyPath);
-    if (previousValue === value) {
+    const previousValue = propDef.getValue(node);
+    // Compare values as JSON strings to handle objects
+    if (JSON.stringify(previousValue) === JSON.stringify(value)) {
       return { didMutate: false };
     }
 
-    this.setPropertyValue(node, propertyPath, value);
+    // Set the property value using the schema's setValue method
+    propDef.setValue(node, value);
 
     const activeSceneId = state.scenes.activeSceneId;
     if (activeSceneId) {
@@ -67,189 +76,66 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       if (descriptor) descriptor.isDirty = true;
     }
 
-    try {
-      const vr = container.getService<ViewportRendererService>(
-        container.getOrCreateToken(ViewportRendererService)
-      );
-      const isTransform = this.isTransformProperty(propertyPath);
-      if (isTransform) {
-        vr.updateNodeTransform(node);
-      } else if (propertyPath === 'visible') {
-        // Visibility change - update 2D node visuals
-        vr.updateNodeVisibility(node);
-      } else {
-        // Other non-transform property; no need to rebuild, just refresh selection visuals
-        vr.updateSelection();
-      }
-    } catch {
-      // Silently ignore viewport renderer errors
-    }
+    // Trigger viewport updates
+    this.updateViewport(container, propertyPath, node);
 
     return {
       didMutate: true,
       commit: {
-        label: 'Update Object Property',
+        label: `Update ${propDef.ui?.label || propertyPath}`,
         beforeSnapshot: context.snapshot,
         undo: async () => {
-          this.setPropertyValue(node, propertyPath, previousValue);
+          propDef.setValue(node, previousValue);
           if (activeSceneId) {
             state.scenes.lastLoadedAt = Date.now();
             const descriptor = state.scenes.descriptors[activeSceneId];
             if (descriptor) descriptor.isDirty = true;
           }
-          try {
-            const vr = container.getService<ViewportRendererService>(
-              container.getOrCreateToken(ViewportRendererService)
-            );
-            const isTransform = this.isTransformProperty(propertyPath);
-            if (isTransform) {
-              vr.updateNodeTransform(node);
-            } else if (propertyPath === 'visible') {
-              vr.updateNodeVisibility(node);
-            } else {
-              vr.updateSelection();
-            }
-          } catch {
-            // Silently ignore viewport renderer errors
-          }
+          this.updateViewport(container, propertyPath, node);
         },
         redo: async () => {
-          this.setPropertyValue(node, propertyPath, value);
+          propDef.setValue(node, value);
           if (activeSceneId) {
             state.scenes.lastLoadedAt = Date.now();
             const descriptor = state.scenes.descriptors[activeSceneId];
             if (descriptor) descriptor.isDirty = true;
           }
-          try {
-            const vr = container.getService<ViewportRendererService>(
-              container.getOrCreateToken(ViewportRendererService)
-            );
-            const isTransform = this.isTransformProperty(propertyPath);
-            if (isTransform) {
-              vr.updateNodeTransform(node);
-            } else if (propertyPath === 'visible') {
-              vr.updateNodeVisibility(node);
-            } else {
-              vr.updateSelection();
-            }
-          } catch {
-            // Silently ignore viewport renderer errors
-          }
+          this.updateViewport(container, propertyPath, node);
         },
       },
     };
   }
 
-  private getPropertyValue(node: NodeBase, propertyPath: string): unknown {
-    const parts = propertyPath.split('.');
-    let current: unknown = node;
-    for (const part of parts) {
-      if (current === null || current === undefined) return undefined;
-      current = (current as Record<string, unknown>)[part];
-    }
-    if (propertyPath === 'visible') {
-      return current ?? node.properties.visible ?? true;
-    }
-    if (parts.length === 2 && parts[0] === 'rotation') {
-      const axis = parts[1] as 'x' | 'y' | 'z';
-      if (node instanceof Node3D) return MathUtils.radToDeg(node.rotation[axis]);
-      if (node instanceof Sprite2D && axis === 'z') return MathUtils.radToDeg(node.rotation.z);
-    }
-    return current;
-  }
-
-  private setPropertyValue(node: NodeBase, propertyPath: string, value: unknown): void {
-    const parts = propertyPath.split('.');
-    if (parts.length === 1) {
-      const property = parts[0];
-      if (property === 'visible') {
-        const boolValue = Boolean(value);
-        node.visible = boolValue;
-        node.properties.visible = boolValue;
-      } else if (property === 'locked') {
-        const boolValue = Boolean(value);
-        node.properties.locked = boolValue;
-      } else if (property === 'name') {
-        node.name = value as string;
+  private updateViewport(container: any, propertyPath: string, node: NodeBase) {
+    try {
+      const vr = container.getService(
+        container.getOrCreateToken(ViewportRendererService)
+      ) as ViewportRendererService;
+      const isTransform = this.isTransformProperty(propertyPath);
+      if (isTransform) {
+        vr.updateNodeTransform(node);
+      } else if (propertyPath === 'visible') {
+        vr.updateNodeVisibility(node);
       } else {
-        node.properties[property] = value;
+        vr.updateSelection();
       }
-      return;
+    } catch {
+      // Silently ignore viewport renderer errors
     }
-    if (parts.length === 2) {
-      const [objectName, propertyName] = parts;
-      if (node instanceof Node3D) {
-        if (objectName === 'rotation') {
-          node.rotation[propertyName as 'x' | 'y' | 'z'] = MathUtils.degToRad(value as number);
-        } else if (objectName === 'position' || objectName === 'scale') {
-          const vector = node[objectName] as Vector3;
-          vector[propertyName as 'x' | 'y' | 'z'] = value as number;
-        }
-      } else if (node instanceof Sprite2D) {
-        const axis = propertyName as 'x' | 'y' | 'z';
-        if (objectName === 'position' && (axis === 'x' || axis === 'y')) {
-          node.position[axis] = value as number;
-        } else if (objectName === 'scale' && (axis === 'x' || axis === 'y')) {
-          node.scale[axis] = value as number;
-        } else if (objectName === 'rotation' && propertyName === 'z') {
-          node.rotation.set(0, 0, MathUtils.degToRad(value as number));
-        }
-      }
-    }
-  }
-
-  private validatePropertyUpdate(
-    node: NodeBase,
-    propertyPath: string,
-    value: unknown
-  ): { isValid: boolean; reason?: string } {
-    const parts = propertyPath.split('.');
-    if (parts.length === 1) {
-      const property = parts[0];
-      if (property === 'visible') {
-        if (typeof value !== 'boolean')
-          return { isValid: false, reason: 'Visible must be boolean' };
-      } else if (property === 'locked') {
-        if (typeof value !== 'boolean') return { isValid: false, reason: 'Locked must be boolean' };
-      } else if (property === 'name') {
-        if (typeof value !== 'string') return { isValid: false, reason: 'Name must be string' };
-      }
-    } else if (parts.length === 2) {
-      const [objectName, propertyName] = parts;
-      if (!['position', 'rotation', 'scale'].includes(objectName)) {
-        return { isValid: false, reason: `Unknown transform object: ${objectName}` };
-      }
-      if (!['x', 'y', 'z'].includes(propertyName)) {
-        return { isValid: false, reason: `Invalid property name: ${propertyName}` };
-      }
-      if (typeof value !== 'number' || !isFinite(value)) {
-        return { isValid: false, reason: 'Transform properties must be finite numbers' };
-      }
-      if (node instanceof Sprite2D) {
-        if (objectName === 'position' && propertyName === 'z') {
-          return { isValid: false, reason: 'Sprite2D does not support position.z' };
-        }
-        if (objectName === 'rotation' && (propertyName === 'x' || propertyName === 'y')) {
-          return { isValid: false, reason: 'Sprite2D only supports rotation.z' };
-        }
-        if (objectName === 'scale' && propertyName === 'z') {
-          return { isValid: false, reason: 'Sprite2D does not support scale.z' };
-        }
-      }
-      if (objectName === 'scale' && (value as number) <= 0) {
-        return { isValid: false, reason: 'Scale values must be greater than 0' };
-      }
-    } else {
-      return { isValid: false, reason: 'Property path is too deep' };
-    }
-    return { isValid: true };
   }
 
   private isTransformProperty(propertyPath: string): boolean {
-    return (
-      propertyPath.startsWith('position.') ||
-      propertyPath.startsWith('rotation.') ||
-      propertyPath.startsWith('scale.')
-    );
+    return ['position', 'rotation', 'scale'].includes(propertyPath);
+  }
+
+  private validatePropertyUpdate(
+    _node: NodeBase,
+    _propDef: PropertyDefinition,
+    value: unknown
+  ): { isValid: boolean; reason?: string } {
+    if (value === null || value === undefined) {
+      return { isValid: false, reason: 'Value cannot be null or undefined' };
+    }
+    return { isValid: true };
   }
 }

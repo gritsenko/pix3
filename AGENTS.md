@@ -7,7 +7,7 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - **Pix3** is a browser-based editor for HTML5 scenes blending 2D and 3D layers
 - **Target stack**: TypeScript + Vite, Lit web components, Valtio state, Three.js, Golden Layout
 - **Architecture model**: Operations-first with OperationService as single mutation gateway
-- **Source of truth**: `docs/pix3-specification.md` (v1.8, 2025-10-05)
+- **Source of truth**: `docs/pix3-specification.md` (v1.9, 2025-12-10)
 
 ## Essential Architecture Patterns
 
@@ -42,6 +42,17 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - **Commands** are thin wrappers: `preconditions()` → `execute()` → OperationService via CommandDispatcher
 - Commands never implement their own undo/redo logic
 
+### Property Schema System (NEW)
+- Godot-inspired declarative property metadata for dynamic UI generation
+- Node classes expose properties via static `getPropertySchema()` returning `PropertySchema`
+- `PropertyDefinition` includes: name, type, getValue/setValue closures, optional UI hints (label, group, step, precision, unit, etc.)
+- Schemas inherit: child schemas extend parent via spread operator, matching class hierarchy
+- **PropertyType** union: `'string' | 'number' | 'boolean' | 'vector2' | 'vector3' | 'euler' | 'color' | 'enum' | 'select' | 'object'`
+- Vector types (vector2, vector3) handled as objects: `{ x, y }` or `{ x, y, z }`
+- Euler type: rotation in degrees (converted to/from radians internally)
+- Inspector uses `getNodePropertySchema()` and `getPropertiesByGroup()` to render UI dynamically
+- All property mutations via `UpdateObjectPropertyOperation` which uses schema's `getValue/setValue` methods
+
 ## File Structure Conventions
 
 ```
@@ -67,16 +78,18 @@ src/
     selection/
       SelectObjectCommand.ts
       SelectObjectOperation.ts
-  fw/                      # Framework utilities (DI, ComponentBase)
+  fw/                      # Framework utilities (DI, ComponentBase, property schema)
     component-base.ts
     di.ts
     from-query.ts
     index.ts
     layout-component-base.ts
+    property-schema.ts              # PropertyDefinition, PropertySchema, PropertyUIHints, PropertyType
+    property-schema-utils.ts        # getNodePropertySchema, getPropertiesByGroup, getPropertyDisplayValue
   nodes/                   # Node definitions (NOT in reactive state)
-    Node2D.ts
-    Node3D.ts
-    NodeBase.ts            # Extends Three.js Object3D; purely data/logic
+    Node2D.ts              # Has getPropertySchema() with position (vector2), rotation (number), scale (vector2)
+    Node3D.ts              # Has getPropertySchema() with position (vector3), rotation (euler), scale (vector3)
+    NodeBase.ts            # Extends Three.js Object3D; has getPropertySchema() with id, name, type
     2D/
       Sprite2D.ts
     3D/
@@ -113,8 +126,9 @@ src/
       asset-tree.ts
       asset-tree.ts.css
     object-inspector/
-      inspector-panel.ts
-      inspector-panel.ts.css
+      inspector-panel.ts          # Dynamic property rendering based on schemas; grid layout for Transform group
+      inspector-panel.ts.css      # transform-fields grid, color-coded X/Y/Z labels
+      property-editors.ts         # Vector2Editor, Vector3Editor, EulerEditor Web Components
     scene-tree/
       node-visuals.helper.ts
       scene-tree-node.ts
@@ -173,6 +187,7 @@ src/
 - **Valtio**: Reactive state with automatic UI updates
 - **Three.js**: Single-engine rendering with orthographic overlay
 - **Plugin system**: Sandboxed extensions via manifest validation
+- **Property Schema**: Dynamic inspector UI generation from node schemas
 
 ## Critical Rules for AI Agents
 
@@ -186,7 +201,8 @@ src/
 8. **Light DOM by default** — use shadow DOM only when explicitly needed
 9. **Singleton services** — register with ServiceContainer, implement dispose()
 10. **Cross-reference specification** — check `docs/pix3-specification.md` for architectural decisions
-11. **Avoid bloat documentation** — Do NOT create detailed changelog or bloat MD files. Project is still in prototype stage. Only update existing docs (README.md, AGENTS.md, architecture.md, pix3-specification.md). Keep documentation minimal and focused on active development.
+11. **Avoid bloat documentation** — Only maintain README.md, AGENTS.md, architecture.md, pix3-specification.md in docs/. Keep documentation minimal and focused on active development.
+12. **Property schemas define node properties** — Node classes must implement `static getPropertySchema()`. Inspector consumes via `getNodePropertySchema()`. Schema's getValue/setValue handle all property access and transformation (e.g., radian/degree conversion).
 
 Always verify architectural decisions against the specification before implementing features.
 
@@ -205,9 +221,9 @@ Always verify architectural decisions against the specification before implement
 
 ### Browser Interaction
 - Agents can use the `#browsermcp` MCP server to navigate pages, read logs and make screenshots.
-- Avoid of use clicking, pressing keys and other input simulations. Ask developer instead to make some changes on the page, before making screenshot or gather logs. The only exception is to open recent project on app statrup.
-- Prefer add console log over using screenshots.
-- Never launch url's directly use MCP to navigate necessary page. Never open simple browser.
+- Avoid use of clicking, pressing keys, and other input simulations. Ask developer instead to make changes on the page before taking screenshots or gathering logs. The only exception is opening recent projects on app startup.
+- Prefer adding console logs over using screenshots.
+- Never launch URLs directly; use MCP to navigate to necessary pages. Never open simple browser.
 - Logs and snapshots can be read using the MCP browser tools.
 
 ### Default Scene Loading

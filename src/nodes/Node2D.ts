@@ -1,6 +1,7 @@
 import { MathUtils, Vector2 } from 'three';
 
 import { NodeBase, type NodeBaseProps } from './NodeBase';
+import type { PropertySchema } from '@/fw';
 
 export interface Node2DProps extends Omit<NodeBaseProps, 'type'> {
   position?: Vector2;
@@ -21,5 +22,90 @@ export class Node2D extends NodeBase {
     const rotationDegrees = props.rotation ?? 0;
     const rotationRadians = MathUtils.degToRad(rotationDegrees);
     this.rotation.set(0, 0, rotationRadians);
+  }
+
+  /**
+   * Get the property schema for Node2D.
+   * Extends NodeBase schema with 2D-specific transform properties.
+   */
+  static getPropertySchema(): PropertySchema {
+    const baseSchema = NodeBase.getPropertySchema();
+
+    return {
+      nodeType: 'Node2D',
+      extends: 'NodeBase',
+      properties: [
+        ...baseSchema.properties,
+        {
+          name: 'position',
+          type: 'vector2',
+          ui: {
+            label: 'Position',
+            group: 'Transform',
+            step: 0.01,
+            precision: 2,
+          },
+          getValue: (node: unknown) => {
+            const n = node as Node2D;
+            return { x: n.position.x, y: n.position.y };
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as Node2D;
+            const v = value as { x: number; y: number };
+            n.position.x = v.x;
+            n.position.y = v.y;
+          },
+        },
+        {
+          name: 'rotation',
+          type: 'number',
+          ui: {
+            label: 'Rotation',
+            description: 'Z-axis rotation',
+            group: 'Transform',
+            step: 0.1,
+            precision: 1,
+            unit: '°',
+          },
+          getValue: (node: unknown) => {
+            const n = node as Node2D;
+            return n.rotation.z * (180 / Math.PI); // Convert radians to degrees
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as Node2D;
+            n.rotation.z = Number(value) * (Math.PI / 180); // Convert degrees to radians
+          },
+        },
+        {
+          name: 'scale',
+          type: 'vector2',
+          ui: {
+            label: 'Scale',
+            group: 'Transform',
+            step: 0.01,
+            precision: 2,
+            min: 0,
+          },
+          getValue: (node: unknown) => {
+            const n = node as Node2D;
+            return { x: n.scale.x, y: n.scale.y };
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as Node2D;
+            const v = value as { x: number; y: number };
+            n.scale.x = v.x;
+            n.scale.y = v.y;
+          },
+        },
+      ],
+      groups: {
+        ...baseSchema.groups,
+        Transform: {
+          label: 'Transform',
+          description: '2D position, rotation, and scale',
+          expanded: true,
+        },
+      },
+    };
   }
 }

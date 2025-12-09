@@ -1,19 +1,17 @@
 import { ComponentBase, customElement, html, state, subscribe, inject } from '@/fw';
+import { getNodePropertySchema, getPropertiesByGroup, getPropertyDisplayValue } from '@/fw/property-schema-utils';
 import { SceneManager } from '@/core/SceneManager';
 import { appState } from '@/state';
 import type { NodeBase } from '@/nodes/NodeBase';
-import { Node3D } from '@/nodes/Node3D';
-import { Sprite2D } from '@/nodes/2D/Sprite2D';
-import { Group2D } from '@/nodes/2D/Group2D';
+import type { PropertySchema, PropertyDefinition } from '@/fw';
 import { UpdateObjectPropertyOperation } from '@/features/properties/UpdateObjectPropertyOperation';
-import { UpdateGroup2DSizeCommand } from '@/features/scene/UpdateGroup2DSizeCommand';
 import { OperationService } from '@/services/OperationService';
-import { CommandDispatcher } from '@/services/CommandDispatcher';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
+import './property-editors';
 
-interface PropertyValue {
+interface PropertyUIState {
   value: string;
   isValid: boolean;
 }
@@ -26,9 +24,6 @@ export class InspectorPanel extends ComponentBase {
   @inject(OperationService)
   private readonly operationService!: OperationService;
 
-  @inject(CommandDispatcher)
-  private readonly commandDispatcher!: CommandDispatcher;
-
   @state()
   private selectedNodes: NodeBase[] = [];
 
@@ -36,37 +31,10 @@ export class InspectorPanel extends ComponentBase {
   private primaryNode: NodeBase | null = null;
 
   @state()
-  private nameValue = '';
+  private propertySchema: PropertySchema | null = null;
 
   @state()
-  private positionValues: Record<'x' | 'y' | 'z', PropertyValue> = {
-    x: { value: '0', isValid: true },
-    y: { value: '0', isValid: true },
-    z: { value: '0', isValid: true },
-  };
-
-  @state()
-  private rotationValues: Record<'x' | 'y' | 'z', PropertyValue> = {
-    x: { value: '0', isValid: true },
-    y: { value: '0', isValid: true },
-    z: { value: '0', isValid: true },
-  };
-
-  @state()
-  private scaleValues: Record<'x' | 'y' | 'z', PropertyValue> = {
-    x: { value: '1', isValid: true },
-    y: { value: '1', isValid: true },
-    z: { value: '1', isValid: true },
-  };
-
-  @state()
-  private visibleValue = true;
-
-  @state()
-  private sizeValues: Record<'width' | 'height', PropertyValue> = {
-    width: { value: '100', isValid: true },
-    height: { value: '100', isValid: true },
-  };
+  private propertyValues: Record<string, PropertyUIState> = {};
 
   private disposeSelectionSubscription?: () => void;
   private disposeSceneSubscription?: () => void;
@@ -97,6 +65,7 @@ export class InspectorPanel extends ComponentBase {
     if (!activeSceneId) {
       this.selectedNodes = [];
       this.primaryNode = null;
+      this.propertySchema = null;
       return;
     }
 
@@ -104,6 +73,7 @@ export class InspectorPanel extends ComponentBase {
     if (!sceneGraph) {
       this.selectedNodes = [];
       this.primaryNode = null;
+      this.propertySchema = null;
       return;
     }
 
@@ -137,276 +107,92 @@ export class InspectorPanel extends ComponentBase {
 
   private syncValuesFromNode(): void {
     if (!this.primaryNode) {
-      this.resetValues();
+      this.propertySchema = null;
+      this.propertyValues = {};
       return;
     }
 
-    const node = this.primaryNode;
-    this.nameValue = node.name;
+    // Get the schema for this node
+    this.propertySchema = getNodePropertySchema(this.primaryNode);
 
-    // Handle visibility (prefer live Object3D state)
-    this.visibleValue =
-      typeof node.properties.visible === 'boolean'
-        ? (node.properties.visible as boolean)
-        : node.visible;
-
-    if (node instanceof Node3D) {
-      // Position
-      this.positionValues = {
-        x: { value: this.formatNumber(node.position.x), isValid: true },
-        y: { value: this.formatNumber(node.position.y), isValid: true },
-        z: { value: this.formatNumber(node.position.z), isValid: true },
-      };
-
-      // Rotation (convert from radians to degrees)
-      this.rotationValues = {
-        x: { value: this.formatNumber(this.radToDeg(node.rotation.x)), isValid: true },
-        y: { value: this.formatNumber(this.radToDeg(node.rotation.y)), isValid: true },
-        z: { value: this.formatNumber(this.radToDeg(node.rotation.z)), isValid: true },
-      };
-
-      // Scale
-      this.scaleValues = {
-        x: { value: this.formatNumber(node.scale.x), isValid: true },
-        y: { value: this.formatNumber(node.scale.y), isValid: true },
-        z: { value: this.formatNumber(node.scale.z), isValid: true },
-      };
-    } else if (node instanceof Group2D) {
-      // For Group2D, show size properties
-      this.sizeValues = {
-        width: { value: this.formatNumber(node.width), isValid: true },
-        height: { value: this.formatNumber(node.height), isValid: true },
-      };
-
-      // Position (2D)
-      this.positionValues = {
-        x: { value: this.formatNumber(node.position.x), isValid: true },
-        y: { value: this.formatNumber(node.position.y), isValid: true },
-        z: { value: this.formatNumber(node.position.z), isValid: true },
-      };
-
-      // Rotation (2D, only Z)
-      this.rotationValues = {
-        x: { value: '0', isValid: true },
-        y: { value: '0', isValid: true },
-        z: { value: this.formatNumber(this.radToDeg(node.rotation.z)), isValid: true },
-      };
-
-      // Scale (2D)
-      this.scaleValues = {
-        x: { value: this.formatNumber(node.scale.x), isValid: true },
-        y: { value: this.formatNumber(node.scale.y), isValid: true },
-        z: { value: this.formatNumber(node.scale.z), isValid: true },
-      };
-    } else if (node instanceof Sprite2D) {
-      // For 2D nodes, only show relevant transform properties
-      this.positionValues = {
-        x: { value: this.formatNumber(node.position.x), isValid: true },
-        y: { value: this.formatNumber(node.position.y), isValid: true },
-        z: { value: this.formatNumber(node.position.z), isValid: true },
-      };
-
-      this.rotationValues = {
-        x: { value: '0', isValid: true },
-        y: { value: '0', isValid: true },
-        z: { value: this.formatNumber(this.radToDeg(node.rotation.z)), isValid: true },
-      };
-
-      this.scaleValues = {
-        x: { value: this.formatNumber(node.scale.x), isValid: true },
-        y: { value: this.formatNumber(node.scale.y), isValid: true },
-        z: { value: this.formatNumber(node.scale.z), isValid: true },
-      };
-    }
-  }
-
-  private resetValues(): void {
-    this.nameValue = '';
-    this.visibleValue = true;
-    this.positionValues = {
-      x: { value: '0', isValid: true },
-      y: { value: '0', isValid: true },
-      z: { value: '0', isValid: true },
-    };
-    this.rotationValues = {
-      x: { value: '0', isValid: true },
-      y: { value: '0', isValid: true },
-      z: { value: '0', isValid: true },
-    };
-    this.scaleValues = {
-      x: { value: '1', isValid: true },
-      y: { value: '1', isValid: true },
-      z: { value: '1', isValid: true },
-    };
-    this.sizeValues = {
-      width: { value: '100', isValid: true },
-      height: { value: '100', isValid: true },
-    };
-  }
-
-  private formatNumber(value: number): string {
-    return parseFloat(value.toFixed(4)).toString();
-  }
-
-  private radToDeg(rad: number): number {
-    return rad * (180 / Math.PI);
-  }
-
-  private async handleNameInput(e: Event) {
-    const input = e.target as HTMLInputElement;
-    this.nameValue = input.value;
-
-    if (this.primaryNode) {
-      const op = new UpdateObjectPropertyOperation({
-        nodeId: this.primaryNode.nodeId,
-        propertyPath: 'name',
-        value: input.value,
-      });
-
-      try {
-        await this.operationService.invokeAndPush(op);
-      } catch (error) {
-        console.error('[InspectorPanel] Failed to execute name update command', error);
+    // Initialize UI values from node properties
+    const values: Record<string, PropertyUIState> = {};
+    for (const prop of this.propertySchema.properties) {
+      if (prop.ui?.hidden || prop.ui?.readOnly) {
+        continue; // Skip hidden or read-only properties
       }
+      const displayValue = getPropertyDisplayValue(this.primaryNode, prop);
+      values[prop.name] = {
+        value: displayValue,
+        isValid: true,
+      };
     }
+    this.propertyValues = values;
   }
 
-  private async handleVisibilityChange(e: Event) {
-    const checkbox = e.target as HTMLInputElement;
-    this.visibleValue = checkbox.checked;
-
-    if (this.primaryNode) {
-      const op = new UpdateObjectPropertyOperation({
-        nodeId: this.primaryNode.nodeId,
-        propertyPath: 'visible',
-        value: checkbox.checked,
-      });
-
-      try {
-        await this.operationService.invokeAndPush(op);
-      } catch (error) {
-        console.error('[InspectorPanel] Failed to execute visibility update command', error);
-        // Revert the UI state on error
-        this.visibleValue = !checkbox.checked;
-      }
-    }
-  }
-
-  private handleTransformInput(
-    field: 'position' | 'rotation' | 'scale',
-    axis: 'x' | 'y' | 'z',
-    e: Event
-  ) {
+  private async handlePropertyInput(propName: string, e: Event) {
     const input = e.target as HTMLInputElement;
     const value = input.value;
     const num = parseFloat(value);
-    const isValid = !isNaN(num);
+    const isValid = !isNaN(num) || input.type !== 'number';
 
     // Update local state
-    if (field === 'position') {
-      this.positionValues = { ...this.positionValues, [axis]: { value, isValid } };
-    } else if (field === 'rotation') {
-      this.rotationValues = { ...this.rotationValues, [axis]: { value, isValid } };
-    } else if (field === 'scale') {
-      this.scaleValues = { ...this.scaleValues, [axis]: { value, isValid } };
-    }
+    this.propertyValues = {
+      ...this.propertyValues,
+      [propName]: { value, isValid },
+    };
 
-    // Apply to node if valid
-    if (isValid && this.primaryNode) {
-      this.applyTransformToNode(field, axis, num);
+    // Apply if valid and node selected
+    if (isValid && this.primaryNode && this.propertySchema) {
+      await this.applyPropertyChange(propName, num);
     }
   }
 
-  private handleTransformBlur(
-    field: 'position' | 'rotation' | 'scale',
-    axis: 'x' | 'y' | 'z',
-    e: Event
-  ) {
+  private async handlePropertyBlur(propName: string, e: Event) {
     const input = e.target as HTMLInputElement;
-    let num = parseFloat(input.value);
-    if (isNaN(num)) num = field === 'scale' ? 1 : 0;
+    let value = input.value;
 
-    const formattedValue = this.formatNumber(num);
-
-    // Update local state with formatted value
-    if (field === 'position') {
-      this.positionValues = {
-        ...this.positionValues,
-        [axis]: { value: formattedValue, isValid: true },
-      };
-    } else if (field === 'rotation') {
-      this.rotationValues = {
-        ...this.rotationValues,
-        [axis]: { value: formattedValue, isValid: true },
-      };
-    } else if (field === 'scale') {
-      this.scaleValues = { ...this.scaleValues, [axis]: { value: formattedValue, isValid: true } };
+    // For number inputs, format the value
+    if (input.type === 'number') {
+      let num = parseFloat(value);
+      if (isNaN(num)) num = 0;
+      value = parseFloat(num.toFixed(4)).toString();
     }
 
-    if (this.primaryNode) {
-      this.applyTransformToNode(field, axis, num);
+    // Update local state
+    this.propertyValues = {
+      ...this.propertyValues,
+      [propName]: { value, isValid: true },
+    };
+
+    if (this.primaryNode && this.propertySchema) {
+      await this.applyPropertyChange(propName, value);
     }
   }
 
-  private async applyTransformToNode(
-    field: 'position' | 'rotation' | 'scale',
-    axis: 'x' | 'y' | 'z',
-    value: number
-  ) {
-    if (!this.primaryNode) return;
+  private async applyPropertyChange(propertyName: string, value: unknown) {
+    if (!this.primaryNode || !this.propertySchema) return;
+
+    // Find the property definition
+    const propDef = this.propertySchema.properties.find(p => p.name === propertyName);
+    if (!propDef) return;
 
     const op = new UpdateObjectPropertyOperation({
       nodeId: this.primaryNode.nodeId,
-      propertyPath: `${field}.${axis}`,
-      value: value,
+      propertyPath: propertyName,
+      value,
     });
 
     try {
       await this.operationService.invokeAndPush(op);
     } catch (error) {
-      console.error('[InspectorPanel] Failed to execute transform update command', error);
-    }
-  }
-
-  private handleSizeInput(dimension: 'width' | 'height', e: Event) {
-    const input = e.target as HTMLInputElement;
-    const value = input.value;
-    const num = parseFloat(value);
-    const isValid = !isNaN(num);
-
-    this.sizeValues = { ...this.sizeValues, [dimension]: { value, isValid } };
-
-    if (isValid && this.primaryNode instanceof Group2D) {
-      this.applySizeToGroup2D(dimension, num);
-    }
-  }
-
-  private handleSizeBlur(dimension: 'width' | 'height', e: Event) {
-    const input = e.target as HTMLInputElement;
-    let num = parseFloat(input.value);
-    if (isNaN(num)) num = 100;
-
-    const formattedValue = this.formatNumber(num);
-    this.sizeValues = { ...this.sizeValues, [dimension]: { value: formattedValue, isValid: true } };
-
-    if (this.primaryNode instanceof Group2D) {
-      this.applySizeToGroup2D(dimension, num);
-    }
-  }
-
-  private async applySizeToGroup2D(dimension: 'width' | 'height', value: number) {
-    if (!this.primaryNode || !(this.primaryNode instanceof Group2D)) return;
-
-    try {
-      const command = new UpdateGroup2DSizeCommand({
-        nodeId: this.primaryNode.nodeId,
-        width: dimension === 'width' ? value : this.primaryNode.width,
-        height: dimension === 'height' ? value : this.primaryNode.height,
-      });
-
-      await this.commandDispatcher.execute(command);
-    } catch (error) {
-      console.error('[InspectorPanel] Failed to execute size update command', error);
+      console.error('[InspectorPanel] Failed to update property', propertyName, error);
+      // Revert UI state on error
+      const displayValue = getPropertyDisplayValue(this.primaryNode, propDef);
+      this.propertyValues = {
+        ...this.propertyValues,
+        [propertyName]: { value: displayValue, isValid: true },
+      };
     }
   }
 
@@ -425,7 +211,19 @@ export class InspectorPanel extends ComponentBase {
   }
 
   private renderProperties() {
-    const nodeType = this.primaryNode?.type || 'Unknown';
+    if (!this.primaryNode || !this.propertySchema) {
+      return '';
+    }
+
+    const nodeType = this.primaryNode.type;
+    const groupedProps = getPropertiesByGroup(this.propertySchema);
+
+    // Sort groups: 'Base' first, then others
+    const sortedGroups = Array.from(groupedProps.entries()).sort(([nameA], [nameB]) => {
+      if (nameA === 'Base') return -1;
+      if (nameB === 'Base') return 1;
+      return nameA.localeCompare(nameB);
+    });
 
     return html`
       <div class="property-section">
@@ -437,124 +235,377 @@ export class InspectorPanel extends ComponentBase {
           <p class="node-type">${nodeType}</p>
         </div>
 
-        <div class="property-group">
-          <label class="property-label">
-            Name:
-            <input
-              type="text"
-              class="property-input property-input--text"
-              .value=${this.nameValue}
-              @input=${this.handleNameInput}
-              placeholder="(unnamed)"
-            />
-          </label>
-        </div>
+        ${sortedGroups.map(([groupName, props]) => this.renderPropertyGroup(groupName, props))}
+      </div>
+    `;
+  }
 
+  private renderPropertyGroup(groupName: string, props: PropertyDefinition[]) {
+    const groupDef = this.propertySchema?.groups?.[groupName];
+    const label = groupDef?.label || groupName;
+
+    // Filter out hidden and read-only properties
+    const visibleProps = props.filter(p => !p.ui?.hidden);
+
+    if (visibleProps.length === 0) {
+      return '';
+    }
+
+    // Special handling for Transform group - render as grid
+    if (groupName === 'Transform') {
+      return this.renderTransformGroup(label, visibleProps);
+    }
+
+    return html`
+      <div class="property-group-section">
+        <h4 class="group-title">${label}</h4>
+        ${visibleProps.map(prop => this.renderPropertyInput(prop))}
+      </div>
+    `;
+  }
+
+  private renderTransformGroup(label: string, props: PropertyDefinition[]) {
+    if (!this.primaryNode) {
+      return '';
+    }
+
+    return html`
+      <div class="property-group-section transform-section">
+        <h4 class="group-title">${label}</h4>
+        ${props.map(prop => this.renderTransformProperty(prop))}
+      </div>
+    `;
+  }
+
+  private renderTransformProperty(prop: PropertyDefinition) {
+    if (!this.primaryNode || !this.propertyValues[prop.name]) {
+      return '';
+    }
+
+    const state = this.propertyValues[prop.name];
+    const label = prop.ui?.label || prop.name;
+    const readOnly = prop.ui?.readOnly;
+
+    // For vector properties, render as grid
+    if (prop.type === 'vector2' || prop.type === 'vector3' || prop.type === 'euler') {
+      let value = { x: 0, y: 0, z: 0 };
+      try {
+        value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
+      } catch (e) {
+        console.warn(`Failed to parse vector value for ${prop.name}:`, state.value);
+      }
+
+      if (prop.type === 'vector2') {
+        return html`
+          <div class="transform-subsection">
+            <div class="subsection-title">
+              ${label}
+              <button class="reset-button" title="Reset to default">↻</button>
+            </div>
+            <div class="transform-fields">
+              <div class="transform-field-label">X</div>
+              <input
+                type="number"
+                class="transform-field-input"
+                step=${prop.ui?.step ?? 0.01}
+                .value=${value.x.toFixed(prop.ui?.precision ?? 2)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) => {
+                  const newX = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: newX, y: value.y });
+                }}
+              />
+
+              <div class="transform-field-label">Y</div>
+              <input
+                type="number"
+                class="transform-field-input"
+                step=${prop.ui?.step ?? 0.01}
+                .value=${value.y.toFixed(prop.ui?.precision ?? 2)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) => {
+                  const newY = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: newY });
+                }}
+              />
+
+              <div></div>
+              <div></div>
+            </div>
+          </div>
+        `;
+      }
+
+      if (prop.type === 'vector3') {
+        return html`
+          <div class="transform-subsection">
+            <div class="subsection-title">
+              ${label}
+              <button class="reset-button" title="Reset to default">↻</button>
+            </div>
+            <div class="transform-fields">
+              <div class="transform-field-label">X</div>
+              <input
+                type="number"
+                class="transform-field-input"
+                step=${prop.ui?.step ?? 0.01}
+                .value=${value.x.toFixed(prop.ui?.precision ?? 2)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) => {
+                  const newX = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
+                }}
+              />
+
+              <div class="transform-field-label">Y</div>
+              <input
+                type="number"
+                class="transform-field-input"
+                step=${prop.ui?.step ?? 0.01}
+                .value=${value.y.toFixed(prop.ui?.precision ?? 2)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) => {
+                  const newY = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
+                }}
+              />
+
+              <div class="transform-field-label">Z</div>
+              <input
+                type="number"
+                class="transform-field-input"
+                step=${prop.ui?.step ?? 0.01}
+                .value=${value.z.toFixed(prop.ui?.precision ?? 2)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) => {
+                  const newZ = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
+                }}
+              />
+            </div>
+          </div>
+        `;
+      }
+
+      if (prop.type === 'euler') {
+        return html`
+          <div class="transform-subsection">
+            <div class="subsection-title">
+              ${label}
+              <button class="reset-button" title="Reset to default">↻</button>
+            </div>
+            <div class="transform-fields">
+              <div class="transform-field-label">X</div>
+              <input
+                type="number"
+                class="transform-field-input"
+                step=${prop.ui?.step ?? 0.1}
+                .value=${value.x.toFixed(prop.ui?.precision ?? 1)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) => {
+                  const newX = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
+                }}
+              />
+
+              <div class="transform-field-label">Y</div>
+              <input
+                type="number"
+                class="transform-field-input"
+                step=${prop.ui?.step ?? 0.1}
+                .value=${value.y.toFixed(prop.ui?.precision ?? 1)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) => {
+                  const newY = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
+                }}
+              />
+
+              <div class="transform-field-label">Z</div>
+              <input
+                type="number"
+                class="transform-field-input"
+                step=${prop.ui?.step ?? 0.1}
+                .value=${value.z.toFixed(prop.ui?.precision ?? 1)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) => {
+                  const newZ = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
+                }}
+              />
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    // For single number properties in transform group
+    if (prop.type === 'number') {
+      return html`
+        <div class="property-group">
+          <span class="property-label">${label}${prop.ui?.unit ? ` (${prop.ui.unit})` : ''}</span>
+          <input
+            type="number"
+            step=${prop.ui?.step ?? 0.01}
+            class="property-input property-input--number ${state.isValid ? '' : 'property-input--invalid'}"
+            .value=${state.value}
+            ?disabled=${readOnly}
+            @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
+            @blur=${(e: Event) => this.handlePropertyBlur(prop.name, e)}
+          />
+        </div>
+      `;
+    }
+
+    return '';
+  }
+
+  private renderPropertyInput(prop: PropertyDefinition) {
+    if (!this.primaryNode || !this.propertyValues[prop.name]) {
+      return '';
+    }
+
+    const state = this.propertyValues[prop.name];
+    const label = prop.ui?.label || prop.name;
+    const readOnly = prop.ui?.readOnly;
+
+    if (prop.type === 'boolean') {
+      return html`
         <div class="property-group">
           <label class="property-label property-label--checkbox">
             <input
               type="checkbox"
               class="property-checkbox"
-              .checked=${this.visibleValue}
-              @change=${this.handleVisibilityChange}
+              .checked=${state.value === 'true'}
+              ?disabled=${readOnly}
+              @change=${(e: Event) =>
+                this.applyPropertyChange(prop.name, (e.target as HTMLInputElement).checked)}
             />
-            Visible
+            ${label}
           </label>
         </div>
-
-        ${this.renderTransformProperties()}
-      </div>
-    `;
-  }
-
-  private renderTransformProperties() {
-    if (!(this.primaryNode instanceof Node3D) && !(this.primaryNode instanceof Sprite2D) && !(this.primaryNode instanceof Group2D)) {
-      return '';
+      `;
     }
 
-    const isGroup2D = this.primaryNode instanceof Group2D;
+    if (prop.type === 'vector2') {
+      let value = { x: 0, y: 0 };
+      try {
+        value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
+      } catch (e) {
+        console.warn(`Failed to parse vector2 value for ${prop.name}:`, state.value);
+      }
+      return html`
+        <div class="property-group">
+          <span class="property-label">${label}</span>
+          <pix3-vector2-editor
+            .x=${value.x}
+            .y=${value.y}
+            step=${prop.ui?.step ?? 0.01}
+            precision=${prop.ui?.precision ?? 2}
+            ?disabled=${readOnly}
+            @change=${(e: CustomEvent) => this.applyPropertyChange(prop.name, e.detail)}
+          ></pix3-vector2-editor>
+        </div>
+      `;
+    }
 
+    if (prop.type === 'vector3') {
+      let value = { x: 0, y: 0, z: 0 };
+      try {
+        value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
+      } catch (e) {
+        console.warn(`Failed to parse vector3 value for ${prop.name}:`, state.value);
+      }
+      return html`
+        <div class="property-group">
+          <span class="property-label">${label}</span>
+          <pix3-vector3-editor
+            .x=${value.x}
+            .y=${value.y}
+            .z=${value.z}
+            step=${prop.ui?.step ?? 0.01}
+            precision=${prop.ui?.precision ?? 2}
+            ?disabled=${readOnly}
+            @change=${(e: CustomEvent) => this.applyPropertyChange(prop.name, e.detail)}
+          ></pix3-vector3-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'euler') {
+      let value = { x: 0, y: 0, z: 0 };
+      try {
+        value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
+      } catch (e) {
+        console.warn(`Failed to parse euler value for ${prop.name}:`, state.value);
+      }
+      return html`
+        <div class="property-group">
+          <span class="property-label">${label}</span>
+          <pix3-euler-editor
+            .x=${value.x}
+            .y=${value.y}
+            .z=${value.z}
+            step=${prop.ui?.step ?? 0.1}
+            precision=${prop.ui?.precision ?? 1}
+            ?disabled=${readOnly}
+            @change=${(e: CustomEvent) => this.applyPropertyChange(prop.name, e.detail)}
+          ></pix3-euler-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'number') {
+      return html`
+        <div class="property-group">
+          <span class="property-label">${label}${prop.ui?.unit ? ` (${prop.ui.unit})` : ''}</span>
+          <input
+            type="number"
+            step=${prop.ui?.step ?? 0.01}
+            class="property-input property-input--number ${state.isValid
+              ? ''
+              : 'property-input--invalid'}"
+            .value=${state.value}
+            ?disabled=${readOnly}
+            @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
+            @blur=${(e: Event) => this.handlePropertyBlur(prop.name, e)}
+          />
+        </div>
+      `;
+    }
+
+    if (prop.type === 'string') {
+      return html`
+        <div class="property-group">
+          <label class="property-label">
+            ${label}:
+            <input
+              type="text"
+              class="property-input property-input--text"
+              .value=${state.value}
+              ?disabled=${readOnly}
+              @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
+              @blur=${(e: Event) => this.handlePropertyBlur(prop.name, e)}
+            />
+          </label>
+        </div>
+      `;
+    }
+
+    // Default fallback for other types
     return html`
-      ${isGroup2D ? this.renderGroup2DSizeProperties() : ''}
-      <div class="transform-section">
-        <h4 class="subsection-title">Transform</h4>
-
-        <div class="property-group">
-          <span class="property-label">Position:</span>
-          <div class="vector-input">
-            ${this.renderVectorInputs('position', this.positionValues)}
-          </div>
-        </div>
-
-        <div class="property-group">
-          <span class="property-label">Rotation:</span>
-          <div class="vector-input">
-            ${this.renderVectorInputs('rotation', this.rotationValues)}
-            <span class="unit-label">°</span>
-          </div>
-        </div>
-
-        <div class="property-group">
-          <span class="property-label">Scale:</span>
-          <div class="vector-input">${this.renderVectorInputs('scale', this.scaleValues)}</div>
-        </div>
+      <div class="property-group">
+        <label class="property-label">
+          ${label}:
+          <input
+            type="text"
+            class="property-input property-input--text"
+            .value=${state.value}
+            ?disabled=${readOnly}
+            @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
+          />
+        </label>
       </div>
-    `;
-  }
-
-  private renderGroup2DSizeProperties() {
-    return html`
-      <div class="size-section">
-        <h4 class="subsection-title">Size</h4>
-        <div class="property-group">
-          <span class="property-label">Width:</span>
-          <input
-            type="number"
-            step="0.01"
-            class="property-input property-input--number ${this.sizeValues.width.isValid
-              ? ''
-              : 'property-input--invalid'}"
-            .value=${this.sizeValues.width.value}
-            @input=${(e: Event) => this.handleSizeInput('width', e)}
-            @blur=${(e: Event) => this.handleSizeBlur('width', e)}
-          />
-        </div>
-        <div class="property-group">
-          <span class="property-label">Height:</span>
-          <input
-            type="number"
-            step="0.01"
-            class="property-input property-input--number ${this.sizeValues.height.isValid
-              ? ''
-              : 'property-input--invalid'}"
-            .value=${this.sizeValues.height.value}
-            @input=${(e: Event) => this.handleSizeInput('height', e)}
-            @blur=${(e: Event) => this.handleSizeBlur('height', e)}
-          />
-        </div>
-      </div>
-    `;
-  }
-
-  private renderVectorInputs(
-    field: 'position' | 'rotation' | 'scale',
-    values: Record<'x' | 'y' | 'z', PropertyValue>
-  ) {
-    return html`
-      ${(['x', 'y', 'z'] as const).map(
-        axis => html`
-          <input
-            type="number"
-            step=${field === 'rotation' ? '0.1' : '0.01'}
-            class="property-input property-input--number ${values[axis].isValid
-              ? ''
-              : 'property-input--invalid'}"
-            .value=${values[axis].value}
-            @input=${(e: Event) => this.handleTransformInput(field, axis, e)}
-            @blur=${(e: Event) => this.handleTransformBlur(field, axis, e)}
-          />
-        `
-      )}
     `;
   }
 }

@@ -151,14 +151,18 @@ The repository contains a working MVP scaffold with a functional rendering pipel
 - **Build & Dev Tooling**: Vite + TypeScript project with ESLint, Prettier, Vitest, and CI workflows. Dev (`npm run dev`), build (`npm run build`), test (`npm run test`), and lint scripts functional.
 - **UI Components**: Golden Layout-based shell. Panels (Scene Tree, Viewport, Inspector, Asset Browser) implemented with `ComponentBase`. All components extend `ComponentBase` and use light DOM by default. Styles separated into `[component].ts.css` files.
 - **Command Execution**: Features implemented for selection (SelectObjectCommand/Operation), scene loading (LoadSceneCommand), and history (RedoCommand/UndoCommand). All use Operations via OperationService and CommandDispatcher.
+- **Property Schema System**: Godot-inspired dynamic property editor framework. Node classes (NodeBase, Node2D, Node3D, Sprite2D, etc.) expose properties via schema with type information, validation, and UI hints. Supports scalar, vector (2D/3D), euler, boolean, string, and enum types. Schemas inherit from parent classes matching class hierarchy.
+- **Custom Vector Editors**: Specialized Web Components (Vector2Editor, Vector3Editor, EulerEditor) display transform properties (position, rotation, scale) with X/Y/Z fields in compact grid layout. Rotation displayed in degrees with proper radian conversion. All editors support undo/redo via UpdateObjectPropertyOperation.
+- **Dynamic Inspector UI**: Object Inspector renders property fields based on node schemas organized by groups (Transform, Sprite, etc.). Transform group uses optimized grid layout with labeled X/Y/Z inputs and reset buttons. Vector properties display as single-row editors rather than separate axis fields for improved UX.
 
 ### Known Gaps / Next Work Items
 
-- **Tests**: Unit tests exist for core managers and commands. Integration tests for renderer DPR/resize behavior would strengthen confidence.
+- **Tests**: Unit tests exist for core managers and commands. Integration tests for property schema rendering and vector editor interactions would strengthen confidence.
 - **Performance Tuning**: Production build has chunk-size warnings. Code-splitting large optional modules would reduce initial bundle size.
 - **Fixed-Pixel Overlays**: If pixel-perfect UI chrome or guides are needed, a small helper to compute orthographic bounds from screen pixels could be added.
 - **Plugin System**: Plugin manifest validation and sandboxing are on the roadmap but not yet implemented.
 - **Collaborative Features**: Shared sessions and live cursors (post-MVP).
+- **Reset Buttons**: Transform property reset buttons are visually present but not yet functional.
 
 ## 5. Scene File Format (*.pix3scene)
 

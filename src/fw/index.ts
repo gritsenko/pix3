@@ -9,5 +9,7 @@ import { subscribe } from 'valtio/vanilla';
 export * from './component-base';
 export * from './di';
 export * from './layout-component-base';
+export * from './property-schema';
+export * from './property-schema-utils';
 
 export { html, css, unsafeCSS, customElement, property, state, inject, fromQuery, subscribe };

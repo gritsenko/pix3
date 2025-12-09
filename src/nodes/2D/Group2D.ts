@@ -1,6 +1,7 @@
 import { Vector2 } from 'three';
 
 import { Node2D, type Node2DProps } from '@/nodes/Node2D';
+import type { PropertySchema } from '@/fw';
 
 export interface Group2DProps extends Omit<Node2DProps, 'type'> {
   width?: number;
@@ -35,5 +36,61 @@ export class Group2D extends Node2D {
   setSize(width: number, height: number): void {
     this.width = width;
     this.height = height;
+  }
+
+  /**
+   * Get the property schema for Group2D.
+   * Extends Node2D schema with group-specific size properties.
+   */
+  static getPropertySchema(): PropertySchema {
+    const baseSchema = Node2D.getPropertySchema();
+
+    return {
+      nodeType: 'Group2D',
+      extends: 'Node2D',
+      properties: [
+        ...baseSchema.properties,
+        {
+          name: 'width',
+          type: 'number',
+          ui: {
+            label: 'Width',
+            group: 'Size',
+            step: 0.01,
+            precision: 2,
+            min: 0,
+          },
+          getValue: (node: unknown) => (node as Group2D).width,
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as Group2D;
+            n.width = Number(value);
+          },
+        },
+        {
+          name: 'height',
+          type: 'number',
+          ui: {
+            label: 'Height',
+            group: 'Size',
+            step: 0.01,
+            precision: 2,
+            min: 0,
+          },
+          getValue: (node: unknown) => (node as Group2D).height,
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as Group2D;
+            n.height = Number(value);
+          },
+        },
+      ],
+      groups: {
+        ...baseSchema.groups,
+        Size: {
+          label: 'Size',
+          description: 'Group dimensions',
+          expanded: true,
+        },
+      },
+    };
   }
 }

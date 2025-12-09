@@ -159,6 +159,71 @@ src/
 - **Commands**: Thin wrappers that validate preconditions and invoke operations via OperationService
 - **CommandDispatcher**: Primary entry point for all user actions; ensures consistent lifecycle, preconditions, telemetry
 
+### Property Schema System
+
+Pix3 uses a **Godot-inspired property schema system** for dynamic object inspector UI generation. Instead of hardcoding property editors, node classes declare their properties declaratively.
+
+#### How It Works
+1. **Node classes expose schemas**: Each node type (Node2D, Sprite2D, etc.) implements `static getPropertySchema()` returning typed property definitions
+2. **Inspector renders dynamically**: The Object Inspector uses `getNodePropertySchema()` and `getPropertiesByGroup()` utilities to auto-generate editors
+3. **Schema-based mutations**: Property changes flow through `UpdateObjectPropertyOperation` which uses schema's getValue/setValue methods for transformation (e.g., radians ↔ degrees)
+
+#### Property Schema Example
+```typescript
+// In Node2D.ts
+static getPropertySchema(): PropertySchema {
+  return {
+    ...NodeBase.getPropertySchema(),
+    position: {
+      type: 'vector2',
+      label: 'Position',
+      group: 'Transform',
+      getValue: (node) => ({ x: node.position.x, y: node.position.y }),
+      setValue: (node, value) => {
+        node.position.x = value.x;
+        node.position.y = value.y;
+      },
+    },
+    rotation: {
+      type: 'number',
+      label: 'Rotation',
+      group: 'Transform',
+      unit: '°',
+      step: 1,
+    },
+    scale: {
+      type: 'vector2',
+      label: 'Scale',
+      group: 'Transform',
+      getValue: (node) => ({ x: node.scale.x, y: node.scale.y }),
+      setValue: (node, value) => {
+        node.scale.x = value.x;
+        node.scale.y = value.y;
+      },
+    },
+  };
+}
+```
+
+#### Supported Property Types
+- `'string'` - Text input
+- `'number'` - Numeric input
+- `'boolean'` - Checkbox
+- `'vector2'` - {x, y} coordinates (grid layout with color-coded labels)
+- `'vector3'` - {x, y, z} coordinates (grid layout with color-coded labels)
+- `'euler'` - {x, y, z} rotation in degrees (internally radians)
+- `'color'` - Color picker
+- `'enum'` - Dropdown selection
+- `'select'` - List selection
+- `'object'` - Generic nested object
+
+#### Custom Editors
+Vector and rotation properties render with custom Web Components (`Vector2Editor`, `Vector3Editor`, `EulerEditor`) in a unified grid layout:
+- Transform group uses 6-column grid layout (1rem 1fr 1rem 1fr 1rem 1fr)
+- X/Y/Z labels color-coded: red (#ff6b6b), green (#51cf66), blue (#4c6ef5)
+- Single-row display with inline label and input for each axis
+- Automatic undo/redo support through UpdateObjectPropertyOperation
+
 ### Component Architecture
 - Extend `ComponentBase` (not raw LitElement) for all Lit components
 - Use light DOM by default for global style integration
