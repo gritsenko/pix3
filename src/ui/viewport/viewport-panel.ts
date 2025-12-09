@@ -160,25 +160,26 @@ export class ViewportPanel extends ComponentBase {
 
     // Only handle pointer down on the canvas or host
     const isCanvasTarget = (event.target as HTMLElement)?.classList?.contains('viewport-canvas');
+    console.debug('[ViewportPanel] pointerDown', { target: event.target, isCanvasTarget, isThis: event.target === this });
     if (event.target !== this && !isCanvasTarget) {
       return;
     }
 
-    // Check if clicking on 2D transform controls
-    if (this.transformMode === 'select') {
-      const rect = this.getBoundingClientRect();
-      const screenX = event.clientX - rect.left;
-      const screenY = event.clientY - rect.top;
+    const rect = this.getBoundingClientRect();
+    const screenX = event.clientX - rect.left;
+    const screenY = event.clientY - rect.top;
+    console.debug('[ViewportPanel] checking 2D handles at', { screenX, screenY });
 
-      const handleType = this.viewportRenderer.get2DHandleAt?.(screenX, screenY);
-      if (handleType && handleType !== 'idle') {
-        // Start 2D transform
-        this.viewportRenderer.start2DTransform?.(screenX, screenY, handleType);
-        this.pointerDownPos = { x: event.clientX, y: event.clientY };
-        this.pointerDownTime = Date.now();
-        this.isDragging = true; // Mark as dragging to prevent raycast selection
-        return;
-      }
+    // Check if clicking on 2D transform handles or within selected 2D node bounds
+    const handleType = this.viewportRenderer.get2DHandleAt?.(screenX, screenY);
+    console.debug('[ViewportPanel] get2DHandleAt result:', handleType);
+    if (handleType && handleType !== 'idle') {
+      // Start 2D transform (move, scale, or rotate)
+      this.viewportRenderer.start2DTransform?.(screenX, screenY, handleType);
+      this.pointerDownPos = { x: event.clientX, y: event.clientY };
+      this.pointerDownTime = Date.now();
+      this.isDragging = true;
+      return;
     }
 
     // Record the position and time for drag detection

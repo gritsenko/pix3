@@ -64,33 +64,27 @@ export class ViewportRendererService {
   private currentTransformMode: TransformMode = 'select';
   private selectedObjects = new Set<THREE.Object3D>();
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
-  private group2DMeshes = new Map<string, THREE.LineSegments>(); // Track Group2D visual representations
-  private sprite2DMeshes = new Map<string, THREE.Mesh>(); // Track Sprite2D visual representations
+  private group2DMeshes = new Map<string, THREE.LineSegments>();
+  private sprite2DMeshes = new Map<string, THREE.Mesh>();
   private selection2DOverlay?: {
     group: THREE.Group;
     handles: THREE.Object3D[];
     frame: THREE.LineSegments;
-    nodeId: string;
-    anchorWorld: THREE.Vector3;
-    anchorLocal: THREE.Vector3;
-    baseSize: THREE.Vector2;
-    startSize: THREE.Vector2;
+    nodeIds: string[];
+    combinedBounds: THREE.Box3;
     centerWorld: THREE.Vector3;
     rotationHandle?: THREE.Object3D;
-    bounds: THREE.Box3;
   };
   private active2DTransform?: {
-    nodeId: string;
+    nodeIds: string[];
     handle: TwoDHandle;
     startPointerWorld: THREE.Vector3;
-    startPosition: THREE.Vector3;
-    startRotation: number;
-    startState: Transform2DState;
-    baseSize: THREE.Vector2;
-    startSize: THREE.Vector2;
+    startStates: Map<string, { position: THREE.Vector3; rotation: number; scale: THREE.Vector2 }>;
+    combinedBounds: THREE.Box3;
+    startCenterWorld: THREE.Vector3;
     anchorWorld: THREE.Vector3;
     anchorLocal: THREE.Vector3;
-    startCenterWorld: THREE.Vector3;
+    startSize: THREE.Vector2;
   };
   private animationId?: number;
   private disposers: Array<() => void> = [];
@@ -101,7 +95,6 @@ export class ViewportRendererService {
   private lastActiveSceneId: string | null = null;
   private viewportSize = { width: 0, height: 0 };
   private readonly min2DSize = 4;
-  private orbitLocked = false;
 
   constructor() {}
 
@@ -222,12 +215,10 @@ export class ViewportRendererService {
   }
 
   begin2DInteraction(): void {
-    this.orbitLocked = true;
     this.setOrbitEnabled(false);
   }
 
   end2DInteraction(): void {
-    this.orbitLocked = false;
     this.setOrbitEnabled(true);
   }
 
@@ -467,8 +458,8 @@ export class ViewportRendererService {
       }
     }
 
-    if (node instanceof Node2D && this.selection2DOverlay?.nodeId === node.nodeId) {
-      this.update2DSelectionOverlay(node.nodeId);
+    if (node instanceof Node2D && this.selection2DOverlay?.nodeIds.includes(node.nodeId)) {
+      this.refreshGizmoPositions();
     }
   }
 
@@ -508,6 +499,11 @@ export class ViewportRendererService {
   }
 
   updateSelection(): void {
+    // Don't update selection while a 2D transform is in progress
+    if (this.active2DTransform) {
+      return;
+    }
+
     // Detach transform controls from previous object
     if (this.transformControls) {
       this.transformControls.detach();
@@ -564,7 +560,7 @@ export class ViewportRendererService {
 
     // Add selection boxes for selected nodes and attach transform controls to the first one
     let firstSelectedNode: Node3D | null = null;
-    let selected2DNodeId: string | null = null;
+    const selected2DNodeIds: string[] = [];
     for (const nodeId of nodeIds) {
       const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
       if (node && node instanceof Node3D) {
@@ -580,13 +576,13 @@ export class ViewportRendererService {
         helper.userData.isSelectionBox = true;
         this.selectionBoxes.set(nodeId, helper);
         this.scene?.add(helper);
-      } else if (node && node instanceof Node2D && !selected2DNodeId) {
-        selected2DNodeId = nodeId;
+      } else if (node && node instanceof Node2D) {
+        selected2DNodeIds.push(nodeId);
       }
     }
 
-    if (selected2DNodeId) {
-      this.update2DSelectionOverlay(selected2DNodeId);
+    if (selected2DNodeIds.length > 0) {
+      this.update2DSelectionOverlayForNodes(selected2DNodeIds);
     } else {
       this.clear2DSelectionOverlay();
     }
@@ -755,44 +751,6 @@ export class ViewportRendererService {
   }
 
   /**
-   * Create a highlighted selection box for a Group2D node.
-   */
-  private createGroup2DSelectionBox(node: Group2D): THREE.LineSegments {
-    const width = node.width;
-    const height = node.height;
-
-    // Create rectangle geometry centered at origin with highlight color
-    const points: THREE.Vector3[] = [
-      new THREE.Vector3(-width / 2, -height / 2, 0),
-      new THREE.Vector3(width / 2, -height / 2, 0),
-      new THREE.Vector3(width / 2, height / 2, 0),
-      new THREE.Vector3(-width / 2, height / 2, 0),
-      new THREE.Vector3(-width / 2, -height / 2, 0), // Close the loop
-    ];
-
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-
-    // Create line material with highlight color (green for selection)
-    const material = new THREE.LineBasicMaterial({
-      color: 0x00ff00,
-      linewidth: 3,
-    });
-
-    const line = new THREE.LineSegments(geometry, material);
-
-    // Apply the node's transform
-    line.position.copy(node.position);
-    line.rotation.copy(node.rotation);
-    line.scale.copy(node.scale);
-
-    // Mark as selection box
-    line.userData.isGroup2DSelectionBox = true;
-    line.userData.nodeId = node.nodeId;
-
-    return line;
-  }
-
-  /**
    * Create a visual representation for a Sprite2D node.
    * Renders the texture if available, or a placeholder rectangle if not.
    */
@@ -944,7 +902,13 @@ export class ViewportRendererService {
     console.debug('[ViewportRenderer] cleared 2D overlay');
   }
 
-  private update2DSelectionOverlay(nodeId: string): void {
+  private update2DSelectionOverlayForNodes(nodeIds: string[]): void {
+    // Don't recreate overlay during an active 2D transform - use refreshGizmoPositions instead
+    if (this.active2DTransform) {
+      this.refreshGizmoPositions();
+      return;
+    }
+
     if (!this.scene || !this.orthographicCamera) {
       return;
     }
@@ -961,27 +925,41 @@ export class ViewportRendererService {
       return;
     }
 
-    const node = sceneGraph.nodeMap.get(nodeId);
-    if (!node || !(node instanceof Node2D)) {
+    const node2DIds: string[] = [];
+    const combinedBounds = new THREE.Box3();
+
+    for (const nodeId of nodeIds) {
+      const node = sceneGraph.nodeMap.get(nodeId);
+      if (!node || !(node instanceof Node2D)) {
+        console.debug('[ViewportRenderer] update2DOverlay: node not Node2D', nodeId);
+        continue;
+      }
+
+      const visual = this.get2DVisual(node);
+      if (!visual) {
+        console.debug('[ViewportRenderer] update2DOverlay: no visual for', nodeId);
+        continue;
+      }
+
+      const nodeBounds = new THREE.Box3().setFromObject(visual);
+      console.debug('[ViewportRenderer] update2DOverlay: nodeBounds', nodeId, nodeBounds);
+      combinedBounds.union(nodeBounds);
+      node2DIds.push(nodeId);
+    }
+
+    if (node2DIds.length === 0 || combinedBounds.isEmpty()) {
+      console.debug('[ViewportRenderer] update2DOverlay: no valid 2D nodes or empty bounds');
       this.clear2DSelectionOverlay();
       return;
     }
 
-    const visual = this.get2DVisual(node);
-    if (!visual) {
-      this.clear2DSelectionOverlay();
-      return;
-    }
-
-    const bounds = new THREE.Box3().setFromObject(visual);
-    const size = bounds.getSize(new THREE.Vector3());
-    const center = bounds.getCenter(new THREE.Vector3());
-    const baseSize = this.getBaseSizeFor2D(visual);
+    const center = combinedBounds.getCenter(new THREE.Vector3());
+    console.debug('[ViewportRenderer] update2DOverlay: creating overlay', { node2DIds, center, combinedBounds });
 
     this.clear2DSelectionOverlay();
 
-    const frame = this.create2DFrame(bounds);
-    const handles = this.create2DHandles(bounds);
+    const frame = this.create2DFrame(combinedBounds);
+    const handles = this.create2DHandles(combinedBounds);
     const group = new THREE.Group();
     group.add(frame, ...handles);
     group.renderOrder = 1000;
@@ -992,15 +970,82 @@ export class ViewportRendererService {
       group,
       handles,
       frame,
-      nodeId,
-      anchorWorld: bounds.min.clone(),
-      anchorLocal: new THREE.Vector3(-size.x / 2, -size.y / 2, 0),
-      baseSize,
-      startSize: new THREE.Vector2(size.x, size.y),
+      nodeIds: node2DIds,
+      combinedBounds,
       centerWorld: center,
       rotationHandle: handles.find(h => h.userData?.handleType === 'rotate'),
-      bounds,
     };
+  }
+
+  private refreshGizmoPositions(): void {
+    if (!this.selection2DOverlay || !this.scene) return;
+
+    const activeSceneId = appState.scenes.activeSceneId;
+    if (!activeSceneId) return;
+
+    const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
+    if (!sceneGraph) return;
+
+    const combinedBounds = new THREE.Box3();
+    for (const nodeId of this.selection2DOverlay.nodeIds) {
+      const node = sceneGraph.nodeMap.get(nodeId);
+      if (!node || !(node instanceof Node2D)) continue;
+      const visual = this.get2DVisual(node);
+      if (!visual) continue;
+      const nodeBounds = new THREE.Box3().setFromObject(visual);
+      combinedBounds.union(nodeBounds);
+    }
+
+    if (combinedBounds.isEmpty()) return;
+
+    const min = combinedBounds.min;
+    const max = combinedBounds.max;
+    const z = (min.z + max.z) / 2;
+    const midX = (min.x + max.x) / 2;
+    const midY = (min.y + max.y) / 2;
+    const center = combinedBounds.getCenter(new THREE.Vector3());
+
+    const framePoints = [
+      new THREE.Vector3(min.x, min.y, z),
+      new THREE.Vector3(max.x, min.y, z),
+      new THREE.Vector3(max.x, min.y, z),
+      new THREE.Vector3(max.x, max.y, z),
+      new THREE.Vector3(max.x, max.y, z),
+      new THREE.Vector3(min.x, max.y, z),
+      new THREE.Vector3(min.x, max.y, z),
+      new THREE.Vector3(min.x, min.y, z),
+    ];
+    this.selection2DOverlay.frame.geometry.setFromPoints(framePoints);
+
+    const handlePositions: Record<string, THREE.Vector3> = {
+      'scale-nw': new THREE.Vector3(min.x, max.y, z),
+      'scale-n': new THREE.Vector3(midX, max.y, z),
+      'scale-ne': new THREE.Vector3(max.x, max.y, z),
+      'scale-e': new THREE.Vector3(max.x, midY, z),
+      'scale-se': new THREE.Vector3(max.x, min.y, z),
+      'scale-s': new THREE.Vector3(midX, min.y, z),
+      'scale-sw': new THREE.Vector3(min.x, min.y, z),
+      'scale-w': new THREE.Vector3(min.x, midY, z),
+      rotate: new THREE.Vector3(midX, max.y + Math.max(max.y - min.y, max.x - min.x) * 0.12, z),
+    };
+
+    for (const handle of this.selection2DOverlay.handles) {
+      const type = handle.userData?.handleType as string | undefined;
+      if (type && handlePositions[type]) {
+        handle.position.copy(handlePositions[type]);
+      }
+      if (type === 'rotate' && handle instanceof THREE.Line) {
+        const lineGeom = new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(midX, max.y, z),
+          handlePositions.rotate,
+        ]);
+        handle.geometry.dispose();
+        handle.geometry = lineGeom;
+      }
+    }
+
+    this.selection2DOverlay.combinedBounds.copy(combinedBounds);
+    this.selection2DOverlay.centerWorld.copy(center);
   }
 
   private create2DFrame(bounds: THREE.Box3): THREE.LineSegments {
@@ -1053,7 +1098,7 @@ export class ViewportRendererService {
       rotate: new THREE.Vector3(midX, max.y + Math.max(max.y - min.y, max.x - min.x) * 0.12, z),
     };
 
-    const handleSize = Math.max(max.x - min.x, max.y - min.y) * 0.04 + 0.1;
+    const handleSize = 0.25;
     const handleColor = 0x4e8df5;
     const handleGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
     const handleMaterial = new THREE.MeshBasicMaterial({
@@ -1103,7 +1148,9 @@ export class ViewportRendererService {
   }
 
   get2DHandleAt(screenX: number, screenY: number): TwoDHandle {
+    console.debug('[ViewportRenderer] get2DHandleAt called', { screenX, screenY, hasOverlay: !!this.selection2DOverlay });
     if (!this.selection2DOverlay || !this.orthographicCamera) {
+      console.debug('[ViewportRenderer] get2DHandleAt: no overlay or camera');
       return 'idle';
     }
 
@@ -1117,14 +1164,31 @@ export class ViewportRendererService {
     const hits = raycaster.intersectObjects(this.selection2DOverlay.handles, true);
     if (hits.length) {
       const handleType = hits[0].object.userData?.handleType as TwoDHandle | undefined;
+      console.debug('[ViewportRenderer] get2DHandleAt: hit handle', handleType);
       return handleType ?? 'idle';
     }
 
     const point = this.screenToWorld2D(screenX, screenY);
-    if (point && this.selection2DOverlay.bounds.containsPoint(point)) {
-      return 'move';
+    const bounds = this.selection2DOverlay.combinedBounds;
+    
+    if (point) {
+      const point2D = new THREE.Vector3(point.x, point.y, (bounds.min.z + bounds.max.z) / 2);
+      const inX = point.x >= bounds.min.x && point.x <= bounds.max.x;
+      const inY = point.y >= bounds.min.y && point.y <= bounds.max.y;
+      console.debug('[ViewportRenderer] get2DHandleAt: point check', {
+        point: { x: point.x.toFixed(3), y: point.y.toFixed(3), z: point.z.toFixed(3) },
+        boundsMin: { x: bounds.min.x.toFixed(3), y: bounds.min.y.toFixed(3), z: bounds.min.z.toFixed(3) },
+        boundsMax: { x: bounds.max.x.toFixed(3), y: bounds.max.y.toFixed(3), z: bounds.max.z.toFixed(3) },
+        inX, inY
+      });
+      
+      if (inX && inY) {
+        console.debug('[ViewportRenderer] get2DHandleAt: inside bounds -> move');
+        return 'move';
+      }
     }
 
+    console.debug('[ViewportRenderer] get2DHandleAt: miss');
     return 'idle';
   }
 
@@ -1142,48 +1206,43 @@ export class ViewportRendererService {
     const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
     if (!sceneGraph) return;
 
-    const node = sceneGraph.nodeMap.get(this.selection2DOverlay.nodeId);
-    if (!node || !(node instanceof Node2D)) {
-      return;
-    }
-
-    const visual = this.get2DVisual(node);
-    if (!visual) return;
+    const { nodeIds, combinedBounds, centerWorld } = this.selection2DOverlay;
+    if (nodeIds.length === 0) return;
 
     const pointerWorld = this.screenToWorld2D(screenX, screenY);
     if (!pointerWorld) return;
 
-    const baseSize = this.selection2DOverlay.baseSize.clone();
-    const startSize = this.selection2DOverlay.startSize.clone();
-    const startScale = new THREE.Vector2(node.scale.x, node.scale.y);
-    const startRotation = node.rotation.z;
-    const anchorLocal = this.getAnchorLocal(handle, startSize);
-    const centerWorld = visual.getWorldPosition(new THREE.Vector3());
-    const rotationMatrix = this.rotationMatrix(startRotation);
-    const anchorWorld = anchorLocal.clone().applyMatrix3(rotationMatrix).add(centerWorld);
+    const startStates = new Map<string, { position: THREE.Vector3; rotation: number; scale: THREE.Vector2 }>();
+    for (const nodeId of nodeIds) {
+      const node = sceneGraph.nodeMap.get(nodeId);
+      if (node && node instanceof Node2D) {
+        startStates.set(nodeId, {
+          position: node.position.clone(),
+          rotation: node.rotation.z,
+          scale: new THREE.Vector2(node.scale.x, node.scale.y),
+        });
+      }
+    }
 
-    const startState: Transform2DState = {
-      position: { x: node.position.x, y: node.position.y },
-      rotation: MathUtils.radToDeg(startRotation),
-      scale: { x: startScale.x, y: startScale.y },
-    };
+    const size = combinedBounds.getSize(new THREE.Vector3());
+    const startSize = new THREE.Vector2(size.x, size.y);
+    const anchorLocal = this.getAnchorLocal(handle, startSize);
+    const anchorWorld = anchorLocal.clone().add(centerWorld);
 
     this.active2DTransform = {
-      nodeId: node.nodeId,
+      nodeIds,
       handle,
       startPointerWorld: pointerWorld,
-      startPosition: node.position.clone(),
-      startRotation,
-      startState,
-      baseSize,
-      startSize,
+      startStates,
+      combinedBounds: combinedBounds.clone(),
+      startCenterWorld: centerWorld.clone(),
       anchorWorld,
       anchorLocal,
-      startCenterWorld: centerWorld,
+      startSize,
     };
 
     this.begin2DInteraction();
-    console.debug('[ViewportRenderer] start 2D transform', { handle, nodeId: node.nodeId, pointerWorld });
+    console.debug('[ViewportRenderer] start 2D transform', { handle, nodeIds, pointerWorld });
   }
 
   update2DTransform(screenX: number, screenY: number): void {
@@ -1196,36 +1255,44 @@ export class ViewportRendererService {
     const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
     if (!sceneGraph) return;
 
-    const node = sceneGraph.nodeMap.get(this.active2DTransform.nodeId);
-    if (!node || !(node instanceof Node2D)) {
-      return;
-    }
-
-    const visual = this.get2DVisual(node);
-    if (!visual) return;
-
     const pointerWorld = this.screenToWorld2D(screenX, screenY);
     if (!pointerWorld) return;
 
-    const { handle, startPointerWorld, startPosition, startRotation, baseSize, startSize, anchorWorld, anchorLocal, startCenterWorld } =
+    const { handle, startPointerWorld, startStates, startCenterWorld, anchorWorld, anchorLocal, startSize } =
       this.active2DTransform;
 
     if (handle === 'move') {
       const delta = pointerWorld.clone().sub(startPointerWorld);
-      node.position.set(startPosition.x + delta.x, startPosition.y + delta.y, node.position.z);
+      for (const [nodeId, startState] of startStates) {
+        const node = sceneGraph.nodeMap.get(nodeId);
+        if (node && node instanceof Node2D) {
+          node.position.set(startState.position.x + delta.x, startState.position.y + delta.y, node.position.z);
+          this.updateNodeTransform(node);
+        }
+      }
     } else if (handle === 'rotate') {
       const startAngle = Math.atan2(startPointerWorld.y - startCenterWorld.y, startPointerWorld.x - startCenterWorld.x);
       const currentAngle = Math.atan2(pointerWorld.y - startCenterWorld.y, pointerWorld.x - startCenterWorld.x);
-      const delta = currentAngle - startAngle;
-      node.rotation.set(0, 0, startRotation + delta);
+      const deltaAngle = currentAngle - startAngle;
+      
+      for (const [nodeId, startState] of startStates) {
+        const node = sceneGraph.nodeMap.get(nodeId);
+        if (node && node instanceof Node2D) {
+          node.rotation.set(0, 0, startState.rotation + deltaAngle);
+          
+          const offsetFromCenter = startState.position.clone().sub(startCenterWorld);
+          const rotatedOffset = new THREE.Vector3(
+            offsetFromCenter.x * Math.cos(deltaAngle) - offsetFromCenter.y * Math.sin(deltaAngle),
+            offsetFromCenter.x * Math.sin(deltaAngle) + offsetFromCenter.y * Math.cos(deltaAngle),
+            0
+          );
+          const newPosition = startCenterWorld.clone().add(rotatedOffset);
+          node.position.set(newPosition.x, newPosition.y, node.position.z);
+          this.updateNodeTransform(node);
+        }
+      }
     } else {
-      const rotationMatrix = this.rotationMatrix(startRotation);
-      const rotationInverse = this.rotationMatrix(-startRotation);
-      const localPoint = pointerWorld
-        .clone()
-        .sub(startCenterWorld)
-        .applyMatrix3(rotationInverse);
-
+      const localPoint = pointerWorld.clone().sub(startCenterWorld);
       let width = startSize.x;
       let height = startSize.y;
 
@@ -1247,24 +1314,38 @@ export class ViewportRendererService {
       if (affectsX) {
         width = Math.max(this.min2DSize, Math.abs(localPoint.x - anchorLocal.x));
       }
-
       if (affectsY) {
         height = Math.max(this.min2DSize, Math.abs(localPoint.y - anchorLocal.y));
       }
 
-      const scaleX = width / baseSize.x;
-      const scaleY = height / baseSize.y;
+      const scaleFactorX = width / startSize.x;
+      const scaleFactorY = height / startSize.y;
 
       const anchorLocalNew = this.getAnchorLocal(handle, new THREE.Vector2(width, height));
-      const anchorOffsetWorld = anchorLocalNew.clone().applyMatrix3(rotationMatrix);
-      const newCenterWorld = anchorWorld.clone().sub(anchorOffsetWorld);
+      const newCenterWorld = anchorWorld.clone().sub(anchorLocalNew);
 
-      node.position.set(newCenterWorld.x, newCenterWorld.y, node.position.z);
-      node.scale.set(scaleX, scaleY, 1);
-      console.debug('[ViewportRenderer] 2D scale', { nodeId: node.nodeId, scaleX, scaleY, newCenterWorld });
+      for (const [nodeId, startState] of startStates) {
+        const node = sceneGraph.nodeMap.get(nodeId);
+        if (node && node instanceof Node2D) {
+          const offsetFromCenter = startState.position.clone().sub(startCenterWorld);
+          const scaledOffset = new THREE.Vector3(
+            offsetFromCenter.x * scaleFactorX,
+            offsetFromCenter.y * scaleFactorY,
+            0
+          );
+          const newPos = newCenterWorld.clone().add(scaledOffset);
+          node.position.set(newPos.x, newPos.y, node.position.z);
+          node.scale.set(
+            startState.scale.x * scaleFactorX,
+            startState.scale.y * scaleFactorY,
+            1
+          );
+          this.updateNodeTransform(node);
+        }
+      }
     }
 
-    this.updateNodeTransform(node);
+    // Gizmo positions are already updated via updateNodeTransform -> refreshGizmoPositions
   }
 
   async complete2DTransform(): Promise<void> {
@@ -1272,7 +1353,7 @@ export class ViewportRendererService {
       return;
     }
 
-    const { nodeId, startState } = this.active2DTransform;
+    const { nodeIds, startStates } = this.active2DTransform;
     const sceneGraph = this.sceneManager.getActiveSceneGraph();
     if (!sceneGraph) {
       this.active2DTransform = undefined;
@@ -1280,33 +1361,41 @@ export class ViewportRendererService {
       return;
     }
 
-    const node = sceneGraph.nodeMap.get(nodeId);
-    if (!node || !(node instanceof Node2D)) {
-      this.active2DTransform = undefined;
-      this.end2DInteraction();
-      return;
-    }
-
-    // Ensure orbit stays disabled until after we push the op
     this.begin2DInteraction();
 
-    const currentState: Transform2DState = {
-      position: { x: node.position.x, y: node.position.y },
-      rotation: MathUtils.radToDeg(node.rotation.z),
-      scale: { x: node.scale.x, y: node.scale.y },
-    };
+    for (const nodeId of nodeIds) {
+      const node = sceneGraph.nodeMap.get(nodeId);
+      if (!node || !(node instanceof Node2D)) continue;
 
-    const op = new Transform2DCompleteOperation({
-      nodeId,
-      previousState: startState,
-      currentState,
-    });
+      const startState = startStates.get(nodeId);
+      if (!startState) continue;
 
-    await this.operationService.invokeAndPush(op);
+      const previousState: Transform2DState = {
+        position: { x: startState.position.x, y: startState.position.y },
+        rotation: MathUtils.radToDeg(startState.rotation),
+        scale: { x: startState.scale.x, y: startState.scale.y },
+      };
+
+      const currentState: Transform2DState = {
+        position: { x: node.position.x, y: node.position.y },
+        rotation: MathUtils.radToDeg(node.rotation.z),
+        scale: { x: node.scale.x, y: node.scale.y },
+      };
+
+      const op = new Transform2DCompleteOperation({
+        nodeId,
+        previousState,
+        currentState,
+      });
+
+      await this.operationService.invokeAndPush(op);
+    }
+
+    const savedNodeIds = [...nodeIds];
     this.active2DTransform = undefined;
     this.end2DInteraction();
-    this.update2DSelectionOverlay(nodeId);
-    console.debug('[ViewportRenderer] complete 2D transform', { nodeId });
+    this.update2DSelectionOverlayForNodes(savedNodeIds);
+    console.debug('[ViewportRenderer] complete 2D transform', { nodeIds });
   }
 
   private toNdc(screenX: number, screenY: number): THREE.Vector2 | null {
@@ -1334,12 +1423,6 @@ export class ViewportRendererService {
     return undefined;
   }
 
-  private getBaseSizeFor2D(visual: THREE.Object3D): THREE.Vector2 {
-    const box = new THREE.Box3().setFromObject(visual);
-    const size = box.getSize(new THREE.Vector3());
-    return new THREE.Vector2(size.x / (visual.scale.x || 1), size.y / (visual.scale.y || 1));
-  }
-
   private getAnchorLocal(handle: TwoDHandle, size: THREE.Vector2): THREE.Vector3 {
     const halfW = size.x / 2;
     const halfH = size.y / 2;
@@ -1363,12 +1446,6 @@ export class ViewportRendererService {
       default:
         return new THREE.Vector3(-halfW, -halfH, 0);
     }
-  }
-
-  private rotationMatrix(angle: number): THREE.Matrix3 {
-    const c = Math.cos(angle);
-    const s = Math.sin(angle);
-    return new THREE.Matrix3().set(c, -s, 0, s, c, 0, 0, 0, 1);
   }
 
   private startRenderLoop(): void {
