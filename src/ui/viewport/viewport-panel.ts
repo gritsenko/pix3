@@ -106,12 +106,13 @@ export class ViewportPanel extends ComponentBase {
         <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>
         <div class="overlay" aria-hidden="true">
           <!-- Transform Toolbar -->
-          <div class="toolbar-overlay">${renderTransformToolbar(this.transformMode, (m) => this.handleTransformModeChange(m))}</div>
+          <div class="toolbar-overlay">
+            ${renderTransformToolbar(this.transformMode, m => this.handleTransformModeChange(m))}
+          </div>
         </div>
       </section>
     `;
   }
- 
 
   private syncViewportScene(): void {
     // Renderer now auto-attaches active scene via subscription; nothing to do here
@@ -150,13 +151,34 @@ export class ViewportPanel extends ComponentBase {
 
   private handleCanvasPointerDown = (event: PointerEvent): void => {
     // Ignore pointer events from toolbar buttons
-    if ((event.target as HTMLElement)?.closest?.('.toolbar-button') || (event.target as HTMLElement)?.closest?.('.transform-toolbar')) {
+    if (
+      (event.target as HTMLElement)?.closest?.('.toolbar-button') ||
+      (event.target as HTMLElement)?.closest?.('.transform-toolbar')
+    ) {
       return;
     }
 
-    // Only handle pointer down on the canvas
-    if (event.target !== this) {
+    // Only handle pointer down on the canvas or host
+    const isCanvasTarget = (event.target as HTMLElement)?.classList?.contains('viewport-canvas');
+    if (event.target !== this && !isCanvasTarget) {
       return;
+    }
+
+    // Check if clicking on 2D transform controls
+    if (this.transformMode === 'select') {
+      const rect = this.getBoundingClientRect();
+      const screenX = event.clientX - rect.left;
+      const screenY = event.clientY - rect.top;
+
+      const handleType = this.viewportRenderer.get2DHandleAt?.(screenX, screenY);
+      if (handleType && handleType !== 'idle') {
+        // Start 2D transform
+        this.viewportRenderer.start2DTransform?.(screenX, screenY, handleType);
+        this.pointerDownPos = { x: event.clientX, y: event.clientY };
+        this.pointerDownTime = Date.now();
+        this.isDragging = true; // Mark as dragging to prevent raycast selection
+        return;
+      }
     }
 
     // Record the position and time for drag detection
@@ -171,6 +193,18 @@ export class ViewportPanel extends ComponentBase {
       return;
     }
 
+    // Handle 2D transform updates when a 2D handle is engaged
+    const has2DTransform = this.viewportRenderer.has2DTransform?.();
+    if (has2DTransform) {
+      const rect = this.getBoundingClientRect();
+      const screenX = event.clientX - rect.left;
+      const screenY = event.clientY - rect.top;
+
+      this.viewportRenderer.update2DTransform?.(screenX, screenY);
+      this.isDragging = true;
+      return;
+    }
+
     // Calculate distance moved since pointer down
     const dx = event.clientX - this.pointerDownPos.x;
     const dy = event.clientY - this.pointerDownPos.y;
@@ -180,23 +214,39 @@ export class ViewportPanel extends ComponentBase {
     if (distance > this.dragThreshold) {
       this.isDragging = true;
     }
-  };
+  }
 
   private handleCanvasPointerUp = (event: PointerEvent): void => {
     // Ignore pointer events from toolbar buttons
-    if ((event.target as HTMLElement)?.closest?.('.toolbar-button') || (event.target as HTMLElement)?.closest?.('.transform-toolbar')) {
+    if (
+      (event.target as HTMLElement)?.closest?.('.toolbar-button') ||
+      (event.target as HTMLElement)?.closest?.('.transform-toolbar')
+    ) {
       this.pointerDownPos = undefined;
       this.pointerDownTime = undefined;
       this.isDragging = false;
       return;
     }
 
-    // Only handle pointer up on the canvas
-    if (event.target !== this) {
+    const isCanvasTarget = (event.target as HTMLElement)?.classList?.contains('viewport-canvas');
+    if (event.target !== this && !isCanvasTarget) {
+      return;
+    }
+
+    // Complete 2D transform if active
+    const has2DTransform = this.viewportRenderer.has2DTransform?.();
+    if (has2DTransform) {
+      this.viewportRenderer.complete2DTransform?.();
+      this.pointerDownPos = undefined;
+      this.pointerDownTime = undefined;
+      this.isDragging = false;
       return;
     }
 
     if (!this.canvas) {
+      this.pointerDownPos = undefined;
+      this.pointerDownTime = undefined;
+      this.isDragging = false;
       return;
     }
 

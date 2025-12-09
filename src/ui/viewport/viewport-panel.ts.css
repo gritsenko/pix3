@@ -41,6 +41,7 @@
 
 .transform-toolbar {
   display: flex;
+  flex-direction: column;
   gap: 0.25rem;
   pointer-events: auto;
   background: rgba(12, 15, 22, 0.85);

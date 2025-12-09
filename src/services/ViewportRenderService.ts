@@ -10,6 +10,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { MathUtils } from 'three';
 import { NodeBase } from '@/nodes/NodeBase';
+import { Node2D } from '@/nodes/Node2D';
 import { Node3D } from '@/nodes/Node3D';
 import { Group2D } from '@/nodes/2D/Group2D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
@@ -23,8 +24,24 @@ import {
   TransformCompleteOperation,
   type TransformState,
 } from '@/features/properties/TransformCompleteOperation';
+import {
+  Transform2DCompleteOperation,
+  type Transform2DState,
+} from '@/features/properties/Transform2DCompleteOperation';
 
 export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
+type TwoDHandle =
+  | 'idle'
+  | 'move'
+  | 'rotate'
+  | 'scale-n'
+  | 'scale-s'
+  | 'scale-e'
+  | 'scale-w'
+  | 'scale-ne'
+  | 'scale-nw'
+  | 'scale-se'
+  | 'scale-sw';
 
 @injectable()
 export class ViewportRendererService {
@@ -49,6 +66,32 @@ export class ViewportRendererService {
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
   private group2DMeshes = new Map<string, THREE.LineSegments>(); // Track Group2D visual representations
   private sprite2DMeshes = new Map<string, THREE.Mesh>(); // Track Sprite2D visual representations
+  private selection2DOverlay?: {
+    group: THREE.Group;
+    handles: THREE.Object3D[];
+    frame: THREE.LineSegments;
+    nodeId: string;
+    anchorWorld: THREE.Vector3;
+    anchorLocal: THREE.Vector3;
+    baseSize: THREE.Vector2;
+    startSize: THREE.Vector2;
+    centerWorld: THREE.Vector3;
+    rotationHandle?: THREE.Object3D;
+    bounds: THREE.Box3;
+  };
+  private active2DTransform?: {
+    nodeId: string;
+    handle: TwoDHandle;
+    startPointerWorld: THREE.Vector3;
+    startPosition: THREE.Vector3;
+    startRotation: number;
+    startState: Transform2DState;
+    baseSize: THREE.Vector2;
+    startSize: THREE.Vector2;
+    anchorWorld: THREE.Vector3;
+    anchorLocal: THREE.Vector3;
+    startCenterWorld: THREE.Vector3;
+  };
   private animationId?: number;
   private disposers: Array<() => void> = [];
   private transformStartStates = new Map<
@@ -56,6 +99,9 @@ export class ViewportRendererService {
     { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }
   >();
   private lastActiveSceneId: string | null = null;
+  private viewportSize = { width: 0, height: 0 };
+  private readonly min2DSize = 4;
+  private orbitLocked = false;
 
   constructor() {}
 
@@ -118,9 +164,7 @@ export class ViewportRendererService {
 
     // When dragging with transform controls, disable orbit controls
     this.transformControls.addEventListener('dragging-changed', (event: any) => {
-      if (this.orbitControls) {
-        this.orbitControls.enabled = !event.value;
-      }
+      this.setOrbitEnabled(!event.value);
 
       // Track transform start state when dragging begins
       if (event.value && this.transformControls?.object) {
@@ -171,8 +215,26 @@ export class ViewportRendererService {
     checkSceneChanges();
   }
 
+  private setOrbitEnabled(enabled: boolean): void {
+    if (this.orbitControls) {
+      this.orbitControls.enabled = enabled;
+    }
+  }
+
+  begin2DInteraction(): void {
+    this.orbitLocked = true;
+    this.setOrbitEnabled(false);
+  }
+
+  end2DInteraction(): void {
+    this.orbitLocked = false;
+    this.setOrbitEnabled(true);
+  }
+
   resize(width: number, height: number): void {
     if (!this.renderer || !this.camera) return;
+
+    this.viewportSize = { width, height };
 
     const pixelWidth = Math.ceil(width * window.devicePixelRatio);
     const pixelHeight = Math.ceil(height * window.devicePixelRatio);
@@ -250,12 +312,25 @@ export class ViewportRendererService {
    * @returns The deepest NodeBase object under the pointer, or null if none found
    */
   raycastObject(screenX: number, screenY: number): NodeBase | null {
-    if (!this.scene || !this.camera || !this.renderer) {
+    if (!this.scene || !this.renderer) {
+      return null;
+    }
+
+    const pixelX = screenX * this.viewportSize.width;
+    const pixelY = screenY * this.viewportSize.height;
+    const hit2D = this.raycast2D(pixelX, pixelY);
+    if (hit2D) {
+      console.debug('[ViewportRenderer] 2D hit', hit2D.nodeId, 'at', { pixelX, pixelY });
+      return hit2D;
+    }
+
+    if (!this.camera) {
       return null;
     }
 
     // Create raycaster and convert screen coordinates to normalized device coordinates
     const raycaster = new THREE.Raycaster();
+    console.debug('[ViewportRenderer] 3D raycast fallback at', { pixelX, pixelY });
     const mouse = new THREE.Vector2();
 
     // Convert from screen coordinates (0-1) to NDC (-1 to 1)
@@ -302,6 +377,71 @@ export class ViewportRendererService {
     return null;
   }
 
+  private raycast2D(pixelX: number, pixelY: number): NodeBase | null {
+    if (!this.orthographicCamera || !appState.ui.showLayer2D) {
+      return null;
+    }
+
+    const mouse = this.toNdc(pixelX, pixelY);
+    if (!mouse) {
+      return null;
+    }
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.params.Line.threshold = 0.5;
+    raycaster.layers.set(1);
+    raycaster.setFromCamera(mouse, this.orthographicCamera);
+
+    const candidates: THREE.Object3D[] = [
+      ...this.group2DMeshes.values(),
+      ...this.sprite2DMeshes.values(),
+    ];
+
+    console.debug('[ViewportRenderer] 2D raycast candidates', {
+      count: candidates.length,
+      nodeIds: candidates.map(c => c.userData?.nodeId).filter(Boolean),
+      mouse,
+    });
+
+    const intersects = raycaster.intersectObjects(candidates, true);
+    console.debug('[ViewportRenderer] 2D raycast intersects', intersects.map(i => ({
+      nodeId: i.object.userData?.nodeId,
+      distance: i.distance,
+      point: i.point,
+    })));
+    if (!intersects.length) {
+      console.debug('[ViewportRenderer] 2D raycast miss at', { pixelX, pixelY });
+      return null;
+    }
+
+    const nodeId = (intersects[0].object.userData?.nodeId as string | undefined) ?? null;
+    if (!nodeId) {
+      return null;
+    }
+
+    const activeSceneId = appState.scenes.activeSceneId;
+    if (!activeSceneId) {
+      return null;
+    }
+
+    const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
+    if (!sceneGraph) {
+      return null;
+    }
+
+    const node = sceneGraph.nodeMap.get(nodeId);
+    if (node instanceof NodeBase) {
+      const isLocked = Boolean((node as any).properties?.locked);
+      if (isLocked) {
+        console.debug('[ViewportRenderer] 2D hit on locked node', nodeId);
+        return null;
+      }
+      return node;
+    }
+
+    return null;
+  }
+
   updateNodeTransform(node: NodeBase): void {
     // Node is already a Three.js Object3D, so it updates automatically via reactivity
     if (this.scene && node instanceof Node3D) {
@@ -325,6 +465,10 @@ export class ViewportRendererService {
         mesh.rotation.copy(node.rotation);
         mesh.scale.copy(node.scale);
       }
+    }
+
+    if (node instanceof Node2D && this.selection2DOverlay?.nodeId === node.nodeId) {
+      this.update2DSelectionOverlay(node.nodeId);
     }
   }
 
@@ -420,32 +564,31 @@ export class ViewportRendererService {
 
     // Add selection boxes for selected nodes and attach transform controls to the first one
     let firstSelectedNode: Node3D | null = null;
+    let selected2DNodeId: string | null = null;
     for (const nodeId of nodeIds) {
       const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
       if (node && node instanceof Node3D) {
         this.selectedObjects.add(node);
 
-        // Track the first selected node for transform controls
         if (!firstSelectedNode) {
           firstSelectedNode = node;
         }
 
-        // Create bounding box visualization
         const box = new THREE.Box3().setFromObject(node);
         const helper = new THREE.Box3Helper(box, new THREE.Color(0x00ff00));
-
-        // Mark as selection box for cleanup
         helper.userData.selectionBoxId = nodeId;
         helper.userData.isSelectionBox = true;
-
         this.selectionBoxes.set(nodeId, helper);
         this.scene?.add(helper);
-      } else if (node && node instanceof Group2D) {
-        // For Group2D, create a rectangle selection visualisation
-        const mesh = this.createGroup2DSelectionBox(node);
-        this.group2DMeshes.set(nodeId, mesh);
-        this.scene?.add(mesh);
+      } else if (node && node instanceof Node2D && !selected2DNodeId) {
+        selected2DNodeId = nodeId;
       }
+    }
+
+    if (selected2DNodeId) {
+      this.update2DSelectionOverlay(selected2DNodeId);
+    } else {
+      this.clear2DSelectionOverlay();
     }
 
     // Attach transform controls to the first selected node if any
@@ -524,6 +667,8 @@ export class ViewportRendererService {
       sceneGraph.rootNodes.forEach(node => {
         this.processNodeForRendering(node);
       });
+
+      this.updateSelection();
     } catch (err) {
       console.error('[ViewportRenderer] Error syncing scene content:', err);
     }
@@ -587,6 +732,7 @@ export class ViewportRendererService {
     ];
 
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    geometry.computeBoundingBox();
 
     // Create line material with 2D node color
     const material = new THREE.LineBasicMaterial({
@@ -656,6 +802,7 @@ export class ViewportRendererService {
 
     // Create a plane geometry to hold the sprite texture
     const geometry = new THREE.PlaneGeometry(size, size);
+    geometry.computeBoundingBox();
 
     let material: THREE.Material;
 
@@ -664,7 +811,7 @@ export class ViewportRendererService {
     const textureLoader = new THREE.TextureLoader();
     if (node.texturePath) {
       // Use a placeholder material immediately, and patch in the texture asynchronously
-      material = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+      material = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
 
       // Asynchronously resolve resource to a Blob using ResourceManager
       (async () => {
@@ -731,7 +878,7 @@ export class ViewportRendererService {
       })();
     } else {
       // No texture path - use placeholder material (light gray)
-      material = new THREE.MeshBasicMaterial({ color: 0xcccccc });
+      material = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
     }
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -773,6 +920,455 @@ export class ViewportRendererService {
         }
       }
     }
+  }
+
+  private clear2DSelectionOverlay(): void {
+    if (!this.selection2DOverlay || !this.scene) {
+      this.selection2DOverlay = undefined;
+      return;
+    }
+
+    const { group } = this.selection2DOverlay;
+    this.scene.remove(group);
+    group.traverse(obj => {
+      if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) {
+        obj.geometry?.dispose();
+        if (obj.material instanceof THREE.Material) {
+          obj.material.dispose();
+        }
+      }
+    });
+    this.selection2DOverlay = undefined;
+    this.active2DTransform = undefined;
+    this.end2DInteraction();
+    console.debug('[ViewportRenderer] cleared 2D overlay');
+  }
+
+  private update2DSelectionOverlay(nodeId: string): void {
+    if (!this.scene || !this.orthographicCamera) {
+      return;
+    }
+
+    const activeSceneId = appState.scenes.activeSceneId;
+    if (!activeSceneId) {
+      this.clear2DSelectionOverlay();
+      return;
+    }
+
+    const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
+    if (!sceneGraph) {
+      this.clear2DSelectionOverlay();
+      return;
+    }
+
+    const node = sceneGraph.nodeMap.get(nodeId);
+    if (!node || !(node instanceof Node2D)) {
+      this.clear2DSelectionOverlay();
+      return;
+    }
+
+    const visual = this.get2DVisual(node);
+    if (!visual) {
+      this.clear2DSelectionOverlay();
+      return;
+    }
+
+    const bounds = new THREE.Box3().setFromObject(visual);
+    const size = bounds.getSize(new THREE.Vector3());
+    const center = bounds.getCenter(new THREE.Vector3());
+    const baseSize = this.getBaseSizeFor2D(visual);
+
+    this.clear2DSelectionOverlay();
+
+    const frame = this.create2DFrame(bounds);
+    const handles = this.create2DHandles(bounds);
+    const group = new THREE.Group();
+    group.add(frame, ...handles);
+    group.renderOrder = 1000;
+    group.layers.set(1);
+    this.scene.add(group);
+
+    this.selection2DOverlay = {
+      group,
+      handles,
+      frame,
+      nodeId,
+      anchorWorld: bounds.min.clone(),
+      anchorLocal: new THREE.Vector3(-size.x / 2, -size.y / 2, 0),
+      baseSize,
+      startSize: new THREE.Vector2(size.x, size.y),
+      centerWorld: center,
+      rotationHandle: handles.find(h => h.userData?.handleType === 'rotate'),
+      bounds,
+    };
+  }
+
+  private create2DFrame(bounds: THREE.Box3): THREE.LineSegments {
+    const min = bounds.min;
+    const max = bounds.max;
+    const z = (min.z + max.z) / 2;
+    const points = [
+      new THREE.Vector3(min.x, min.y, z),
+      new THREE.Vector3(max.x, min.y, z),
+      new THREE.Vector3(max.x, min.y, z),
+      new THREE.Vector3(max.x, max.y, z),
+      new THREE.Vector3(max.x, max.y, z),
+      new THREE.Vector3(min.x, max.y, z),
+      new THREE.Vector3(min.x, max.y, z),
+      new THREE.Vector3(min.x, min.y, z),
+    ];
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    geometry.computeBoundingBox();
+
+    const material = new THREE.LineBasicMaterial({
+      color: 0x4e8df5,
+      linewidth: 1,
+      depthTest: false,
+      transparent: true,
+      opacity: 0.95,
+    });
+    const frame = new THREE.LineSegments(geometry, material);
+    frame.userData.is2DFrame = true;
+    frame.renderOrder = 1000;
+    frame.layers.set(1);
+    return frame;
+  }
+
+  private create2DHandles(bounds: THREE.Box3): THREE.Object3D[] {
+    const min = bounds.min;
+    const max = bounds.max;
+    const z = (min.z + max.z) / 2;
+    const midX = (min.x + max.x) / 2;
+    const midY = (min.y + max.y) / 2;
+
+    const positions: Record<Exclude<TwoDHandle, 'idle' | 'move'>, THREE.Vector3> = {
+      'scale-nw': new THREE.Vector3(min.x, max.y, z),
+      'scale-n': new THREE.Vector3(midX, max.y, z),
+      'scale-ne': new THREE.Vector3(max.x, max.y, z),
+      'scale-e': new THREE.Vector3(max.x, midY, z),
+      'scale-se': new THREE.Vector3(max.x, min.y, z),
+      'scale-s': new THREE.Vector3(midX, min.y, z),
+      'scale-sw': new THREE.Vector3(min.x, min.y, z),
+      'scale-w': new THREE.Vector3(min.x, midY, z),
+      rotate: new THREE.Vector3(midX, max.y + Math.max(max.y - min.y, max.x - min.x) * 0.12, z),
+    };
+
+    const handleSize = Math.max(max.x - min.x, max.y - min.y) * 0.04 + 0.1;
+    const handleColor = 0x4e8df5;
+    const handleGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
+    const handleMaterial = new THREE.MeshBasicMaterial({
+      color: handleColor,
+      side: THREE.DoubleSide,
+      depthTest: false,
+      transparent: true,
+      opacity: 0.9,
+    });
+
+    const rotationMaterial = new THREE.MeshBasicMaterial({
+      color: 0xf5b64e,
+      side: THREE.DoubleSide,
+      depthTest: false,
+      transparent: true,
+      opacity: 0.9,
+    });
+
+    const handles: THREE.Object3D[] = [];
+    (Object.entries(positions) as Array<[Exclude<TwoDHandle, 'idle' | 'move'>, THREE.Vector3]>).forEach(
+      ([type, pos]) => {
+        const mesh = new THREE.Mesh(handleGeometry.clone(), type === 'rotate' ? rotationMaterial.clone() : handleMaterial.clone());
+        mesh.position.copy(pos);
+        mesh.userData.handleType = type;
+        mesh.renderOrder = 1100;
+        mesh.layers.set(1);
+        handles.push(mesh);
+      }
+    );
+
+    // Connect rotation handle with a thin line for affordance
+    const rotationPos = positions.rotate;
+    if (rotationPos) {
+      const lineGeom = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(midX, max.y, z),
+        new THREE.Vector3(rotationPos.x, rotationPos.y, z),
+      ]);
+      const lineMat = new THREE.LineBasicMaterial({ color: 0xf5b64e, depthTest: false });
+      const connector = new THREE.Line(lineGeom, lineMat);
+      connector.renderOrder = 1050;
+      connector.layers.set(1);
+      connector.userData.handleType = 'rotate';
+      handles.push(connector);
+    }
+
+    return handles;
+  }
+
+  get2DHandleAt(screenX: number, screenY: number): TwoDHandle {
+    if (!this.selection2DOverlay || !this.orthographicCamera) {
+      return 'idle';
+    }
+
+    const mouse = this.toNdc(screenX, screenY);
+    if (!mouse) {
+      return 'idle';
+    }
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.setFromCamera(mouse, this.orthographicCamera);
+    const hits = raycaster.intersectObjects(this.selection2DOverlay.handles, true);
+    if (hits.length) {
+      const handleType = hits[0].object.userData?.handleType as TwoDHandle | undefined;
+      return handleType ?? 'idle';
+    }
+
+    const point = this.screenToWorld2D(screenX, screenY);
+    if (point && this.selection2DOverlay.bounds.containsPoint(point)) {
+      return 'move';
+    }
+
+    return 'idle';
+  }
+
+  has2DTransform(): boolean {
+    return this.active2DTransform !== undefined;
+  }
+
+  start2DTransform(screenX: number, screenY: number, handle: TwoDHandle): void {
+    if (!this.selection2DOverlay || !this.orthographicCamera) {
+      return;
+    }
+
+    const activeSceneId = appState.scenes.activeSceneId;
+    if (!activeSceneId) return;
+    const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
+    if (!sceneGraph) return;
+
+    const node = sceneGraph.nodeMap.get(this.selection2DOverlay.nodeId);
+    if (!node || !(node instanceof Node2D)) {
+      return;
+    }
+
+    const visual = this.get2DVisual(node);
+    if (!visual) return;
+
+    const pointerWorld = this.screenToWorld2D(screenX, screenY);
+    if (!pointerWorld) return;
+
+    const baseSize = this.selection2DOverlay.baseSize.clone();
+    const startSize = this.selection2DOverlay.startSize.clone();
+    const startScale = new THREE.Vector2(node.scale.x, node.scale.y);
+    const startRotation = node.rotation.z;
+    const anchorLocal = this.getAnchorLocal(handle, startSize);
+    const centerWorld = visual.getWorldPosition(new THREE.Vector3());
+    const rotationMatrix = this.rotationMatrix(startRotation);
+    const anchorWorld = anchorLocal.clone().applyMatrix3(rotationMatrix).add(centerWorld);
+
+    const startState: Transform2DState = {
+      position: { x: node.position.x, y: node.position.y },
+      rotation: MathUtils.radToDeg(startRotation),
+      scale: { x: startScale.x, y: startScale.y },
+    };
+
+    this.active2DTransform = {
+      nodeId: node.nodeId,
+      handle,
+      startPointerWorld: pointerWorld,
+      startPosition: node.position.clone(),
+      startRotation,
+      startState,
+      baseSize,
+      startSize,
+      anchorWorld,
+      anchorLocal,
+      startCenterWorld: centerWorld,
+    };
+
+    this.begin2DInteraction();
+    console.debug('[ViewportRenderer] start 2D transform', { handle, nodeId: node.nodeId, pointerWorld });
+  }
+
+  update2DTransform(screenX: number, screenY: number): void {
+    if (!this.active2DTransform) {
+      return;
+    }
+
+    const activeSceneId = appState.scenes.activeSceneId;
+    if (!activeSceneId) return;
+    const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
+    if (!sceneGraph) return;
+
+    const node = sceneGraph.nodeMap.get(this.active2DTransform.nodeId);
+    if (!node || !(node instanceof Node2D)) {
+      return;
+    }
+
+    const visual = this.get2DVisual(node);
+    if (!visual) return;
+
+    const pointerWorld = this.screenToWorld2D(screenX, screenY);
+    if (!pointerWorld) return;
+
+    const { handle, startPointerWorld, startPosition, startRotation, baseSize, startSize, anchorWorld, anchorLocal, startCenterWorld } =
+      this.active2DTransform;
+
+    if (handle === 'move') {
+      const delta = pointerWorld.clone().sub(startPointerWorld);
+      node.position.set(startPosition.x + delta.x, startPosition.y + delta.y, node.position.z);
+    } else if (handle === 'rotate') {
+      const startAngle = Math.atan2(startPointerWorld.y - startCenterWorld.y, startPointerWorld.x - startCenterWorld.x);
+      const currentAngle = Math.atan2(pointerWorld.y - startCenterWorld.y, pointerWorld.x - startCenterWorld.x);
+      const delta = currentAngle - startAngle;
+      node.rotation.set(0, 0, startRotation + delta);
+    } else {
+      const rotationMatrix = this.rotationMatrix(startRotation);
+      const rotationInverse = this.rotationMatrix(-startRotation);
+      const localPoint = pointerWorld
+        .clone()
+        .sub(startCenterWorld)
+        .applyMatrix3(rotationInverse);
+
+      let width = startSize.x;
+      let height = startSize.y;
+
+      const affectsX =
+        handle === 'scale-e' ||
+        handle === 'scale-w' ||
+        handle === 'scale-ne' ||
+        handle === 'scale-se' ||
+        handle === 'scale-nw' ||
+        handle === 'scale-sw';
+      const affectsY =
+        handle === 'scale-n' ||
+        handle === 'scale-s' ||
+        handle === 'scale-ne' ||
+        handle === 'scale-se' ||
+        handle === 'scale-nw' ||
+        handle === 'scale-sw';
+
+      if (affectsX) {
+        width = Math.max(this.min2DSize, Math.abs(localPoint.x - anchorLocal.x));
+      }
+
+      if (affectsY) {
+        height = Math.max(this.min2DSize, Math.abs(localPoint.y - anchorLocal.y));
+      }
+
+      const scaleX = width / baseSize.x;
+      const scaleY = height / baseSize.y;
+
+      const anchorLocalNew = this.getAnchorLocal(handle, new THREE.Vector2(width, height));
+      const anchorOffsetWorld = anchorLocalNew.clone().applyMatrix3(rotationMatrix);
+      const newCenterWorld = anchorWorld.clone().sub(anchorOffsetWorld);
+
+      node.position.set(newCenterWorld.x, newCenterWorld.y, node.position.z);
+      node.scale.set(scaleX, scaleY, 1);
+      console.debug('[ViewportRenderer] 2D scale', { nodeId: node.nodeId, scaleX, scaleY, newCenterWorld });
+    }
+
+    this.updateNodeTransform(node);
+  }
+
+  async complete2DTransform(): Promise<void> {
+    if (!this.active2DTransform) {
+      return;
+    }
+
+    const { nodeId, startState } = this.active2DTransform;
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      this.active2DTransform = undefined;
+      this.end2DInteraction();
+      return;
+    }
+
+    const node = sceneGraph.nodeMap.get(nodeId);
+    if (!node || !(node instanceof Node2D)) {
+      this.active2DTransform = undefined;
+      this.end2DInteraction();
+      return;
+    }
+
+    // Ensure orbit stays disabled until after we push the op
+    this.begin2DInteraction();
+
+    const currentState: Transform2DState = {
+      position: { x: node.position.x, y: node.position.y },
+      rotation: MathUtils.radToDeg(node.rotation.z),
+      scale: { x: node.scale.x, y: node.scale.y },
+    };
+
+    const op = new Transform2DCompleteOperation({
+      nodeId,
+      previousState: startState,
+      currentState,
+    });
+
+    await this.operationService.invokeAndPush(op);
+    this.active2DTransform = undefined;
+    this.end2DInteraction();
+    this.update2DSelectionOverlay(nodeId);
+    console.debug('[ViewportRenderer] complete 2D transform', { nodeId });
+  }
+
+  private toNdc(screenX: number, screenY: number): THREE.Vector2 | null {
+    const { width, height } = this.viewportSize;
+    if (width <= 0 || height <= 0) return null;
+    return new THREE.Vector2((screenX / width) * 2 - 1, -(screenY / height) * 2 + 1);
+  }
+
+  private screenToWorld2D(screenX: number, screenY: number): THREE.Vector3 | null {
+    if (!this.orthographicCamera) return null;
+    const ndc = this.toNdc(screenX, screenY);
+    if (!ndc) return null;
+    const point = new THREE.Vector3(ndc.x, ndc.y, 0);
+    point.unproject(this.orthographicCamera);
+    return point;
+  }
+
+  private get2DVisual(node: Node2D): THREE.Object3D | undefined {
+    if (node instanceof Group2D) {
+      return this.group2DMeshes.get(node.nodeId);
+    }
+    if (node instanceof Sprite2D) {
+      return this.sprite2DMeshes.get(node.nodeId);
+    }
+    return undefined;
+  }
+
+  private getBaseSizeFor2D(visual: THREE.Object3D): THREE.Vector2 {
+    const box = new THREE.Box3().setFromObject(visual);
+    const size = box.getSize(new THREE.Vector3());
+    return new THREE.Vector2(size.x / (visual.scale.x || 1), size.y / (visual.scale.y || 1));
+  }
+
+  private getAnchorLocal(handle: TwoDHandle, size: THREE.Vector2): THREE.Vector3 {
+    const halfW = size.x / 2;
+    const halfH = size.y / 2;
+    switch (handle) {
+      case 'scale-ne':
+        return new THREE.Vector3(-halfW, -halfH, 0);
+      case 'scale-nw':
+        return new THREE.Vector3(halfW, -halfH, 0);
+      case 'scale-se':
+        return new THREE.Vector3(-halfW, halfH, 0);
+      case 'scale-sw':
+        return new THREE.Vector3(halfW, halfH, 0);
+      case 'scale-n':
+        return new THREE.Vector3(0, -halfH, 0);
+      case 'scale-s':
+        return new THREE.Vector3(0, halfH, 0);
+      case 'scale-e':
+        return new THREE.Vector3(-halfW, 0, 0);
+      case 'scale-w':
+        return new THREE.Vector3(halfW, 0, 0);
+      default:
+        return new THREE.Vector3(-halfW, -halfH, 0);
+    }
+  }
+
+  private rotationMatrix(angle: number): THREE.Matrix3 {
+    const c = Math.cos(angle);
+    const s = Math.sin(angle);
+    return new THREE.Matrix3().set(c, -s, 0, s, c, 0, 0, 0, 1);
   }
 
   private startRenderLoop(): void {
@@ -931,6 +1527,8 @@ export class ViewportRendererService {
       }
     });
     this.group2DMeshes.clear();
+
+    this.clear2DSelectionOverlay();
 
     if (this.scene) {
       this.scene.traverse(obj => {
