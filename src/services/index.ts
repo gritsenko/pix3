@@ -20,3 +20,9 @@ export { CommandDispatcher, resolveCommandDispatcher } from './CommandDispatcher
 export { LoggingService, type LogLevel, type LogEntry, type LogListener } from './LoggingService';
 export { CommandRegistry, type CommandMenuItem, type MenuSection } from './CommandRegistry';
 export { FileWatchService } from './FileWatchService';
+export {
+  DialogService,
+  type DialogOptions,
+  type DialogInstance,
+  resolveDialogService,
+} from './DialogService';

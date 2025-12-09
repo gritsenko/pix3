@@ -1,6 +1,7 @@
 import { ComponentBase, customElement, html, inject, state } from '@/fw';
 import { ref } from 'lit/directives/ref.js';
 import { AssetFileActivationService, type AssetActivation } from '@/services';
+import { DialogService } from '@/services/DialogService';
 
 import '../shared/pix3-panel';
 import '../shared/pix3-toolbar';
@@ -14,10 +15,10 @@ export class AssetBrowserPanel extends ComponentBase {
   @inject(AssetFileActivationService)
   private readonly assetFileActivation!: AssetFileActivationService;
 
-  private assetTreeRef: HTMLElement | null = null;
+  @inject(DialogService)
+  private readonly dialogService!: DialogService;
 
-  @state()
-  private showDeleteConfirm = false;
+  private assetTreeRef: HTMLElement | null = null;
 
   @state()
   private selectedItemName: string | null = null;
@@ -70,7 +71,7 @@ export class AssetBrowserPanel extends ComponentBase {
     try {
       const assetTree = this.assetTreeRef as any;
       const selectedPath = assetTree?.selectedPath;
-      
+
       if (!selectedPath) {
         console.warn('[AssetBrowserPanel] No item selected for deletion');
         return;
@@ -79,40 +80,53 @@ export class AssetBrowserPanel extends ComponentBase {
       // Extract name from path for display
       const itemName = selectedPath.split('/').pop() || selectedPath;
       this.selectedItemName = itemName;
-      this.showDeleteConfirm = true;
-      console.log('[AssetBrowserPanel] Delete confirmation opened for:', itemName);
+
+      // Show confirmation dialog
+      void this.showDeleteConfirmation(itemName);
     } catch (error) {
       console.error('[AssetBrowserPanel] Failed to open delete confirmation:', error);
     }
   };
 
-  private async onConfirmDelete() {
+  private async showDeleteConfirmation(itemName: string): Promise<void> {
     try {
-      console.log('[AssetBrowserPanel] Confirming delete of:', this.selectedItemName);
-      this.showDeleteConfirm = false;
-      
+      const confirmed = await this.dialogService.showConfirmation({
+        title: 'Delete Item?',
+        message: `Are you sure you want to delete ${itemName}?`,
+        confirmLabel: 'Delete',
+        cancelLabel: 'Cancel',
+        isDangerous: true,
+      });
+
+      if (confirmed) {
+        await this.performDelete();
+      }
+    } catch (error) {
+      console.error('[AssetBrowserPanel] Error showing delete confirmation:', error);
+    }
+  }
+
+  private async performDelete(): Promise<void> {
+    try {
+      console.log('[AssetBrowserPanel] Performing delete of:', this.selectedItemName);
+
       if (!this.assetTreeRef) {
         console.warn('[AssetBrowserPanel] assetTreeRef is null');
         return;
       }
-      
+
       const assetTree = this.assetTreeRef as any;
       if (!assetTree.deleteSelected || typeof assetTree.deleteSelected !== 'function') {
         console.warn('[AssetBrowserPanel] deleteSelected method not found on asset tree');
         return;
       }
-      
+
       await assetTree.deleteSelected();
       console.log('[AssetBrowserPanel] Item deleted successfully');
+      this.selectedItemName = null;
     } catch (error) {
       console.error('[AssetBrowserPanel] Failed to delete item:', error);
     }
-  }
-
-  private onCancelDelete() {
-    console.log('[AssetBrowserPanel] Delete cancelled');
-    this.showDeleteConfirm = false;
-    this.selectedItemName = null;
   }
 
   private setAssetTreeRef = (element: Element | undefined) => {
@@ -151,26 +165,6 @@ export class AssetBrowserPanel extends ComponentBase {
       </pix3-toolbar>
 
       <pix3-asset-tree ${ref(this.setAssetTreeRef)}></pix3-asset-tree>
-
-      ${this.showDeleteConfirm
-        ? html`<div class="delete-modal-backdrop" @click=${this.onCancelDelete.bind(this)}>
-          <div class="delete-modal" @click=${(e: Event) => e.stopPropagation()}>
-          <h2>Delete Item?</h2>
-          <p>Are you sure you want to delete <strong>${this.selectedItemName}</strong>?</p>
-          <p style="color: var(--color-warning, #ff9800); font-size: 0.9em;">
-            This action cannot be undone.
-          </p>
-          <div class="modal-actions">
-            <button class="btn-cancel" @click=${this.onCancelDelete.bind(this)}>
-            Cancel
-            </button>
-            <button class="btn-delete" @click=${this.onConfirmDelete.bind(this)}>
-            Delete
-            </button>
-          </div>
-          </div>
-        </div>`
-        : null}
       </pix3-panel>
     `;
   }

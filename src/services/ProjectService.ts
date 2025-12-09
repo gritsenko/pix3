@@ -246,6 +246,29 @@ export class ProjectService {
   listDirectory(path = '.'): Promise<FileDescriptor[]> {
     return this.fs.listDirectory(path);
   }
+
+  async moveItem(sourcePath: string, targetPath: string): Promise<void> {
+    // Move operation: copy then delete
+    // For now, we'll use FileSystemAPI's move capability if available
+    // Otherwise, we'll implement via copy + delete (for files) or recursive copy + delete (for directories)
+    try {
+      // Get the source and target parent directory names and handles
+      const sourceParentPath = sourcePath.split('/').slice(0, -1).join('/') || '.';
+      const sourceName = sourcePath.split('/').pop();
+      const targetParentPath = targetPath.split('/').slice(0, -1).join('/') || '.';
+      const targetName = targetPath.split('/').pop();
+
+      if (!sourceName || !targetName) {
+        throw new Error('Invalid source or target path');
+      }
+
+      // Use the filesystem API to move (copy + delete or native move if available)
+      await this.fs.moveEntry(sourcePath, targetPath);
+    } catch (error) {
+      console.error('[ProjectService] Error moving item:', error);
+      throw error;
+    }
+  }
 }
 
 export const resolveProjectService = (): ProjectService => {

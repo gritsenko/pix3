@@ -6,6 +6,7 @@ import { OperationService } from '@/services/OperationService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { CommandRegistry } from '@/services/CommandRegistry';
 import { FileWatchService } from '@/services/FileWatchService';
+import { DialogService, type DialogInstance } from '@/services/DialogService';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
 import { ReloadSceneCommand } from '@/features/scene/ReloadSceneCommand';
@@ -16,6 +17,7 @@ import { ProjectService } from '@/services';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './shared/pix3-main-menu';
+import './shared/pix3-confirm-dialog';
 import './welcome/pix3-welcome';
 import './logs-view/logs-panel';
 import './pix3-editor-shell.ts.css';
@@ -40,16 +42,23 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(FileWatchService)
   private readonly fileWatchService!: FileWatchService;
 
+  @inject(DialogService)
+  private readonly dialogService!: DialogService;
+
   // project open handled by <pix3-welcome>
 
   @state()
   private isLayoutReady = appState.ui.isLayoutReady;
+
+  @state()
+  private dialogs: DialogInstance[] = [];
 
   @property({ type: Boolean, reflect: true, attribute: 'shell-ready' })
   protected shellReady = false;
 
   private disposeSubscription?: () => void;
   private disposeScenesSubscription?: () => void;
+  private disposeDialogsSubscription?: () => void;
   private onWelcomeProjectReady?: (e: Event) => void;
   private keyboardHandler?: (e: KeyboardEvent) => void;
   private watchedSceneIds = new Set<string>();
@@ -62,6 +71,12 @@ export class Pix3EditorShell extends ComponentBase {
     const undoCommand = new UndoCommand(this.operationService);
     const redoCommand = new RedoCommand(this.operationService);
     this.commandRegistry.registerMany(undoCommand, redoCommand, saveAsCommand);
+
+    // Subscribe to dialog changes
+    this.disposeDialogsSubscription = this.dialogService.subscribe((dialogs) => {
+      this.dialogs = dialogs;
+      this.requestUpdate();
+    });
 
     // Setup keyboard shortcuts
     this.keyboardHandler = this.handleKeyboardShortcuts.bind(this);
@@ -152,6 +167,8 @@ export class Pix3EditorShell extends ComponentBase {
     this.disposeSubscription = undefined;
     this.disposeScenesSubscription?.();
     this.disposeScenesSubscription = undefined;
+    this.disposeDialogsSubscription?.();
+    this.disposeDialogsSubscription = undefined;
     if (this.onWelcomeProjectReady) {
       this.removeEventListener(
         'pix3-welcome:project-ready',
@@ -212,6 +229,20 @@ export class Pix3EditorShell extends ComponentBase {
       await this.operationService.redo();
     } catch (error) {
       console.error('[Pix3EditorShell] Failed to redo', error);
+    }
+  }
+
+  private onDialogConfirmed(e: CustomEvent): void {
+    const { dialogId } = e.detail;
+    if (dialogId) {
+      this.dialogService.confirm(dialogId);
+    }
+  }
+
+  private onDialogCancelled(e: CustomEvent): void {
+    const { dialogId } = e.detail;
+    if (dialogId) {
+      this.dialogService.cancel(dialogId);
     }
   }
 
@@ -327,6 +358,7 @@ export class Pix3EditorShell extends ComponentBase {
           <div class="layout-host" role="application" aria-busy=${!this.isLayoutReady}></div>
           ${this.isLayoutReady ? html`` : html`<pix3-welcome></pix3-welcome>`}
         </div>
+        ${this.renderDialogHost()}
       </div>
     `;
   }
@@ -341,6 +373,29 @@ export class Pix3EditorShell extends ComponentBase {
           <span> Project: ${appState.project.projectName} </span>
         </div>
       </pix3-toolbar>
+    `;
+  }
+
+  private renderDialogHost() {
+    return html`
+      <div
+        class="dialog-host"
+        @dialog-confirmed=${(e: CustomEvent) => this.onDialogConfirmed(e)}
+        @dialog-cancelled=${(e: CustomEvent) => this.onDialogCancelled(e)}
+      >
+        ${this.dialogs.map(
+          (dialog) => html`
+            <pix3-confirm-dialog
+              .dialogId=${dialog.id}
+              .title=${dialog.options.title}
+              .message=${dialog.options.message}
+              .confirmLabel=${dialog.options.confirmLabel || 'Confirm'}
+              .cancelLabel=${dialog.options.cancelLabel || 'Cancel'}
+              .isDangerous=${dialog.options.isDangerous || false}
+            ></pix3-confirm-dialog>
+          `
+        )}
+      </div>
     `;
   }
 }

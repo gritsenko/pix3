@@ -16,6 +16,11 @@ asset-tree {
   display: block;
 }
 
+.node-children {
+  padding-inline-start: 1.1rem;
+  margin: 0;
+}
+
 .node-row {
   display: flex;
   align-items: center;
@@ -24,15 +29,25 @@ asset-tree {
   border-radius: 0.25rem;
   cursor: pointer;
   user-select: none;
+  min-width: 0;
 }
 
 .icon {
-  width: 1.1rem;
-  height: 1.1rem;
+  width: 18px;
+  height: 18px;
+  min-width: 18px;
+  min-height: 18px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: rgba(245, 247, 250, 0.9);
+  flex-shrink: 0;
+}
+
+.icon svg {
+  width: 18px;
+  height: 18px;
+  display: block;
 }
 
 .icon.folder {
@@ -56,6 +71,11 @@ asset-tree {
 .node-row.selected {
   background: rgba(48, 164, 255, 0.14);
   outline: 1px solid rgba(48, 164, 255, 0.18);
+}
+
+.node-row.drag-over {
+  background: rgba(76, 175, 80, 0.2);
+  outline: 2px solid rgba(76, 175, 80, 0.5);
 }
 
 .expander {
@@ -96,6 +116,7 @@ asset-tree {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
 }
 
 .node-kind {

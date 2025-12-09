@@ -3,6 +3,7 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 import type { FileDescriptor } from '@/services/FileSystemAPIService';
 import { ProjectService } from '@/services/ProjectService';
 import { ResourceManager } from '@/services/ResourceManager';
+import { DialogService } from '@/services/DialogService';
 import { appState } from '@/state';
 import { subscribe } from 'valtio/vanilla';
 import './asset-tree.ts.css';
@@ -22,6 +23,8 @@ export class AssetTree extends ComponentBase {
   private readonly projectService!: ProjectService;
   @inject(ResourceManager)
   private readonly resourceManager!: ResourceManager;
+  @inject(DialogService)
+  private readonly dialogService!: DialogService;
   // Parent will handle actions via 'asset-activate' event
 
   // root path to show, defaults to project root
@@ -32,6 +35,12 @@ export class AssetTree extends ComponentBase {
 
   @state()
   private selectedPath: string | null = null;
+
+  @state()
+  private draggedPath: string | null = null;
+
+  @state()
+  private dragOverPath: string | null = null;
 
   private disposeSubscription?: () => void;
 
@@ -244,7 +253,7 @@ export class AssetTree extends ComponentBase {
 
   private renderNode(node: Node, depth = 0): ReturnType<typeof html> {
     const isSelected = this.selectedPath === node.path;
-    // reduce per-level indent to 0.6rem for a denser tree
+    const isDragOver = this.dragOverPath === node.path && node.kind === 'directory';
     return html`<div
       class="tree-node"
       data-path=${node.path}
@@ -252,12 +261,17 @@ export class AssetTree extends ComponentBase {
       aria-expanded=${ifDefined(
         node.kind === 'directory' ? (node.expanded ? 'true' : 'false') : undefined
       )}
-      style="padding-left: ${depth * 0.3}rem;"
     >
       <div
-        class="node-row ${isSelected ? 'selected' : ''}"
+        class="node-row ${isSelected ? 'selected' : ''} ${isDragOver ? 'drag-over' : ''}"
         @click=${() => this.onSelect(node)}
         @dblclick=${(event: MouseEvent) => this.onNodeActivate(event, node)}
+        @dragstart=${(e: DragEvent) => this.onDragStart(e, node)}
+        @dragend=${(e: DragEvent) => this.onDragEnd(e)}
+        @dragover=${(e: DragEvent) => this.onDragOver(e, node)}
+        @dragleave=${(e: DragEvent) => this.onDragLeave(e, node)}
+        @drop=${(e: DragEvent) => this.onDrop(e, node)}
+        draggable="true"
       >
         ${node.kind === 'directory'
           ? html`<button
@@ -290,6 +304,115 @@ export class AssetTree extends ComponentBase {
           </div>`
         : null}
     </div>`;
+  }
+
+  private onDragStart(e: DragEvent, node: Node): void {
+    // Prevent dragging while editing
+    if (node.editing) {
+      e.preventDefault();
+      return;
+    }
+
+    this.draggedPath = node.path;
+    if (e.dataTransfer) {
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', node.path);
+    }
+  }
+
+  private onDragEnd(e: DragEvent): void {
+    this.draggedPath = null;
+    this.dragOverPath = null;
+  }
+
+  private onDragOver(e: DragEvent, node: Node): void {
+    // Only allow dropping on directories
+    if (node.kind !== 'directory' || this.draggedPath === node.path) {
+      return;
+    }
+
+    e.preventDefault();
+    if (e.dataTransfer) {
+      e.dataTransfer.dropEffect = 'move';
+    }
+
+    this.dragOverPath = node.path;
+  }
+
+  private onDragLeave(e: DragEvent, node: Node): void {
+    // Only clear drag over if we're actually leaving this node
+    if (this.dragOverPath === node.path) {
+      this.dragOverPath = null;
+    }
+  }
+
+  private async onDrop(e: DragEvent, targetNode: Node): Promise<void> {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const sourcePath = e.dataTransfer?.getData('text/plain');
+    this.dragOverPath = null;
+
+    if (!sourcePath || sourcePath === targetNode.path || targetNode.kind !== 'directory') {
+      return;
+    }
+
+    // Show confirmation dialog
+    const sourceName = sourcePath.split('/').pop() || sourcePath;
+    const targetName = targetNode.name;
+
+    try {
+      const confirmed = await this.dialogService.showConfirmation({
+        title: 'Move Item?',
+        message: `Move "${sourceName}" to "${targetName}"?`,
+        confirmLabel: 'Move',
+        cancelLabel: 'Cancel',
+        isDangerous: false,
+      });
+
+      if (confirmed) {
+        await this.performMove(sourcePath, targetNode.path);
+      }
+    } catch (error) {
+      console.error('[AssetTree] Error during move operation:', error);
+    }
+  }
+
+  private async performMove(sourcePath: string, targetDirPath: string): Promise<void> {
+    try {
+      const sourceName = sourcePath.split('/').pop() || sourcePath;
+      const targetPath = this.joinPath(targetDirPath === '.' ? '' : targetDirPath, sourceName);
+
+      console.log('[AssetTree] Moving', { sourcePath, targetPath });
+
+      // Use ProjectService to move the file/folder
+      await this.projectService.moveItem(sourcePath, targetPath);
+
+      // Refresh both source parent and target directory
+      const sourceParent = this.getParentPath(sourcePath);
+      const targetParent = targetDirPath;
+
+      // Refresh source parent
+      if (sourceParent === '.' || sourceParent === '') {
+        await this.loadRoot();
+      } else {
+        await this.refreshDirectory(sourceParent);
+      }
+
+      // Refresh target if different from source
+      if (targetParent !== sourceParent) {
+        if (targetParent === '.' || targetParent === '') {
+          // Already refreshed root if needed
+        } else {
+          await this.refreshDirectory(targetParent);
+        }
+      }
+
+      this.selectedPath = targetPath;
+      console.log('[AssetTree] Move completed successfully');
+    } catch (error) {
+      console.error('[AssetTree] Failed to move item:', error);
+    }
   }
 
   private folderIcon(open: boolean) {

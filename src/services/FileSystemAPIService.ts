@@ -394,6 +394,69 @@ export class FileSystemAPIService {
   }
 
   /**
+   * Move a file or directory from source to target path.
+   * Uses copy + delete approach since File System API doesn't provide native move.
+   */
+  async moveEntry(sourcePath: string, targetPath: string): Promise<void> {
+    try {
+      const sourceDesc = await this.getEntryDescription(sourcePath);
+      if (!sourceDesc) {
+        throw new Error(`Source entry not found at ${sourcePath}`);
+      }
+
+      if (sourceDesc.kind === 'file') {
+        // For files: read, write, delete
+        const content = await this.readTextFile(sourcePath);
+        await this.writeTextFile(targetPath, content);
+        await this.deleteEntry(sourcePath);
+      } else {
+        // For directories: recursive copy then delete
+        await this.copyDirectory(sourcePath, targetPath);
+        await this.deleteEntry(sourcePath);
+      }
+    } catch (error) {
+      throw this.normalizeError(error, `Failed to move entry from ${sourcePath} to ${targetPath}`);
+    }
+  }
+
+  /**
+   * Recursively copy a directory structure
+   */
+  private async copyDirectory(sourceDir: string, targetDir: string): Promise<void> {
+    // Create target directory
+    await this.createDirectory(targetDir);
+
+    // List source directory contents
+    const entries = await this.listDirectory(sourceDir);
+
+    // Copy each entry
+    for (const entry of entries) {
+      const sourcePath = `${sourceDir}/${entry.name}`;
+      const targetPath = `${targetDir}/${entry.name}`;
+
+      if (entry.kind === 'file') {
+        const content = await this.readTextFile(sourcePath);
+        await this.writeTextFile(targetPath, content);
+      } else {
+        await this.copyDirectory(sourcePath, targetPath);
+      }
+    }
+  }
+
+  /**
+   * Get description of an entry (file or directory)
+   */
+  private async getEntryDescription(path: string): Promise<FileDescriptor | null> {
+    try {
+      const entries = await this.listDirectory(this.getDirectoryPart(path));
+      const name = this.getFileName(path);
+      return entries.find(e => e.name === name) || null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Check if a fileHandle is within the project directory.
    * Uses isSameEntry API if available to verify containment.
    */
