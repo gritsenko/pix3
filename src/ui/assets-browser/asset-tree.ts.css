@@ -78,6 +78,12 @@ asset-tree {
   outline: 2px solid rgba(76, 175, 80, 0.5);
 }
 
+.tree.drag-over-root {
+  background: rgba(76, 175, 80, 0.1);
+  outline: 2px dashed rgba(76, 175, 80, 0.4);
+  outline-offset: -2px;
+}
+
 .expander {
   background: none;
   border: none;

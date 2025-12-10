@@ -320,14 +320,41 @@ export class AssetTree extends ComponentBase {
     }
   }
 
-  private onDragEnd(e: DragEvent): void {
+  private onDragEnd(_e: DragEvent): void {
     this.draggedPath = null;
     this.dragOverPath = null;
   }
 
-  private onDragOver(e: DragEvent, node: Node): void {
+  private onDragOver(_e: DragEvent, node: Node): void {
     // Only allow dropping on directories
     if (node.kind !== 'directory' || this.draggedPath === node.path) {
+      return;
+    }
+
+    _e.preventDefault();
+    if (_e.dataTransfer) {
+      _e.dataTransfer.dropEffect = 'move';
+    }
+
+    // Clear tree root highlight when hovering over a specific node
+    this.dragOverPath = node.path;
+  }
+
+  private onDragLeave(_e: DragEvent, node: Node): void {
+    // Only clear drag over if we're actually leaving this node
+    if (this.dragOverPath === node.path) {
+      // Use a small delay to allow tree root drag over to take precedence
+      setTimeout(() => {
+        if (this.dragOverPath === node.path) {
+          this.dragOverPath = null;
+        }
+      }, 10);
+    }
+  }
+
+  private onTreeDragOver(e: DragEvent): void {
+    // Only allow dropping on tree root if we're dragging something
+    if (!this.draggedPath) {
       return;
     }
 
@@ -336,13 +363,56 @@ export class AssetTree extends ComponentBase {
       e.dataTransfer.dropEffect = 'move';
     }
 
-    this.dragOverPath = node.path;
+    // Only set tree root drag over if we're not already over a specific node
+    if (!this.dragOverPath || this.dragOverPath === '__TREE_ROOT__') {
+      this.dragOverPath = '__TREE_ROOT__';
+    }
   }
 
-  private onDragLeave(e: DragEvent, node: Node): void {
-    // Only clear drag over if we're actually leaving this node
-    if (this.dragOverPath === node.path) {
-      this.dragOverPath = null;
+  private onTreeDragLeave(_e: DragEvent): void {
+    // Clear drag over state if we're leaving the tree area
+    // Use a small delay to allow node drag over to take precedence
+    setTimeout(() => {
+      if (this.dragOverPath === '__TREE_ROOT__') {
+        this.dragOverPath = null;
+      }
+    }, 10);
+  }
+
+  private async onTreeDrop(e: DragEvent): Promise<void> {
+    e.preventDefault();
+    e.stopPropagation();
+
+    const sourcePath = e.dataTransfer?.getData('text/plain');
+    this.dragOverPath = null;
+
+    if (!sourcePath) {
+      return;
+    }
+
+    // Don't allow moving to root if already at root
+    const sourceParent = this.getParentPath(sourcePath);
+    if (sourceParent === '.' || sourceParent === '') {
+      return;
+    }
+
+    // Show confirmation dialog
+    const sourceName = sourcePath.split('/').pop() || sourcePath;
+
+    try {
+      const confirmed = await this.dialogService.showConfirmation({
+        title: 'Move to Root?',
+        message: `Move "${sourceName}" to the project root?`,
+        confirmLabel: 'Move',
+        cancelLabel: 'Cancel',
+        isDangerous: false,
+      });
+
+      if (confirmed) {
+        await this.performMove(sourcePath, '.');
+      }
+    } catch (error) {
+      console.error('[AssetTree] Error during move to root operation:', error);
     }
   }
 
@@ -402,7 +472,8 @@ export class AssetTree extends ComponentBase {
       // Refresh target if different from source
       if (targetParent !== sourceParent) {
         if (targetParent === '.' || targetParent === '') {
-          // Already refreshed root if needed
+          // Refresh root to show the moved item
+          await this.loadRoot();
         } else {
           await this.refreshDirectory(targetParent);
         }
@@ -463,8 +534,16 @@ export class AssetTree extends ComponentBase {
   }
 
   protected render() {
+    const isDragOverRoot = this.dragOverPath === '__TREE_ROOT__';
     return html`<div class="asset-tree-root">
-      <div class="tree" role="tree" aria-label="Assets">
+      <div
+        class="tree ${isDragOverRoot ? 'drag-over-root' : ''}"
+        role="tree"
+        aria-label="Assets"
+        @dragover=${this.onTreeDragOver}
+        @dragleave=${this.onTreeDragLeave}
+        @drop=${this.onTreeDrop}
+      >
         ${this.tree.length === 0
           ? html`<p class="empty">No assets</p>`
           : this.tree.map(n => this.renderNode(n))}
@@ -680,17 +759,17 @@ export class AssetTree extends ComponentBase {
     try {
       console.log('[AssetTree] Deleting entry at path:', path);
       await this.projectService.deleteEntry(path);
-      
+
       // Remove from tree UI
       const found = this.removeNodeByPath(path);
       if (!found) {
         console.warn('[AssetTree] Entry not found in tree:', path);
       }
-      
+
       // Clear selection
       this.selectedPath = null;
       this.requestUpdate();
-      
+
       console.log('[AssetTree] Entry deleted successfully:', path);
     } catch (error) {
       console.error('[AssetTree] Failed to delete entry:', error);

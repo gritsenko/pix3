@@ -253,9 +253,7 @@ export class ProjectService {
     // Otherwise, we'll implement via copy + delete (for files) or recursive copy + delete (for directories)
     try {
       // Get the source and target parent directory names and handles
-      const sourceParentPath = sourcePath.split('/').slice(0, -1).join('/') || '.';
       const sourceName = sourcePath.split('/').pop();
-      const targetParentPath = targetPath.split('/').slice(0, -1).join('/') || '.';
       const targetName = targetPath.split('/').pop();
 
       if (!sourceName || !targetName) {
