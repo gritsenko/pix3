@@ -239,6 +239,10 @@ export class ProjectService {
     await this.fs.writeTextFile(path, contents);
   }
 
+  async writeBinaryFile(path: string, data: ArrayBuffer): Promise<void> {
+    await this.fs.writeBinaryFile(path, data);
+  }
+
   async deleteEntry(path: string): Promise<void> {
     await this.fs.deleteEntry(path);
   }

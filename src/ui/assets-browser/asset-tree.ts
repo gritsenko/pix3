@@ -42,10 +42,68 @@ export class AssetTree extends ComponentBase {
   @state()
   private dragOverPath: string | null = null;
 
+  @state()
+  private isExternalDrag: boolean = false;
+
+  // Click-and-wait rename behavior
+  private _lastClickedPath: string | null = null;
+  private _lastClickTime: number = 0;
+  private _renameTimer: number | null = null;
+  private readonly _renameDelay = 500; // milliseconds
+
   private disposeSubscription?: () => void;
+
+  private previousRootSignature: string | null = null;
+
+  private onWindowFocus = async (): Promise<void> => {
+    await this.checkForExternalChanges();
+  };
+
+  private onVisibilityChange = async (): Promise<void> => {
+    if (document.visibilityState === 'visible') {
+      await this.checkForExternalChanges();
+    }
+  };
 
   public async createFolder(): Promise<void> {
     await this.startCreateFolder();
+  }
+
+  private async buildRootSignature(): Promise<string> {
+    try {
+      const paths: string[] = [];
+      const collect = async (path: string) => {
+        const entries = await this.listDirectory(path || '.');
+        for (const e of entries) {
+          paths.push(`${e.path}:${e.kind}`);
+          if (e.kind === 'directory') {
+            await collect(e.path);
+          }
+        }
+      };
+      await collect(this.rootPath || '.');
+      return paths.sort().join('|');
+    } catch (err) {
+      return '';
+    }
+  }
+
+  private async checkForExternalChanges(): Promise<void> {
+    try {
+      const signature = await this.buildRootSignature();
+      if (this.previousRootSignature === null) {
+        this.previousRootSignature = signature;
+        return;
+      }
+
+      if (this.previousRootSignature !== signature) {
+        console.debug('[AssetTree] External changes detected, refreshing root');
+        this.previousRootSignature = signature;
+        await this.loadRoot();
+      }
+    } catch (err) {
+      console.error('[AssetTree] Failed to check external changes', err);
+    }
   }
 
   public createScene(): void {
@@ -58,6 +116,14 @@ export class AssetTree extends ComponentBase {
       return;
     }
     await this.deleteEntry(this.selectedPath);
+  }
+
+  public async renameSelected(): Promise<void> {
+    if (!this.selectedPath) {
+      console.warn('[AssetTree] No item selected for rename');
+      return;
+    }
+    await this.startRename(this.selectedPath);
   }
 
   protected async firstUpdated(): Promise<void> {
@@ -82,11 +148,31 @@ export class AssetTree extends ComponentBase {
         }
       }
     });
+
+    // Initialize previous signature
+    this.previousRootSignature = await this.buildRootSignature();
+
+    // Listen for window focus and visibility changes to detect external file changes
+    window.addEventListener('focus', this.onWindowFocus);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
+
+    // Listen for window focus and visibility changes to detect external file changes
+    window.addEventListener('focus', this.onWindowFocus);
+    document.addEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.disposeSubscription?.();
+    
+    // Clean up timers
+    if (this._renameTimer) {
+      clearTimeout(this._renameTimer);
+      this._renameTimer = null;
+    }
+    
+    window.removeEventListener('focus', this.onWindowFocus);
+    document.removeEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   private async listDirectory(path: string): Promise<FileDescriptor[]> {
@@ -197,6 +283,7 @@ export class AssetTree extends ComponentBase {
     }
 
     if (node.kind === 'directory') {
+      // Toggle directory expansion on single click
       if (node.expanded) {
         this.collapseNode(node);
       } else {
@@ -205,7 +292,7 @@ export class AssetTree extends ComponentBase {
       return;
     }
 
-    // Raise activation event to parent instead of handling here
+    // For files, raise activation event to parent instead of handling here
     const payload = this.buildAssetPayload(node);
     this.dispatchEvent(
       new CustomEvent('asset-activate', {
@@ -240,14 +327,56 @@ export class AssetTree extends ComponentBase {
   }
 
   private onSelect(node: Node): void {
-    this.selectedPath = node.path;
-    this.dispatchEvent(
-      new CustomEvent('asset-selected', {
-        detail: { path: node.path, kind: node.kind },
-        bubbles: true,
-        composed: true,
-      })
-    );
+    const currentTime = Date.now();
+    const isSameNode = this._lastClickedPath === node.path;
+    const isAlreadySelected = this.selectedPath === node.path;
+
+    // Clear any existing rename timer
+    if (this._renameTimer) {
+      clearTimeout(this._renameTimer);
+      this._renameTimer = null;
+    }
+
+    if (isSameNode && isAlreadySelected) {
+      // Click on already selected item - start rename timer
+      this._lastClickedPath = node.path;
+      this._lastClickTime = currentTime;
+
+      // Set timer for rename after delay
+      this._renameTimer = window.setTimeout(() => {
+        this._renameTimer = null;
+        this._lastClickedPath = null;
+        this._lastClickTime = 0;
+        // Start rename after waiting on selected item
+        void this.startRename(node.path);
+      }, this._renameDelay);
+    } else if (isSameNode) {
+      // Click on same item but not selected yet - just select it
+      this._lastClickedPath = null;
+      this._lastClickTime = 0;
+      this.selectedPath = node.path;
+      this.dispatchEvent(
+        new CustomEvent('asset-selected', {
+          detail: { path: node.path, kind: node.kind },
+          bubbles: true,
+          composed: true,
+        })
+      );
+    } else {
+      // Click on different item - just select it
+      this.selectedPath = node.path;
+      this.dispatchEvent(
+        new CustomEvent('asset-selected', {
+          detail: { path: node.path, kind: node.kind },
+          bubbles: true,
+          composed: true,
+        })
+      );
+      
+      this._lastClickedPath = node.path;
+      this._lastClickTime = currentTime;
+    }
+
     this.requestUpdate();
   }
 
@@ -265,7 +394,6 @@ export class AssetTree extends ComponentBase {
       <div
         class="node-row ${isSelected ? 'selected' : ''} ${isDragOver ? 'drag-over' : ''}"
         @click=${() => this.onSelect(node)}
-        @dblclick=${(event: MouseEvent) => this.onNodeActivate(event, node)}
         @dragstart=${(e: DragEvent) => this.onDragStart(e, node)}
         @dragend=${(e: DragEvent) => this.onDragEnd(e)}
         @dragover=${(e: DragEvent) => this.onDragOver(e, node)}
@@ -314,6 +442,7 @@ export class AssetTree extends ComponentBase {
     }
 
     this.draggedPath = node.path;
+    this.isExternalDrag = false;
     if (e.dataTransfer) {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', node.path);
@@ -326,6 +455,25 @@ export class AssetTree extends ComponentBase {
   }
 
   private onDragOver(_e: DragEvent, node: Node): void {
+    // Check if this is an external drag (files from outside browser)
+    if (_e.dataTransfer?.items && _e.dataTransfer.items.length > 0) {
+      const hasFiles = Array.from(_e.dataTransfer.items).some(item => item.kind === 'file');
+      if (hasFiles) {
+        this.isExternalDrag = true;
+        // Only allow dropping on directories for external files
+        if (node.kind !== 'directory') {
+          return;
+        }
+        _e.preventDefault();
+        if (_e.dataTransfer) {
+          _e.dataTransfer.dropEffect = 'copy';
+        }
+        this.dragOverPath = node.path;
+        return;
+      }
+    }
+
+    // Handle internal drag (existing logic)
     // Only allow dropping on directories
     if (node.kind !== 'directory' || this.draggedPath === node.path) {
       return;
@@ -353,7 +501,24 @@ export class AssetTree extends ComponentBase {
   }
 
   private onTreeDragOver(e: DragEvent): void {
-    // Only allow dropping on tree root if we're dragging something
+    // Check if this is an external drag (files from outside browser)
+    if (e.dataTransfer?.items && e.dataTransfer.items.length > 0) {
+      const hasFiles = Array.from(e.dataTransfer.items).some(item => item.kind === 'file');
+      if (hasFiles) {
+        this.isExternalDrag = true;
+        e.preventDefault();
+        if (e.dataTransfer) {
+          e.dataTransfer.dropEffect = 'copy';
+        }
+        // Only set tree root drag over if we're not already over a specific node
+        if (!this.dragOverPath || this.dragOverPath === '__TREE_ROOT__') {
+          this.dragOverPath = '__TREE_ROOT__';
+        }
+        return;
+      }
+    }
+
+    // Handle internal drag (existing logic)
     if (!this.draggedPath) {
       return;
     }
@@ -383,9 +548,17 @@ export class AssetTree extends ComponentBase {
     e.preventDefault();
     e.stopPropagation();
 
-    const sourcePath = e.dataTransfer?.getData('text/plain');
     this.dragOverPath = null;
 
+    // Check if this is an external file drop
+    if (this.isExternalDrag && e.dataTransfer?.items) {
+      await this.handleExternalFileDrop(e.dataTransfer.items, '.');
+      this.isExternalDrag = false;
+      return;
+    }
+
+    // Handle internal drag (existing logic)
+    const sourcePath = e.dataTransfer?.getData('text/plain');
     if (!sourcePath) {
       return;
     }
@@ -420,9 +593,17 @@ export class AssetTree extends ComponentBase {
     e.preventDefault();
     e.stopPropagation();
 
-    const sourcePath = e.dataTransfer?.getData('text/plain');
     this.dragOverPath = null;
 
+    // Check if this is an external file drop
+    if (this.isExternalDrag && e.dataTransfer?.items) {
+      await this.handleExternalFileDrop(e.dataTransfer.items, targetNode.path);
+      this.isExternalDrag = false;
+      return;
+    }
+
+    // Handle internal drag (existing logic)
+    const sourcePath = e.dataTransfer?.getData('text/plain');
     if (!sourcePath || sourcePath === targetNode.path || targetNode.kind !== 'directory') {
       return;
     }
@@ -483,6 +664,99 @@ export class AssetTree extends ComponentBase {
       console.log('[AssetTree] Move completed successfully');
     } catch (error) {
       console.error('[AssetTree] Failed to move item:', error);
+    }
+  }
+
+  private async handleExternalFileDrop(
+    items: DataTransferItemList,
+    targetPath: string
+  ): Promise<void> {
+    try {
+      // Get files from dataTransfer (simplified approach)
+      const files: File[] = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file') {
+          const file = item.getAsFile();
+          if (file) {
+            files.push(file);
+          }
+        }
+      }
+
+      if (files.length === 0) {
+        return;
+      }
+
+      // Show confirmation dialog for multiple files
+      const message =
+        files.length === 1
+          ? `Copy "${files[0].name}" to "${targetPath === '.' ? 'project root' : targetPath}"?`
+          : `Copy ${files.length} items to "${targetPath === '.' ? 'project root' : targetPath}"?`;
+
+      const confirmed = await this.dialogService.showConfirmation({
+        title: 'Copy Files?',
+        message,
+        confirmLabel: 'Copy',
+        cancelLabel: 'Cancel',
+        isDangerous: false,
+      });
+
+      if (!confirmed) {
+        return;
+      }
+
+      // Process each file
+      for (const file of files) {
+        await this.copyExternalFile(file, targetPath);
+      }
+
+      // Refresh target directory
+      if (targetPath === '.' || targetPath === '') {
+        await this.loadRoot();
+      } else {
+        await this.refreshDirectory(targetPath);
+      }
+
+      console.log(
+        `[AssetTree] Successfully copied ${files.length} external files to ${targetPath}`
+      );
+    } catch (error) {
+      console.error('[AssetTree] Error handling external file drop:', error);
+    }
+  }
+
+  private async copyExternalFile(file: File, targetPath: string): Promise<void> {
+    try {
+      // Handle directory structure in file name
+      const fullPath = this.joinPath(targetPath === '.' ? '' : targetPath, file.name);
+
+      // If file contains path separators, create directories
+      const pathParts = fullPath.split('/');
+      if (pathParts.length > 1) {
+        const dirPath = pathParts.slice(0, -1).join('/');
+        await this.projectService.createDirectory(dirPath);
+      }
+
+      // Read file content and write to project
+      if (
+        file.type.startsWith('text/') ||
+        file.name.endsWith('.json') ||
+        file.name.endsWith('.pix3scene')
+      ) {
+        // Text files
+        const content = await file.text();
+        await this.projectService.writeFile(fullPath, content);
+      } else {
+        // Binary files
+        const arrayBuffer = await file.arrayBuffer();
+        await this.projectService.writeBinaryFile(fullPath, arrayBuffer);
+      }
+
+      console.log(`[AssetTree] Copied external file: ${file.name} to ${fullPath}`);
+    } catch (error) {
+      console.error(`[AssetTree] Failed to copy external file ${file.name}:`, error);
+      throw error;
     }
   }
 
@@ -551,7 +825,48 @@ export class AssetTree extends ComponentBase {
     </div>`;
   }
 
+  private async startRename(path: string): Promise<void> {
+    const nodeEntry = this.findNodeByPath(path);
+    if (!nodeEntry || !nodeEntry.node) {
+      console.warn('[AssetTree] Node not found for rename:', path);
+      return;
+    }
+
+    // Clear any pending click-to-rename timers
+    if (this._renameTimer) {
+      clearTimeout(this._renameTimer);
+      this._renameTimer = null;
+    }
+    this._lastClickedPath = null;
+    this._lastClickTime = 0;
+
+    const node = nodeEntry.node;
+    node.editing = true;
+    
+    // Cache the original file extension for rename operations
+    const originalName = node.name;
+    const lastDotIndex = originalName.lastIndexOf('.');
+    this._originalExtension = lastDotIndex > -1 ? originalName.substring(lastDotIndex) : '';
+    this._isNewScene = false; // This is a rename, not new scene creation
+    
+    // For files, show name without extension for cleaner editing
+    this._editingValue = lastDotIndex > -1 ? originalName.substring(0, lastDotIndex) : originalName;
+    this.requestUpdate();
+
+    // focus input after render
+    await this.updateComplete;
+    const input = this.renderRoot.querySelector('.node-edit') as HTMLInputElement | null;
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  }
+
   private _editingValue: string | null = null;
+  
+  // Cache original extension and operation type for rename operations
+  private _originalExtension: string = '';
+  private _isNewScene: boolean = true;
 
   private startCreateScene(): void {
     // similar to startCreateFolder but for scene file
@@ -581,7 +896,10 @@ export class AssetTree extends ComponentBase {
       this.tree.unshift(newNode);
     }
 
-    this._editingValue = newNode.name;
+    // For new scene creation, force .pix3scene extension
+    this._isNewScene = true;
+    this._originalExtension = '.pix3scene';
+    this._editingValue = newName; // Show without extension for editing
     this.selectedPath = newPath;
     this.requestUpdate();
 
@@ -626,6 +944,9 @@ export class AssetTree extends ComponentBase {
       this.tree.unshift(newNode);
     }
 
+    // For folder creation, no extension needed
+    this._isNewScene = false;
+    this._originalExtension = '';
     this._editingValue = newName;
     this.selectedPath = newPath;
     this.requestUpdate();
@@ -644,6 +965,7 @@ export class AssetTree extends ComponentBase {
       e.stopPropagation();
       this.cancelCreateFolder(node);
     } else if (e.key === 'Enter') {
+      e.preventDefault(); // Prevent any default form submission or other behavior
       e.stopPropagation();
       this.commitCreateFolder(node);
     }
@@ -653,32 +975,126 @@ export class AssetTree extends ComponentBase {
     // remove the temporary node
     const removed = this.removeNodeByPath(node.path);
     this._editingValue = null;
+    this._originalExtension = '';
+    this._isNewScene = true;
     if (removed) {
       this.requestUpdate();
     }
   }
 
+  private _committing = false;
+
   private async commitCreateFolder(node: Node) {
-    const finalName = (this._editingValue ?? node.name).trim();
-    if (!finalName) {
-      await this.cancelCreateFolder(node);
+    // Prevent double execution
+    if (this._committing) {
       return;
     }
-    // create folder or file via ProjectService
-    try {
-      const parentPath = this.getParentPath(node.path);
-      const createdPath = this.joinPath(parentPath === '.' ? '' : parentPath, finalName);
+    this._committing = true;
 
-      if (node.kind === 'directory') {
-        await this.projectService.createDirectory(createdPath);
-      } else if (node.kind === 'file') {
-        // ensure extension
-        let filename = finalName;
-        if (!filename.endsWith('.pix3scene')) filename = `${filename}.pix3scene`;
-        const filePath = this.joinPath(parentPath === '.' ? '' : parentPath, filename);
-        // read template via ResourceManager and write
-        const template = await this.resourceManager.readText('templ://startup-scene');
-        await this.projectService.writeFile(filePath, template);
+    let isRename = false;
+
+    try {
+      const finalName = (this._editingValue ?? node.name).trim();
+      
+      // Check if this is a rename (existing node) or create (new node)
+      // by checking if the file exists in the filesystem
+      const parentPath = this.getParentPath(node.path);
+      const entries = await this.listDirectory(parentPath === '.' ? '.' : parentPath);
+      const existingEntry = entries.find(e => e.path === node.path);
+      isRename = !!existingEntry;
+
+      // If this is a rename and the name is empty or unchanged, just cancel editing
+      if (isRename) {
+        const originalName = node.name;
+        const finalNameWithoutExt = finalName.includes('.') ? finalName.substring(0, finalName.lastIndexOf('.')) : finalName;
+        const originalNameWithoutExt = originalName.includes('.') ? originalName.substring(0, originalName.lastIndexOf('.')) : originalName;
+        
+        if (!finalName || finalNameWithoutExt === originalNameWithoutExt) {
+          // Just cancel editing without deleting the existing folder
+          node.editing = false;
+          this._editingValue = null;
+          this._originalExtension = '';
+          this._isNewScene = true;
+          this.requestUpdate();
+          return;
+        }
+      } else {
+        // For new items, empty name means cancel creation
+        if (!finalName) {
+          await this.cancelCreateFolder(node);
+          return;
+        }
+      }
+
+      console.log('[AssetTree] commitCreateFolder', {
+        nodePath: node.path,
+        finalName,
+        isRename,
+        existingEntry: existingEntry?.name,
+        editingValue: this._editingValue,
+        nodeName: node.name
+      });
+
+      const newPath = this.joinPath(parentPath === '.' ? '' : parentPath, finalName);
+
+      if (isRename) {
+        // Rename existing item
+        let finalFileName = finalName;
+        
+        if (node.kind === 'file') {
+          // For rename operations, preserve the original extension unless user explicitly removed it
+          // and they want to change it to a scene file
+          if (this._originalExtension) {
+            // User had an extension, check if they want to keep it or change it
+            if (!finalName.includes('.')) {
+              // User didn't specify extension, restore the original one
+              finalFileName = finalName + this._originalExtension;
+            } else {
+              // User specified an extension, use what they provided
+              finalFileName = finalName;
+            }
+          } else {
+            // No original extension (unlikely for files, but handle it)
+            finalFileName = finalName;
+          }
+        }
+        
+        const renamedPath = this.joinPath(parentPath === '.' ? '' : parentPath, finalFileName);
+        await this.projectService.moveItem(node.path, renamedPath);
+        node.path = renamedPath;
+        node.name = finalFileName;
+      } else {
+        // Create new item
+        if (node.kind === 'directory') {
+          await this.projectService.createDirectory(newPath);
+        } else if (node.kind === 'file') {
+          // For new files, force the appropriate extension
+          let filename = finalName;
+          
+          if (this._isNewScene) {
+            // New scene creation - always force .pix3scene extension
+            if (!filename.endsWith('.pix3scene')) {
+              filename = `${filename}.pix3scene`;
+            }
+          } else if (this._originalExtension) {
+            // New file with original extension preserved
+            if (!filename.includes('.')) {
+              filename = filename + this._originalExtension;
+            }
+          }
+          // If no extension specified and no original extension, leave as-is
+          
+          const filePath = this.joinPath(parentPath === '.' ? '' : parentPath, filename);
+          
+          if (this._isNewScene) {
+            // read template via ResourceManager and write
+            const template = await this.resourceManager.readText('templ://startup-scene');
+            await this.projectService.writeFile(filePath, template);
+          }
+          
+          node.path = filePath;
+          node.name = filename;
+        }
       }
 
       // refresh parent in UI
@@ -692,13 +1108,20 @@ export class AssetTree extends ComponentBase {
         }
       }
 
-      this.selectedPath = createdPath.replace(/^\//, '');
+      this.selectedPath = newPath.replace(/^\//, '');
+      node.editing = false;
       this._editingValue = null;
+      this._originalExtension = '';
+      this._isNewScene = true;
       this.requestUpdate();
     } catch (err) {
-      console.error('Failed to create folder', err);
-      // remove temp node
-      await this.cancelCreateFolder(node);
+      console.error('Failed to create/rename item', err);
+      // remove temp node for create operations
+      if (!isRename) {
+        await this.cancelCreateFolder(node);
+      }
+    } finally {
+      this._committing = false;
     }
   }
 

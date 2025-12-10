@@ -88,6 +88,25 @@ export class AssetBrowserPanel extends ComponentBase {
     }
   };
 
+  private onRenameClick = () => {
+    try {
+      console.log('[AssetBrowserPanel] Renaming item...', { assetTreeRef: this.assetTreeRef });
+      if (!this.assetTreeRef) {
+        console.warn('[AssetBrowserPanel] assetTreeRef is null, cannot rename');
+        return;
+      }
+      const assetTree = this.assetTreeRef as any;
+      if (!assetTree.renameSelected || typeof assetTree.renameSelected !== 'function') {
+        console.warn('[AssetBrowserPanel] renameSelected method not found on asset tree');
+        return;
+      }
+      void assetTree.renameSelected();
+      console.log('[AssetBrowserPanel] Rename initiated');
+    } catch (error) {
+      console.error('[AssetBrowserPanel] Failed to rename item:', error);
+    }
+  };
+
   private async showDeleteConfirmation(itemName: string): Promise<void> {
     try {
       const confirmed = await this.dialogService.showConfirmation({
@@ -136,35 +155,41 @@ export class AssetBrowserPanel extends ComponentBase {
   protected render() {
     return html`
       <pix3-panel
-      panel-description="Open a project to browse textures, models, and prefabs."
-      actions-label="Asset browser actions"
-      @asset-activate=${this.onAssetActivate}
+        panel-description="Open a project to browse textures, models, and prefabs."
+        actions-label="Asset browser actions"
+        @asset-activate=${this.onAssetActivate}
       >
-      <pix3-toolbar label="Asset browser tools" slot="toolbar">
-        <pix3-dropdown-button
-          icon="plus-circle"
-          aria-label="Create"
-          .items=${[
-            { id: 'folder', label: 'Create folder', icon: 'folder' },
-            { id: 'scene', label: 'Create scene', icon: 'film' },
-          ]}
-          @item-select=${(e: CustomEvent) => {
-            if (e.detail.id === 'folder') {
-              this.onCreateFolder();
-            } else if (e.detail.id === 'scene') {
-              this.onCreateScene();
-            }
-          }}
-        ></pix3-dropdown-button>
-        <pix3-toolbar-button
-        icon="trash"
-        label="Delete"
-        title="Delete selected item"
-        @click=${this.onDeleteClick}
-        ></pix3-toolbar-button>
-      </pix3-toolbar>
+        <pix3-toolbar label="Asset browser tools" slot="toolbar">
+          <pix3-dropdown-button
+            icon="plus-circle"
+            aria-label="Create"
+            .items=${[
+              { id: 'folder', label: 'Create folder', icon: 'folder' },
+              { id: 'scene', label: 'Create scene', icon: 'film' },
+            ]}
+            @item-select=${(e: CustomEvent) => {
+              if (e.detail.id === 'folder') {
+                this.onCreateFolder();
+              } else if (e.detail.id === 'scene') {
+                this.onCreateScene();
+              }
+            }}
+          ></pix3-dropdown-button>
+          <pix3-toolbar-button
+            icon="edit"
+            label="Rename"
+            title="Rename selected item"
+            @click=${this.onRenameClick}
+          ></pix3-toolbar-button>
+          <pix3-toolbar-button
+            icon="trash"
+            label="Delete"
+            title="Delete selected item"
+            @click=${this.onDeleteClick}
+          ></pix3-toolbar-button>
+        </pix3-toolbar>
 
-      <pix3-asset-tree ${ref(this.setAssetTreeRef)}></pix3-asset-tree>
+        <pix3-asset-tree ${ref(this.setAssetTreeRef)}></pix3-asset-tree>
       </pix3-panel>
     `;
   }

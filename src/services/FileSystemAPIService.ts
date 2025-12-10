@@ -54,13 +54,13 @@ const HANDLE_KEY = 'project-root';
 async function saveHandleToDB(handle: FileSystemDirectoryHandle): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = event => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
       }
     };
-    request.onsuccess = (event) => {
+    request.onsuccess = event => {
       const db = (event.target as IDBOpenDBRequest).result;
       const tx = db.transaction(STORE_NAME, 'readwrite');
       const store = tx.objectStore(STORE_NAME);
@@ -93,9 +93,7 @@ export class FileSystemAPIService {
 
   setProjectDirectory(handle: FileSystemDirectoryHandle): void {
     this.directoryHandle = handle;
-    saveHandleToDB(handle).catch((err) =>
-      this.logger?.('Failed to save project handle to IDB', err)
-    );
+    saveHandleToDB(handle).catch(err => this.logger?.('Failed to save project handle to IDB', err));
   }
 
   getProjectDirectory(): FileSystemDirectoryHandle | null {
@@ -379,6 +377,20 @@ export class FileSystemAPIService {
       await writable.close();
     } catch (error) {
       throw this.normalizeError(error, `Failed to write file at ${path}`);
+    }
+  }
+
+  async writeBinaryFile(path: string, data: ArrayBuffer): Promise<void> {
+    try {
+      const directory = await this.resolveDirectoryHandle(this.getDirectoryPart(path), 'readwrite');
+      const fileName = this.getFileName(path);
+      const handle = await directory.getFileHandle(fileName, { create: true });
+      await this.ensurePermission(handle, 'readwrite');
+      const writable = await handle.createWritable();
+      await writable.write(data);
+      await writable.close();
+    } catch (error) {
+      throw this.normalizeError(error, `Failed to write binary file at ${path}`);
     }
   }
 
