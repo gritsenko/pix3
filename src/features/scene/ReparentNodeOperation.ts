@@ -1,4 +1,9 @@
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/Operation';
 import { SceneManager } from '@/core/SceneManager';
 import { ref } from 'valtio/vanilla';
 import type { NodeBase } from '@/nodes/NodeBase';
@@ -67,10 +72,12 @@ export class ReparentNodeOperation implements Operation<OperationInvokeResult> {
         console.log('[ReparentNodeOperation] New parent not found:', this.params.newParentId);
         return { didMutate: false };
       }
-      
+
       // Prevent moving a node into its own descendants (circular reference)
       if (this.isDescendantOf(newParent, this.params.nodeId)) {
-        console.log('[ReparentNodeOperation] Cannot move to descendant - would create circular reference');
+        console.log(
+          '[ReparentNodeOperation] Cannot move to descendant - would create circular reference'
+        );
         return { didMutate: false };
       }
     }
@@ -104,7 +111,7 @@ export class ReparentNodeOperation implements Operation<OperationInvokeResult> {
       }
       // Use Three.js API to add child
       newParent.add(nodeToMove);
-      
+
       // If we need to insert at a specific index, reorder after adding
       if (newIndex >= 0 && newIndex < newParent.children.length - 1) {
         newParent.children.splice(newIndex, 0, newParent.children.pop()!);
@@ -212,10 +219,7 @@ export class ReparentNodeOperation implements Operation<OperationInvokeResult> {
     await this.perform(context);
   }
 
-  private isDescendantOf(
-    node: NodeBase,
-    ancestorId: string
-  ): boolean {
+  private isDescendantOf(node: NodeBase, ancestorId: string): boolean {
     let current = node.parentNode;
     while (current) {
       if (current.nodeId === ancestorId) {

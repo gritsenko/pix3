@@ -1,6 +1,6 @@
 /**
  * Property Schema Utilities
- * 
+ *
  * Helper functions for working with property schemas in the inspector.
  */
 
@@ -55,17 +55,14 @@ export function getPropertyDefinition(
 /**
  * Get the display value for a property (formatted, converted to display units, etc.)
  */
-export function getPropertyDisplayValue(
-  node: NodeBase,
-  prop: PropertyDefinition
-): string {
+export function getPropertyDisplayValue(node: NodeBase, prop: PropertyDefinition): string {
   const value = prop.getValue(node);
 
   // Handle different types
   if (prop.type === 'number') {
     const num = Number(value);
     if (isNaN(num)) return '0';
-    
+
     const precision = prop.ui?.precision ?? 2;
     return parseFloat(num.toFixed(precision)).toString();
   }
@@ -74,7 +71,12 @@ export function getPropertyDisplayValue(
     return String(value === true);
   }
 
-  if (prop.type === 'vector2' || prop.type === 'vector3' || prop.type === 'vector4' || prop.type === 'euler') {
+  if (
+    prop.type === 'vector2' ||
+    prop.type === 'vector3' ||
+    prop.type === 'vector4' ||
+    prop.type === 'euler'
+  ) {
     // Vector and Euler values are objects - serialize as JSON
     return JSON.stringify(value);
   }

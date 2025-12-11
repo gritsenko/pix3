@@ -47,7 +47,10 @@ export class SceneTreePanel extends ComponentBase {
   private loadError: string | null = appState.scenes.loadError;
 
   @state()
-  private createNodeItems: Array<{ label: string; items: Array<{ id: string; label: string; icon: string; color: string }> }> = [];
+  private createNodeItems: Array<{
+    label: string;
+    items: Array<{ id: string; label: string; icon: string; color: string }>;
+  }> = [];
 
   private lastHierarchyRef: NodeBase[] | null = null;
   private disposeSceneSubscription?: () => void;
@@ -92,7 +95,11 @@ export class SceneTreePanel extends ComponentBase {
             @item-select=${this.onCreateNode}
           ></pix3-dropdown-button>
         </pix3-toolbar>
-        <div class="tree-container" @toggle-node=${this.onToggleNode.bind(this)} @node-drop=${this.onNodeDrop.bind(this)}>
+        <div
+          class="tree-container"
+          @toggle-node=${this.onToggleNode.bind(this)}
+          @node-drop=${this.onNodeDrop.bind(this)}
+        >
           ${hasHierarchy
             ? html`<ul
                 class="tree-root"
@@ -252,7 +259,7 @@ export class SceneTreePanel extends ComponentBase {
 
     const nodeRegistry = NodeRegistry.getInstance();
     const nodeType = nodeRegistry.getNodeType(id);
-    
+
     if (!nodeType) {
       console.error('[SceneTreePanel] Unknown node type:', id);
       return;
@@ -317,7 +324,12 @@ export class SceneTreePanel extends ComponentBase {
       newIndex = -1; // Append
     }
 
-    console.log('[SceneTreePanel] Executing reparent:', { draggedNodeId, newParentId, newIndex, position });
+    console.log('[SceneTreePanel] Executing reparent:', {
+      draggedNodeId,
+      newParentId,
+      newIndex,
+      position,
+    });
 
     try {
       const command = new ReparentNodeCommand({

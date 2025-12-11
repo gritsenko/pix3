@@ -5,7 +5,10 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { CreateGroup2DOperation, type CreateGroup2DOperationParams } from '@/features/scene/CreateGroup2DOperation';
+import {
+  CreateGroup2DOperation,
+  type CreateGroup2DOperationParams,
+} from '@/features/scene/CreateGroup2DOperation';
 import { SceneManager } from '@/core/SceneManager';
 
 export interface CreateGroup2DCommandPayload {
@@ -42,7 +45,9 @@ export class CreateGroup2DCommand extends CommandBase<CreateGroup2DCommandPayloa
     return { canExecute: true };
   }
 
-  async execute(context: CommandContext): Promise<CommandExecutionResult<CreateGroup2DCommandPayload>> {
+  async execute(
+    context: CommandContext
+  ): Promise<CommandExecutionResult<CreateGroup2DCommandPayload>> {
     const operationService = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );

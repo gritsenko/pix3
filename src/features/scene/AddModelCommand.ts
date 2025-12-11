@@ -5,10 +5,13 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { AddModelOperation, type AddModelOperationParams } from '@/features/scene/AddModelOperation';
+import {
+  AddModelOperation,
+  type AddModelOperationParams,
+} from '@/features/scene/AddModelOperation';
 import { SceneManager } from '@/core/SceneManager';
 
-export interface AddModelCommandPayload {}
+export type AddModelCommandPayload = object;
 
 export class AddModelCommand extends CommandBase<AddModelCommandPayload, void> {
   readonly metadata: CommandMetadata = {

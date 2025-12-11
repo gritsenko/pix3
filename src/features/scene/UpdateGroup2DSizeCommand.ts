@@ -12,7 +12,7 @@ import {
 import { SceneManager } from '@/core/SceneManager';
 import { Group2D } from '@/nodes/2D/Group2D';
 
-export interface UpdateGroup2DSizeExecutePayload {}
+export type UpdateGroup2DSizeExecutePayload = object;
 
 export class UpdateGroup2DSizeCommand extends CommandBaseImpl<
   UpdateGroup2DSizeExecutePayload,

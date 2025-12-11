@@ -5,7 +5,10 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { ReparentNodeOperation, type ReparentNodeOperationParams } from '@/features/scene/ReparentNodeOperation';
+import {
+  ReparentNodeOperation,
+  type ReparentNodeOperationParams,
+} from '@/features/scene/ReparentNodeOperation';
 
 export class ReparentNodeCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
@@ -25,7 +28,7 @@ export class ReparentNodeCommand extends CommandBase<void, void> {
   preconditions(context: CommandContext) {
     const { state } = context;
     const activeSceneId = state.scenes.activeSceneId;
-    
+
     if (!activeSceneId) {
       return {
         canExecute: false,

@@ -11,7 +11,7 @@ import {
 } from '@/features/properties/UpdateObjectPropertyOperation';
 import { SceneManager } from '@/core/SceneManager';
 
-export interface UpdateObjectPropertyExecutePayload {}
+export type UpdateObjectPropertyExecutePayload = object;
 
 export class UpdateObjectPropertyCommand extends CommandBase<
   UpdateObjectPropertyExecutePayload,

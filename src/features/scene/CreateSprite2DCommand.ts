@@ -5,7 +5,10 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { CreateSprite2DOperation, type CreateSprite2DOperationParams } from '@/features/scene/CreateSprite2DOperation';
+import {
+  CreateSprite2DOperation,
+  type CreateSprite2DOperationParams,
+} from '@/features/scene/CreateSprite2DOperation';
 import { SceneManager } from '@/core/SceneManager';
 
 export interface CreateSprite2DCommandPayload {
@@ -42,7 +45,9 @@ export class CreateSprite2DCommand extends CommandBase<CreateSprite2DCommandPayl
     return { canExecute: true };
   }
 
-  async execute(context: CommandContext): Promise<CommandExecutionResult<CreateSprite2DCommandPayload>> {
+  async execute(
+    context: CommandContext
+  ): Promise<CommandExecutionResult<CreateSprite2DCommandPayload>> {
     const operationService = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );

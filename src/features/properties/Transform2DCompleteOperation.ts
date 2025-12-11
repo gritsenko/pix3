@@ -70,6 +70,7 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
         container.getOrCreateToken(ViewportRendererService)
       );
       vr.updateNodeTransform(node);
+      // eslint-disable-next-line no-empty
     } catch {}
 
     return {
@@ -89,6 +90,7 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
               container.getOrCreateToken(ViewportRendererService)
             );
             vr.updateNodeTransform(node);
+            // eslint-disable-next-line no-empty
           } catch {}
         },
         redo: async () => {
@@ -103,6 +105,7 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
               container.getOrCreateToken(ViewportRendererService)
             );
             vr.updateNodeTransform(node);
+            // eslint-disable-next-line no-empty
           } catch {}
         },
       },
@@ -144,10 +147,7 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
     }
 
     if (a.scale && b.scale) {
-      if (
-        Math.abs(a.scale.x - b.scale.x) > eps ||
-        Math.abs(a.scale.y - b.scale.y) > eps
-      ) {
+      if (Math.abs(a.scale.x - b.scale.x) > eps || Math.abs(a.scale.y - b.scale.y) > eps) {
         return false;
       }
     } else if (a.scale || b.scale) {

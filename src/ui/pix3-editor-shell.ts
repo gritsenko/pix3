@@ -73,7 +73,7 @@ export class Pix3EditorShell extends ComponentBase {
     this.commandRegistry.registerMany(undoCommand, redoCommand, saveAsCommand);
 
     // Subscribe to dialog changes
-    this.disposeDialogsSubscription = this.dialogService.subscribe((dialogs) => {
+    this.disposeDialogsSubscription = this.dialogService.subscribe(dialogs => {
       this.dialogs = dialogs;
       this.requestUpdate();
     });
@@ -322,7 +322,7 @@ export class Pix3EditorShell extends ComponentBase {
 
     // Execute reload command
     const reloadCommand = new ReloadSceneCommand({ sceneId, filePath });
-    void this.commandDispatcher.execute(reloadCommand).catch((error) => {
+    void this.commandDispatcher.execute(reloadCommand).catch(error => {
       console.error('[Pix3EditorShell] Failed to reload scene from external change:', error);
     });
   }
@@ -384,7 +384,7 @@ export class Pix3EditorShell extends ComponentBase {
         @dialog-cancelled=${(e: CustomEvent) => this.onDialogCancelled(e)}
       >
         ${this.dialogs.map(
-          (dialog) => html`
+          dialog => html`
             <pix3-confirm-dialog
               .dialogId=${dialog.id}
               .title=${dialog.options.title}

@@ -70,6 +70,7 @@ export class UpdateGroup2DSizeOperation implements Operation<OperationInvokeResu
         container.getOrCreateToken(ViewportRendererService)
       );
       vr.updateSelection();
+      // eslint-disable-next-line no-empty
     } catch {}
 
     return {
@@ -89,6 +90,7 @@ export class UpdateGroup2DSizeOperation implements Operation<OperationInvokeResu
               container.getOrCreateToken(ViewportRendererService)
             );
             vr.updateSelection();
+            // eslint-disable-next-line no-empty
           } catch {}
         },
         redo: async () => {
@@ -103,6 +105,7 @@ export class UpdateGroup2DSizeOperation implements Operation<OperationInvokeResu
               container.getOrCreateToken(ViewportRendererService)
             );
             vr.updateSelection();
+            // eslint-disable-next-line no-empty
           } catch {}
         },
       },

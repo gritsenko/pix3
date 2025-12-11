@@ -8,7 +8,7 @@ describe('ViewportRendererService', () => {
     const service = new ViewportRendererService();
 
     // Create a fake resource manager
-    const readBlobSpy = vi.fn().mockResolvedValue(new Blob(["fake"]));
+    const readBlobSpy = vi.fn().mockResolvedValue(new Blob(['fake']));
     Object.defineProperty(service, 'resourceManager', {
       value: { readBlob: readBlobSpy },
       configurable: true,

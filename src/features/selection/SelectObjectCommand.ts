@@ -10,7 +10,7 @@ import {
   type SelectObjectParams,
 } from '@/features/selection/SelectObjectOperation';
 
-export interface SelectObjectExecutePayload {}
+export type SelectObjectExecutePayload = object;
 
 export class SelectObjectCommand extends CommandBase<SelectObjectExecutePayload, void> {
   readonly metadata: CommandMetadata = {

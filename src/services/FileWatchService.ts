@@ -6,7 +6,6 @@ import { injectable } from '@/fw/di';
  */
 @injectable()
 export class FileWatchService {
-
   /** Map of watched file paths to their file handles. */
   private readonly fileHandles = new Map<string, FileSystemFileHandle>();
 

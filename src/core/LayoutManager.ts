@@ -201,12 +201,12 @@ export class LayoutManagerService {
     Object.entries(PANEL_TAG_NAMES).forEach(([componentType, tagName]) => {
       layout.registerComponentFactoryFunction(componentType, container => {
         container.setTitle(PANEL_DISPLAY_TITLES[componentType as PanelComponentType]);
-        
+
         // Store reference to viewport container for dynamic title updates
         if (componentType === PANEL_COMPONENT_TYPES.viewport) {
           this.viewportContainer = container;
         }
-        
+
         const element = document.createElement(tagName);
         element.setAttribute('data-panel-id', componentType);
         container.element.append(element);

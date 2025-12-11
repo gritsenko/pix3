@@ -196,10 +196,9 @@ export class SceneLoader {
       }
       case 'Node2D': {
         const props = baseProps.properties as Node2DProperties;
-        const { position, scale, rotation, ...rest } = props;
         return new Node2D({
           ...baseProps,
-          properties: rest,
+          properties: props,
           position: this.readVector2(props.position, ZERO_VECTOR2),
           scale: this.readVector2(props.scale, UNIT_VECTOR2),
           rotation: props.rotation ?? 0,
@@ -207,10 +206,9 @@ export class SceneLoader {
       }
       case 'Group2D': {
         const props = baseProps.properties as Group2DProperties;
-        const { position, scale, rotation, width, height, ...rest } = props;
         return new Group2D({
           ...baseProps,
-          properties: rest,
+          properties: props,
           position: this.readVector2(props.position, ZERO_VECTOR2),
           scale: this.readVector2(props.scale, UNIT_VECTOR2),
           rotation: props.rotation ?? 0,

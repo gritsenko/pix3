@@ -6,7 +6,10 @@ import {
   type CommandPreconditionResult,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { ReloadSceneOperation, type ReloadSceneOperationParams } from '@/features/scene/ReloadSceneOperation';
+import {
+  ReloadSceneOperation,
+  type ReloadSceneOperationParams,
+} from '@/features/scene/ReloadSceneOperation';
 
 /**
  * ReloadSceneCommand reloads a scene from its file source.

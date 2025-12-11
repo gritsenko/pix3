@@ -72,6 +72,7 @@ export class TransformCompleteOperation implements Operation<OperationInvokeResu
         container.getOrCreateToken(ViewportRendererService)
       );
       vr.updateNodeTransform(node);
+      // eslint-disable-next-line no-empty
     } catch {}
 
     return {
@@ -91,6 +92,7 @@ export class TransformCompleteOperation implements Operation<OperationInvokeResu
               container.getOrCreateToken(ViewportRendererService)
             );
             vr.updateNodeTransform(node);
+            // eslint-disable-next-line no-empty
           } catch {}
         },
         redo: async () => {
@@ -105,6 +107,7 @@ export class TransformCompleteOperation implements Operation<OperationInvokeResu
               container.getOrCreateToken(ViewportRendererService)
             );
             vr.updateNodeTransform(node);
+            // eslint-disable-next-line no-empty
           } catch {}
         },
       },

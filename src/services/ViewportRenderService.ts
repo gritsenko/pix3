@@ -28,7 +28,12 @@ import {
   Transform2DCompleteOperation,
   type Transform2DState,
 } from '@/features/properties/Transform2DCompleteOperation';
-import { TransformTool2d, type TwoDHandle, type Active2DTransform, type Selection2DOverlay } from '@/services/TransformTool2d';
+import {
+  TransformTool2d,
+  type TwoDHandle,
+  type Active2DTransform,
+  type Selection2DOverlay,
+} from '@/services/TransformTool2d';
 
 export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 
@@ -368,11 +373,14 @@ export class ViewportRendererService {
     });
 
     const intersects = raycaster.intersectObjects(candidates, true);
-    console.debug('[ViewportRenderer] 2D raycast intersects', intersects.map(i => ({
-      nodeId: i.object.userData?.nodeId,
-      distance: i.distance,
-      point: i.point,
-    })));
+    console.debug(
+      '[ViewportRenderer] 2D raycast intersects',
+      intersects.map(i => ({
+        nodeId: i.object.userData?.nodeId,
+        distance: i.distance,
+        point: i.point,
+      }))
+    );
     if (!intersects.length) {
       console.debug('[ViewportRenderer] 2D raycast miss at', { pixelX, pixelY });
       return null;
@@ -752,7 +760,7 @@ export class ViewportRendererService {
           const blobUrl = URL.createObjectURL(blob);
 
           // Load texture from object URL and patch material when loaded
-            textureLoader.load(
+          textureLoader.load(
             blobUrl,
             texture => {
               try {
@@ -773,7 +781,11 @@ export class ViewportRendererService {
             undefined,
             err => {
               // Loading error — keep placeholder material
-              console.warn('[ViewportRenderer] Failed to load sprite texture', node.texturePath, err);
+              console.warn(
+                '[ViewportRenderer] Failed to load sprite texture',
+                node.texturePath,
+                err
+              );
               try {
                 URL.revokeObjectURL(blobUrl);
               } catch {
@@ -781,31 +793,34 @@ export class ViewportRendererService {
               }
             }
           );
-          } catch (err) {
-            // failed to fetch blob via ResourceManager — only attempt direct load for http/https or no-scheme paths.
-            const schemeMatch = /^([a-z]+[a-z0-9+.-]*):\/\//i.exec(texturePath);
-            const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : '';
+        } catch {
+          // failed to fetch blob via ResourceManager — only attempt direct load for http/https or no-scheme paths.
+          const schemeMatch = /^([a-z]+[a-z0-9+.-]*):\/\//i.exec(texturePath);
+          const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : '';
 
-            if (scheme === 'http' || scheme === 'https' || scheme === '') {
-              try {
-                const texture = textureLoader.load(texturePath, undefined, undefined, e => {
-                  console.warn('[ViewportRenderer] Direct texture load failed', node.texturePath, e);
-                });
-                if (texture) {
-                  if (material instanceof THREE.MeshBasicMaterial) {
-                    material.map = texture;
-                    material.color.set(0xffffff);
-                    material.needsUpdate = true;
-                  }
+          if (scheme === 'http' || scheme === 'https' || scheme === '') {
+            try {
+              const texture = textureLoader.load(texturePath, undefined, undefined, e => {
+                console.warn('[ViewportRenderer] Direct texture load failed', node.texturePath, e);
+              });
+              if (texture) {
+                if (material instanceof THREE.MeshBasicMaterial) {
+                  material.map = texture;
+                  material.color.set(0xffffff);
+                  material.needsUpdate = true;
                 }
-              } catch (err2) {
-                console.warn('[ViewportRenderer] Failed to load texture for', node.texturePath, err2);
               }
-            } else {
-              // If the scheme is templ:// or res://, avoid direct load (these schemes are handled by ResourceManager)
-              console.warn('[ViewportRenderer] Skipping direct load for unsupported scheme:', texturePath);
+            } catch (err2) {
+              console.warn('[ViewportRenderer] Failed to load texture for', node.texturePath, err2);
             }
+          } else {
+            // If the scheme is templ:// or res://, avoid direct load (these schemes are handled by ResourceManager)
+            console.warn(
+              '[ViewportRenderer] Skipping direct load for unsupported scheme:',
+              texturePath
+            );
           }
+        }
       })();
     } else {
       // No texture path - use placeholder material (light gray)
@@ -927,7 +942,11 @@ export class ViewportRendererService {
     }
 
     const center = combinedBounds.getCenter(new THREE.Vector3());
-    console.debug('[ViewportRenderer] update2DOverlay: creating overlay', { node2DIds, center, combinedBounds });
+    console.debug('[ViewportRenderer] update2DOverlay: creating overlay', {
+      node2DIds,
+      center,
+      combinedBounds,
+    });
 
     this.clear2DSelectionOverlay();
 
@@ -1030,7 +1049,11 @@ export class ViewportRendererService {
   }
 
   get2DHandleAt(screenX: number, screenY: number): TwoDHandle {
-    console.debug('[ViewportRenderer] get2DHandleAt called', { screenX, screenY, hasOverlay: !!this.selection2DOverlay });
+    console.debug('[ViewportRenderer] get2DHandleAt called', {
+      screenX,
+      screenY,
+      hasOverlay: !!this.selection2DOverlay,
+    });
     if (!this.selection2DOverlay || !this.orthographicCamera) {
       console.debug('[ViewportRenderer] get2DHandleAt: no overlay or camera');
       return 'idle';
@@ -1072,7 +1095,10 @@ export class ViewportRendererService {
     if (transform) {
       this.active2DTransform = transform;
       this.begin2DInteraction();
-      console.debug('[ViewportRenderer] start 2D transform', { handle, nodeIds: this.active2DTransform.nodeIds });
+      console.debug('[ViewportRenderer] start 2D transform', {
+        handle,
+        nodeIds: this.active2DTransform.nodeIds,
+      });
     }
   }
 
@@ -1204,11 +1230,11 @@ export class ViewportRendererService {
           // Save and remove scene background to prevent it from overwriting 3D content
           const savedBackground = this.scene.background;
           this.scene.background = null;
-          
+
           this.renderer.autoClear = false;
           this.renderer.clearDepth();
           this.renderer.render(this.scene, this.orthographicCamera);
-          
+
           // Restore scene background and autoClear for next frame
           this.scene.background = savedBackground;
           this.renderer.autoClear = true;

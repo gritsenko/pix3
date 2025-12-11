@@ -47,29 +47,50 @@ export class SceneSaver {
 
     // Custom YAML stringification to keep vectors as inline arrays
     let yaml = stringify(document, { indent: 2 });
-    
+
     // Replace expanded position arrays with inline format
-    yaml = yaml.replace(/position:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'position: [$1, $2, $3]');
-    yaml = yaml.replace(/position:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g, 'position: [$1, $2]');
-    
+    yaml = yaml.replace(
+      /position:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'position: [$1, $2, $3]'
+    );
+    yaml = yaml.replace(
+      /position:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g,
+      'position: [$1, $2]'
+    );
+
     // Replace expanded rotationEuler arrays with inline format
-    yaml = yaml.replace(/rotationEuler:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'rotationEuler: [$1, $2, $3]');
-    
+    yaml = yaml.replace(
+      /rotationEuler:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'rotationEuler: [$1, $2, $3]'
+    );
+
     // Replace expanded scale arrays with inline format
-    yaml = yaml.replace(/scale:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'scale: [$1, $2, $3]');
+    yaml = yaml.replace(
+      /scale:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'scale: [$1, $2, $3]'
+    );
     yaml = yaml.replace(/scale:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g, 'scale: [$1, $2]');
-    
+
     // Replace expanded rotation arrays with inline format (2D)
-    yaml = yaml.replace(/rotation:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- (\w+)/g, 'rotation: [$1, $2, $3, $4]');
-    yaml = yaml.replace(/rotation:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g, 'rotation: [$1, $2]');
-    
+    yaml = yaml.replace(
+      /rotation:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- (\w+)/g,
+      'rotation: [$1, $2, $3, $4]'
+    );
+    yaml = yaml.replace(
+      /rotation:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g,
+      'rotation: [$1, $2]'
+    );
+
     // Replace expanded size arrays with inline format
-    yaml = yaml.replace(/size:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'size: [$1, $2, $3]');
+    yaml = yaml.replace(
+      /size:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'size: [$1, $2, $3]'
+    );
     yaml = yaml.replace(/size:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)(?!\s*-)/g, 'size: [$1, $2]');
-    
+
     // Replace expanded pivot arrays with inline format
     yaml = yaml.replace(/pivot:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'pivot: [$1, $2]');
-    
+
     console.debug('[SceneSaver] Serialization complete', {
       yamlLength: yaml.length,
       rootDefinitionCount: rootDefinitions.length,
@@ -81,7 +102,7 @@ export class SceneSaver {
   private serializeNode(node: NodeBase): SceneNodeDefinition {
     // First, get the properties (this might modify the type for DirectionalLightNode)
     const properties = this.serializeNodeProperties(node);
-    
+
     const definition: SceneNodeDefinition = {
       id: node.nodeId,
       type: node.type !== 'Group' ? node.type : undefined,

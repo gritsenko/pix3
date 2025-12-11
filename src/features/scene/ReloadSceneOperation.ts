@@ -3,7 +3,12 @@ import { SceneManager } from '@/core/SceneManager';
 import { SceneValidationError } from '@/core/SceneLoader';
 import { ref } from 'valtio/vanilla';
 import { getAppStateSnapshot } from '@/state';
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/Operation';
 
 export interface ReloadSceneOperationParams {
   /** Scene ID to reload. */

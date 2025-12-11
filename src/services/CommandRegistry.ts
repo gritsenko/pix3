@@ -101,21 +101,21 @@ export class CommandRegistry {
 
     // Standard menu section order - File, Edit, View, Insert, Window, Help
     const standardMenuOrder = ['file', 'edit', 'view', 'insert', 'window', 'help'];
-    
+
     const sections: MenuSection[] = Array.from(sectionMap.entries())
       .sort((a, b) => {
         const orderA = standardMenuOrder.indexOf(a[0]);
         const orderB = standardMenuOrder.indexOf(b[0]);
-        
+
         // If both menu paths are in standard order, use their order
         if (orderA !== -1 && orderB !== -1) {
           return orderA - orderB;
         }
-        
+
         // If only one is in standard order, put it first
         if (orderA !== -1) return -1;
         if (orderB !== -1) return 1;
-        
+
         // If neither is in standard order, fall back to alphabetical
         return a[0].localeCompare(b[0]);
       })

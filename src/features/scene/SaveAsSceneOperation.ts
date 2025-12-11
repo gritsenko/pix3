@@ -1,4 +1,9 @@
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/Operation';
 import { SceneManager } from '@/core/SceneManager';
 import { getAppStateSnapshot } from '@/state';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
@@ -74,7 +79,10 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
     // Write to file - either directly via fileHandle or to project
     if (this.params.fileHandle) {
       try {
-        console.debug('[SaveAsSceneOperation] Writing to external file via handle:', this.params.fileHandle.name);
+        console.debug(
+          '[SaveAsSceneOperation] Writing to external file via handle:',
+          this.params.fileHandle.name
+        );
         const writable = await this.params.fileHandle.createWritable();
         await writable.write(sceneYaml);
         await writable.close();
@@ -93,7 +101,9 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
         console.error('[SaveAsSceneOperation] Failed to write to external file', {
           error: error instanceof Error ? error.message : String(error),
         });
-        throw new Error(`Failed to save scene: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to save scene: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     } else if (this.params.filePath) {
       // Validate that the path is within the project (res:// prefix)
@@ -101,7 +111,9 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
         console.error('[SaveAsSceneOperation] Invalid file path - must be within project', {
           filePath: this.params.filePath,
         });
-        throw new Error(`File must be saved within the project. Path must start with 'res://', got: ${this.params.filePath}`);
+        throw new Error(
+          `File must be saved within the project. Path must start with 'res://', got: ${this.params.filePath}`
+        );
       }
 
       try {
@@ -117,7 +129,9 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
           filePath: this.params.filePath,
           error: error instanceof Error ? error.message : String(error),
         });
-        throw new Error(`Failed to save scene to ${this.params.filePath}: ${error instanceof Error ? error.message : String(error)}`);
+        throw new Error(
+          `Failed to save scene to ${this.params.filePath}: ${error instanceof Error ? error.message : String(error)}`
+        );
       }
     } else {
       throw new Error('No file path or handle provided');
@@ -133,13 +147,13 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
         sceneId,
         newFilePath: savedFilePath || this.params.filePath,
       });
-      
+
       // Extract directory path for targeted refresh (e.g., 'res://Scenes' from 'res://Scenes/level1.pix3scene')
       const filePath = savedFilePath || this.params.filePath;
       const lastSlashIndex = filePath.lastIndexOf('/');
       const directoryPath = lastSlashIndex > 0 ? filePath.substring(0, lastSlashIndex) : '.';
       state.project.lastModifiedDirectoryPath = directoryPath;
-      
+
       // Trigger asset explorer refresh by incrementing signal
       state.project.fileRefreshSignal = (state.project.fileRefreshSignal || 0) + 1;
       console.debug('[SaveAsSceneOperation] Triggered project file refresh', {

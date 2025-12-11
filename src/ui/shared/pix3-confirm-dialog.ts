@@ -23,8 +23,18 @@ export class ConfirmDialog extends ComponentBase {
 
   protected render() {
     return html`
-      <div class="dialog-backdrop" @click=${this.onBackdropClick}>
-        <div class="dialog-content" @click=${(e: Event) => e.stopPropagation()}>
+      <div
+        class="dialog-backdrop"
+        @click=${this.onBackdropClick}
+        @keydown=${(e: KeyboardEvent) => {
+          if (e.key === 'Escape') this.dispatchCancel();
+        }}
+      >
+        <div
+          class="dialog-content"
+          @click=${(e: Event) => e.stopPropagation()}
+          @keydown=${() => {}}
+        >
           <h2 class="dialog-title">${this.title}</h2>
           <p class="dialog-message">${this.message}</p>
           <div class="dialog-actions">

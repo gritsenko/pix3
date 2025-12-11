@@ -1,4 +1,9 @@
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/Operation';
 import { Group2D } from '@/nodes/2D/Group2D';
 import { SceneManager } from '@/core/SceneManager';
 import { ref } from 'valtio/vanilla';

@@ -1,6 +1,6 @@
 /**
  * Property Schema Framework
- * 
+ *
  * Defines metadata for node properties to enable dynamic inspector UI generation.
  * Similar to Godot's property system - each node class exposes its editable properties
  * with type information, validation rules, and UI hints.
@@ -110,11 +110,14 @@ export interface PropertySchema {
   properties: PropertyDefinition[];
 
   /** Group definitions for organizing properties */
-  groups?: Record<string, {
-    label: string;
-    description?: string;
-    expanded?: boolean;
-  }>;
+  groups?: Record<
+    string,
+    {
+      label: string;
+      description?: string;
+      expanded?: boolean;
+    }
+  >;
 }
 
 /**

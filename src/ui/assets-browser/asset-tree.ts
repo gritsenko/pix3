@@ -83,7 +83,7 @@ export class AssetTree extends ComponentBase {
       };
       await collect(this.rootPath || '.');
       return paths.sort().join('|');
-    } catch (err) {
+    } catch {
       return '';
     }
   }
@@ -164,13 +164,13 @@ export class AssetTree extends ComponentBase {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.disposeSubscription?.();
-    
+
     // Clean up timers
     if (this._renameTimer) {
       clearTimeout(this._renameTimer);
       this._renameTimer = null;
     }
-    
+
     window.removeEventListener('focus', this.onWindowFocus);
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
   }
@@ -372,7 +372,7 @@ export class AssetTree extends ComponentBase {
           composed: true,
         })
       );
-      
+
       this._lastClickedPath = node.path;
       this._lastClickTime = currentTime;
     }
@@ -394,12 +394,19 @@ export class AssetTree extends ComponentBase {
       <div
         class="node-row ${isSelected ? 'selected' : ''} ${isDragOver ? 'drag-over' : ''}"
         @click=${() => this.onSelect(node)}
+        @keydown=${(e: KeyboardEvent) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            this.onSelect(node);
+            e.preventDefault();
+          }
+        }}
         @dragstart=${(e: DragEvent) => this.onDragStart(e, node)}
         @dragend=${(e: DragEvent) => this.onDragEnd(e)}
         @dragover=${(e: DragEvent) => this.onDragOver(e, node)}
         @dragleave=${(e: DragEvent) => this.onDragLeave(e, node)}
         @drop=${(e: DragEvent) => this.onDrop(e, node)}
         draggable="true"
+        tabindex="0"
       >
         ${node.kind === 'directory'
           ? html`<button
@@ -762,6 +769,7 @@ export class AssetTree extends ComponentBase {
 
   private folderIcon(open: boolean) {
     const title = open ? 'Open folder' : 'Closed folder';
+
     return html`<span class="icon folder" role="img" aria-label=${title} title=${title}>
       <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
         <path
@@ -769,7 +777,9 @@ export class AssetTree extends ComponentBase {
           fill="currentColor"
           opacity="0.95"
         />
-        ${open ? html`<path d="M3 7L7 11H21" stroke="rgba(0,0,0,0.08)" stroke-width="0" />` : null}
+        ${open
+          ? html`<path d="M3 7L7 11H21" stroke="rgba(0,0,0,0.08)" stroke-width="0"></path>`
+          : null}
       </svg>
     </span>`;
   }
@@ -842,13 +852,13 @@ export class AssetTree extends ComponentBase {
 
     const node = nodeEntry.node;
     node.editing = true;
-    
+
     // Cache the original file extension for rename operations
     const originalName = node.name;
     const lastDotIndex = originalName.lastIndexOf('.');
     this._originalExtension = lastDotIndex > -1 ? originalName.substring(lastDotIndex) : '';
     this._isNewScene = false; // This is a rename, not new scene creation
-    
+
     // For files, show name without extension for cleaner editing
     this._editingValue = lastDotIndex > -1 ? originalName.substring(0, lastDotIndex) : originalName;
     this.requestUpdate();
@@ -863,7 +873,7 @@ export class AssetTree extends ComponentBase {
   }
 
   private _editingValue: string | null = null;
-  
+
   // Cache original extension and operation type for rename operations
   private _originalExtension: string = '';
   private _isNewScene: boolean = true;
@@ -995,7 +1005,7 @@ export class AssetTree extends ComponentBase {
 
     try {
       const finalName = (this._editingValue ?? node.name).trim();
-      
+
       // Check if this is a rename (existing node) or create (new node)
       // by checking if the file exists in the filesystem
       const parentPath = this.getParentPath(node.path);
@@ -1006,9 +1016,13 @@ export class AssetTree extends ComponentBase {
       // If this is a rename and the name is empty or unchanged, just cancel editing
       if (isRename) {
         const originalName = node.name;
-        const finalNameWithoutExt = finalName.includes('.') ? finalName.substring(0, finalName.lastIndexOf('.')) : finalName;
-        const originalNameWithoutExt = originalName.includes('.') ? originalName.substring(0, originalName.lastIndexOf('.')) : originalName;
-        
+        const finalNameWithoutExt = finalName.includes('.')
+          ? finalName.substring(0, finalName.lastIndexOf('.'))
+          : finalName;
+        const originalNameWithoutExt = originalName.includes('.')
+          ? originalName.substring(0, originalName.lastIndexOf('.'))
+          : originalName;
+
         if (!finalName || finalNameWithoutExt === originalNameWithoutExt) {
           // Just cancel editing without deleting the existing folder
           node.editing = false;
@@ -1032,7 +1046,7 @@ export class AssetTree extends ComponentBase {
         isRename,
         existingEntry: existingEntry?.name,
         editingValue: this._editingValue,
-        nodeName: node.name
+        nodeName: node.name,
       });
 
       const newPath = this.joinPath(parentPath === '.' ? '' : parentPath, finalName);
@@ -1040,7 +1054,7 @@ export class AssetTree extends ComponentBase {
       if (isRename) {
         // Rename existing item
         let finalFileName = finalName;
-        
+
         if (node.kind === 'file') {
           // For rename operations, preserve the original extension unless user explicitly removed it
           // and they want to change it to a scene file
@@ -1058,7 +1072,7 @@ export class AssetTree extends ComponentBase {
             finalFileName = finalName;
           }
         }
-        
+
         const renamedPath = this.joinPath(parentPath === '.' ? '' : parentPath, finalFileName);
         await this.projectService.moveItem(node.path, renamedPath);
         node.path = renamedPath;
@@ -1070,7 +1084,7 @@ export class AssetTree extends ComponentBase {
         } else if (node.kind === 'file') {
           // For new files, force the appropriate extension
           let filename = finalName;
-          
+
           if (this._isNewScene) {
             // New scene creation - always force .pix3scene extension
             if (!filename.endsWith('.pix3scene')) {
@@ -1083,15 +1097,15 @@ export class AssetTree extends ComponentBase {
             }
           }
           // If no extension specified and no original extension, leave as-is
-          
+
           const filePath = this.joinPath(parentPath === '.' ? '' : parentPath, filename);
-          
+
           if (this._isNewScene) {
             // read template via ResourceManager and write
             const template = await this.resourceManager.readText('templ://startup-scene');
             await this.projectService.writeFile(filePath, template);
           }
-          
+
           node.path = filePath;
           node.name = filename;
         }

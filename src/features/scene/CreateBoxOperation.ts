@@ -1,4 +1,9 @@
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/Operation';
 import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
 import { SceneManager } from '@/core/SceneManager';
 import { ref } from 'valtio/vanilla';

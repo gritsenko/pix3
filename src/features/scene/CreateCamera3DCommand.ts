@@ -5,7 +5,10 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { CreateCamera3DOperation, type CreateCamera3DOperationParams } from '@/features/scene/CreateCamera3DOperation';
+import {
+  CreateCamera3DOperation,
+  type CreateCamera3DOperationParams,
+} from '@/features/scene/CreateCamera3DOperation';
 import { SceneManager } from '@/core/SceneManager';
 
 export interface CreateCamera3DCommandPayload {
@@ -42,7 +45,9 @@ export class CreateCamera3DCommand extends CommandBase<CreateCamera3DCommandPayl
     return { canExecute: true };
   }
 
-  async execute(context: CommandContext): Promise<CommandExecutionResult<CreateCamera3DCommandPayload>> {
+  async execute(
+    context: CommandContext
+  ): Promise<CommandExecutionResult<CreateCamera3DCommandPayload>> {
     const operationService = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );

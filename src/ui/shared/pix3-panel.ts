@@ -48,7 +48,7 @@ export class Pix3Panel extends ComponentBase {
       return node.nodeType !== Node.TEXT_NODE || (node.textContent?.trim() ?? '').length > 0;
     });
     const newHasBodyContent = nodes.length > 0;
-    
+
     // Only update state if the value actually changed to avoid unnecessary renders
     if (newHasBodyContent !== this.hasBodyContent) {
       this.hasBodyContent = newHasBodyContent;

@@ -87,23 +87,25 @@ export class Pix3MainMenu extends ComponentBase {
     setTimeout(() => {
       if (!this.activeSection) return;
 
-      const trigger = this.querySelector(`.menu-section-button[data-section="${this.activeSection}"]`) as HTMLElement;
-      
+      const trigger = this.querySelector(
+        `.menu-section-button[data-section="${this.activeSection}"]`
+      ) as HTMLElement;
+
       if (!trigger || !this.portalElement) return;
 
       const triggerRect = trigger.getBoundingClientRect();
-      
+
       // Render menu to portal
       const menuHTML = this.renderMenuToString();
       this.portalElement.innerHTML = menuHTML;
-      
+
       // Style the portal
       const dropdown = this.portalElement.querySelector('.menu-dropdown') as HTMLElement;
       if (dropdown) {
         dropdown.style.position = 'fixed';
         dropdown.style.top = `${triggerRect.bottom + 4}px`;
         dropdown.style.left = `${triggerRect.left}px`;
-        
+
         // Re-attach event listeners to the portal menu items
         this.attachPortalEventListeners();
       }
@@ -221,7 +223,9 @@ export class Pix3MainMenu extends ComponentBase {
           ${this.menuSections.map(
             section => html`
               <button
-                class="menu-section-button ${this.activeSection === section.id ? 'menu-section-button--active' : ''}"
+                class="menu-section-button ${this.activeSection === section.id
+                  ? 'menu-section-button--active'
+                  : ''}"
                 data-section=${section.id}
                 @click=${() => this.toggleSection(section.id)}
                 @mouseenter=${() => this.handleSectionHover(section.id)}

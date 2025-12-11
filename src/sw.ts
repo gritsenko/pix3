@@ -11,13 +11,13 @@ const HANDLE_KEY = 'project-root';
 async function getProjectHandle(): Promise<FileSystemDirectoryHandle | null> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = (event) => {
+    request.onupgradeneeded = event => {
       const db = (event.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
       }
     };
-    request.onsuccess = (event) => {
+    request.onsuccess = event => {
       const db = (event.target as IDBOpenDBRequest).result;
       const tx = db.transaction(STORE_NAME, 'readonly');
       const store = tx.objectStore(STORE_NAME);
@@ -33,7 +33,7 @@ async function getFileHandle(
   root: FileSystemDirectoryHandle,
   path: string
 ): Promise<FileSystemFileHandle> {
-  const parts = path.split('/').filter((p) => p.length > 0);
+  const parts = path.split('/').filter(p => p.length > 0);
   let currentHandle: FileSystemDirectoryHandle | FileSystemFileHandle = root;
 
   for (let i = 0; i < parts.length; i++) {
@@ -87,7 +87,7 @@ async function handleTemplRequest(url: URL): Promise<Response> {
   const id = decodeURIComponent(url.pathname).replace(/^\/+/, '');
 
   // Check binary templates
-  const binary = binaryTemplates.find((t) => t.id === id);
+  const binary = binaryTemplates.find(t => t.id === id);
   if (binary) {
     // Fetch the actual URL
     const response = await fetch(binary.url);
@@ -95,7 +95,7 @@ async function handleTemplRequest(url: URL): Promise<Response> {
   }
 
   // Check scene templates (return as text/json)
-  const scene = sceneTemplates.find((t) => t.id === id);
+  const scene = sceneTemplates.find(t => t.id === id);
   if (scene) {
     return new Response(scene.contents, {
       headers: { 'Content-Type': 'text/yaml' }, // or application/json if it was json
@@ -109,11 +109,11 @@ self.addEventListener('install', () => {
   self.skipWaiting();
 });
 
-self.addEventListener('activate', (event) => {
+self.addEventListener('activate', event => {
   event.waitUntil(self.clients.claim());
 });
 
-self.addEventListener('fetch', (event) => {
+self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
 
   if (url.protocol === 'res:') {

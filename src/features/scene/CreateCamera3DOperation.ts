@@ -1,4 +1,9 @@
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/Operation';
 import { Camera3D } from '@/nodes/3D/Camera3D';
 import { SceneManager } from '@/core/SceneManager';
 import { ref } from 'valtio/vanilla';

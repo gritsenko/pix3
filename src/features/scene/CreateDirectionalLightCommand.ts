@@ -5,14 +5,20 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { CreateDirectionalLightOperation, type CreateDirectionalLightOperationParams } from '@/features/scene/CreateDirectionalLightOperation';
+import {
+  CreateDirectionalLightOperation,
+  type CreateDirectionalLightOperationParams,
+} from '@/features/scene/CreateDirectionalLightOperation';
 import { SceneManager } from '@/core/SceneManager';
 
 export interface CreateDirectionalLightCommandPayload {
   nodeId: string;
 }
 
-export class CreateDirectionalLightCommand extends CommandBase<CreateDirectionalLightCommandPayload, void> {
+export class CreateDirectionalLightCommand extends CommandBase<
+  CreateDirectionalLightCommandPayload,
+  void
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-directional-light',
     title: 'Create Directional Light',
@@ -42,7 +48,9 @@ export class CreateDirectionalLightCommand extends CommandBase<CreateDirectional
     return { canExecute: true };
   }
 
-  async execute(context: CommandContext): Promise<CommandExecutionResult<CreateDirectionalLightCommandPayload>> {
+  async execute(
+    context: CommandContext
+  ): Promise<CommandExecutionResult<CreateDirectionalLightCommandPayload>> {
     const operationService = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );

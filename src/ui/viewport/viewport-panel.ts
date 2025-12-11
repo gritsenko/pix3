@@ -160,7 +160,11 @@ export class ViewportPanel extends ComponentBase {
 
     // Only handle pointer down on the canvas or host
     const isCanvasTarget = (event.target as HTMLElement)?.classList?.contains('viewport-canvas');
-    console.debug('[ViewportPanel] pointerDown', { target: event.target, isCanvasTarget, isThis: event.target === this });
+    console.debug('[ViewportPanel] pointerDown', {
+      target: event.target,
+      isCanvasTarget,
+      isThis: event.target === this,
+    });
     if (event.target !== this && !isCanvasTarget) {
       return;
     }
@@ -215,7 +219,7 @@ export class ViewportPanel extends ComponentBase {
     if (distance > this.dragThreshold) {
       this.isDragging = true;
     }
-  }
+  };
 
   private handleCanvasPointerUp = (event: PointerEvent): void => {
     // Ignore pointer events from toolbar buttons

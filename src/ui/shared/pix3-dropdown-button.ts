@@ -166,14 +166,19 @@ export class Pix3DropdownButton extends ComponentBase {
                     html`<div class="dropdown__group">
                       <div class="dropdown__group-label">${group.label}</div>
                       ${group.items.map(
-                        item => html`<button
-                          role="menuitem"
-                          class="dropdown__item dropdown__item--grouped"
-                          @click=${() => this.selectItem(item)}
-                        >
-                          ${item.icon ? html`<span class="dropdown__item-icon">${this.getItemIconSvg(item.icon)}</span>` : null}
-                          <span class="dropdown__item-label">${item.label}</span>
-                        </button>`
+                        item =>
+                          html`<button
+                            role="menuitem"
+                            class="dropdown__item dropdown__item--grouped"
+                            @click=${() => this.selectItem(item)}
+                          >
+                            ${item.icon
+                              ? html`<span class="dropdown__item-icon"
+                                  >${this.getItemIconSvg(item.icon)}</span
+                                >`
+                              : null}
+                            <span class="dropdown__item-label">${item.label}</span>
+                          </button>`
                       )}
                     </div>`
                 )
@@ -187,11 +192,14 @@ export class Pix3DropdownButton extends ComponentBase {
                           ?disabled=${item.disabled}
                           @click=${() => this.selectItem(item)}
                         >
-                          ${item.icon ? html`<span class="dropdown__item-icon">${this.getItemIconSvg(item.icon)}</span>` : null}
+                          ${item.icon
+                            ? html`<span class="dropdown__item-icon"
+                                >${this.getItemIconSvg(item.icon)}</span
+                              >`
+                            : null}
                           <span class="dropdown__item-label">${item.label}</span>
                         </button>`}`
-                )
-            }
+                )}
           </div>`
         : null}
     `;

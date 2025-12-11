@@ -5,7 +5,10 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { CreateMeshInstanceOperation, type CreateMeshInstanceOperationParams } from '@/features/scene/CreateMeshInstanceOperation';
+import {
+  CreateMeshInstanceOperation,
+  type CreateMeshInstanceOperationParams,
+} from '@/features/scene/CreateMeshInstanceOperation';
 import { SceneManager } from '@/core/SceneManager';
 
 export interface CreateMeshInstanceCommandPayload {
@@ -42,7 +45,9 @@ export class CreateMeshInstanceCommand extends CommandBase<CreateMeshInstanceCom
     return { canExecute: true };
   }
 
-  async execute(context: CommandContext): Promise<CommandExecutionResult<CreateMeshInstanceCommandPayload>> {
+  async execute(
+    context: CommandContext
+  ): Promise<CommandExecutionResult<CreateMeshInstanceCommandPayload>> {
     const operationService = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );

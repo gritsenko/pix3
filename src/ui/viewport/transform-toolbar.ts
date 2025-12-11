@@ -8,8 +8,16 @@ export type ModeChangeHandler = (mode: TransformMode) => void;
 
 // Small, self-contained renderer for the transform toolbar so the markup is
 // reusable and separate from the viewport panel logic.
-export function renderTransformToolbar(current: TransformMode, onChange: ModeChangeHandler): TemplateResult {
-  const transformModes: Array<{ mode: TransformMode; iconName: string; label: string; key: string }> = [
+export function renderTransformToolbar(
+  current: TransformMode,
+  onChange: ModeChangeHandler
+): TemplateResult {
+  const transformModes: Array<{
+    mode: TransformMode;
+    iconName: string;
+    label: string;
+    key: string;
+  }> = [
     // use a mouse pointer icon for select mode
     { mode: 'select', iconName: 'mouse-pointer', label: 'Select (Q)', key: 'Q' },
     { mode: 'translate', iconName: 'move', label: 'Move (W)', key: 'W' },

@@ -1,9 +1,6 @@
 import { injectable } from '@/fw/di';
 
-import type {
-  BinaryTemplateDescriptor,
-  SceneTemplateDescriptor,
-} from './template-data';
+import type { BinaryTemplateDescriptor, SceneTemplateDescriptor } from './template-data';
 import { binaryTemplates, sceneTemplates } from './template-data';
 
 export type TemplateScheme = 'templ';

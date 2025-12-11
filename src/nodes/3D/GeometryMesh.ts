@@ -45,9 +45,11 @@ export class GeometryMesh extends Node3D {
   dispose(): void {
     try {
       this._geometry?.dispose();
+      // eslint-disable-next-line no-empty
     } catch {}
     try {
       (this._material as unknown as { dispose?: () => void })?.dispose?.();
+      // eslint-disable-next-line no-empty
     } catch {}
   }
 }

@@ -1,6 +1,6 @@
 /**
  * Custom Property Editor Components
- * 
+ *
  * Specialized editors for vector and rotation properties that display
  * multiple components (x, y, z) in a single row.
  */
@@ -199,7 +199,11 @@ export class Vector3Editor extends LitElement {
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
-                detail: { x: parseFloat((e.target as HTMLInputElement).value), y: this.y, z: this.z },
+                detail: {
+                  x: parseFloat((e.target as HTMLInputElement).value),
+                  y: this.y,
+                  z: this.z,
+                },
               })
             )}
         />
@@ -213,7 +217,11 @@ export class Vector3Editor extends LitElement {
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
-                detail: { x: this.x, y: parseFloat((e.target as HTMLInputElement).value), z: this.z },
+                detail: {
+                  x: this.x,
+                  y: parseFloat((e.target as HTMLInputElement).value),
+                  z: this.z,
+                },
               })
             )}
         />
@@ -227,7 +235,11 @@ export class Vector3Editor extends LitElement {
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
-                detail: { x: this.x, y: this.y, z: parseFloat((e.target as HTMLInputElement).value) },
+                detail: {
+                  x: this.x,
+                  y: this.y,
+                  z: parseFloat((e.target as HTMLInputElement).value),
+                },
               })
             )}
         />
@@ -322,7 +334,11 @@ export class EulerEditor extends LitElement {
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
-                detail: { x: parseFloat((e.target as HTMLInputElement).value), y: this.y, z: this.z },
+                detail: {
+                  x: parseFloat((e.target as HTMLInputElement).value),
+                  y: this.y,
+                  z: this.z,
+                },
               })
             )}
         />
@@ -336,7 +352,11 @@ export class EulerEditor extends LitElement {
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
-                detail: { x: this.x, y: parseFloat((e.target as HTMLInputElement).value), z: this.z },
+                detail: {
+                  x: this.x,
+                  y: parseFloat((e.target as HTMLInputElement).value),
+                  z: this.z,
+                },
               })
             )}
         />
@@ -350,7 +370,11 @@ export class EulerEditor extends LitElement {
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
-                detail: { x: this.x, y: this.y, z: parseFloat((e.target as HTMLInputElement).value) },
+                detail: {
+                  x: this.x,
+                  y: this.y,
+                  z: parseFloat((e.target as HTMLInputElement).value),
+                },
               })
             )}
         />

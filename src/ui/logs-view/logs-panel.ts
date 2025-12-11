@@ -24,11 +24,11 @@ export class LogsPanel extends ComponentBase {
 
   connectedCallback() {
     super.connectedCallback();
-    
+
     // Get initial logs
     this.logs = this.loggingService.getLogs();
     this.enabledLevels = new Set(this.loggingService.getEnabledLevels());
-    
+
     // Subscribe to new logs
     this.disposeListen = this.loggingService.subscribe(() => {
       this.logs = [...this.loggingService.getLogs()];
@@ -106,16 +106,10 @@ export class LogsPanel extends ComponentBase {
       <div class="logs-container">
         <div class="logs-header">
           <div class="logs-controls">
-            ${this.renderLevelToggle('debug')}
-            ${this.renderLevelToggle('info')}
-            ${this.renderLevelToggle('warn')}
-            ${this.renderLevelToggle('error')}
+            ${this.renderLevelToggle('debug')} ${this.renderLevelToggle('info')}
+            ${this.renderLevelToggle('warn')} ${this.renderLevelToggle('error')}
           </div>
-          <button
-            class="clear-btn"
-            @click=${() => this.handleClear()}
-            aria-label="Clear all logs"
-          >
+          <button class="clear-btn" @click=${() => this.handleClear()} aria-label="Clear all logs">
             Clear
           </button>
         </div>

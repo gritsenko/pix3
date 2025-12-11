@@ -131,16 +131,19 @@ export class TransformTool2d {
     });
 
     const handles: THREE.Object3D[] = [];
-    (Object.entries(positions) as Array<[Exclude<TwoDHandle, 'idle' | 'move'>, THREE.Vector3]>).forEach(
-      ([type, pos]) => {
-        const mesh = new THREE.Mesh(handleGeometry.clone(), type === 'rotate' ? rotationMaterial.clone() : handleMaterial.clone());
-        mesh.position.copy(pos);
-        mesh.userData.handleType = type;
-        mesh.renderOrder = 1100;
-        mesh.layers.set(1);
-        handles.push(mesh);
-      }
-    );
+    (
+      Object.entries(positions) as Array<[Exclude<TwoDHandle, 'idle' | 'move'>, THREE.Vector3]>
+    ).forEach(([type, pos]) => {
+      const mesh = new THREE.Mesh(
+        handleGeometry.clone(),
+        type === 'rotate' ? rotationMaterial.clone() : handleMaterial.clone()
+      );
+      mesh.position.copy(pos);
+      mesh.userData.handleType = type;
+      mesh.renderOrder = 1100;
+      mesh.layers.set(1);
+      handles.push(mesh);
+    });
 
     // Connect rotation handle with a thin line for affordance
     const rotationPos = positions.rotate;
@@ -318,19 +321,37 @@ export class TransformTool2d {
     const pointerWorld = this.screenToWorld2D(screenX, screenY, orthographicCamera, viewportSize);
     if (!pointerWorld) return;
 
-    const { handle, startPointerWorld, startStates, startCenterWorld, anchorWorld, anchorLocal, startSize } = transform;
+    const {
+      handle,
+      startPointerWorld,
+      startStates,
+      startCenterWorld,
+      anchorWorld,
+      anchorLocal,
+      startSize,
+    } = transform;
 
     if (handle === 'move') {
       const delta = pointerWorld.clone().sub(startPointerWorld);
       for (const [nodeId, startState] of startStates) {
         const node = sceneGraph.nodeMap.get(nodeId);
         if (node && node instanceof Node2D) {
-          node.position.set(startState.position.x + delta.x, startState.position.y + delta.y, node.position.z);
+          node.position.set(
+            startState.position.x + delta.x,
+            startState.position.y + delta.y,
+            node.position.z
+          );
         }
       }
     } else if (handle === 'rotate') {
-      const startAngle = Math.atan2(startPointerWorld.y - startCenterWorld.y, startPointerWorld.x - startCenterWorld.x);
-      const currentAngle = Math.atan2(pointerWorld.y - startCenterWorld.y, pointerWorld.x - startCenterWorld.x);
+      const startAngle = Math.atan2(
+        startPointerWorld.y - startCenterWorld.y,
+        startPointerWorld.x - startCenterWorld.x
+      );
+      const currentAngle = Math.atan2(
+        pointerWorld.y - startCenterWorld.y,
+        pointerWorld.x - startCenterWorld.x
+      );
       const deltaAngle = currentAngle - startAngle;
 
       for (const [nodeId, startState] of startStates) {
@@ -429,7 +450,11 @@ export class TransformTool2d {
   /**
    * Convert screen coordinates to NDC (normalized device coordinates)
    */
-  private toNdc(screenX: number, screenY: number, viewportSize: { width: number; height: number }): THREE.Vector2 | null {
+  private toNdc(
+    screenX: number,
+    screenY: number,
+    viewportSize: { width: number; height: number }
+  ): THREE.Vector2 | null {
     const { width, height } = viewportSize;
     if (width <= 0 || height <= 0) return null;
     return new THREE.Vector2((screenX / width) * 2 - 1, -(screenY / height) * 2 + 1);

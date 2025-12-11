@@ -7,7 +7,10 @@ import {
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
-import { SaveAsSceneOperation, type SaveAsSceneOperationParams } from '@/features/scene/SaveAsSceneOperation';
+import {
+  SaveAsSceneOperation,
+  type SaveAsSceneOperationParams,
+} from '@/features/scene/SaveAsSceneOperation';
 import { SceneManager } from '@/core/SceneManager';
 
 export class SaveAsSceneCommand extends CommandBase<void, void> {

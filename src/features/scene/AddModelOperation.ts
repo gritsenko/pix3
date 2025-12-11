@@ -1,4 +1,9 @@
-import type { Operation, OperationContext, OperationInvokeResult, OperationMetadata } from '@/core/Operation';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/Operation';
 import { MeshInstance } from '@/nodes/3D/MeshInstance';
 import { SceneManager } from '@/core/SceneManager';
 import { AssetLoader } from '@/core/AssetLoader';
@@ -45,12 +50,10 @@ export class AddModelOperation implements Operation<OperationInvokeResult> {
     const nodeId = `model-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
     // Load the model using AssetLoader to get the actual geometry
-    const assetLoader = container.getService<AssetLoader>(
-      container.getOrCreateToken(AssetLoader)
-    );
-    
+    const assetLoader = container.getService<AssetLoader>(container.getOrCreateToken(AssetLoader));
+
     const modelName = this.params.modelName || this.deriveModelName(this.params.modelPath);
-    
+
     let node: MeshInstance;
     try {
       const result = await assetLoader.loadAsset(this.params.modelPath, nodeId, modelName);

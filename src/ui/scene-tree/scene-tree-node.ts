@@ -114,11 +114,19 @@ export class SceneTreeNodeComponent extends ComponentBase {
           role="treeitem"
           aria-level=${this.level}
           aria-selected=${isSelected ? 'true' : 'false'}
-          aria-expanded=${ifDefined(hasChildren ? (this.isCollapsed ? 'false' : 'true') : undefined)}
+          aria-expanded=${ifDefined(
+            hasChildren ? (this.isCollapsed ? 'false' : 'true') : undefined
+          )}
           tabindex=${this.focusable ? '0' : '-1'}
           data-node-id=${this.node.id}
           title=${this.getNodeTooltip(this.node)}
           @click=${(event: Event) => this.onSelectNode(event)}
+          @keydown=${(event: KeyboardEvent) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              this.onSelectNode(event);
+              event.preventDefault();
+            }
+          }}
           @dragstart=${(event: DragEvent) => this.onDragStart(event)}
           @dragend=${(event: DragEvent) => this.onDragEnd(event)}
           @dragover=${(event: DragEvent) => this.onDragOver(event)}
@@ -127,14 +135,17 @@ export class SceneTreeNodeComponent extends ComponentBase {
           draggable="true"
         >
           ${expanderTemplate}
-          <span class="tree-node__icon" title=${this.node.type} aria-label=${this.node.type} style="color: ${this.node.treeColor};">
+          <span
+            class="tree-node__icon"
+            title=${this.node.type}
+            aria-label=${this.node.type}
+            style="color: ${this.node.treeColor};"
+          >
             ${this.renderNodeIcon(this.node.treeIcon)}
           </span>
           <span class="tree-node__label">
             <span class="tree-node__header">
-              <span class="tree-node__name">
-                ${this.node.name}
-              </span>
+              <span class="tree-node__name"> ${this.node.name} </span>
             </span>
             ${this.node.instancePath
               ? html`<span class="tree-node__instance">${this.node.instancePath}</span>`
@@ -143,7 +154,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
           <div class="tree-node__buttons">
             <button
               type="button"
-              class="tree-node__button tree-node__button--visible ${this.isVisible ? 'tree-node__button--active' : ''}"
+              class="tree-node__button tree-node__button--visible ${this.isVisible
+                ? 'tree-node__button--active'
+                : ''}"
               aria-label=${this.isVisible ? `Hide ${this.node.name}` : `Show ${this.node.name}`}
               @click=${(event: Event) => this.onToggleVisibility(event)}
             >
@@ -151,7 +164,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
             </button>
             <button
               type="button"
-              class="tree-node__button tree-node__button--lock ${this.isLocked ? 'tree-node__button--active' : ''}"
+              class="tree-node__button tree-node__button--lock ${this.isLocked
+                ? 'tree-node__button--active'
+                : ''}"
               aria-label=${this.isLocked ? `Unlock ${this.node.name}` : `Lock ${this.node.name}`}
               @click=${(event: Event) => this.onToggleLock(event)}
             >
@@ -254,13 +269,14 @@ export class SceneTreeNodeComponent extends ComponentBase {
   private onDragStart(event: DragEvent): void {
     event.stopPropagation();
     this.isDragging = true;
-    
+
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('application/x-scene-tree-node', this.node.id);
       // Set a visual feedback image
       const img = new Image();
-      img.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="16" height="16"%3E%3Crect width="16" height="16" fill="%235ec2ff" opacity="0.3"/%3E%3C/svg%3E';
+      img.src =
+        'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="16" height="16"%3E%3Crect width="16" height="16" fill="%235ec2ff" opacity="0.3"/%3E%3C/svg%3E';
       event.dataTransfer.setDragImage(img, 0, 0);
     }
   }
@@ -359,7 +375,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
   private async onToggleVisibility(event: Event): Promise<void> {
     event.stopPropagation();
-    
+
     const newVisibleState = !this.isVisible;
     try {
       const command = new UpdateObjectPropertyCommand({
@@ -367,7 +383,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
         propertyPath: 'visible',
         value: newVisibleState,
       });
-      
+
       await this.commandDispatcher.execute(command);
       this.isVisible = newVisibleState;
     } catch (error) {
@@ -377,7 +393,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
   private async onToggleLock(event: Event): Promise<void> {
     event.stopPropagation();
-    
+
     const newLockedState = !this.isLocked;
     try {
       const command = new UpdateObjectPropertyCommand({
@@ -385,7 +401,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
         propertyPath: 'locked',
         value: newLockedState,
       });
-      
+
       await this.commandDispatcher.execute(command);
       this.isLocked = newLockedState;
     } catch (error) {

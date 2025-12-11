@@ -1,5 +1,9 @@
 import { ComponentBase, customElement, html, state, subscribe, inject } from '@/fw';
-import { getNodePropertySchema, getPropertiesByGroup, getPropertyDisplayValue } from '@/fw/property-schema-utils';
+import {
+  getNodePropertySchema,
+  getPropertiesByGroup,
+  getPropertyDisplayValue,
+} from '@/fw/property-schema-utils';
 import { SceneManager } from '@/core/SceneManager';
 import { appState } from '@/state';
 import type { NodeBase } from '@/nodes/NodeBase';
@@ -291,7 +295,7 @@ export class InspectorPanel extends ComponentBase {
       let value = { x: 0, y: 0, z: 0 };
       try {
         value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
-      } catch (e) {
+      } catch {
         console.warn(`Failed to parse vector value for ${prop.name}:`, state.value);
       }
 
@@ -447,7 +451,9 @@ export class InspectorPanel extends ComponentBase {
           <input
             type="number"
             step=${prop.ui?.step ?? 0.01}
-            class="property-input property-input--number ${state.isValid ? '' : 'property-input--invalid'}"
+            class="property-input property-input--number ${state.isValid
+              ? ''
+              : 'property-input--invalid'}"
             .value=${state.value}
             ?disabled=${readOnly}
             @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
@@ -491,7 +497,7 @@ export class InspectorPanel extends ComponentBase {
       let value = { x: 0, y: 0 };
       try {
         value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
-      } catch (e) {
+      } catch {
         console.warn(`Failed to parse vector2 value for ${prop.name}:`, state.value);
       }
       return html`
@@ -513,7 +519,7 @@ export class InspectorPanel extends ComponentBase {
       let value = { x: 0, y: 0, z: 0 };
       try {
         value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
-      } catch (e) {
+      } catch {
         console.warn(`Failed to parse vector3 value for ${prop.name}:`, state.value);
       }
       return html`
@@ -536,7 +542,7 @@ export class InspectorPanel extends ComponentBase {
       let value = { x: 0, y: 0, z: 0 };
       try {
         value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
-      } catch (e) {
+      } catch {
         console.warn(`Failed to parse euler value for ${prop.name}:`, state.value);
       }
       return html`

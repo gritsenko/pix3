@@ -76,11 +76,7 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
 
       const activeId = this.payload.sceneId ?? state.scenes.activeSceneId ?? 'startup-scene';
       const existing = state.scenes.descriptors[activeId] ?? null;
-      const sceneName = this.deriveSceneName(
-        filePath,
-        graph.metadata ?? {},
-        existing?.name
-      );
+      const sceneName = this.deriveSceneName(filePath, graph.metadata ?? {}, existing?.name);
 
       // Try to get file handle and modification time for file watching
       let fileHandle: FileSystemFileHandle | null = null;

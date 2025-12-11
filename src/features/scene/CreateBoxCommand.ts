@@ -5,7 +5,10 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { CreateBoxOperation, type CreateBoxOperationParams } from '@/features/scene/CreateBoxOperation';
+import {
+  CreateBoxOperation,
+  type CreateBoxOperationParams,
+} from '@/features/scene/CreateBoxOperation';
 import { SceneManager } from '@/core/SceneManager';
 
 export interface CreateBoxCommandPayload {

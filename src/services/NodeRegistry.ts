@@ -170,17 +170,24 @@ export class NodeRegistry {
    */
   public searchNodeTypes(query: string): NodeTypeInfo[] {
     const lowercaseQuery = query.toLowerCase();
-    return this.getAllNodeTypes().filter(nodeType =>
-      nodeType.displayName.toLowerCase().includes(lowercaseQuery) ||
-      nodeType.description.toLowerCase().includes(lowercaseQuery) ||
-      nodeType.keywords.some(keyword => keyword.toLowerCase().includes(lowercaseQuery))
+    return this.getAllNodeTypes().filter(
+      nodeType =>
+        nodeType.displayName.toLowerCase().includes(lowercaseQuery) ||
+        nodeType.description.toLowerCase().includes(lowercaseQuery) ||
+        nodeType.keywords.some(keyword => keyword.toLowerCase().includes(lowercaseQuery))
     );
   }
 
   /**
    * Create dropdown items for UI consumption
    */
-  public getDropdownItems(): Array<{ id: string; label: string; icon: string; color: string; category: '2D' | '3D' }> {
+  public getDropdownItems(): Array<{
+    id: string;
+    label: string;
+    icon: string;
+    color: string;
+    category: '2D' | '3D';
+  }> {
     return this.getAllNodeTypes().map(nodeType => ({
       id: nodeType.id,
       label: nodeType.displayName,
@@ -198,7 +205,7 @@ export class NodeRegistry {
     items: Array<{ id: string; label: string; icon: string; color: string }>;
   }> {
     const categories = this.getNodeTypesByCategory();
-    
+
     return [
       {
         label: '2D Nodes',
