@@ -198,7 +198,6 @@ export class SceneLoader {
         const props = baseProps.properties as Node2DProperties;
         return new Node2D({
           ...baseProps,
-          properties: props,
           position: this.readVector2(props.position, ZERO_VECTOR2),
           scale: this.readVector2(props.scale, UNIT_VECTOR2),
           rotation: props.rotation ?? 0,
@@ -208,7 +207,6 @@ export class SceneLoader {
         const props = baseProps.properties as Group2DProperties;
         return new Group2D({
           ...baseProps,
-          properties: props,
           position: this.readVector2(props.position, ZERO_VECTOR2),
           scale: this.readVector2(props.scale, UNIT_VECTOR2),
           rotation: props.rotation ?? 0,

@@ -47,7 +47,6 @@ export class AssetTree extends ComponentBase {
 
   // Click-and-wait rename behavior
   private _lastClickedPath: string | null = null;
-  private _lastClickTime: number = 0;
   private _renameTimer: number | null = null;
   private readonly _renameDelay = 500; // milliseconds
 
@@ -274,60 +273,7 @@ export class AssetTree extends ComponentBase {
     else this.expandNode(node);
   }
 
-  private onNodeActivate(event: MouseEvent, node: Node): void {
-    event.preventDefault();
-    event.stopPropagation();
-
-    if (node.editing) {
-      return;
-    }
-
-    if (node.kind === 'directory') {
-      // Toggle directory expansion on single click
-      if (node.expanded) {
-        this.collapseNode(node);
-      } else {
-        void this.expandNode(node);
-      }
-      return;
-    }
-
-    // For files, raise activation event to parent instead of handling here
-    const payload = this.buildAssetPayload(node);
-    this.dispatchEvent(
-      new CustomEvent('asset-activate', {
-        detail: payload,
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  private buildAssetPayload(node: Node): {
-    name: string;
-    path: string;
-    kind: FileSystemHandleKind;
-    resourcePath: string | null;
-    extension: string;
-  } {
-    const resourcePath = this.toResourceUri(node.path);
-    const extension = (node.name.split('.').pop() || '').toLowerCase();
-    return { name: node.name, path: node.path, kind: node.kind, resourcePath, extension };
-  }
-
-  private toResourceUri(path: string): string | null {
-    const normalized = path
-      .replace(/^[./]+/, '')
-      .replace(/\\+/g, '/')
-      .trim();
-    if (!normalized) {
-      return null;
-    }
-    return normalized.startsWith('res://') ? normalized : `res://${normalized}`;
-  }
-
   private onSelect(node: Node): void {
-    const currentTime = Date.now();
     const isSameNode = this._lastClickedPath === node.path;
     const isAlreadySelected = this.selectedPath === node.path;
 
@@ -340,20 +286,17 @@ export class AssetTree extends ComponentBase {
     if (isSameNode && isAlreadySelected) {
       // Click on already selected item - start rename timer
       this._lastClickedPath = node.path;
-      this._lastClickTime = currentTime;
 
       // Set timer for rename after delay
       this._renameTimer = window.setTimeout(() => {
         this._renameTimer = null;
         this._lastClickedPath = null;
-        this._lastClickTime = 0;
         // Start rename after waiting on selected item
         void this.startRename(node.path);
       }, this._renameDelay);
     } else if (isSameNode) {
       // Click on same item but not selected yet - just select it
       this._lastClickedPath = null;
-      this._lastClickTime = 0;
       this.selectedPath = node.path;
       this.dispatchEvent(
         new CustomEvent('asset-selected', {
@@ -374,7 +317,6 @@ export class AssetTree extends ComponentBase {
       );
 
       this._lastClickedPath = node.path;
-      this._lastClickTime = currentTime;
     }
 
     this.requestUpdate();
@@ -848,7 +790,6 @@ export class AssetTree extends ComponentBase {
       this._renameTimer = null;
     }
     this._lastClickedPath = null;
-    this._lastClickTime = 0;
 
     const node = nodeEntry.node;
     node.editing = true;
