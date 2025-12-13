@@ -27,9 +27,9 @@
 }
 
 :host([accent='primary']) .panel {
-  border-color: rgba(48, 164, 255, 0.45);
+  border-color: rgba(255, 207, 51, 0.45);
   box-shadow:
-    0 0 0 1px rgba(48, 164, 255, 0.25),
+    0 0 0 1px rgba(255, 207, 51, 0.25),
     0 22px 38px rgba(0, 0, 0, 0.24);
 }
 
@@ -48,7 +48,7 @@
 }
 
 .panel__header:focus-visible {
-  box-shadow: 0 0 0 2px rgba(94, 194, 255, 0.8);
+  box-shadow: 0 0 0 2px rgba(255, 207, 51, 0.8);
 }
 
 .panel__heading {

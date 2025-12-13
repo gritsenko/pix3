@@ -82,11 +82,11 @@
 }
 
 .menu-item:hover:not(.menu-item--disabled) {
-  background-color: rgba(48, 164, 255, 0.15);
+  background-color: rgba(255, 207, 51, 0.15);
 }
 
 .menu-item:active:not(.menu-item--disabled) {
-  background-color: rgba(48, 164, 255, 0.2);
+  background-color: rgba(255, 207, 51, 0.2);
 }
 
 .menu-item--disabled {

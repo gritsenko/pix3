@@ -18,7 +18,7 @@ pix3-dropdown {
 
 pix3-dropdown:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(94, 194, 255, 0.85);
+  box-shadow: 0 0 0 2px rgba(255, 207, 51, 0.85);
 }
 
 pix3-dropdown:hover {
@@ -89,12 +89,12 @@ pix3-dropdown[icon-only] .dropdown__caret {
 }
 
 .dropdown__item:hover:not(.dropdown__item--disabled) {
-  background: rgba(48, 164, 255, 0.15);
+  background: rgba(255, 207, 51, 0.15);
 }
 
 .dropdown__item:focus-visible {
   outline: none;
-  background: rgba(48, 164, 255, 0.2);
+  background: rgba(255, 207, 51, 0.2);
 }
 
 .dropdown__item--disabled {

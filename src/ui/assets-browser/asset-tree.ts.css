@@ -69,8 +69,8 @@ asset-tree {
 }
 
 .node-row.selected {
-  background: rgba(48, 164, 255, 0.14);
-  outline: 1px solid rgba(48, 164, 255, 0.18);
+  background: rgba(255, 207, 51, 0.14);
+  outline: 1px solid rgba(255, 207, 51, 0.18);
 }
 
 .node-row.drag-over {
@@ -108,7 +108,7 @@ asset-tree {
 
 .expander:focus {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(94, 194, 255, 0.6);
+  box-shadow: 0 0 0 2px rgba(255, 207, 51, 0.6);
 }
 
 .expander-placeholder {

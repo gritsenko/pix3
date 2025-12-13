@@ -14,7 +14,7 @@
 }
 
 .panel:focus-visible {
-  box-shadow: inset 0 0 0 2px rgba(78, 141, 245, 0.5);
+  box-shadow: inset 0 0 0 2px rgba(255, 207, 51, 0.5);
 }
 
 .viewport-canvas {
@@ -89,12 +89,12 @@
 }
 
 .toolbar-button--active {
-  background: rgba(78, 141, 245, 0.8);
+  background: rgba(255, 207, 51, 0.8);
   color: rgba(255, 255, 255, 1);
-  box-shadow: 0 0 0 2px rgba(78, 141, 245, 0.3);
+  box-shadow: 0 0 0 2px rgba(255, 207, 51, 0.3);
 }
 
 .toolbar-button--active:hover {
-  background: rgba(78, 141, 245, 1);
+  background: rgba(255, 207, 51, 1);
   transform: translateY(-1px);
 }
