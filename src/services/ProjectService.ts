@@ -271,6 +271,93 @@ export class ProjectService {
       throw error;
     }
   }
+
+  async createNewProject(): Promise<void> {
+    try {
+      const handle = await this.fs.requestProjectDirectory('readwrite');
+
+      // Check if directory is empty
+      const entries = await this.fs.listDirectory('.');
+      if (entries.length > 0) {
+        throw new Error(
+          'Selected folder is not empty. Please choose an empty folder for a new project.'
+        );
+      }
+
+      // Create base project structure
+      await this.createProjectStructure();
+
+      // Set up project state
+      const hasRandomUUID =
+        typeof crypto !== 'undefined' &&
+        typeof (crypto as unknown as { randomUUID?: unknown }).randomUUID === 'function';
+      const id = hasRandomUUID
+        ? (crypto as unknown as { randomUUID: () => string }).randomUUID()
+        : `handle-${Date.now()}`;
+
+      appState.project.directoryHandle = handle;
+      appState.project.projectName = handle.name ?? 'New Project';
+      appState.project.status = 'ready';
+      appState.project.errorMessage = null;
+
+      // Save to recent projects
+      this.addRecentProject({
+        id,
+        name: appState.project.projectName ?? 'New Project',
+        lastOpenedAt: Date.now(),
+      });
+      this.saveHandleToIndexedDB(id, handle).catch(() => {
+        // ignore persistence errors; fallback behavior remains functional
+      });
+    } catch (error) {
+      // Propagate error after recording state
+      appState.project.status = 'error';
+      appState.project.errorMessage =
+        error instanceof Error ? error.message : String(error ?? 'Failed to create new project');
+      throw error;
+    }
+  }
+
+  private async createProjectStructure(): Promise<void> {
+    const directories = [
+      'src',
+      'src/models',
+      'src/assets',
+      'src/assets/scenes',
+      'src/assets/models',
+      'src/assets/textures',
+    ];
+
+    // Create directories
+    for (const dir of directories) {
+      await this.fs.createDirectory(dir);
+    }
+
+    // Create README.md
+    const readmeContent = `# Pix3 Project
+
+This is a new Pix3 project created on ${new Date().toLocaleDateString()}.
+
+## Project Structure
+
+- \`src/\` - Source code
+- \`src/models/\` - 3D model files
+- \`src/assets/\` - Project assets
+- \`src/assets/scenes/\` - Scene files
+- \`src/assets/models/\` - 3D models
+- \`src/assets/textures/\` - Texture files
+
+## Getting Started
+
+1. Add your 3D models to \`src/assets/models/\`
+2. Create scenes in \`src/assets/scenes/\`
+3. Open your project in Pix3 to start editing
+
+Happy creating! 🎨
+`;
+
+    await this.fs.writeTextFile('README.md', readmeContent);
+  }
 }
 
 export const resolveProjectService = (): ProjectService => {

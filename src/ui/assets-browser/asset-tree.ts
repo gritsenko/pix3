@@ -679,11 +679,13 @@ export class AssetTree extends ComponentBase {
     try {
       // Handle directory structure in file name
       const fullPath = this.joinPath(targetPath === '.' ? '' : targetPath, file.name);
+      console.log(`[AssetTree] Copying file ${file.name} to ${fullPath}`);
 
       // If file contains path separators, create directories
       const pathParts = fullPath.split('/');
       if (pathParts.length > 1) {
         const dirPath = pathParts.slice(0, -1).join('/');
+        console.log(`[AssetTree] Creating directory structure: ${dirPath}`);
         await this.projectService.createDirectory(dirPath);
       }
 

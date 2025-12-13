@@ -61,6 +61,19 @@ export class Pix3Welcome extends ComponentBase {
     await this.projectService.openProjectViaPicker();
   };
 
+  private onStartNew = async (): Promise<void> => {
+    try {
+      await this.projectService.createNewProject();
+    } catch (error) {
+      // Show alert for errors (like non-empty directory)
+      if (error instanceof Error) {
+        alert(error.message);
+      } else {
+        alert('Failed to create new project');
+      }
+    }
+  };
+
   private onRecent = async (e: Event): Promise<void> => {
     const btn = e.currentTarget as HTMLElement | null;
     if (!btn) return;
@@ -145,7 +158,7 @@ export class Pix3Welcome extends ComponentBase {
               </button>
             </div>
             <div class="action-column">
-              <button class="action-btn">
+              <button @click=${this.onStartNew} class="action-btn">
                 <span class="action-icon">${this.plusSvg()}</span>
                 <span class="action-label">Start New Project</span>
               </button>

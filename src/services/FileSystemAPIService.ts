@@ -357,11 +357,28 @@ export class FileSystemAPIService {
    */
   async createDirectory(path: string): Promise<void> {
     try {
-      const parentPath = this.getDirectoryPart(path);
-      const dirName = this.getFileName(path);
-      const parentHandle = await this.resolveDirectoryHandle(parentPath, 'readwrite');
-      await parentHandle.getDirectoryHandle(dirName, { create: true });
+      console.log(`[FileSystemAPIService] Creating directory: ${path}`);
+      const normalizedPath = this.normalizeResourcePath(path);
+      const segments = this.splitPath(normalizedPath).filter(segment => segment.length > 0);
+      console.log(`[FileSystemAPIService] Path segments:`, segments);
+
+      const root = this.directoryHandle;
+      if (!root) {
+        throw new FileSystemAPIError('not-initialized', 'Project directory has not been set.');
+      }
+
+      let current: FileSystemDirectoryHandle = root;
+      await this.ensurePermission(current, 'readwrite');
+
+      // Create each directory segment in the path
+      for (const segment of segments) {
+        console.log(`[FileSystemAPIService] Creating segment: ${segment}`);
+        current = await current.getDirectoryHandle(segment, { create: true });
+        await this.ensurePermission(current, 'readwrite');
+      }
+      console.log(`[FileSystemAPIService] Successfully created directory: ${path}`);
     } catch (error) {
+      console.error(`[FileSystemAPIService] Error creating directory ${path}:`, error);
       throw this.normalizeError(error, `Failed to create directory at ${path}`);
     }
   }

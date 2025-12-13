@@ -233,17 +233,13 @@ export class Pix3EditorShell extends ComponentBase {
   }
 
   private onDialogConfirmed(e: CustomEvent): void {
-    const { dialogId } = e.detail;
-    if (dialogId) {
-      this.dialogService.confirm(dialogId);
-    }
+    const dialogId = e.detail.dialogId;
+    this.dialogService.confirm(dialogId);
   }
 
   private onDialogCancelled(e: CustomEvent): void {
-    const { dialogId } = e.detail;
-    if (dialogId) {
-      this.dialogService.cancel(dialogId);
-    }
+    const dialogId = e.detail.dialogId;
+    this.dialogService.cancel(dialogId);
   }
 
   /**
