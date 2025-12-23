@@ -228,3 +228,12 @@ Always verify architectural decisions against the specification before implement
 
 ### Default Scene Loading
 - After the page is refreshed, the agent should click on the first recent project in the list to load the default scene.
+
+### Scene Reload Debugging
+- When diagnosing scene reload failures after save operations, check:
+  - `ReloadSceneOperation.ts`: Logs file content size and preview when reading
+  - `SceneLoader.ts`: Logs YAML parse start with content preview; logs if parser returns null with diagnostic details
+  - Look for race conditions in file write timing or content encoding issues
+  - File watch service (`FileWatchService`) detects external changes via polling and triggers `ReloadSceneCommand`
+  - `pix3-editor-shell.ts` `handleFileChanged()` executes reload and logs errors
+- These debugging logs help identify whether issues are in file I/O, YAML parsing, or timing

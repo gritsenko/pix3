@@ -91,12 +91,32 @@ export class SceneLoader {
 
   async parseScene(sceneText: string, options: ParseSceneOptions = {}): Promise<SceneGraph> {
     let document: SceneDocument;
+    
+    console.debug('[SceneLoader.parseScene] Starting parse', {
+      contentLength: sceneText.length,
+      contentPreview: sceneText.substring(0, 100),
+      filePath: options.filePath,
+    });
+    
     try {
       document = parse(sceneText) as SceneDocument;
     } catch (error) {
       throw new SceneValidationError(
         `Failed to parse scene YAML${options.filePath ? ` (${options.filePath})` : ''}.`,
         [(error as Error).message]
+      );
+    }
+
+    // Handle null document (empty or invalid YAML)
+    if (!document) {
+      console.error('[SceneLoader.parseScene] YAML parser returned null', {
+        contentLength: sceneText.length,
+        contentPreview: sceneText.substring(0, 100),
+        filePath: options.filePath,
+      });
+      throw new SceneValidationError(
+        `Scene document is empty or invalid${options.filePath ? ` (${options.filePath})` : ''}.`,
+        ['The YAML parser returned null or undefined']
       );
     }
 
@@ -167,17 +187,16 @@ export class SceneLoader {
 
     switch (definition.type) {
       case 'Sprite2D': {
-        const { position, scale, rotation, texturePath, ...rest } = baseProps.properties as Record<
-          string,
-          unknown
-        >;
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        
         return new Sprite2D({
           ...baseProps,
-          properties: rest,
-          position: this.readVector2(position, ZERO_VECTOR2),
-          scale: this.readVector2(scale, UNIT_VECTOR2),
-          rotation: typeof rotation === 'number' ? rotation : 0,
-          texturePath: typeof texturePath === 'string' ? texturePath : null,
+          properties: props,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? (transform?.rotation ?? props.rotation) as number : 0,
+          texturePath: typeof props.texturePath === 'string' ? props.texturePath : null,
         });
       }
       case 'Group':
@@ -204,14 +223,16 @@ export class SceneLoader {
         });
       }
       case 'Group2D': {
-        const props = baseProps.properties as Group2DProperties;
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        
         return new Group2D({
           ...baseProps,
-          position: this.readVector2(props.position, ZERO_VECTOR2),
-          scale: this.readVector2(props.scale, UNIT_VECTOR2),
-          rotation: props.rotation ?? 0,
-          width: props.width ?? 100,
-          height: props.height ?? 100,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? (transform?.rotation ?? props.rotation) as number : 0,
+          width: this.asNumber(props.width) ?? 100,
+          height: this.asNumber(props.height) ?? 100,
         });
       }
       case 'GeometryMesh': {

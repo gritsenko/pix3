@@ -740,7 +740,8 @@ export class ViewportRendererService {
     const size = 64;
 
     // Create a plane geometry to hold the sprite texture
-    const geometry = new THREE.PlaneGeometry(size, size);
+    // We'll adjust this when the texture loads to maintain aspect ratio
+    let geometry = new THREE.PlaneGeometry(size, size);
     geometry.computeBoundingBox();
 
     let material: THREE.Material;
@@ -748,6 +749,8 @@ export class ViewportRendererService {
     // Try to load texture if available; if it references a templ:// or res:// URL,
     // use ResourceManager to resolve it to a Blob and create an object URL for the TextureLoader.
     const textureLoader = new THREE.TextureLoader();
+    const meshRef = { current: null as THREE.Mesh | null }; // Reference to be set after mesh creation
+
     if (node.texturePath) {
       // Use a placeholder material immediately, and patch in the texture asynchronously
       material = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
@@ -768,6 +771,26 @@ export class ViewportRendererService {
                   material.map = texture;
                   material.color.set(0xffffff);
                   material.needsUpdate = true;
+
+                  // Adjust plane geometry to maintain aspect ratio of the loaded image
+                  const image = texture.source.data as HTMLImageElement;
+                  if (image && image.width && image.height) {
+                    const aspectRatio = image.width / image.height;
+                    const newWidth = size * aspectRatio;
+                    const newHeight = size;
+
+                    // Dispose of old geometry and create new one with correct aspect ratio
+                    geometry.dispose();
+                    geometry = new THREE.PlaneGeometry(newWidth, newHeight);
+                    geometry.computeBoundingBox();
+
+                    // Update the mesh's geometry
+                    const mesh = meshRef.current;
+                    if (mesh && mesh.geometry) {
+                      mesh.geometry.dispose();
+                      mesh.geometry = geometry;
+                    }
+                  }
                 }
               } finally {
                 // Revoke the object URL once the texture has been decoded
@@ -828,6 +851,7 @@ export class ViewportRendererService {
     }
 
     const mesh = new THREE.Mesh(geometry, material);
+    meshRef.current = mesh; // Store reference for async texture loading callback
 
     // Apply the node's transform (2D space within parent Group2D)
     mesh.position.copy(node.position);

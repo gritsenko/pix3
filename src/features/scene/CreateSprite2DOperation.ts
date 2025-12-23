@@ -4,6 +4,7 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
+import type { NodeBase } from '@/nodes/NodeBase';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { SceneManager } from '@/core/SceneManager';
 import { ref } from 'valtio/vanilla';
@@ -15,6 +16,7 @@ export interface CreateSprite2DOperationParams {
   height?: number;
   position?: Vector2;
   texturePath?: string | null;
+  parentNodeId?: string | null;
 }
 
 export class CreateSprite2DOperation implements Operation<OperationInvokeResult> {
@@ -48,10 +50,7 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       return { didMutate: false };
     }
 
-    // Generate a unique node ID
     const nodeId = `sprite2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-    // Create the Sprite2D node
     const spriteName = this.params.spriteName || 'Sprite2D';
     const texturePath = this.params.texturePath ?? null;
 
@@ -62,89 +61,76 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       texturePath,
     });
 
-    // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
-    sceneGraph.nodeMap.set(nodeId, node);
+    const parentNodeId = this.params.parentNodeId ?? null;
+    const parentNode = parentNodeId ? sceneGraph.nodeMap.get(parentNodeId) ?? null : null;
 
-    // Update the state hierarchy - REPLACE the entire object to trigger reactivity
-    const hierarchy = state.scenes.hierarchies[activeSceneId];
-    if (hierarchy) {
-      // Create a new hierarchy state object to trigger Valtio subscribers
-      state.scenes.hierarchies[activeSceneId] = {
-        version: hierarchy.version,
-        description: hierarchy.description,
-        rootNodes: ref([...sceneGraph.rootNodes]), // Create new array reference
-        metadata: hierarchy.metadata,
-      };
-    }
+    const updateHierarchyState = () => {
+      const hierarchy = state.scenes.hierarchies[activeSceneId];
+      if (hierarchy) {
+        state.scenes.hierarchies[activeSceneId] = {
+          version: hierarchy.version,
+          description: hierarchy.description,
+          rootNodes: ref([...sceneGraph.rootNodes]),
+          metadata: hierarchy.metadata,
+        };
+      }
+    };
 
-    // Mark scene as dirty
-    const descriptor = state.scenes.descriptors[activeSceneId];
-    if (descriptor) {
-      descriptor.isDirty = true;
-    }
+    const markSceneDirty = () => {
+      const descriptor = state.scenes.descriptors[activeSceneId];
+      if (descriptor) {
+        descriptor.isDirty = true;
+      }
+    };
 
-    // Select the newly created node
-    state.selection.nodeIds = [nodeId];
-    state.selection.primaryNodeId = nodeId;
+    const selectCreatedNode = () => {
+      state.selection.nodeIds = [nodeId];
+      state.selection.primaryNodeId = nodeId;
+    };
+
+    const clearSelectionIfTargeted = () => {
+      if (state.selection.nodeIds.includes(nodeId)) {
+        state.selection.nodeIds = [];
+        state.selection.primaryNodeId = null;
+      }
+    };
+
+    const attachNode = (targetParent: NodeBase | null) => {
+      if (targetParent) {
+        targetParent.adoptChild(node);
+      } else {
+        sceneGraph.rootNodes.push(node);
+      }
+      sceneGraph.nodeMap.set(nodeId, node);
+      updateHierarchyState();
+      markSceneDirty();
+    };
+
+    const detachNode = (targetParent: NodeBase | null) => {
+      if (targetParent) {
+        targetParent.disownChild(node);
+      } else {
+        sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
+      }
+      sceneGraph.nodeMap.delete(nodeId);
+      updateHierarchyState();
+      markSceneDirty();
+    };
+
+    attachNode(parentNode);
+    selectCreatedNode();
 
     return {
       didMutate: true,
       commit: {
         label: `Create ${spriteName}`,
         undo: () => {
-          // Remove from scene graph
-          sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
-          sceneGraph.nodeMap.delete(nodeId);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark scene as dirty
-          const descriptor = state.scenes.descriptors[activeSceneId];
-          if (descriptor) {
-            descriptor.isDirty = true;
-          }
-
-          // Clear selection if this node was selected
-          if (state.selection.nodeIds.includes(nodeId)) {
-            state.selection.nodeIds = [];
-            state.selection.primaryNodeId = null;
-          }
+          detachNode(parentNode);
+          clearSelectionIfTargeted();
         },
         redo: () => {
-          // Re-add to scene graph
-          sceneGraph.rootNodes.push(node);
-          sceneGraph.nodeMap.set(nodeId, node);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark scene as dirty
-          const descriptor = state.scenes.descriptors[activeSceneId];
-          if (descriptor) {
-            descriptor.isDirty = true;
-          }
-
-          // Select the node
-          state.selection.nodeIds = [nodeId];
-          state.selection.primaryNodeId = nodeId;
+          attachNode(parentNode);
+          selectCreatedNode();
         },
       },
     };

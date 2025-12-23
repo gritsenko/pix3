@@ -219,6 +219,17 @@ export class FileSystemAPIService {
     return this.resolveFileHandle(path, options?.mode ?? 'read');
   }
 
+  /**
+   * Get a directory handle for a given path (e.g., res://path/to/directory or res://scenes/).
+   * This resolves the directory path and returns its handle.
+   */
+  async getDirectoryHandleForPath(
+    path: string,
+    options?: { mode?: PermissionMode }
+  ): Promise<FileSystemDirectoryHandle> {
+    return this.resolveDirectoryHandle(path, options?.mode ?? 'read');
+  }
+
   normalizeResourcePath(path: string): string {
     if (path.startsWith(this.resourcePrefix)) {
       return path.slice(this.resourcePrefix.length);

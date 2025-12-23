@@ -22,8 +22,8 @@ root:
           near: 0.1
           far: 1000
           transform:
-            position: [0, 4, 8]
-            rotationEuler: [-15, 0, 0]
+            position: [0, 2, 6]
+            rotationEuler: [-10, 0, 0]
             scale: [1, 1, 1]
         children: []
       - id: key-light
@@ -33,221 +33,61 @@ root:
           intensity: 1.2
           color: "#ffffff"
           transform:
-            position: [10, 12, 8]
-            rotationEuler: [-45, 45, 0]
+            position: [5, 8, 3]
+            rotationEuler: [-45, 35, 0]
             scale: [1, 1, 1]
         children: []
-      - id: ground
+      - id: demo-box
         type: GeometryMesh
-        name: Ground
-        properties:
-          geometry: box
-          size: [20, 0.5, 20]
-          material:
-            type: standard
-            color: "#8B7355"
-          transform:
-            position: [0, -0.25, 0]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: building-1
-        type: GeometryMesh
-        name: Building 1
-        properties:
-          geometry: box
-          size: [2, 3, 2]
-          material:
-            type: standard
-            color: "#D2691E"
-          transform:
-            position: [-4, 1.5, -4]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: building-1-roof
-        type: GeometryMesh
-        name: Building 1 Roof
-        properties:
-          geometry: box
-          size: [2.3, 0.5, 2.3]
-          material:
-            type: standard
-            color: "#8B4513"
-          transform:
-            position: [-4, 3.25, -4]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: building-2
-        type: GeometryMesh
-        name: Building 2
-        properties:
-          geometry: box
-          size: [3, 2.5, 2.5]
-          material:
-            type: standard
-            color: "#CD853F"
-          transform:
-            position: [3, 1.25, -4]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: building-2-roof
-        type: GeometryMesh
-        name: Building 2 Roof
-        properties:
-          geometry: box
-          size: [3.3, 0.5, 2.8]
-          material:
-            type: standard
-            color: "#8B4513"
-          transform:
-            position: [3, 2.75, -4]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: building-3
-        type: GeometryMesh
-        name: Building 3 (Tall)
-        properties:
-          geometry: box
-          size: [1.5, 4, 1.5]
-          material:
-            type: standard
-            color: "#A0522D"
-          transform:
-            position: [-5, 2, 3]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: building-3-roof
-        type: GeometryMesh
-        name: Building 3 Roof
-        properties:
-          geometry: box
-          size: [1.8, 0.5, 1.8]
-          material:
-            type: standard
-            color: "#654321"
-          transform:
-            position: [-5, 4.25, 3]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: building-4
-        type: GeometryMesh
-        name: Building 4 (Market Stall)
-        properties:
-          geometry: box
-          size: [2.5, 1.5, 2]
-          material:
-            type: standard
-            color: "#FF6347"
-          transform:
-            position: [4, 0.75, 2]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: building-4-roof
-        type: GeometryMesh
-        name: Building 4 Roof
-        properties:
-          geometry: box
-          size: [2.8, 0.5, 2.3]
-          material:
-            type: standard
-            color: "#8B4513"
-          transform:
-            position: [4, 1.75, 2]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: well
-        type: GeometryMesh
-        name: Well
+        name: Demo Box
         properties:
           geometry: box
           size: [1, 1, 1]
           material:
             type: standard
-            color: "#696969"
-          transform:
-            position: [-2, 0.5, 1]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: tower
-        type: GeometryMesh
-        name: Tower
-        properties:
-          geometry: box
-          size: [1, 5, 1]
-          material:
-            type: standard
-            color: "#696969"
-          transform:
-            position: [6, 2.5, -5]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: tower-flag
-        type: GeometryMesh
-        name: Tower Flag
-        properties:
-          geometry: box
-          size: [0.5, 0.3, 1]
-          material:
-            type: standard
-            color: "#FFD700"
-          transform:
-            position: [6.75, 5, -5]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: street-path
-        type: GeometryMesh
-        name: Street Path
-        properties:
-          geometry: box
-          size: [3, 0.1, 10]
-          material:
-            type: standard
-            color: "#A9A9A9"
-          transform:
-            position: [0, 0.05, 0]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
-      - id: duck-character
-        type: MeshInstance
-        name: Duck
-        properties:
-          src: templ://Duck.glb
-          size: [0.5, 0.5, 0.5]
+            color: "#ff00ff"
           transform:
             position: [0, 0.5, 0]
+            rotationEuler: [0, 45, 0]
+            scale: [1, 1, 1]
+        children: []
+      - id: demo-glb
+        type: MeshInstance
+        name: Demo Glb
+        properties:
+          src: templ://Duck.glb
+          size: [1, 1, 1]
+          transform:
+            position: [0, 0, 0]
             rotationEuler: [0, 0, 0]
             scale: [1, 1, 1]
         children: []
   - id: ui-layer
-    type: Node2D
+    type: Group2D
     name: UI Layer
     properties:
+      width: 256
+      height: 256
       transform:
         position: [0, 0]
         scale: [1, 1]
-        rotation: [0, 0, 0, XYZ]
+        rotation: 0
     children:
       - id: logo-sprite
         type: Sprite2D
         name: Logo Sprite
         properties:
-          source: templ://pix3-logo.png
-          pivot: [0.5, 0.5]
-          size: [256, 256]
-          opacity: 1
+          texturePath: templ://pix3-logo.png
           transform:
-            position: [0, 0]
-            scale: [1, 1]
-            rotation: [0, 0, 0, XYZ]
+            position: [2.238687236657304, 3.8936863588483144]
+            scale: [0.01, 0.01]
+            rotation: 0
+      - id: sprite2d-1766524794309-ug3akuf
+        type: Sprite2D
+        name: ai
+        properties:
+          transform:
+            position: [1.5045646067415732, 2.736185481039326]
+            scale: [0.02, 0.02]
+            rotation: 0
+          texturePath: res://images/ai.jpg

@@ -48,6 +48,15 @@ export class ReloadSceneOperation implements Operation<OperationInvokeResult> {
     try {
       // Read and parse the scene from file
       const sceneText = await resourceManager.readText(filePath);
+      
+      // Log the content for debugging
+      if (!sceneText || sceneText.trim().length === 0) {
+        console.warn('[ReloadSceneOperation] Scene file is empty or contains only whitespace', {
+          filePath,
+          contentLength: sceneText?.length ?? 0,
+        });
+      }
+      
       const graph = await sceneManager.parseScene(sceneText, { filePath });
 
       // Get current scene descriptor
