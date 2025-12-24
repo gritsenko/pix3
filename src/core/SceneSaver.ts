@@ -196,6 +196,9 @@ export class SceneSaver {
       if (node.texturePath) {
         props.texturePath = node.texturePath;
       }
+      // Save width/height in pixels
+      props.width = node.width;
+      props.height = node.height;
     } else if (node instanceof GeometryMesh) {
       const mesh = node as any;
       if (mesh.geometry) props.geometry = mesh.geometry;

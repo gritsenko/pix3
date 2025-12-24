@@ -197,6 +197,8 @@ export class SceneLoader {
           scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
           rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? (transform?.rotation ?? props.rotation) as number : 0,
           texturePath: typeof props.texturePath === 'string' ? props.texturePath : null,
+          width: this.asNumber(props.width),
+          height: this.asNumber(props.height),
         });
       }
       case 'Group':

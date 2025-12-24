@@ -59,6 +59,8 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       name: spriteName,
       position: this.params.position,
       texturePath,
+      width: this.params.width,
+      height: this.params.height,
     });
 
     const parentNodeId = this.params.parentNodeId ?? null;

@@ -212,15 +212,13 @@ export class ViewportRendererService {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
-    // Update orthographic camera to match viewport aspect ratio
+    // Update orthographic camera to match viewport in physical pixels
+    // 1 world unit = 1 physical pixel, so sprites display at true pixel size
     if (this.orthographicCamera) {
-      const aspectRatio = width / height;
-      const viewHeight = 10;
-      const viewWidth = viewHeight * aspectRatio;
-      this.orthographicCamera.left = -viewWidth / 2;
-      this.orthographicCamera.right = viewWidth / 2;
-      this.orthographicCamera.top = viewHeight / 2;
-      this.orthographicCamera.bottom = -viewHeight / 2;
+      this.orthographicCamera.left = -pixelWidth / 2;
+      this.orthographicCamera.right = pixelWidth / 2;
+      this.orthographicCamera.top = pixelHeight / 2;
+      this.orthographicCamera.bottom = -pixelHeight / 2;
       this.orthographicCamera.updateProjectionMatrix();
     }
   }
@@ -736,12 +734,9 @@ export class ViewportRendererService {
    * Renders the texture if available, or a placeholder rectangle if not.
    */
   private createSprite2DVisual(node: Sprite2D): THREE.Mesh {
-    // Default size for placeholder
-    const size = 64;
-
-    // Create a plane geometry to hold the sprite texture
-    // We'll adjust this when the texture loads to maintain aspect ratio
-    let geometry = new THREE.PlaneGeometry(size, size);
+    // Use sprite's width/height (in pixels) for geometry
+    // This ensures 1:1 pixel mapping with the orthographic camera
+    let geometry = new THREE.PlaneGeometry(node.width, node.height);
     geometry.computeBoundingBox();
 
     let material: THREE.Material;
@@ -772,16 +767,19 @@ export class ViewportRendererService {
                   material.color.set(0xffffff);
                   material.needsUpdate = true;
 
-                  // Adjust plane geometry to maintain aspect ratio of the loaded image
+                  // Get actual image dimensions from texture
                   const image = texture.source.data as HTMLImageElement;
                   if (image && image.width && image.height) {
-                    const aspectRatio = image.width / image.height;
-                    const newWidth = size * aspectRatio;
-                    const newHeight = size;
+                    // Update node's width/height to match texture (if not already set from scene file)
+                    // Only update if dimensions are still at placeholder values
+                    if (node.width === 64 && node.height === 64) {
+                      node.width = image.width;
+                      node.height = image.height;
+                    }
 
-                    // Dispose of old geometry and create new one with correct aspect ratio
+                    // Update geometry to match node's current dimensions
                     geometry.dispose();
-                    geometry = new THREE.PlaneGeometry(newWidth, newHeight);
+                    geometry = new THREE.PlaneGeometry(node.width, node.height);
                     geometry.computeBoundingBox();
 
                     // Update the mesh's geometry
