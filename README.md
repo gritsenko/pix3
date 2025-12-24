@@ -26,6 +26,50 @@
 3. **Open in browser**:
    Navigate to `http://localhost:5173`
 
+### Debugging with Chrome & MCP (Chrome DevTools) 🔧
+
+You can debug the app using Chrome's remote DevTools and the MCP bridge. The repository includes a VS Code launch config (`.vscode/launch.json`) and an MCP server entry (`mcp.json`) to simplify this.
+
+1. Start the dev server:
+   ```bash
+   npm run dev
+   ```
+
+2. Launch Chrome with remote debugging (the included `Launch Chrome against localhost` config in `.vscode/launch.json` uses these flags). To start manually on Windows:
+   ```bash
+   "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%LOCALAPPDATA%\\pix3-chrome-debug"
+   ```
+
+3. Start the MCP server (from the workspace root) to bridge Chrome DevTools to VS Code:
+   ```bash
+   npx chrome-devtools-mcp@0.12.1 --autoConnect --browserUrl=http://127.0.0.1:9222
+   ```
+   Or keep the `mcp.json` entry (example below) and let your MCP client/extension use it:
+   ```json
+   {
+     "servers": {
+       "mcp_chrome": {
+         "type": "stdio",
+         "command": "npx",
+         "args": [
+           "chrome-devtools-mcp@0.12.1",
+           "--autoConnect",
+           "--browserUrl=http://127.0.0.1:9222"
+         ],
+         "gallery": "https://api.mcp.github.com",
+         "version": "0.12.1"
+       }
+     },
+     "inputs": []
+   }
+   ```
+
+4. Use the MCP/DevTools UI to open the page at `http://localhost:5173`, inspect elements, view console logs, and capture traces.
+
+Notes:
+- If Chrome is already running, close other instances or use a separate `--user-data-dir` to avoid profile conflicts.
+- The `.vscode/launch.json` config already sets the necessary runtime args for remote debugging.
+
 ### Project Scripts
 
 - `npm run dev` - Start development server with hot reload
