@@ -197,8 +197,8 @@ export class SceneLoader {
           scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
           rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? (transform?.rotation ?? props.rotation) as number : 0,
           texturePath: typeof props.texturePath === 'string' ? props.texturePath : null,
-          width: this.asNumber(props.width),
-          height: this.asNumber(props.height),
+          width: this.asNumber(props.width, 64),
+          height: this.asNumber(props.height, 64),
         });
       }
       case 'Group':
@@ -233,8 +233,8 @@ export class SceneLoader {
           position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
           scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
           rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? (transform?.rotation ?? props.rotation) as number : 0,
-          width: this.asNumber(props.width) ?? 100,
-          height: this.asNumber(props.height) ?? 100,
+          width: this.asNumber(props.width, 100),
+          height: this.asNumber(props.height, 100),
         });
       }
       case 'GeometryMesh': {

@@ -24,6 +24,17 @@ export class FileWatchService {
   constructor() {}
 
   /**
+   * Update the last-known modification time for a watched file.
+   * Useful to prevent internal writes (Save/Save As) from being treated as external changes.
+   */
+  setLastKnownModifiedTime(filePath: string, lastModifiedTime: number | null | undefined): void {
+    if (lastModifiedTime === null || lastModifiedTime === undefined) {
+      return;
+    }
+    this.lastModifiedTimes.set(filePath, lastModifiedTime);
+  }
+
+  /**
    * Start watching a scene file for external changes.
    * @param filePath Resource path (e.g., res://scenes/level.pix3scene)
    * @param fileHandle File system handle for the file

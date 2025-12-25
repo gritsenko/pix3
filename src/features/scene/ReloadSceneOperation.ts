@@ -47,14 +47,26 @@ export class ReloadSceneOperation implements Operation<OperationInvokeResult> {
 
     try {
       // Read and parse the scene from file
-      const sceneText = await resourceManager.readText(filePath);
-      
-      // Log the content for debugging
+      let sceneText = await resourceManager.readText(filePath);
+
+      // When a file is being written, some browsers briefly expose a 0-byte file.
+      // Retry a few times before treating this as a real invalid scene.
+      for (let attempt = 0; attempt < 3 && (!sceneText || sceneText.trim().length === 0); attempt += 1) {
+        console.warn('[ReloadSceneOperation] Scene file empty; retrying read', {
+          filePath,
+          attempt: attempt + 1,
+          contentLength: sceneText?.length ?? 0,
+        });
+        await new Promise(resolve => window.setTimeout(resolve, 50));
+        sceneText = await resourceManager.readText(filePath);
+      }
+
       if (!sceneText || sceneText.trim().length === 0) {
-        console.warn('[ReloadSceneOperation] Scene file is empty or contains only whitespace', {
+        console.warn('[ReloadSceneOperation] Scene file still empty; skipping reload', {
           filePath,
           contentLength: sceneText?.length ?? 0,
         });
+        return { didMutate: false };
       }
       
       const graph = await sceneManager.parseScene(sceneText, { filePath });

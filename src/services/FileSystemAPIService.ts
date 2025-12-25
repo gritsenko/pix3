@@ -534,6 +534,34 @@ export class FileSystemAPIService {
       return false;
     }
   }
+
+  /**
+   * Resolve a file handle to a project-relative `res://` resource path.
+   * Returns null if the handle is not within the current project or resolution is unsupported.
+   */
+  async resolveHandleToResourcePath(fileHandle: FileSystemFileHandle): Promise<string | null> {
+    if (!this.directoryHandle) {
+      return null;
+    }
+
+    const projectDirWithResolve = this.directoryHandle as FileSystemDirectoryHandle & {
+      resolve?: (handle: FileSystemHandle) => Promise<string[]>;
+    };
+
+    if (!projectDirWithResolve.resolve) {
+      return null;
+    }
+
+    try {
+      const pathSegments = await projectDirWithResolve.resolve(fileHandle);
+      if (!pathSegments || pathSegments.length === 0) {
+        return null;
+      }
+      return `${this.resourcePrefix}${pathSegments.join('/')}`;
+    } catch {
+      return null;
+    }
+  }
 }
 
 export const resolveFileSystemAPIService = (): FileSystemAPIService => {

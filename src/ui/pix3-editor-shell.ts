@@ -8,6 +8,7 @@ import { CommandRegistry } from '@/services/CommandRegistry';
 import { FileWatchService } from '@/services/FileWatchService';
 import { DialogService, type DialogInstance } from '@/services/DialogService';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
+import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
 import { ReloadSceneCommand } from '@/features/scene/ReloadSceneCommand';
 import { UndoCommand } from '@/features/history/UndoCommand';
@@ -62,15 +63,17 @@ export class Pix3EditorShell extends ComponentBase {
   private onWelcomeProjectReady?: (e: Event) => void;
   private keyboardHandler?: (e: KeyboardEvent) => void;
   private watchedSceneIds = new Set<string>();
+  private watchedScenePaths = new Map<string, string>();
 
   connectedCallback(): void {
     super.connectedCallback();
 
     // Register history commands and scene commands
+    const saveCommand = new SaveSceneCommand();
     const saveAsCommand = new SaveAsSceneCommand();
     const undoCommand = new UndoCommand(this.operationService);
     const redoCommand = new RedoCommand(this.operationService);
-    this.commandRegistry.registerMany(undoCommand, redoCommand, saveAsCommand);
+    this.commandRegistry.registerMany(undoCommand, redoCommand, saveCommand, saveAsCommand);
 
     // Subscribe to dialog changes
     this.disposeDialogsSubscription = this.dialogService.subscribe(dialogs => {
@@ -257,23 +260,35 @@ export class Pix3EditorShell extends ComponentBase {
           this.fileWatchService.unwatch(descriptor.filePath);
         }
         this.watchedSceneIds.delete(sceneId);
+        this.watchedScenePaths.delete(sceneId);
       }
     }
 
     // Start watching new scenes that have file handles
     for (const sceneId of currentSceneIds) {
+      const descriptor = appState.scenes.descriptors[sceneId];
+      const currentPath = descriptor?.filePath ?? '';
+      const previousPath = this.watchedScenePaths.get(sceneId) ?? '';
+
+      // If a scene's path changed (e.g., Save As inside project), rewire watchers.
+      if (previousPath && currentPath && previousPath !== currentPath) {
+        this.fileWatchService.unwatch(previousPath);
+        this.watchedSceneIds.delete(sceneId);
+        this.watchedScenePaths.delete(sceneId);
+      }
+
       if (!this.watchedSceneIds.has(sceneId)) {
-        const descriptor = appState.scenes.descriptors[sceneId];
-        if (descriptor?.fileHandle && descriptor?.filePath) {
+        if (descriptor?.fileHandle && currentPath) {
           // Only watch res:// paths (project files)
-          if (descriptor.filePath.startsWith('res://')) {
+          if (currentPath.startsWith('res://')) {
             this.fileWatchService.watch(
-              descriptor.filePath,
+              currentPath,
               descriptor.fileHandle,
               descriptor.lastModifiedTime,
-              () => this.handleFileChanged(sceneId, descriptor.filePath)
+              () => this.handleFileChanged(sceneId, currentPath)
             );
             this.watchedSceneIds.add(sceneId);
+            this.watchedScenePaths.set(sceneId, currentPath);
           }
         }
       }

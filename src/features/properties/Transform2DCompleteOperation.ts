@@ -13,6 +13,8 @@ export interface Transform2DState {
   position?: { x: number; y: number };
   rotation?: number; // degrees
   scale?: { x: number; y: number };
+  width?: number;
+  height?: number;
 }
 
 export interface Transform2DCompleteParams {
@@ -122,6 +124,16 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
     if (state.scale) {
       node.scale.set(state.scale.x, state.scale.y, 1);
     }
+
+    const canSize = typeof (node as any).width === 'number' && typeof (node as any).height === 'number';
+    if (canSize) {
+      if (typeof state.width === 'number') {
+        (node as any).width = state.width;
+      }
+      if (typeof state.height === 'number') {
+        (node as any).height = state.height;
+      }
+    }
   }
 
   private isStateEqual(a: Transform2DState, b: Transform2DState): boolean {
@@ -151,6 +163,22 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
         return false;
       }
     } else if (a.scale || b.scale) {
+      return false;
+    }
+
+    if (typeof a.width === 'number' && typeof b.width === 'number') {
+      if (Math.abs(a.width - b.width) > eps) {
+        return false;
+      }
+    } else if (typeof a.width === 'number' || typeof b.width === 'number') {
+      return false;
+    }
+
+    if (typeof a.height === 'number' && typeof b.height === 'number') {
+      if (Math.abs(a.height - b.height) > eps) {
+        return false;
+      }
+    } else if (typeof a.height === 'number' || typeof b.height === 'number') {
       return false;
     }
 

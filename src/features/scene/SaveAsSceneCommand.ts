@@ -107,6 +107,12 @@ export class SaveAsSceneCommand extends CommandBase<void, void> {
         // Check if the selected file is within the project
         if (fileHandle) {
           isHandleInProject = await fileSystemService.isHandleInProject(fileHandle);
+          if (isHandleInProject) {
+            const resolved = await fileSystemService.resolveHandleToResourcePath(fileHandle);
+            if (resolved) {
+              filePath = resolved;
+            }
+          }
           console.debug('[SaveAsSceneCommand] Checked if file is in project', {
             fileName: fileHandle.name,
             isInProject: isHandleInProject,

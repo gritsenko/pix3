@@ -425,7 +425,7 @@ export class ViewportRendererService {
       if (mesh) {
         mesh.position.copy(node.position);
         mesh.rotation.copy(node.rotation);
-        mesh.scale.copy(node.scale);
+        mesh.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
       }
     } else if (node instanceof Sprite2D) {
       // Update Sprite2D visual representation transform
@@ -433,7 +433,7 @@ export class ViewportRendererService {
       if (mesh) {
         mesh.position.copy(node.position);
         mesh.rotation.copy(node.rotation);
-        mesh.scale.copy(node.scale);
+        mesh.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
       }
     }
 
@@ -694,16 +694,17 @@ export class ViewportRendererService {
    * Create a rectangle outline visual representation for a Group2D node.
    */
   private createGroup2DVisual(node: Group2D): THREE.LineSegments {
-    const width = node.width;
-    const height = node.height;
-
-    // Create rectangle geometry centered at origin
+    // Use normalized rectangle geometry and apply width/height via scale.
+    // This makes width/height edits and resize-gizmo updates visible immediately.
     const points: THREE.Vector3[] = [
-      new THREE.Vector3(-width / 2, -height / 2, 0),
-      new THREE.Vector3(width / 2, -height / 2, 0),
-      new THREE.Vector3(width / 2, height / 2, 0),
-      new THREE.Vector3(-width / 2, height / 2, 0),
-      new THREE.Vector3(-width / 2, -height / 2, 0), // Close the loop
+      new THREE.Vector3(-0.5, -0.5, 0),
+      new THREE.Vector3(0.5, -0.5, 0),
+      new THREE.Vector3(0.5, -0.5, 0),
+      new THREE.Vector3(0.5, 0.5, 0),
+      new THREE.Vector3(0.5, 0.5, 0),
+      new THREE.Vector3(-0.5, 0.5, 0),
+      new THREE.Vector3(-0.5, 0.5, 0),
+      new THREE.Vector3(-0.5, -0.5, 0),
     ];
 
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
@@ -720,7 +721,7 @@ export class ViewportRendererService {
     // Apply the node's transform
     line.position.copy(node.position);
     line.rotation.copy(node.rotation);
-    line.scale.copy(node.scale);
+    line.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
 
     // Mark as editor visual
     line.userData.isGroup2DVisual = true;
@@ -734,9 +735,9 @@ export class ViewportRendererService {
    * Renders the texture if available, or a placeholder rectangle if not.
    */
   private createSprite2DVisual(node: Sprite2D): THREE.Mesh {
-    // Use sprite's width/height (in pixels) for geometry
-    // This ensures 1:1 pixel mapping with the orthographic camera
-    let geometry = new THREE.PlaneGeometry(node.width, node.height);
+    // Use a normalized plane geometry and apply width/height via scale.
+    // This avoids geometry churn during interactive resize and makes width/height edits visible.
+    const geometry = new THREE.PlaneGeometry(1, 1);
     geometry.computeBoundingBox();
 
     let material: THREE.Material;
@@ -777,16 +778,10 @@ export class ViewportRendererService {
                       node.height = image.height;
                     }
 
-                    // Update geometry to match node's current dimensions
-                    geometry.dispose();
-                    geometry = new THREE.PlaneGeometry(node.width, node.height);
-                    geometry.computeBoundingBox();
-
-                    // Update the mesh's geometry
+                    // Update the mesh scale to match the node's current dimensions
                     const mesh = meshRef.current;
-                    if (mesh && mesh.geometry) {
-                      mesh.geometry.dispose();
-                      mesh.geometry = geometry;
+                    if (mesh) {
+                      mesh.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
                     }
                   }
                 }
@@ -854,7 +849,7 @@ export class ViewportRendererService {
     // Apply the node's transform (2D space within parent Group2D)
     mesh.position.copy(node.position);
     mesh.rotation.copy(node.rotation);
-    mesh.scale.copy(node.scale);
+    mesh.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
 
     // Mark as Sprite2D visual for identification
     mesh.userData.isSprite2DVisual = true;
@@ -899,7 +894,7 @@ export class ViewportRendererService {
     const { group } = this.selection2DOverlay;
     this.scene.remove(group);
     group.traverse(obj => {
-      if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments) {
+      if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
         obj.geometry?.dispose();
         if (obj.material instanceof THREE.Material) {
           obj.material.dispose();
@@ -1176,12 +1171,16 @@ export class ViewportRendererService {
         position: { x: startState.position.x, y: startState.position.y },
         rotation: MathUtils.radToDeg(startState.rotation),
         scale: { x: startState.scale.x, y: startState.scale.y },
+        ...(typeof startState.width === 'number' ? { width: startState.width } : {}),
+        ...(typeof startState.height === 'number' ? { height: startState.height } : {}),
       };
 
       const currentState: Transform2DState = {
         position: { x: node.position.x, y: node.position.y },
         rotation: MathUtils.radToDeg(node.rotation.z),
         scale: { x: node.scale.x, y: node.scale.y },
+        ...(typeof (node as any).width === 'number' ? { width: (node as any).width } : {}),
+        ...(typeof (node as any).height === 'number' ? { height: (node as any).height } : {}),
       };
 
       const op = new Transform2DCompleteOperation({

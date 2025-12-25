@@ -5,6 +5,8 @@ import type {
   OperationMetadata,
 } from '@/core/Operation';
 import { NodeBase } from '@/nodes/NodeBase';
+import { Group2D } from '@/nodes/2D/Group2D';
+import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { SceneManager } from '@/core/SceneManager';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { getNodePropertySchema } from '@/fw/property-schema-utils';
@@ -113,6 +115,11 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       ) as ViewportRendererService;
       const isTransform = this.isTransformProperty(propertyPath);
       if (isTransform) {
+        vr.updateNodeTransform(node);
+      } else if (
+        (propertyPath === 'width' || propertyPath === 'height') &&
+        (node instanceof Group2D || node instanceof Sprite2D)
+      ) {
         vr.updateNodeTransform(node);
       } else if (propertyPath === 'visible') {
         vr.updateNodeVisibility(node);

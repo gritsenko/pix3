@@ -3,7 +3,6 @@ metadata:
   author: Pix3 Auto Template
   created: 2025-09-27
   description: Starter scene with box, light, camera and logo sprite
-# Test reload trigger
 root:
   - id: environment-root
     type: Node3D
@@ -79,16 +78,21 @@ root:
         name: Logo Sprite
         properties:
           texturePath: templ://pix3-logo.png
+          width: 160.7369425912922
+          height: 152.4255727703653
           transform:
-            position: [2.708369908707865, 4.370885270365168]
-            scale: [0.01, 0.01]
+            position: [-240.11065879564615, 464.51747388518265]
+            scale: [1, 1]
             rotation: 0
-      - id: sprite2d-1766523812223-r4qa2tf
-        type: Sprite2D
-        name: ai
-        properties:
-          texturePath: res://images/ai.jpg
-          transform:
-            position: [1.4753225948033708, 3.1116134129213475]
-            scale: [0.02, 0.02]
-            rotation: 0
+        children:
+          - id: sprite2d-1766523812223-r4qa2tf
+            type: Sprite2D
+            name: ai
+            properties:
+              texturePath: res://images/ai.jpg
+              width: 570.9831350948033
+              height: 258.5491134129213
+              transform:
+                position: [261.9446925474016, 396.2589317064606]
+                scale: [1, 1]
+                rotation: 0

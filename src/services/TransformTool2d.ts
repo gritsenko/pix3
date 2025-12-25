@@ -28,6 +28,8 @@ export interface Transform2DState {
   position: THREE.Vector3;
   rotation: number;
   scale: THREE.Vector2;
+  width?: number;
+  height?: number;
 }
 
 export interface Selection2DOverlay {
@@ -53,7 +55,21 @@ export interface Active2DTransform {
 }
 
 export class TransformTool2d {
-  private readonly min2DSize = 4;
+  private readonly min2DSizeCssPx = 4;
+  private readonly handleSizeCssPx = 10;
+
+  private getDpr(): number {
+    // Keep 2D overlay sizing stable in CSS pixels; the ortho camera uses physical pixels.
+    return typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1;
+  }
+
+  private getMin2DSizeWorldPx(): number {
+    return this.min2DSizeCssPx * this.getDpr();
+  }
+
+  private getHandleSizeWorldPx(): number {
+    return this.handleSizeCssPx * this.getDpr();
+  }
 
   /**
    * Create a selection frame (rectangle outline) for 2D objects
@@ -111,7 +127,9 @@ export class TransformTool2d {
       rotate: new THREE.Vector3(midX, max.y + Math.max(max.y - min.y, max.x - min.x) * 0.12, z),
     };
 
-    const handleSize = 0.25;
+    // Ortho camera uses physical pixels as world units (see ViewportRendererService.resize).
+    // Keep handles a stable size in CSS pixels by multiplying by DPR.
+    const handleSize = this.getHandleSizeWorldPx();
     const handleColor = 0x4e8df5;
     const handleGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
     const handleMaterial = new THREE.MeshBasicMaterial({
@@ -233,6 +251,10 @@ export class TransformTool2d {
     }
 
     const raycaster = new THREE.Raycaster();
+    // Handles live on layer 1; Raycaster defaults to layer 0.
+    raycaster.layers.set(1);
+    // Make thin connector line easier to hit.
+    raycaster.params.Line.threshold = 6 * this.getDpr();
     raycaster.setFromCamera(mouse, orthographicCamera);
     const hits = raycaster.intersectObjects(overlay.handles, true);
     if (hits.length) {
@@ -281,10 +303,14 @@ export class TransformTool2d {
     for (const nodeId of nodeIds) {
       const node = sceneGraph.nodeMap.get(nodeId);
       if (node && node instanceof Node2D) {
+        const width = typeof (node as any).width === 'number' ? (node as any).width : undefined;
+        const height = typeof (node as any).height === 'number' ? (node as any).height : undefined;
         startStates.set(nodeId, {
           position: node.position.clone(),
           rotation: node.rotation.z,
           scale: new THREE.Vector2(node.scale.x, node.scale.y),
+          width,
+          height,
         });
       }
     }
@@ -374,6 +400,8 @@ export class TransformTool2d {
       let width = startSize.x;
       let height = startSize.y;
 
+      const minSize = this.getMin2DSizeWorldPx();
+
       const affectsX =
         handle === 'scale-e' ||
         handle === 'scale-w' ||
@@ -390,10 +418,10 @@ export class TransformTool2d {
         handle === 'scale-sw';
 
       if (affectsX) {
-        width = Math.max(this.min2DSize, Math.abs(localPoint.x - anchorLocal.x));
+        width = Math.max(minSize, Math.abs(localPoint.x - anchorLocal.x));
       }
       if (affectsY) {
-        height = Math.max(this.min2DSize, Math.abs(localPoint.y - anchorLocal.y));
+        height = Math.max(minSize, Math.abs(localPoint.y - anchorLocal.y));
       }
 
       const scaleFactorX = width / startSize.x;
@@ -413,7 +441,23 @@ export class TransformTool2d {
           );
           const newPos = newCenterWorld.clone().add(scaledOffset);
           node.position.set(newPos.x, newPos.y, node.position.z);
-          node.scale.set(startState.scale.x * scaleFactorX, startState.scale.y * scaleFactorY, 1);
+
+          const startWidth = typeof startState.width === 'number' ? startState.width : undefined;
+          const startHeight = typeof startState.height === 'number' ? startState.height : undefined;
+          const hasSize =
+            typeof (node as any).width === 'number' &&
+            typeof (node as any).height === 'number' &&
+            typeof startWidth === 'number' &&
+            typeof startHeight === 'number';
+
+          if (hasSize) {
+            (node as any).width = Math.max(minSize, startWidth * scaleFactorX);
+            (node as any).height = Math.max(minSize, startHeight * scaleFactorY);
+            // Keep node.scale stable; size changes should primarily use width/height.
+            node.scale.set(startState.scale.x, startState.scale.y, 1);
+          } else {
+            node.scale.set(startState.scale.x * scaleFactorX, startState.scale.y * scaleFactorY, 1);
+          }
         }
       }
     }
