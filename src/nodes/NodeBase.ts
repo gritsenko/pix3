@@ -34,6 +34,14 @@ export class NodeBase extends Object3D {
     this.metadata = { ...(props.metadata ?? {}) };
     this.instancePath = props.instancePath ?? null;
 
+    // Initialize visibility and lock state from properties
+    if (this.properties.visible !== undefined) {
+      this.visible = !!this.properties.visible;
+    }
+    if (this.properties.locked !== undefined) {
+      this.userData.locked = !!this.properties.locked;
+    }
+
     this.userData = {
       ...this.userData,
       nodeId: this.nodeId,
@@ -118,6 +126,38 @@ export class NodeBase extends Object3D {
           getValue: (node: unknown) => (node as NodeBase).type,
           setValue: () => {
             // Read-only, no-op
+          },
+        },
+        {
+          name: 'visible',
+          type: 'boolean',
+          ui: {
+            label: 'Visible',
+            description: 'Whether the node is visible in the viewport',
+            group: 'Base',
+          },
+          getValue: (node: unknown) => (node as NodeBase).visible,
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as NodeBase;
+            const v = !!value;
+            n.visible = v;
+            n.properties.visible = v;
+          },
+        },
+        {
+          name: 'locked',
+          type: 'boolean',
+          ui: {
+            label: 'Locked',
+            description: 'Whether the node is locked and cannot be selected in the viewport',
+            group: 'Base',
+          },
+          getValue: (node: unknown) => !!(node as NodeBase).userData.locked,
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as NodeBase;
+            const v = !!value;
+            n.userData.locked = v;
+            n.properties.locked = v;
           },
         },
       ],
