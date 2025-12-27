@@ -2,6 +2,8 @@ import { CreateGroup2DCommand } from '@/features/scene/CreateGroup2DCommand';
 import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
 import { CreateBoxCommand } from '@/features/scene/CreateBoxCommand';
 import { CreateDirectionalLightCommand } from '@/features/scene/CreateDirectionalLightCommand';
+import { CreatePointLightCommand } from '@/features/scene/CreatePointLightCommand';
+import { CreateSpotLightCommand } from '@/features/scene/CreateSpotLightCommand';
 import { CreateCamera3DCommand } from '@/features/scene/CreateCamera3DCommand';
 import { CreateMeshInstanceCommand } from '@/features/scene/CreateMeshInstanceCommand';
 
@@ -87,6 +89,30 @@ export class NodeRegistry {
       icon: 'sun',
       keywords: ['create', 'light', 'directional', '3d', 'illumination'],
       order: 2,
+    });
+
+    this.registerNodeType({
+      id: 'pointlight',
+      displayName: 'Point Light',
+      description: '3D point light source',
+      category: '3D',
+      commandClass: CreatePointLightCommand,
+      color: '#fe9ebeff',
+      icon: 'sun',
+      keywords: ['create', 'light', 'point', '3d', 'illumination'],
+      order: 3,
+    });
+
+    this.registerNodeType({
+      id: 'spotlight',
+      displayName: 'Spot Light',
+      description: '3D spot light source',
+      category: '3D',
+      commandClass: CreateSpotLightCommand,
+      color: '#fe9ebeff',
+      icon: 'sun',
+      keywords: ['create', 'light', 'spot', '3d', 'illumination'],
+      order: 4,
     });
 
     this.registerNodeType({

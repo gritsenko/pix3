@@ -1,5 +1,5 @@
 import { stringify } from 'yaml';
-import { MathUtils } from 'three';
+import { MathUtils, PerspectiveCamera } from 'three';
 
 import { injectable } from '@/fw/di';
 import { NodeBase } from '@/nodes/NodeBase';
@@ -8,6 +8,8 @@ import { Node2D } from '@/nodes/Node2D';
 import { Group2D } from '@/nodes/2D/Group2D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
+import { PointLightNode } from '@/nodes/3D/PointLightNode';
+import { SpotLightNode } from '@/nodes/3D/SpotLightNode';
 import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
 import { Camera3D } from '@/nodes/3D/Camera3D';
 import { MeshInstance } from '@/nodes/3D/MeshInstance';
@@ -114,6 +116,10 @@ export class SceneSaver {
     // Ensure correct type for DirectionalLightNode
     if (node instanceof DirectionalLightNode) {
       definition.type = 'DirectionalLightNode';
+    } else if (node instanceof PointLightNode) {
+      definition.type = 'PointLightNode';
+    } else if (node instanceof SpotLightNode) {
+      definition.type = 'SpotLightNode';
     }
 
     if (node.instancePath) {
@@ -205,15 +211,29 @@ export class SceneSaver {
       if (mesh.size) props.size = mesh.size;
       if (mesh.material) props.material = mesh.material;
     } else if (node instanceof DirectionalLightNode) {
-      const light = node as any;
-      if (light.color) props.color = light.color;
-      if (light.intensity) props.intensity = light.intensity;
+      props.color = '#' + node.light.color.getHexString();
+      props.intensity = node.light.intensity;
+    } else if (node instanceof PointLightNode) {
+      props.color = '#' + node.light.color.getHexString();
+      props.intensity = node.light.intensity;
+      props.distance = node.light.distance;
+      props.decay = node.light.decay;
+    } else if (node instanceof SpotLightNode) {
+      props.color = '#' + node.light.color.getHexString();
+      props.intensity = node.light.intensity;
+      props.distance = node.light.distance;
+      props.angle = (node.light.angle * 180) / Math.PI;
+      props.penumbra = node.light.penumbra;
+      props.decay = node.light.decay;
     } else if (node instanceof Camera3D) {
-      const camera = node as any;
-      if (camera.projection) props.projection = camera.projection;
-      if (camera.fov) props.fov = camera.fov;
-      if (camera.near) props.near = camera.near;
-      if (camera.far) props.far = camera.far;
+      if (node.camera instanceof PerspectiveCamera) {
+        props.projection = 'perspective';
+        props.fov = node.camera.fov;
+      } else {
+        props.projection = 'orthographic';
+      }
+      props.near = node.camera.near;
+      props.far = node.camera.far;
     } else if (node instanceof MeshInstance) {
       const mesh = node as any;
       if (mesh.src) {

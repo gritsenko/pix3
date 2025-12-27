@@ -8,6 +8,8 @@ import { MeshInstance } from '@/nodes/3D/MeshInstance';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { Group2D } from '@/nodes/2D/Group2D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
+import { PointLightNode } from '@/nodes/3D/PointLightNode';
+import { SpotLightNode } from '@/nodes/3D/SpotLightNode';
 import type { SceneGraph } from './SceneManager';
 
 import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
@@ -65,6 +67,22 @@ export interface Camera3DProperties {
 export interface DirectionalLightNodeProperties {
   color?: string;
   intensity?: number;
+}
+
+export interface PointLightNodeProperties {
+  color?: string;
+  intensity?: number;
+  distance?: number;
+  decay?: number;
+}
+
+export interface SpotLightNodeProperties {
+  color?: string;
+  intensity?: number;
+  distance?: number;
+  angle?: number;
+  penumbra?: number;
+  decay?: number;
 }
 
 export interface Node2DProperties {
@@ -268,6 +286,40 @@ export class SceneLoader {
           scale: parsed.scale,
           color: props.color ?? '#ffffff',
           intensity: props.intensity ?? 1,
+        });
+      }
+      case 'PointLightNode': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as PointLightNodeProperties;
+        return new PointLightNode({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          color: props.color ?? '#ffffff',
+          intensity: props.intensity ?? 1,
+          distance: props.distance ?? 0,
+          decay: props.decay ?? 2,
+        });
+      }
+      case 'SpotLightNode': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as SpotLightNodeProperties;
+        return new SpotLightNode({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          color: props.color ?? '#ffffff',
+          intensity: props.intensity ?? 1,
+          distance: props.distance ?? 0,
+          angle: typeof props.angle === 'number' ? (props.angle * Math.PI) / 180 : Math.PI / 3,
+          penumbra: props.penumbra ?? 0,
+          decay: props.decay ?? 2,
         });
       }
       case 'Camera3D': {

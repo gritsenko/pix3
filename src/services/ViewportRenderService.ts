@@ -14,6 +14,10 @@ import { Node2D } from '@/nodes/Node2D';
 import { Node3D } from '@/nodes/Node3D';
 import { Group2D } from '@/nodes/2D/Group2D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
+import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
+import { PointLightNode } from '@/nodes/3D/PointLightNode';
+import { SpotLightNode } from '@/nodes/3D/SpotLightNode';
+import { Camera3D } from '@/nodes/3D/Camera3D';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager } from '@/core/SceneManager';
 import { OperationService } from '@/services/OperationService';
@@ -37,6 +41,10 @@ import {
 
 export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 
+const LAYER_3D = 0;
+const LAYER_2D = 1;
+const LAYER_GIZMOS = 2;
+
 @injectable()
 export class ViewportRendererService {
   @inject(SceneManager)
@@ -58,6 +66,8 @@ export class ViewportRendererService {
   private currentTransformMode: TransformMode = 'select';
   private selectedObjects = new Set<THREE.Object3D>();
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
+  private selectionGizmos = new Map<string, THREE.Object3D>();
+  private previewCamera: THREE.Camera | null = null;
   private group2DMeshes = new Map<string, THREE.LineSegments>();
   private sprite2DMeshes = new Map<string, THREE.Mesh>();
   private selection2DOverlay?: Selection2DOverlay;
@@ -96,17 +106,18 @@ export class ViewportRendererService {
     this.camera.position.set(5, 5, 5);
     this.camera.lookAt(0, 0, 0);
 
-    // Set up camera layers: layer 0 for 3D nodes, layer 1 for 2D nodes
-    // Main perspective camera only renders 3D layer
+    // Set up camera layers: layer 0 for 3D nodes, layer 1 for 2D nodes, layer 2 for gizmos
+    // Main perspective camera renders 3D layer and gizmos
     this.camera.layers.disableAll();
-    this.camera.layers.enable(0);
+    this.camera.layers.enable(LAYER_3D);
+    this.camera.layers.enable(LAYER_GIZMOS);
 
     // Create orthographic camera for 2D layer overlay
     this.orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
     this.orthographicCamera.position.z = 100;
     // Orthographic camera only renders 2D layer
     this.orthographicCamera.layers.disableAll();
-    this.orthographicCamera.layers.enable(1);
+    this.orthographicCamera.layers.enable(LAYER_2D);
 
     // Add lights
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -419,6 +430,24 @@ export class ViewportRendererService {
       if (!node.parent) {
         this.scene.add(node);
       }
+
+      // Update gizmo if it exists
+      const gizmo = this.selectionGizmos.get(node.nodeId);
+      if (gizmo) {
+        node.updateMatrixWorld(true);
+        
+        // PointLightHelper doesn't self-position in update()
+        if (gizmo instanceof THREE.PointLightHelper) {
+          node.getWorldPosition(gizmo.position);
+        }
+
+        // Some helpers need explicit update
+        gizmo.traverse(child => {
+          if ((child as any).update) {
+            (child as any).update();
+          }
+        });
+      }
     } else if (node instanceof Group2D) {
       // Update Group2D visual representation transform
       const mesh = this.group2DMeshes.get(node.nodeId);
@@ -507,12 +536,32 @@ export class ViewportRendererService {
     }
     this.selectionBoxes.clear();
 
+    // Clear previous selection gizmos
+    for (const gizmo of this.selectionGizmos.values()) {
+      if (this.scene) {
+        this.scene.remove(gizmo);
+      }
+      gizmo.traverse(child => {
+        if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
+          child.geometry.dispose();
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose();
+          }
+        }
+      });
+    }
+    this.selectionGizmos.clear();
+
     // Extra safety: remove any lingering selection boxes from the scene
     // (in case of reference mismatches)
     if (this.scene) {
       const toRemove: THREE.Object3D[] = [];
       this.scene.children.forEach(child => {
-        if ((child as any).userData?.isSelectionBox || (child as any).userData?.isTransformGizmo) {
+        if (
+          (child as any).userData?.isSelectionBox ||
+          (child as any).userData?.isTransformGizmo ||
+          (child as any).userData?.isSelectionGizmo
+        ) {
           toRemove.push(child);
         }
       });
@@ -536,10 +585,15 @@ export class ViewportRendererService {
 
     // Clear previous selection object tracking
     this.selectedObjects.clear();
+    this.previewCamera = null;
 
     // Add selection boxes for selected nodes and attach transform controls to the first one
     let firstSelectedNode: Node3D | null = null;
     const selected2DNodeIds: string[] = [];
+    
+    // Primary selection for camera preview
+    const primaryNodeId = appState.selection.primaryNodeId;
+
     for (const nodeId of nodeIds) {
       const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
       if (node && node instanceof Node3D) {
@@ -549,12 +603,28 @@ export class ViewportRendererService {
           firstSelectedNode = node;
         }
 
+        if (nodeId === primaryNodeId && node instanceof Camera3D) {
+          this.previewCamera = node.camera;
+        }
+
         const box = new THREE.Box3().setFromObject(node);
         const helper = new THREE.Box3Helper(box, new THREE.Color(0x00ff00));
         helper.userData.selectionBoxId = nodeId;
         helper.userData.isSelectionBox = true;
         this.selectionBoxes.set(nodeId, helper);
         this.scene?.add(helper);
+
+        // Create custom gizmos for specific node types
+        const gizmo = this.createNodeGizmo(node);
+        if (gizmo) {
+          gizmo.userData.isSelectionGizmo = true;
+          gizmo.layers.set(LAYER_GIZMOS);
+          gizmo.traverse(child => {
+            child.layers.set(LAYER_GIZMOS);
+          });
+          this.selectionGizmos.set(nodeId, gizmo);
+          this.scene?.add(gizmo);
+        }
       } else if (node && node instanceof Node2D) {
         selected2DNodeIds.push(nodeId);
       }
@@ -659,13 +729,13 @@ export class ViewportRendererService {
     // Add 3D nodes to the scene with layer 0
     if (node instanceof Node3D && !node.parent) {
       this.scene.add(node);
-      node.layers.set(0); // 3D nodes use layer 0
+      node.layers.set(LAYER_3D); // 3D nodes use layer 0
     }
 
     // Create visual representation for Group2D nodes with layer 1
     if (node instanceof Group2D) {
       const mesh = this.createGroup2DVisual(node);
-      mesh.layers.set(1); // 2D visuals use layer 1
+      mesh.layers.set(LAYER_2D); // 2D visuals use layer 1
       this.group2DMeshes.set(node.nodeId, mesh);
       // Only add to scene if the node is visible
       if (node.visible) {
@@ -676,7 +746,7 @@ export class ViewportRendererService {
     // Create visual representation for Sprite2D nodes with layer 1
     if (node instanceof Sprite2D) {
       const mesh = this.createSprite2DVisual(node);
-      mesh.layers.set(1); // 2D visuals use layer 1
+      mesh.layers.set(LAYER_2D); // 2D visuals use layer 1
       this.sprite2DMeshes.set(node.nodeId, mesh);
       // Only add to scene if the node is visible
       if (node.visible) {
@@ -728,6 +798,45 @@ export class ViewportRendererService {
     line.userData.nodeId = node.nodeId;
 
     return line;
+  }
+
+  private createNodeGizmo(node: Node3D): THREE.Object3D | null {
+    if (node instanceof Camera3D) {
+      return this.createCameraGizmo(node);
+    } else if (node instanceof DirectionalLightNode) {
+      return this.createDirectionalLightGizmo(node);
+    } else if (node instanceof PointLightNode) {
+      return this.createPointLightGizmo(node);
+    } else if (node instanceof SpotLightNode) {
+      return this.createSpotLightGizmo(node);
+    }
+    return null;
+  }
+
+  private createCameraGizmo(node: Camera3D): THREE.Object3D {
+    const helper = new THREE.CameraHelper(node.camera);
+    helper.update();
+    return helper;
+  }
+
+  private createDirectionalLightGizmo(node: DirectionalLightNode): THREE.Object3D {
+    const helper = new THREE.DirectionalLightHelper(node.light, 1);
+    helper.update();
+    return helper;
+  }
+
+  private createPointLightGizmo(node: PointLightNode): THREE.Object3D {
+    const helper = new THREE.PointLightHelper(node.light, 0.5);
+    node.updateMatrixWorld(true);
+    node.getWorldPosition(helper.position);
+    helper.update();
+    return helper;
+  }
+
+  private createSpotLightGizmo(node: SpotLightNode): THREE.Object3D {
+    const helper = new THREE.SpotLightHelper(node.light);
+    helper.update();
+    return helper;
   }
 
   /**
@@ -1223,7 +1332,7 @@ export class ViewportRendererService {
         // Update orbit controls
         this.orbitControls?.update();
 
-        // Only update selection boxes every few frames to avoid performance issues
+        // Only update selection boxes and gizmos every few frames to avoid performance issues
         if ((this.animationId || 0) % 10 === 0) {
           try {
             // Update selection boxes
@@ -1237,12 +1346,32 @@ export class ViewportRendererService {
                 }
               }
             }
+
+            // Update gizmos
+            for (const [nodeId, gizmo] of this.selectionGizmos.entries()) {
+              const sceneGraph = this.sceneManager.getActiveSceneGraph();
+              if (sceneGraph) {
+                const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
+                if (node && node instanceof Node3D) {
+                  node.updateMatrixWorld(true);
+                  if (gizmo instanceof THREE.PointLightHelper) {
+                    node.getWorldPosition(gizmo.position);
+                  }
+                }
+              }
+
+              gizmo.traverse(child => {
+                if ((child as any).update) {
+                  (child as any).update();
+                }
+              });
+            }
           } catch (error) {
             console.error('[ViewportRenderer] Error updating selection:', error);
           }
         }
 
-        // Render main scene with perspective camera (3D layer only)
+        // Render main scene with perspective camera (3D layer and gizmos)
         this.renderer.autoClear = true;
         this.renderer.render(this.scene, this.camera);
 
@@ -1256,10 +1385,61 @@ export class ViewportRendererService {
           this.renderer.clearDepth();
           this.renderer.render(this.scene, this.orthographicCamera);
 
-          // Restore scene background and autoClear for next frame
+          // Restore scene background
           this.scene.background = savedBackground;
-          this.renderer.autoClear = true;
         }
+
+        // Render camera preview inset if a camera is selected
+        if (this.previewCamera) {
+          const savedBackground = this.scene.background;
+          this.scene.background = null;
+
+          // Calculate inset size (e.g., 25% of viewport)
+          const insetWidth = this.viewportSize.width * 0.25;
+          const insetHeight = this.viewportSize.height * 0.25;
+          
+          // Position in bottom-right corner
+          const insetX = this.viewportSize.width - insetWidth - 20;
+          const insetY = 20;
+
+          // Set viewport and scissor for the inset
+          const pixelRatio = this.renderer.getPixelRatio();
+          this.renderer.setViewport(
+            insetX * pixelRatio,
+            insetY * pixelRatio,
+            insetWidth * pixelRatio,
+            insetHeight * pixelRatio
+          );
+          this.renderer.setScissor(
+            insetX * pixelRatio,
+            insetY * pixelRatio,
+            insetWidth * pixelRatio,
+            insetHeight * pixelRatio
+          );
+          this.renderer.setScissorTest(true);
+
+          // Clear depth for the inset
+          this.renderer.clearDepth();
+
+          // Render only 3D layer (no gizmos)
+          const savedMask = this.previewCamera.layers.mask;
+          this.previewCamera.layers.set(LAYER_3D);
+          
+          this.renderer.render(this.scene, this.previewCamera);
+
+          // Restore state
+          this.previewCamera.layers.mask = savedMask;
+          this.renderer.setScissorTest(false);
+          this.renderer.setViewport(
+            0,
+            0,
+            this.viewportSize.width * pixelRatio,
+            this.viewportSize.height * pixelRatio
+          );
+          this.scene.background = savedBackground;
+        }
+
+        this.renderer.autoClear = true;
       }
     };
 
