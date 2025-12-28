@@ -74,6 +74,7 @@ export class ViewportRendererService {
   private active2DTransform?: Active2DTransform;
   private animationId?: number;
   private disposers: Array<() => void> = [];
+  private gridHelper?: THREE.GridHelper;
   private transformStartStates = new Map<
     string,
     { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }
@@ -128,8 +129,8 @@ export class ViewportRendererService {
     this.scene.add(directionalLight);
 
     // Add grid helper for reference
-    const gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
-    this.scene.add(gridHelper);
+    this.gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
+    this.scene.add(this.gridHelper);
 
     // Initialize OrbitControls
     this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -193,6 +194,12 @@ export class ViewportRendererService {
     });
     this.disposers.push(unsubscribeHierarchies);
 
+    // Subscribe to grid visibility changes
+    const unsubscribeGrid = subscribe(appState.ui, () => {
+      this.toggleGrid();
+    });
+    this.disposers.push(unsubscribeGrid);
+
     // Initial sync
     checkSceneChanges();
   }
@@ -209,6 +216,58 @@ export class ViewportRendererService {
 
   end2DInteraction(): void {
     this.setOrbitEnabled(true);
+  }
+
+  toggleGrid(): void {
+    if (this.gridHelper && this.gridHelper) {
+      this.gridHelper.visible = appState.ui.showGrid;
+    }
+  }
+
+  zoomDefault(): void {
+    if (!this.camera || !this.orbitControls) return;
+    this.camera.position.set(5, 5, 5);
+    this.camera.lookAt(0, 0, 0);
+    this.orbitControls.reset();
+  }
+
+  zoomAll(): void {
+    if (!this.camera || !this.scene || !this.orbitControls) return;
+
+    const box = new THREE.Box3();
+    const nodes: THREE.Object3D[] = [];
+    this.scene.traverse(obj => {
+      if (obj instanceof NodeBase) {
+        nodes.push(obj);
+      }
+    });
+
+    if (nodes.length === 0) {
+      this.zoomDefault();
+      return;
+    }
+
+    box.setFromObject(nodes[0]);
+    for (let i = 1; i < nodes.length; i++) {
+      box.expandByObject(nodes[i]);
+    }
+
+    if (box.isEmpty()) {
+      this.zoomDefault();
+      return;
+    }
+
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const maxDim = Math.max(size.x, size.y, size.z);
+
+    const fov = (this.camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
+    const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 2;
+
+    this.camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
+    this.camera.lookAt(center);
+    this.orbitControls.target.copy(center);
+    this.orbitControls.update();
   }
 
   resize(width: number, height: number): void {
@@ -435,7 +494,7 @@ export class ViewportRendererService {
       const gizmo = this.selectionGizmos.get(node.nodeId);
       if (gizmo) {
         node.updateMatrixWorld(true);
-        
+
         // PointLightHelper doesn't self-position in update()
         if (gizmo instanceof THREE.PointLightHelper) {
           node.getWorldPosition(gizmo.position);
@@ -590,7 +649,7 @@ export class ViewportRendererService {
     // Add selection boxes for selected nodes and attach transform controls to the first one
     let firstSelectedNode: Node3D | null = null;
     const selected2DNodeIds: string[] = [];
-    
+
     // Primary selection for camera preview
     const primaryNodeId = appState.selection.primaryNodeId;
 
@@ -1003,7 +1062,11 @@ export class ViewportRendererService {
     const { group } = this.selection2DOverlay;
     this.scene.remove(group);
     group.traverse(obj => {
-      if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
+      if (
+        obj instanceof THREE.Mesh ||
+        obj instanceof THREE.LineSegments ||
+        obj instanceof THREE.Line
+      ) {
         obj.geometry?.dispose();
         if (obj.material instanceof THREE.Material) {
           obj.material.dispose();
@@ -1397,7 +1460,7 @@ export class ViewportRendererService {
           // Calculate inset size (e.g., 25% of viewport)
           const insetWidth = this.viewportSize.width * 0.25;
           const insetHeight = this.viewportSize.height * 0.25;
-          
+
           // Position in bottom-right corner
           const insetX = this.viewportSize.width - insetWidth - 20;
           const insetY = 20;
@@ -1424,7 +1487,7 @@ export class ViewportRendererService {
           // Render only 3D layer (no gizmos)
           const savedMask = this.previewCamera.layers.mask;
           this.previewCamera.layers.set(LAYER_3D);
-          
+
           this.renderer.render(this.scene, this.previewCamera);
 
           // Restore state

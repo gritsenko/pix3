@@ -5,6 +5,8 @@ import { ViewportRendererService, type TransformMode } from '@/services/Viewport
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
 import renderTransformToolbar from './transform-toolbar';
+import { unsafeHTML } from 'lit/directives/unsafe-html.js';
+import feather from 'feather-icons';
 
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
@@ -18,6 +20,13 @@ export class ViewportPanel extends ComponentBase {
 
   @state()
   private transformMode: TransformMode = 'select';
+
+  @state()
+  private showGrid = false;
+
+  @state()
+  private showLayer2D = false;
+
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
     if (!entry) {
@@ -46,6 +55,11 @@ export class ViewportPanel extends ComponentBase {
       this.syncViewportScene();
     });
     this.syncViewportScene();
+
+    subscribe(appState.ui, () => {
+      this.showGrid = appState.ui.showGrid;
+      this.showLayer2D = appState.ui.showLayer2D;
+    });
 
     // Add keyboard shortcuts for transform modes
     this.addEventListener('keydown', this.handleKeyDown);
@@ -103,13 +117,69 @@ export class ViewportPanel extends ComponentBase {
   protected render() {
     return html`
       <section class="panel" role="region" aria-label="Scene viewport" tabindex="0">
-        <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>
-        <div class="overlay" aria-hidden="true">
-          <!-- Transform Toolbar -->
-          <div class="toolbar-overlay">
-            ${renderTransformToolbar(this.transformMode, m => this.handleTransformModeChange(m))}
-          </div>
+        <div
+          class="top-toolbar"
+          @click=${(e: Event) => e.stopPropagation()}
+          @pointerdown=${(e: Event) => e.stopPropagation()}
+          @pointerup=${(e: Event) => e.stopPropagation()}
+        >
+          <!-- Transform mode buttons -->
+          ${renderTransformToolbar(this.transformMode, m => this.handleTransformModeChange(m))}
+          <div class="toolbar-separator"></div>
+          <!-- Viewport controls -->
+          <button
+            class="toolbar-button"
+            aria-label="Toggle grid"
+            aria-pressed="${this.showGrid}"
+            @click="${(e: Event) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              this.toggleGrid();
+            }}"
+            title="Toggle Grid (G)"
+          >
+            <span class="toolbar-icon">${unsafeHTML(this.getIcon('grid'))}</span>
+          </button>
+          <button
+            class="toolbar-button"
+            aria-label="Toggle 2D layer"
+            aria-pressed="${this.showLayer2D}"
+            @click="${(e: Event) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              this.toggleLayer2D();
+            }}"
+            title="Toggle 2D Layer (2)"
+          >
+            <span class="toolbar-icon">${unsafeHTML(this.getIcon('layers'))}</span>
+          </button>
+          <div class="toolbar-separator"></div>
+          <button
+            class="toolbar-button"
+            aria-label="Zoom to default"
+            @click="${(e: Event) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              this.zoomDefault();
+            }}"
+            title="Zoom Default (Home)"
+          >
+            <span class="toolbar-icon">${unsafeHTML(this.getIcon('home'))}</span>
+          </button>
+          <button
+            class="toolbar-button"
+            aria-label="Zoom all"
+            @click="${(e: Event) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              this.zoomAll();
+            }}"
+            title="Zoom All (F)"
+          >
+            <span class="toolbar-icon">${unsafeHTML(this.getIcon('maximize-2'))}</span>
+          </button>
         </div>
+        <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>
       </section>
     `;
   }
@@ -121,6 +191,34 @@ export class ViewportPanel extends ComponentBase {
   private handleTransformModeChange(mode: TransformMode): void {
     this.transformMode = mode;
     this.viewportRenderer.setTransformMode(mode);
+  }
+
+  private toggleGrid(): void {
+    appState.ui.showGrid = !appState.ui.showGrid;
+  }
+
+  private toggleLayer2D(): void {
+    appState.ui.showLayer2D = !appState.ui.showLayer2D;
+  }
+
+  private zoomDefault(): void {
+    this.viewportRenderer.zoomDefault();
+  }
+
+  private zoomAll(): void {
+    this.viewportRenderer.zoomAll();
+  }
+
+  private getIcon(name: string): string {
+    try {
+      const icon = (feather.icons as Record<string, any>)[name];
+      if (icon && typeof icon.toSvg === 'function') {
+        return icon.toSvg({ width: 16, height: 16 });
+      }
+    } catch (error) {
+      console.warn(`[ViewportPanel] Failed to load icon: ${name}`, error);
+    }
+    return '';
   }
 
   private handleKeyDown = (event: KeyboardEvent): void => {
@@ -146,25 +244,35 @@ export class ViewportPanel extends ComponentBase {
         event.preventDefault();
         this.handleTransformModeChange('scale');
         break;
+      case 'g':
+        event.preventDefault();
+        this.toggleGrid();
+        break;
+      case '2':
+        event.preventDefault();
+        this.toggleLayer2D();
+        break;
+      case 'home':
+        event.preventDefault();
+        this.zoomDefault();
+        break;
+      case 'f':
+        event.preventDefault();
+        this.zoomAll();
+        break;
     }
   };
 
   private handleCanvasPointerDown = (event: PointerEvent): void => {
-    // Ignore pointer events from toolbar buttons
-    if (
-      (event.target as HTMLElement)?.closest?.('.toolbar-button') ||
-      (event.target as HTMLElement)?.closest?.('.transform-toolbar')
-    ) {
+    // Ignore pointer events from toolbar
+    const isToolbar = event.composedPath().some(el =>
+      el instanceof HTMLElement && (el.classList.contains('top-toolbar') || el.classList.contains('toolbar-button'))
+    );
+    if (isToolbar) {
       return;
     }
 
-    // Only handle pointer down on the canvas or host
     const isCanvasTarget = (event.target as HTMLElement)?.classList?.contains('viewport-canvas');
-    console.debug('[ViewportPanel] pointerDown', {
-      target: event.target,
-      isCanvasTarget,
-      isThis: event.target === this,
-    });
     if (event.target !== this && !isCanvasTarget) {
       return;
     }
@@ -172,11 +280,8 @@ export class ViewportPanel extends ComponentBase {
     const rect = this.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
-    console.debug('[ViewportPanel] checking 2D handles at', { screenX, screenY });
 
-    // Check if clicking on 2D transform handles or within selected 2D node bounds
     const handleType = this.viewportRenderer.get2DHandleAt?.(screenX, screenY);
-    console.debug('[ViewportPanel] get2DHandleAt result:', handleType);
     if (handleType && handleType !== 'idle') {
       // Start 2D transform (move, scale, or rotate)
       this.viewportRenderer.start2DTransform?.(screenX, screenY, handleType);
@@ -222,11 +327,11 @@ export class ViewportPanel extends ComponentBase {
   };
 
   private handleCanvasPointerUp = (event: PointerEvent): void => {
-    // Ignore pointer events from toolbar buttons
-    if (
-      (event.target as HTMLElement)?.closest?.('.toolbar-button') ||
-      (event.target as HTMLElement)?.closest?.('.transform-toolbar')
-    ) {
+    // Ignore pointer events from toolbar
+    const isToolbar = event.composedPath().some(el =>
+      el instanceof HTMLElement && (el.classList.contains('top-toolbar') || el.classList.contains('toolbar-button'))
+    );
+    if (isToolbar) {
       this.pointerDownPos = undefined;
       this.pointerDownTime = undefined;
       this.isDragging = false;
