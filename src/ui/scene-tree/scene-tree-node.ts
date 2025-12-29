@@ -29,6 +29,7 @@ export interface SceneTreeNode {
   instancePath: string | null;
   properties: Record<string, unknown>;
   children: SceneTreeNode[];
+  isContainer: boolean;
 }
 
 @customElement('pix3-scene-tree-node')
@@ -305,12 +306,18 @@ export class SceneTreeNodeComponent extends ComponentBase {
     const thresholdPercent = 0.33;
 
     let nextPosition: 'top' | 'inside' | 'bottom' | null = null;
-    if (relativeY < rect.height * thresholdPercent) {
-      nextPosition = 'top';
-    } else if (relativeY > rect.height * (1 - thresholdPercent)) {
-      nextPosition = 'bottom';
+
+    if (this.node.isContainer) {
+      if (relativeY < rect.height * thresholdPercent) {
+        nextPosition = 'top';
+      } else if (relativeY > rect.height * (1 - thresholdPercent)) {
+        nextPosition = 'bottom';
+      } else {
+        nextPosition = 'inside';
+      }
     } else {
-      nextPosition = 'inside';
+      // For non-containers, only allow top/bottom snapping
+      nextPosition = relativeY < rect.height * 0.5 ? 'top' : 'bottom';
     }
 
     if (this.dragOverPosition !== nextPosition) {
@@ -349,8 +356,13 @@ export class SceneTreeNodeComponent extends ComponentBase {
     try {
       // Determine the action based on drop position
       if (dropPosition === 'inside' || dropPosition === null) {
-        // Drop inside as child
-        await this.performReparent(draggedNodeId, this.node.id, -1);
+        // Drop inside as child - only if it's a container
+        if (this.node.isContainer) {
+          await this.performReparent(draggedNodeId, this.node.id, -1);
+        } else {
+          // Fallback for non-containers: drop after
+          await this.performReparent(draggedNodeId, this.node.id, 'after');
+        }
       } else if (dropPosition === 'top') {
         // Drop before this node (same parent, earlier index)
         await this.performReparent(draggedNodeId, this.node.id, 'before');

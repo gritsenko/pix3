@@ -19,6 +19,7 @@ export class Sprite2D extends Node2D {
     this.texturePath = props.texturePath ?? null;
     this.width = props.width ?? 64;
     this.height = props.height ?? 64;
+    this.isContainer = false;
   }
 
   /**

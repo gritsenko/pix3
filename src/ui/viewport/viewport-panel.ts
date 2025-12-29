@@ -210,6 +210,15 @@ export class ViewportPanel extends ComponentBase {
   }
 
   private getIcon(name: string): string {
+    if (name === 'grid') {
+      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M6 3V21M12 3V21M18 3V21M3 6H21M3 12H21M3 18H21" 
+        stroke="currentColor" 
+        stroke-width="2" 
+        stroke-linecap="round" 
+        stroke-linejoin="round"/>
+</svg>`;
+    }
     try {
       const icon = (feather.icons as Record<string, any>)[name];
       if (icon && typeof icon.toSvg === 'function') {
@@ -265,9 +274,13 @@ export class ViewportPanel extends ComponentBase {
 
   private handleCanvasPointerDown = (event: PointerEvent): void => {
     // Ignore pointer events from toolbar
-    const isToolbar = event.composedPath().some(el =>
-      el instanceof HTMLElement && (el.classList.contains('top-toolbar') || el.classList.contains('toolbar-button'))
-    );
+    const isToolbar = event
+      .composedPath()
+      .some(
+        el =>
+          el instanceof HTMLElement &&
+          (el.classList.contains('top-toolbar') || el.classList.contains('toolbar-button'))
+      );
     if (isToolbar) {
       return;
     }
@@ -330,9 +343,13 @@ export class ViewportPanel extends ComponentBase {
 
   private handleCanvasPointerUp = (event: PointerEvent): void => {
     // Ignore pointer events from toolbar
-    const isToolbar = event.composedPath().some(el =>
-      el instanceof HTMLElement && (el.classList.contains('top-toolbar') || el.classList.contains('toolbar-button'))
-    );
+    const isToolbar = event
+      .composedPath()
+      .some(
+        el =>
+          el instanceof HTMLElement &&
+          (el.classList.contains('top-toolbar') || el.classList.contains('toolbar-button'))
+      );
     if (isToolbar) {
       this.pointerDownPos = undefined;
       this.pointerDownTime = undefined;

@@ -22,6 +22,8 @@ export class NodeBase extends Object3D {
   readonly properties: Record<string, unknown>;
   readonly metadata: NodeMetadata;
   readonly instancePath: string | null;
+  /** Whether this node can have children. */
+  isContainer: boolean = true;
 
   constructor(props: NodeBaseProps) {
     super();
