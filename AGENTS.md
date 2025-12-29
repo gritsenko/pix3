@@ -7,11 +7,12 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - **Pix3** is a browser-based editor for HTML5 scenes blending 2D and 3D layers
 - **Target stack**: TypeScript + Vite, Lit web components, Valtio state, Three.js, Golden Layout
 - **Architecture model**: Operations-first with OperationService as single mutation gateway
-- **Source of truth**: `docs/pix3-specification.md` (v1.9, 2025-12-10)
+- **Source of truth**: `docs/pix3-specification.md` (v1.11, 2025-12-30)
 
 ## Essential Architecture Patterns
 
 ### Component System
+
 - Extend `ComponentBase` from `src/fw` (not raw `LitElement`)
 - Default to **light DOM** for global style integration
 - Use shadow DOM only when explicitly needed: `static useShadowDom = true`
@@ -21,11 +22,13 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - **Light DOM CSS**: use component tag selector (e.g., `pix3-toolbar-button`) and attribute selectors instead of `:host` (which only works in shadow DOM)
 
 ### Dependency Injection
+
 - Services use `@injectable()` decorator with `dispose()` method
 - Inject services via `@inject(ServiceClass)` (requires reflect-metadata)
 - Register services with `ServiceContainer` (singleton by default)
 
 ### State Management (Valtio)
+
 - Global state in `appState` proxy from `src/state/AppState.ts` - never mutate directly
 - State includes UI, scenes metadata, selection (node IDs), and operations lifecycle
 - **Nodes are NOT in reactive state** — they are managed by `SceneManager` and stored in `SceneGraph` objects. Node references sync to state only as IDs in `SceneHierarchyState.rootNodes` (for UI consumption of tree structure)
@@ -35,6 +38,7 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - Use `snapshot(appState)` for read-only checks
 
 ### Commands and Operations
+
 - **Operations** are first-class, encapsulate all mutation logic
 - Implement `perform()` returning OperationCommit with `undo()`/`redo()` closures
 - **OperationService** is the gateway for executing operations: `invoke(op)`, `invokeAndPush(op)`, `undo()`, `redo()`
@@ -43,6 +47,7 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - Commands never implement their own undo/redo logic
 
 ### Property Schema System (NEW)
+
 - Godot-inspired declarative property metadata for dynamic UI generation
 - Node classes expose properties via static `getPropertySchema()` returning `PropertySchema`
 - `PropertyDefinition` includes: name, type, getValue/setValue closures, optional UI hints (label, group, step, precision, unit, etc.)
@@ -153,6 +158,7 @@ src/
 ## Development Requirements
 
 ### Required TypeScript Config
+
 ```json
 {
   "experimentalDecorators": true,
@@ -163,12 +169,14 @@ src/
 ```
 
 ### Key Development Commands
+
 - `npm run dev` - Vite dev server with hot reload
 - `npm run test` - Vitest unit tests (co-located `.spec.ts` files)
 - `npm run build` - TypeScript compilation + Vite production build
 - `npm run lint` - ESLint with Lit/a11y plugins
 
 ## Scene File Format (.pix3scene)
+
 - YAML format with version, node hierarchy under `root:`
 - Unique node `id` fields required
 - Asset references use `res://` prefix
@@ -176,12 +184,14 @@ src/
 - AJV schema validation in `SceneManager`
 
 ## Performance & Quality Gates
+
 - Target ≥85 FPS viewport rendering
 - <6s cold start, <80ms command latency
 - WCAG 2.1 AA compliance (keyboard nav, ARIA, high-contrast)
 - Chromium-only for MVP
 
 ## Key Integration Points
+
 - **Golden Layout**: Panel management
 - **File System Access API**: Direct project access
 - **Valtio**: Reactive state with automatic UI updates
@@ -210,10 +220,12 @@ Always verify architectural decisions against the specification before implement
 ## Additional Agent Instructions
 
 ### Dev Server
+
 - The development server is always started manually by the developer on `localhost:5173`.
 - Agents must not attempt to start the dev server themselves.
 
 ### Command-Driven Menu System
+
 - Commands opt into the menu via metadata properties: `menuPath`, `shortcut`, `addToMenu`
 - Register commands with `CommandRegistry` in editor shell at app startup
 - Menu is generated automatically from registered commands — no hardcoded menu structure
@@ -221,6 +233,7 @@ Always verify architectural decisions against the specification before implement
 - Menu items execute commands through `CommandDispatcher` for consistent lifecycle
 
 ### Browser Interaction
+
 - Agents can use the `#browsermcp` MCP server to navigate pages, read logs and make screenshots.
 - Avoid use of clicking, pressing keys, and other input simulations. Ask developer instead to make changes on the page before taking screenshots or gathering logs. The only exception is opening recent projects on app startup.
 - Prefer adding console logs over using screenshots.
@@ -228,9 +241,11 @@ Always verify architectural decisions against the specification before implement
 - Logs and snapshots can be read using the MCP browser tools.
 
 ### Default Scene Loading
+
 - After the page is refreshed, the agent should click on the first recent project in the list to load the default scene.
 
 ### Scene Reload Debugging
+
 - When diagnosing scene reload failures after save operations, check:
   - `ReloadSceneOperation.ts`: Logs file content size and preview when reading
   - `SceneLoader.ts`: Logs YAML parse start with content preview; logs if parser returns null with diagnostic details
