@@ -48,6 +48,12 @@ export class SceneTreePanel extends ComponentBase {
   private loadError: string | null = appState.scenes.loadError;
 
   @state()
+  private draggedNodeId: string | null = null;
+
+  @state()
+  private draggedNodeType: string | null = null;
+
+  @state()
   private lastLoadedAt = appState.scenes.lastLoadedAt;
 
   @state()
@@ -101,8 +107,11 @@ export class SceneTreePanel extends ComponentBase {
         </pix3-toolbar>
         <div
           class="tree-container"
+          ?data-dragging=${this.draggedNodeId !== null}
           @toggle-node=${this.onToggleNode.bind(this)}
           @node-drop=${this.onNodeDrop.bind(this)}
+          @node-drag-start=${this.onNodeDragStart.bind(this)}
+          @node-drag-end=${this.onNodeDragEnd.bind(this)}
         >
           ${hasHierarchy
             ? html`<ul
@@ -120,6 +129,8 @@ export class SceneTreePanel extends ComponentBase {
                       .selectedNodeIds=${this.selectedNodeIds}
                       .primaryNodeId=${this.primaryNodeId}
                       .collapsedNodeIds=${this.collapsedNodeIds}
+                      .draggedNodeId=${this.draggedNodeId}
+                      .draggedNodeType=${this.draggedNodeType}
                       ?focusable=${index === 0}
                     ></pix3-scene-tree-node>`
                 )}
@@ -352,6 +363,19 @@ export class SceneTreePanel extends ComponentBase {
     } catch (error) {
       console.error('[SceneTreePanel] Failed to reparent node:', error);
     }
+  }
+
+  private onNodeDragStart(event: CustomEvent): void {
+    const { nodeId, nodeType } = event.detail;
+    this.draggedNodeId = nodeId;
+    this.draggedNodeType = nodeType;
+    console.log('[SceneTreePanel] Drag started:', { nodeId, nodeType });
+  }
+
+  private onNodeDragEnd(_event: CustomEvent): void {
+    this.draggedNodeId = null;
+    this.draggedNodeType = null;
+    console.log('[SceneTreePanel] Drag ended');
   }
 }
 

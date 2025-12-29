@@ -5,6 +5,7 @@ import type {
   OperationMetadata,
 } from '@/core/Operation';
 import { SceneManager } from '@/core/SceneManager';
+import { canDropNode } from '@/fw/hierarchy-validation';
 import { ref } from 'valtio/vanilla';
 import type { NodeBase } from '@/nodes/NodeBase';
 
@@ -49,6 +50,22 @@ export class ReparentNodeOperation implements Operation<OperationInvokeResult> {
     const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
     if (!sceneGraph) {
       console.log('[ReparentNodeOperation] No scene graph');
+      return { didMutate: false };
+    }
+
+    // Validate using the helper function
+    if (!canDropNode(this.params.nodeId, this.params.newParentId, sceneGraph, 'inside')) {
+      const draggedNode = sceneGraph.nodeMap.get(this.params.nodeId);
+      const targetNode = this.params.newParentId
+        ? sceneGraph.nodeMap.get(this.params.newParentId)
+        : null;
+
+      console.log('[ReparentNodeOperation] Invalid drop operation:', {
+        draggedNode: draggedNode?.name,
+        draggedType: draggedNode?.type,
+        targetNode: targetNode?.name,
+        targetType: targetNode?.type,
+      });
       return { didMutate: false };
     }
 

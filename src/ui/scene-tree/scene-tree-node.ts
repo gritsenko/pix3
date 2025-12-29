@@ -8,6 +8,9 @@ import feather from 'feather-icons';
 import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
 import { appState } from '@/state';
 import { CommandDispatcher } from '@/services';
+import { ServiceContainer } from '@/fw/di';
+import { SceneManager } from '@/core/SceneManager';
+import { canDropNode } from '@/fw/hierarchy-validation';
 import {
   selectObject,
   toggleObjectSelection,
@@ -54,6 +57,12 @@ export class SceneTreeNodeComponent extends ComponentBase {
   @property({ type: String })
   primaryNodeId: string | null = null;
 
+  @property({ type: String })
+  draggedNodeId: string | null = null;
+
+  @property({ type: String })
+  draggedNodeType: string | null = null;
+
   @property({ type: Object })
   collapsedNodeIds: Set<string> = new Set();
 
@@ -72,10 +81,18 @@ export class SceneTreeNodeComponent extends ComponentBase {
   @state()
   private isLocked: boolean = false;
 
-  updated(): void {
-    this.isCollapsed = this.collapsedNodeIds.has(this.node.id);
-    this.isVisible = (this.node.properties?.visible as boolean) ?? true;
-    this.isLocked = (this.node.properties?.locked as boolean) ?? false;
+  @state()
+  private isValidDropTarget: boolean = true;
+
+  updated(changedProperties: Map<string, any>): void {
+    super.updated(changedProperties);
+    if (changedProperties.has('node') || changedProperties.has('collapsedNodeIds')) {
+      this.isCollapsed = this.collapsedNodeIds.has(this.node.id);
+    }
+    if (changedProperties.has('node')) {
+      this.isVisible = (this.node.properties?.visible as boolean) ?? true;
+      this.isLocked = (this.node.properties?.locked as boolean) ?? false;
+    }
   }
 
   protected render() {
@@ -88,9 +105,15 @@ export class SceneTreeNodeComponent extends ComponentBase {
       'tree-node__content--selected': isSelected,
       'tree-node__content--primary': isPrimary,
       'tree-node__content--dragging': this.isDragging,
-      'tree-node__content--drag-over-top': this.dragOverPosition === 'top',
-      'tree-node__content--drag-over-inside': this.dragOverPosition === 'inside',
-      'tree-node__content--drag-over-bottom': this.dragOverPosition === 'bottom',
+      'tree-node__content--drag-over-top': this.dragOverPosition === 'top' && !this.isDragging,
+      'tree-node__content--drag-over-inside':
+        this.dragOverPosition === 'inside' && !this.isDragging,
+      'tree-node__content--drag-over-bottom':
+        this.dragOverPosition === 'bottom' && !this.isDragging,
+      'tree-node__content--drop-disabled':
+        this.dragOverPosition !== null &&
+        !this.isValidDropTarget &&
+        !this.isDragging,
     });
 
     const expanderClasses = classMap({
@@ -110,7 +133,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
       : html`<span class=${expanderClasses} aria-hidden="true"></span>`;
 
     return html`
-      <li class="tree-node" role="none">
+      <li class="tree-node" role="none" ?data-dragged=${this.draggedNodeId === this.node.id && this.draggedNodeId !== null}>
         <div
           class=${contentClasses}
           role="treeitem"
@@ -189,6 +212,8 @@ export class SceneTreeNodeComponent extends ComponentBase {
                       .selectedNodeIds=${this.selectedNodeIds}
                       .primaryNodeId=${this.primaryNodeId}
                       .collapsedNodeIds=${this.collapsedNodeIds}
+                      .draggedNodeId=${this.draggedNodeId}
+                      .draggedNodeType=${this.draggedNodeType}
                       ?focusable=${index === 0}
                     ></pix3-scene-tree-node>
                   </li>`
@@ -277,18 +302,37 @@ export class SceneTreeNodeComponent extends ComponentBase {
     if (event.dataTransfer) {
       event.dataTransfer.effectAllowed = 'move';
       event.dataTransfer.setData('application/x-scene-tree-node', this.node.id);
-      // Set a visual feedback image
       const img = new Image();
       img.src =
         'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="16" height="16"%3E%3Crect width="16" height="16" fill="%235ec2ff" opacity="0.3"/%3E%3C/svg%3E';
       event.dataTransfer.setDragImage(img, 0, 0);
     }
+
+    this.dispatchEvent(
+      new CustomEvent('node-drag-start', {
+        detail: {
+          nodeId: this.node.id,
+          nodeType: this.node.type,
+        },
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   private onDragEnd(event: DragEvent): void {
     event.stopPropagation();
     this.isDragging = false;
     this.dragOverPosition = null;
+    this.isValidDropTarget = true;
+
+    this.dispatchEvent(
+      new CustomEvent('node-drag-end', {
+        detail: {},
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   private onDragOver(event: DragEvent): void {
@@ -299,7 +343,6 @@ export class SceneTreeNodeComponent extends ComponentBase {
       event.dataTransfer.dropEffect = 'move';
     }
 
-    // Determine the drop position based on cursor position
     const element = event.currentTarget as HTMLElement;
     const rect = element.getBoundingClientRect();
     const relativeY = event.clientY - rect.top;
@@ -316,8 +359,21 @@ export class SceneTreeNodeComponent extends ComponentBase {
         nextPosition = 'inside';
       }
     } else {
-      // For non-containers, only allow top/bottom snapping
       nextPosition = relativeY < rect.height * 0.5 ? 'top' : 'bottom';
+    }
+
+    // Validate the drop target for the current hover position
+    if (this.draggedNodeId && this.draggedNodeId !== this.node.id && !this.isDragging) {
+      const isValid = this.validateDropTarget(
+        this.draggedNodeId,
+        this.node.id,
+        nextPosition
+      );
+      // Set isValidDropTarget: true = valid/bright, false = invalid/faded
+      this.isValidDropTarget = isValid;
+      if (event.dataTransfer) {
+        event.dataTransfer.dropEffect = isValid ? 'move' : 'none';
+      }
     }
 
     if (this.dragOverPosition !== nextPosition) {
@@ -327,11 +383,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
   private onDragLeave(event: DragEvent): void {
     event.stopPropagation();
-    // Clear the highlight when leaving the element.
-    // We don't check event.target === event.currentTarget here to ensure 
-    // the highlight is cleared more reliably, even if it causes minor flickering 
-    // when moving over child elements (which is immediately corrected by onDragOver).
+    // Clear both position and validity when leaving - will restore fade via CSS
     this.dragOverPosition = null;
+    this.isValidDropTarget = true;
   }
 
   private async onDrop(event: DragEvent): Promise<void> {
@@ -339,35 +393,34 @@ export class SceneTreeNodeComponent extends ComponentBase {
     event.stopPropagation();
 
     const draggedNodeId = event.dataTransfer?.getData('application/x-scene-tree-node');
-    
-    // Always clear the highlight on drop
+
     const dropPosition = this.dragOverPosition;
     this.dragOverPosition = null;
+    this.isValidDropTarget = true;
 
     if (!draggedNodeId) {
       return;
     }
 
-    // Prevent dropping a node on itself
     if (draggedNodeId === this.node.id) {
       return;
     }
 
+    if (!this.isValidDropTarget) {
+      console.log('[SceneTreeNode] Drop prevented: invalid target');
+      return;
+    }
+
     try {
-      // Determine the action based on drop position
       if (dropPosition === 'inside' || dropPosition === null) {
-        // Drop inside as child - only if it's a container
         if (this.node.isContainer) {
           await this.performReparent(draggedNodeId, this.node.id, -1);
         } else {
-          // Fallback for non-containers: drop after
           await this.performReparent(draggedNodeId, this.node.id, 'after');
         }
       } else if (dropPosition === 'top') {
-        // Drop before this node (same parent, earlier index)
         await this.performReparent(draggedNodeId, this.node.id, 'before');
       } else if (dropPosition === 'bottom') {
-        // Drop after this node (same parent, later index)
         await this.performReparent(draggedNodeId, this.node.id, 'after');
       }
     } catch (error) {
@@ -428,6 +481,30 @@ export class SceneTreeNodeComponent extends ComponentBase {
     } catch (error) {
       console.error('[SceneTreeNode] Failed to toggle lock:', error);
     }
+  }
+
+  private validateDropTarget(
+    draggedNodeId: string,
+    targetNodeId: string,
+    position: 'top' | 'inside' | 'bottom' | null
+  ): boolean {
+    if (!position) return true;
+
+    const container = ServiceContainer.getInstance();
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
+    );
+
+    const activeSceneId = appState.scenes.activeSceneId;
+    if (!activeSceneId) return true;
+
+    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
+    if (!sceneGraph) return true;
+
+    const mappedPosition: 'inside' | 'before' | 'after' =
+      position === 'inside' ? 'inside' : position === 'top' ? 'before' : 'after';
+
+    return canDropNode(draggedNodeId, targetNodeId, sceneGraph, mappedPosition);
   }
 }
 
