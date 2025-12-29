@@ -1,4 +1,5 @@
 import { subscribe } from 'valtio/vanilla';
+import { repeat } from 'lit/directives/repeat.js';
 
 import { ComponentBase, customElement, html, state, inject } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
@@ -109,7 +110,9 @@ export class SceneTreePanel extends ComponentBase {
                 role="tree"
                 aria-label=${this.getTreeAriaLabel(activeSceneName)}
               >
-                ${this.hierarchy.map(
+                ${repeat(
+                  this.hierarchy,
+                  node => node.id,
                   (node, index) =>
                     html`<pix3-scene-tree-node
                       .node=${node}

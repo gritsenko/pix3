@@ -11,6 +11,7 @@ import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
 import { ReloadSceneCommand } from '@/features/scene/ReloadSceneCommand';
+import { DeleteObjectCommand } from '@/features/scene/DeleteObjectCommand';
 import { UndoCommand } from '@/features/history/UndoCommand';
 import { RedoCommand } from '@/features/history/RedoCommand';
 import { appState } from '@/state';
@@ -71,9 +72,16 @@ export class Pix3EditorShell extends ComponentBase {
     // Register history commands and scene commands
     const saveCommand = new SaveSceneCommand();
     const saveAsCommand = new SaveAsSceneCommand();
+    const deleteCommand = new DeleteObjectCommand();
     const undoCommand = new UndoCommand(this.operationService);
     const redoCommand = new RedoCommand(this.operationService);
-    this.commandRegistry.registerMany(undoCommand, redoCommand, saveCommand, saveAsCommand);
+    this.commandRegistry.registerMany(
+      undoCommand,
+      redoCommand,
+      saveCommand,
+      saveAsCommand,
+      deleteCommand
+    );
 
     // Subscribe to dialog changes
     this.disposeDialogsSubscription = this.dialogService.subscribe(dialogs => {
@@ -217,6 +225,18 @@ export class Pix3EditorShell extends ComponentBase {
       void this.executeRedoCommand();
       return;
     }
+
+    // Delete: Delete or Backspace key
+    if (
+      (e.key === 'Delete' || e.key === 'Backspace') &&
+      !e.metaKey &&
+      !e.ctrlKey &&
+      !isInputElement
+    ) {
+      e.preventDefault();
+      void this.executeDeleteCommand();
+      return;
+    }
   }
 
   private async executeUndoCommand(): Promise<void> {
@@ -232,6 +252,17 @@ export class Pix3EditorShell extends ComponentBase {
       await this.operationService.redo();
     } catch (error) {
       console.error('[Pix3EditorShell] Failed to redo', error);
+    }
+  }
+
+  private async executeDeleteCommand(): Promise<void> {
+    try {
+      const command = this.commandRegistry.getCommand('scene.delete-object');
+      if (command) {
+        await this.commandDispatcher.execute(command);
+      }
+    } catch (error) {
+      console.error('[Pix3EditorShell] Failed to delete objects', error);
     }
   }
 

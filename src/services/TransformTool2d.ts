@@ -30,6 +30,8 @@ export interface Transform2DState {
   scale: THREE.Vector2;
   width?: number;
   height?: number;
+  worldPosition?: THREE.Vector3;
+  worldRotationZ?: number;
 }
 
 export interface Selection2DOverlay {
@@ -57,6 +59,31 @@ export interface Active2DTransform {
 export class TransformTool2d {
   private readonly min2DSizeCssPx = 4;
   private readonly handleSizeCssPx = 10;
+
+  private setNodeWorldPosition(node: Node2D, worldPosition: THREE.Vector3): void {
+    const parent = node.parent as THREE.Object3D | null;
+    if (parent) {
+      parent.updateWorldMatrix(true, false);
+      const local = worldPosition.clone();
+      parent.worldToLocal(local);
+      node.position.set(local.x, local.y, node.position.z);
+      return;
+    }
+    node.position.set(worldPosition.x, worldPosition.y, node.position.z);
+  }
+
+  private setNodeWorldRotationZ(node: Node2D, worldRotationZ: number): void {
+    const parent = node.parent as THREE.Object3D | null;
+    if (!parent) {
+      node.rotation.set(0, 0, worldRotationZ);
+      return;
+    }
+
+    parent.updateWorldMatrix(true, false);
+    const parentQuat = parent.getWorldQuaternion(new THREE.Quaternion());
+    const parentEuler = new THREE.Euler().setFromQuaternion(parentQuat, 'XYZ');
+    node.rotation.set(0, 0, worldRotationZ - parentEuler.z);
+  }
 
   private getDpr(): number {
     // Keep 2D overlay sizing stable in CSS pixels; the ortho camera uses physical pixels.
@@ -219,7 +246,8 @@ export class TransformTool2d {
 
     for (const handle of overlay.handles) {
       const type = handle.userData?.handleType as string | undefined;
-      if (type && handlePositions[type]) {
+      // The rotate connector line geometry is defined in world-space points; don't also translate the Line.
+      if (type && handlePositions[type] && !(handle instanceof THREE.Line)) {
         handle.position.copy(handlePositions[type]);
       }
       if (type === 'rotate' && handle instanceof THREE.Line) {
@@ -229,6 +257,7 @@ export class TransformTool2d {
         ]);
         handle.geometry.dispose();
         handle.geometry = lineGeom;
+        handle.position.set(0, 0, 0);
       }
     }
 
@@ -250,15 +279,34 @@ export class TransformTool2d {
       return 'idle';
     }
 
+    // Ensure matrices are current before raycasting.
+    // Raycaster does not guarantee fresh matrixWorld after we mutate handle positions.
+    overlay.group.updateMatrixWorld(true);
+
     const raycaster = new THREE.Raycaster();
     // Handles live on layer 1; Raycaster defaults to layer 0.
     raycaster.layers.set(1);
     // Make thin connector line easier to hit.
     raycaster.params.Line.threshold = 6 * this.getDpr();
     raycaster.setFromCamera(mouse, orthographicCamera);
+
+    // DEBUG: log pointer vs all handle positions (in world space)
+    const pointerWorld = this.screenToWorld2D(screenX, screenY, orthographicCamera, viewportSize);
+    console.debug('[TransformTool2d] pointer vs handles:');
+    console.debug('  pointer:', pointerWorld ? `(${pointerWorld.x.toFixed(0)}, ${pointerWorld.y.toFixed(0)})` : 'null');
+    console.debug('  bounds:', `min(${overlay.combinedBounds.min.x.toFixed(0)}, ${overlay.combinedBounds.min.y.toFixed(0)}) max(${overlay.combinedBounds.max.x.toFixed(0)}, ${overlay.combinedBounds.max.y.toFixed(0)})`);
+    for (const h of overlay.handles) {
+      const wp = h.getWorldPosition(new THREE.Vector3());
+      console.debug(`  ${h.userData?.handleType}: (${wp.x.toFixed(0)}, ${wp.y.toFixed(0)})`);
+    }
+
     const hits = raycaster.intersectObjects(overlay.handles, true);
+    console.debug('[TransformTool2d] raycast hits', hits.length, hits.map(h => h.object.userData?.handleType));
     if (hits.length) {
-      const handleType = hits[0].object.userData?.handleType as TwoDHandle | undefined;
+      // Prefer actual handle meshes over the rotation connector line.
+      const meshHit = hits.find(h => h.object instanceof THREE.Mesh);
+      const bestHit = meshHit ?? hits[0];
+      const handleType = bestHit.object.userData?.handleType as TwoDHandle | undefined;
       return handleType ?? 'idle';
     }
 
@@ -303,6 +351,10 @@ export class TransformTool2d {
     for (const nodeId of nodeIds) {
       const node = sceneGraph.nodeMap.get(nodeId);
       if (node && node instanceof Node2D) {
+        node.updateWorldMatrix(true, false);
+        const worldPosition = node.getWorldPosition(new THREE.Vector3());
+        const worldQuat = node.getWorldQuaternion(new THREE.Quaternion());
+        const worldEuler = new THREE.Euler().setFromQuaternion(worldQuat, 'XYZ');
         const width = typeof (node as any).width === 'number' ? (node as any).width : undefined;
         const height = typeof (node as any).height === 'number' ? (node as any).height : undefined;
         startStates.set(nodeId, {
@@ -311,6 +363,8 @@ export class TransformTool2d {
           scale: new THREE.Vector2(node.scale.x, node.scale.y),
           width,
           height,
+          worldPosition,
+          worldRotationZ: worldEuler.z,
         });
       }
     }
@@ -362,11 +416,9 @@ export class TransformTool2d {
       for (const [nodeId, startState] of startStates) {
         const node = sceneGraph.nodeMap.get(nodeId);
         if (node && node instanceof Node2D) {
-          node.position.set(
-            startState.position.x + delta.x,
-            startState.position.y + delta.y,
-            node.position.z
-          );
+          const startWorld = startState.worldPosition ?? node.getWorldPosition(new THREE.Vector3());
+          const newWorld = startWorld.clone().add(delta);
+          this.setNodeWorldPosition(node, newWorld);
         }
       }
     } else if (handle === 'rotate') {
@@ -383,16 +435,18 @@ export class TransformTool2d {
       for (const [nodeId, startState] of startStates) {
         const node = sceneGraph.nodeMap.get(nodeId);
         if (node && node instanceof Node2D) {
-          node.rotation.set(0, 0, startState.rotation + deltaAngle);
+          const startWorldRot = startState.worldRotationZ ?? startState.rotation;
+          this.setNodeWorldRotationZ(node, startWorldRot + deltaAngle);
 
-          const offsetFromCenter = startState.position.clone().sub(startCenterWorld);
+          const startWorldPos = startState.worldPosition ?? node.getWorldPosition(new THREE.Vector3());
+          const offsetFromCenter = startWorldPos.clone().sub(startCenterWorld);
           const rotatedOffset = new THREE.Vector3(
             offsetFromCenter.x * Math.cos(deltaAngle) - offsetFromCenter.y * Math.sin(deltaAngle),
             offsetFromCenter.x * Math.sin(deltaAngle) + offsetFromCenter.y * Math.cos(deltaAngle),
             0
           );
           const newPosition = startCenterWorld.clone().add(rotatedOffset);
-          node.position.set(newPosition.x, newPosition.y, node.position.z);
+          this.setNodeWorldPosition(node, newPosition);
         }
       }
     } else {
@@ -433,14 +487,15 @@ export class TransformTool2d {
       for (const [nodeId, startState] of startStates) {
         const node = sceneGraph.nodeMap.get(nodeId);
         if (node && node instanceof Node2D) {
-          const offsetFromCenter = startState.position.clone().sub(startCenterWorld);
+          const startWorldPos = startState.worldPosition ?? node.getWorldPosition(new THREE.Vector3());
+          const offsetFromCenter = startWorldPos.clone().sub(startCenterWorld);
           const scaledOffset = new THREE.Vector3(
             offsetFromCenter.x * scaleFactorX,
             offsetFromCenter.y * scaleFactorY,
             0
           );
           const newPos = newCenterWorld.clone().add(scaledOffset);
-          node.position.set(newPos.x, newPos.y, node.position.z);
+          this.setNodeWorldPosition(node, newPos);
 
           const startWidth = typeof startState.width === 'number' ? startState.width : undefined;
           const startHeight = typeof startState.height === 'number' ? startState.height : undefined;

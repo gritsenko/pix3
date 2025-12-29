@@ -1,6 +1,7 @@
 import type { TemplateResult } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
+import { repeat } from 'lit/directives/repeat.js';
 import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
 import feather from 'feather-icons';
 
@@ -176,7 +177,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
         </div>
         ${hasChildren && !this.isCollapsed
           ? html`<ul class="tree-children" role="group">
-              ${this.node.children.map(
+              ${repeat(
+                this.node.children,
+                child => child.id,
                 (child, index) =>
                   html`<li>
                     <pix3-scene-tree-node
@@ -301,21 +304,27 @@ export class SceneTreeNodeComponent extends ComponentBase {
     const relativeY = event.clientY - rect.top;
     const thresholdPercent = 0.33;
 
+    let nextPosition: 'top' | 'inside' | 'bottom' | null = null;
     if (relativeY < rect.height * thresholdPercent) {
-      this.dragOverPosition = 'top';
+      nextPosition = 'top';
     } else if (relativeY > rect.height * (1 - thresholdPercent)) {
-      this.dragOverPosition = 'bottom';
+      nextPosition = 'bottom';
     } else {
-      this.dragOverPosition = 'inside';
+      nextPosition = 'inside';
+    }
+
+    if (this.dragOverPosition !== nextPosition) {
+      this.dragOverPosition = nextPosition;
     }
   }
 
   private onDragLeave(event: DragEvent): void {
     event.stopPropagation();
-    // Only clear if we're actually leaving this element
-    if (event.target === event.currentTarget) {
-      this.dragOverPosition = null;
-    }
+    // Clear the highlight when leaving the element.
+    // We don't check event.target === event.currentTarget here to ensure 
+    // the highlight is cleared more reliably, even if it causes minor flickering 
+    // when moving over child elements (which is immediately corrected by onDragOver).
+    this.dragOverPosition = null;
   }
 
   private async onDrop(event: DragEvent): Promise<void> {
@@ -323,19 +332,19 @@ export class SceneTreeNodeComponent extends ComponentBase {
     event.stopPropagation();
 
     const draggedNodeId = event.dataTransfer?.getData('application/x-scene-tree-node');
+    
+    // Always clear the highlight on drop
+    const dropPosition = this.dragOverPosition;
+    this.dragOverPosition = null;
+
     if (!draggedNodeId) {
       return;
     }
 
     // Prevent dropping a node on itself
     if (draggedNodeId === this.node.id) {
-      this.dragOverPosition = null;
       return;
     }
-
-    // Capture the drop position before clearing it
-    const dropPosition = this.dragOverPosition;
-    this.dragOverPosition = null;
 
     try {
       // Determine the action based on drop position

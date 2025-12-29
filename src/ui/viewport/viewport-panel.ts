@@ -277,7 +277,8 @@ export class ViewportPanel extends ComponentBase {
       return;
     }
 
-    const rect = this.getBoundingClientRect();
+    // Use canvas rect, not panel rect, since canvas is offset by toolbar
+    const rect = this.canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
 
@@ -306,7 +307,8 @@ export class ViewportPanel extends ComponentBase {
     // Handle 2D transform updates when a 2D handle is engaged
     const has2DTransform = this.viewportRenderer.has2DTransform?.();
     if (has2DTransform) {
-      const rect = this.getBoundingClientRect();
+      // Use canvas rect, not panel rect, since canvas is offset by toolbar
+      const rect = this.canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
       const screenX = event.clientX - rect.left;
       const screenY = event.clientY - rect.top;
 

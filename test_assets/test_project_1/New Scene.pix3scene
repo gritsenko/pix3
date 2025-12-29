@@ -81,7 +81,7 @@ root:
           width: 160.7369425912922
           height: 152.4255727703653
           transform:
-            position: [-240.11065879564615, 464.51747388518265]
+            position: [-196.1105977604899, -91.48255663239559]
             scale: [1, 1]
             rotation: 0
         children:
@@ -91,8 +91,8 @@ root:
             properties:
               texturePath: res://images/ai.jpg
               width: 570.9831350948033
-              height: 258.5491134129213
+              height: 311.99817018830396
               transform:
-                position: [261.9446925474016, 396.2589317064606]
+                position: [248.94466202982343, 447.9834906117301]
                 scale: [1, 1]
                 rotation: 0

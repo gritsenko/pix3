@@ -68,8 +68,8 @@ export class ViewportRendererService {
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
   private selectionGizmos = new Map<string, THREE.Object3D>();
   private previewCamera: THREE.Camera | null = null;
-  private group2DMeshes = new Map<string, THREE.LineSegments>();
-  private sprite2DMeshes = new Map<string, THREE.Mesh>();
+  private group2DVisuals = new Map<string, THREE.Group>();
+  private sprite2DVisuals = new Map<string, THREE.Group>();
   private selection2DOverlay?: Selection2DOverlay;
   private active2DTransform?: Active2DTransform;
   private animationId?: number;
@@ -85,6 +85,20 @@ export class ViewportRendererService {
 
   constructor() {
     this.transformTool2d = new TransformTool2d();
+  }
+
+  private disposeObject3D(root: THREE.Object3D): void {
+    root.traverse(obj => {
+      if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
+        obj.geometry?.dispose();
+        const material = (obj as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        if (material instanceof THREE.Material) {
+          material.dispose();
+        } else if (Array.isArray(material)) {
+          material.forEach(m => m.dispose());
+        }
+      }
+    });
   }
 
   initialize(canvas: HTMLCanvasElement): void {
@@ -430,8 +444,8 @@ export class ViewportRendererService {
     raycaster.setFromCamera(mouse, this.orthographicCamera);
 
     const candidates: THREE.Object3D[] = [
-      ...this.group2DMeshes.values(),
-      ...this.sprite2DMeshes.values(),
+      ...this.group2DVisuals.values(),
+      ...this.sprite2DVisuals.values(),
     ];
 
     console.debug('[ViewportRenderer] 2D raycast candidates', {
@@ -508,20 +522,28 @@ export class ViewportRendererService {
         });
       }
     } else if (node instanceof Group2D) {
-      // Update Group2D visual representation transform
-      const mesh = this.group2DMeshes.get(node.nodeId);
-      if (mesh) {
-        mesh.position.copy(node.position);
-        mesh.rotation.copy(node.rotation);
-        mesh.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
+      const visualRoot = this.group2DVisuals.get(node.nodeId);
+      if (visualRoot) {
+        visualRoot.position.copy(node.position);
+        visualRoot.rotation.copy(node.rotation);
+        visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+        const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
+        if (sizeGroup) {
+          sizeGroup.scale.set(node.width, node.height, 1);
+        }
+        visualRoot.visible = node.visible;
       }
     } else if (node instanceof Sprite2D) {
-      // Update Sprite2D visual representation transform
-      const mesh = this.sprite2DMeshes.get(node.nodeId);
-      if (mesh) {
-        mesh.position.copy(node.position);
-        mesh.rotation.copy(node.rotation);
-        mesh.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
+      const visualRoot = this.sprite2DVisuals.get(node.nodeId);
+      if (visualRoot) {
+        visualRoot.position.copy(node.position);
+        visualRoot.rotation.copy(node.rotation);
+        visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+        const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
+        if (sizeGroup) {
+          sizeGroup.scale.set(node.width, node.height, 1);
+        }
+        visualRoot.visible = node.visible;
       }
     }
 
@@ -533,34 +555,14 @@ export class ViewportRendererService {
   updateNodeVisibility(node: NodeBase): void {
     // Handle visibility changes for 2D nodes (Group2D and Sprite2D)
     if (node instanceof Group2D) {
-      const mesh = this.group2DMeshes.get(node.nodeId);
-      if (mesh) {
-        if (node.visible) {
-          // Show the mesh
-          if (!mesh.parent && this.scene) {
-            this.scene.add(mesh);
-          }
-        } else {
-          // Hide the mesh
-          if (mesh.parent) {
-            mesh.parent.remove(mesh);
-          }
-        }
+      const visualRoot = this.group2DVisuals.get(node.nodeId);
+      if (visualRoot) {
+        visualRoot.visible = node.visible;
       }
     } else if (node instanceof Sprite2D) {
-      const mesh = this.sprite2DMeshes.get(node.nodeId);
-      if (mesh) {
-        if (node.visible) {
-          // Show the mesh
-          if (!mesh.parent && this.scene) {
-            this.scene.add(mesh);
-          }
-        } else {
-          // Hide the mesh
-          if (mesh.parent) {
-            mesh.parent.remove(mesh);
-          }
-        }
+      const visualRoot = this.sprite2DVisuals.get(node.nodeId);
+      if (visualRoot) {
+        visualRoot.visible = node.visible;
       }
     }
   }
@@ -728,33 +730,22 @@ export class ViewportRendererService {
         return;
       }
 
-      // Clean up previous Group2D meshes
-      for (const mesh of this.group2DMeshes.values()) {
-        if (this.scene) {
-          this.scene.remove(mesh);
+      // Clean up previous 2D visuals
+      for (const visual of this.group2DVisuals.values()) {
+        if (visual.parent) {
+          visual.parent.remove(visual);
         }
-        mesh.geometry.dispose();
-        if (mesh.material instanceof THREE.Material) {
-          mesh.material.dispose();
-        } else if (Array.isArray(mesh.material)) {
-          mesh.material.forEach(m => m.dispose());
-        }
+        this.disposeObject3D(visual);
       }
-      this.group2DMeshes.clear();
+      this.group2DVisuals.clear();
 
-      // Clean up previous Sprite2D meshes
-      for (const mesh of this.sprite2DMeshes.values()) {
-        if (this.scene) {
-          this.scene.remove(mesh);
+      for (const visual of this.sprite2DVisuals.values()) {
+        if (visual.parent) {
+          visual.parent.remove(visual);
         }
-        mesh.geometry.dispose();
-        if (mesh.material instanceof THREE.Material) {
-          mesh.material.dispose();
-        } else if (Array.isArray(mesh.material)) {
-          mesh.material.forEach(m => m.dispose());
-        }
+        this.disposeObject3D(visual);
       }
-      this.sprite2DMeshes.clear();
+      this.sprite2DVisuals.clear();
 
       // Remove all root nodes from scene (except lights and helpers)
       const objectsToRemove: THREE.Object3D[] = [];
@@ -767,7 +758,7 @@ export class ViewportRendererService {
 
       objectsToRemove.forEach(obj => this.scene!.remove(obj));
 
-      // Add scene graph root nodes and create visual representations for Group2D
+      // Add scene graph root nodes and create visual representations for 2D nodes
       sceneGraph.rootNodes.forEach(node => {
         this.processNodeForRendering(node);
       });
@@ -782,7 +773,7 @@ export class ViewportRendererService {
    * Process a node and its children for rendering.
    * Creates visual representations for Group2D nodes and Sprite2D nodes.
    */
-  private processNodeForRendering(node: NodeBase): void {
+  private processNodeForRendering(node: NodeBase, parent2DVisualRoot?: THREE.Object3D): void {
     if (!this.scene) return;
 
     // Add 3D nodes to the scene with layer 0
@@ -791,40 +782,37 @@ export class ViewportRendererService {
       node.layers.set(LAYER_3D); // 3D nodes use layer 0
     }
 
-    // Create visual representation for Group2D nodes with layer 1
+    let current2DVisualRoot = parent2DVisualRoot;
+
     if (node instanceof Group2D) {
-      const mesh = this.createGroup2DVisual(node);
-      mesh.layers.set(LAYER_2D); // 2D visuals use layer 1
-      this.group2DMeshes.set(node.nodeId, mesh);
-      // Only add to scene if the node is visible
-      if (node.visible) {
-        this.scene.add(mesh);
-      }
+      const visualRoot = this.createGroup2DVisual(node);
+      this.group2DVisuals.set(node.nodeId, visualRoot);
+
+      const parent = parent2DVisualRoot ?? this.scene;
+      parent.add(visualRoot);
+      current2DVisualRoot = visualRoot;
+    } else if (node instanceof Sprite2D) {
+      const visualRoot = this.createSprite2DVisual(node);
+      this.sprite2DVisuals.set(node.nodeId, visualRoot);
+
+      const parent = parent2DVisualRoot ?? this.scene;
+      parent.add(visualRoot);
+      current2DVisualRoot = visualRoot;
     }
 
-    // Create visual representation for Sprite2D nodes with layer 1
-    if (node instanceof Sprite2D) {
-      const mesh = this.createSprite2DVisual(node);
-      mesh.layers.set(LAYER_2D); // 2D visuals use layer 1
-      this.sprite2DMeshes.set(node.nodeId, mesh);
-      // Only add to scene if the node is visible
-      if (node.visible) {
-        this.scene.add(mesh);
-      }
-    }
-
-    // Recursively process children
     for (const child of node.children) {
-      this.processNodeForRendering(child);
+      this.processNodeForRendering(child, current2DVisualRoot);
     }
   }
 
   /**
    * Create a rectangle outline visual representation for a Group2D node.
    */
-  private createGroup2DVisual(node: Group2D): THREE.LineSegments {
-    // Use normalized rectangle geometry and apply width/height via scale.
-    // This makes width/height edits and resize-gizmo updates visible immediately.
+  private createGroup2DVisual(node: Group2D): THREE.Group {
+    // Visual hierarchy:
+    // - root group: position/rotation/scale (transform scale)
+    // - size group: width/height only (does NOT affect children)
+    // - line: normalized outline
     const points: THREE.Vector3[] = [
       new THREE.Vector3(-0.5, -0.5, 0),
       new THREE.Vector3(0.5, -0.5, 0),
@@ -845,18 +833,31 @@ export class ViewportRendererService {
       linewidth: 2,
     });
 
+    const root = new THREE.Group();
+    root.position.copy(node.position);
+    root.rotation.copy(node.rotation);
+    root.scale.set(node.scale.x, node.scale.y, 1);
+    root.visible = node.visible;
+    root.layers.set(LAYER_2D);
+
+    const sizeGroup = new THREE.Group();
+    sizeGroup.scale.set(node.width, node.height, 1);
+    sizeGroup.layers.set(LAYER_2D);
+
     const line = new THREE.LineSegments(geometry, material);
-
-    // Apply the node's transform
-    line.position.copy(node.position);
-    line.rotation.copy(node.rotation);
-    line.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
-
-    // Mark as editor visual
+    line.layers.set(LAYER_2D);
     line.userData.isGroup2DVisual = true;
     line.userData.nodeId = node.nodeId;
 
-    return line;
+    sizeGroup.add(line);
+    root.add(sizeGroup);
+
+    // Keep references for updates
+    root.userData.isGroup2DVisualRoot = true;
+    root.userData.nodeId = node.nodeId;
+    root.userData.sizeGroup = sizeGroup;
+
+    return root;
   }
 
   private createNodeGizmo(node: Node3D): THREE.Object3D | null {
@@ -902,9 +903,11 @@ export class ViewportRendererService {
    * Create a visual representation for a Sprite2D node.
    * Renders the texture if available, or a placeholder rectangle if not.
    */
-  private createSprite2DVisual(node: Sprite2D): THREE.Mesh {
-    // Use a normalized plane geometry and apply width/height via scale.
-    // This avoids geometry churn during interactive resize and makes width/height edits visible.
+  private createSprite2DVisual(node: Sprite2D): THREE.Group {
+    // Visual hierarchy:
+    // - root group: position/rotation/scale (transform scale)
+    // - size group: width/height only (does NOT affect children)
+    // - mesh: normalized quad
     const geometry = new THREE.PlaneGeometry(1, 1);
     geometry.computeBoundingBox();
 
@@ -913,7 +916,7 @@ export class ViewportRendererService {
     // Try to load texture if available; if it references a templ:// or res:// URL,
     // use ResourceManager to resolve it to a Blob and create an object URL for the TextureLoader.
     const textureLoader = new THREE.TextureLoader();
-    const meshRef = { current: null as THREE.Mesh | null }; // Reference to be set after mesh creation
+    const meshRef = { current: null as THREE.Mesh | null };
 
     if (node.texturePath) {
       // Use a placeholder material immediately, and patch in the texture asynchronously
@@ -946,11 +949,8 @@ export class ViewportRendererService {
                       node.height = image.height;
                     }
 
-                    // Update the mesh scale to match the node's current dimensions
-                    const mesh = meshRef.current;
-                    if (mesh) {
-                      mesh.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
-                    }
+                    // Ensure the visual reflects updated dimensions
+                    this.updateNodeTransform(node);
                   }
                 }
               } finally {
@@ -1014,16 +1014,28 @@ export class ViewportRendererService {
     const mesh = new THREE.Mesh(geometry, material);
     meshRef.current = mesh; // Store reference for async texture loading callback
 
-    // Apply the node's transform (2D space within parent Group2D)
-    mesh.position.copy(node.position);
-    mesh.rotation.copy(node.rotation);
-    mesh.scale.set(node.scale.x * node.width, node.scale.y * node.height, 1);
-
-    // Mark as Sprite2D visual for identification
+    mesh.layers.set(LAYER_2D);
     mesh.userData.isSprite2DVisual = true;
     mesh.userData.nodeId = node.nodeId;
 
-    return mesh;
+    const root = new THREE.Group();
+    root.position.copy(node.position);
+    root.rotation.copy(node.rotation);
+    root.scale.set(node.scale.x, node.scale.y, 1);
+    root.visible = node.visible;
+    root.layers.set(LAYER_2D);
+
+    const sizeGroup = new THREE.Group();
+    sizeGroup.scale.set(node.width, node.height, 1);
+    sizeGroup.layers.set(LAYER_2D);
+    sizeGroup.add(mesh);
+    root.add(sizeGroup);
+
+    root.userData.isSprite2DVisualRoot = true;
+    root.userData.nodeId = node.nodeId;
+    root.userData.sizeGroup = sizeGroup;
+
+    return root;
   }
 
   private findNodeById(nodeId: string, nodes: NodeBase[]): NodeBase | null {
@@ -1212,7 +1224,8 @@ export class ViewportRendererService {
 
     for (const handle of this.selection2DOverlay.handles) {
       const type = handle.userData?.handleType as string | undefined;
-      if (type && handlePositions[type]) {
+      // The rotate connector line geometry is defined in world-space points; don't also translate the Line.
+      if (type && handlePositions[type] && !(handle instanceof THREE.Line)) {
         handle.position.copy(handlePositions[type]);
       }
       if (type === 'rotate' && handle instanceof THREE.Line) {
@@ -1222,6 +1235,7 @@ export class ViewportRendererService {
         ]);
         handle.geometry.dispose();
         handle.geometry = lineGeom;
+        handle.position.set(0, 0, 0);
       }
     }
 
@@ -1379,10 +1393,10 @@ export class ViewportRendererService {
 
   private get2DVisual(node: Node2D): THREE.Object3D | undefined {
     if (node instanceof Group2D) {
-      return this.group2DMeshes.get(node.nodeId);
+      return this.group2DVisuals.get(node.nodeId);
     }
     if (node instanceof Sprite2D) {
-      return this.sprite2DMeshes.get(node.nodeId);
+      return this.sprite2DVisuals.get(node.nodeId);
     }
     return undefined;
   }
@@ -1604,16 +1618,15 @@ export class ViewportRendererService {
     });
     this.selectionBoxes.clear();
 
-    // Dispose Group2D visual meshes
-    this.group2DMeshes.forEach(mesh => {
-      mesh.geometry.dispose();
-      if (mesh.material instanceof THREE.Material) {
-        mesh.material.dispose();
-      } else if (Array.isArray(mesh.material)) {
-        mesh.material.forEach(m => m.dispose());
-      }
-    });
-    this.group2DMeshes.clear();
+    for (const visual of this.group2DVisuals.values()) {
+      this.disposeObject3D(visual);
+    }
+    this.group2DVisuals.clear();
+
+    for (const visual of this.sprite2DVisuals.values()) {
+      this.disposeObject3D(visual);
+    }
+    this.sprite2DVisuals.clear();
 
     this.clear2DSelectionOverlay();
 
