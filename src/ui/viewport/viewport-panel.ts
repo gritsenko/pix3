@@ -27,6 +27,9 @@ export class ViewportPanel extends ComponentBase {
   @state()
   private showLayer2D = false;
 
+  @state()
+  private showLayer3D = false;
+
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
     if (!entry) {
@@ -59,6 +62,7 @@ export class ViewportPanel extends ComponentBase {
     subscribe(appState.ui, () => {
       this.showGrid = appState.ui.showGrid;
       this.showLayer2D = appState.ui.showLayer2D;
+      this.showLayer3D = appState.ui.showLayer3D;
     });
 
     // Add keyboard shortcuts for transform modes
@@ -141,7 +145,20 @@ export class ViewportPanel extends ComponentBase {
             <span class="toolbar-icon">${unsafeHTML(this.getIcon('grid'))}</span>
           </button>
           <button
-            class="toolbar-button"
+            class="toolbar-button layer-toggle-button"
+            aria-label="Toggle 3D layer"
+            aria-pressed="${this.showLayer3D}"
+            @click="${(e: Event) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              this.toggleLayer3D();
+            }}"
+            title="Toggle 3D Layer (3)"
+          >
+            <span class="layer-label">3D</span>
+          </button>
+          <button
+            class="toolbar-button layer-toggle-button"
             aria-label="Toggle 2D layer"
             aria-pressed="${this.showLayer2D}"
             @click="${(e: Event) => {
@@ -151,7 +168,7 @@ export class ViewportPanel extends ComponentBase {
             }}"
             title="Toggle 2D Layer (2)"
           >
-            <span class="toolbar-icon">${unsafeHTML(this.getIcon('layers'))}</span>
+            <span class="layer-label">2D</span>
           </button>
           <div class="toolbar-separator"></div>
           <button
@@ -199,6 +216,10 @@ export class ViewportPanel extends ComponentBase {
 
   private toggleLayer2D(): void {
     appState.ui.showLayer2D = !appState.ui.showLayer2D;
+  }
+
+  private toggleLayer3D(): void {
+    appState.ui.showLayer3D = !appState.ui.showLayer3D;
   }
 
   private zoomDefault(): void {
@@ -260,6 +281,10 @@ export class ViewportPanel extends ComponentBase {
       case '2':
         event.preventDefault();
         this.toggleLayer2D();
+        break;
+      case '3':
+        event.preventDefault();
+        this.toggleLayer3D();
         break;
       case 'home':
         event.preventDefault();

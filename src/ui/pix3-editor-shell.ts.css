@@ -2,6 +2,8 @@ pix3-editor-shell {
   display: block;
   inline-size: 100%;
   block-size: 100%;
+  --pix3-accent-color: #ffcf33;
+  --pix3-accent-rgb: 255, 207, 51;
 }
 
 .editor-shell {

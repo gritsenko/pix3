@@ -282,6 +282,21 @@ Vector and rotation properties render with custom Web Components (`Vector2Editor
 - Services implement `@injectable()` and `dispose()` methods
 - Import from `@/` aliases, never relative paths for core code
 
+### Styling & Theme Variables
+
+**Centralized Accent Color**: Use CSS custom properties instead of hardcoded color values:
+- `--pix3-accent-color: #ffcf33` — For direct hex references
+- `--pix3-accent-rgb: 255, 207, 51` — For use in rgba() functions with opacity
+
+```css
+/* Apply accent color with varying opacity */
+background: rgba(var(--pix3-accent-rgb), 0.8);      /* 80% opacity */
+box-shadow: 0 0 0 2px rgba(var(--pix3-accent-rgb), 0.3);  /* 30% opacity */
+border-color: rgba(var(--pix3-accent-rgb), 0.45);   /* 45% opacity */
+```
+
+Both variables are defined in `:root` in `src/index.css` and available globally. To change the theme accent color, update these CSS variables — all buttons, tabs, panels, and interactive elements will automatically reflect the new color.
+
 ### File Conventions
 - `*.command.ts` - Command implementations
 - `*.operation.ts` - Operation implementations

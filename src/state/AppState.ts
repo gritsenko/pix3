@@ -85,6 +85,8 @@ export interface UIState {
   panelVisibility: PanelVisibilityState;
   /** Toggle for showing the 2D orthographic layer overlay */
   showLayer2D: boolean;
+  /** Toggle for showing the 3D perspective layer */
+  showLayer3D: boolean;
   /** Toggle for showing the 3D grid helper */
   showGrid: boolean;
 }
@@ -154,6 +156,7 @@ export const createInitialAppState = (): AppState => ({
       logs: true,
     },
     showLayer2D: true,
+    showLayer3D: true,
     showGrid: true,
   },
   operations: {

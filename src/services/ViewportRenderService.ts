@@ -1449,8 +1449,14 @@ export class ViewportRendererService {
         }
 
         // Render main scene with perspective camera (3D layer and gizmos)
-        this.renderer.autoClear = true;
-        this.renderer.render(this.scene, this.camera);
+        if (appState.ui.showLayer3D) {
+          this.renderer.autoClear = true;
+          this.renderer.render(this.scene, this.camera);
+        } else {
+          // Clear the canvas when 3D layer is disabled
+          this.renderer.autoClear = true;
+          this.renderer.clear();
+        }
 
         // Render 2D layer with orthographic camera if enabled
         if (appState.ui.showLayer2D && this.orthographicCamera) {

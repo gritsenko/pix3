@@ -198,11 +198,12 @@ src/
 5. **Use ComponentBase** for all Lit components, not LitElement directly
 6. **Import from `@/` aliases** — never use relative paths for core imports
 7. **Separate styles** — each component has corresponding `.css` file
-8. **Light DOM by default** — use shadow DOM only when explicitly needed
-9. **Singleton services** — register with ServiceContainer, implement dispose()
-10. **Cross-reference specification** — check `docs/pix3-specification.md` for architectural decisions
-11. **Avoid bloat documentation** — Only maintain README.md, AGENTS.md, architecture.md, pix3-specification.md in docs/. Keep documentation minimal and focused on active development.
-12. **Property schemas define node properties** — Node classes must implement `static getPropertySchema()`. Inspector consumes via `getNodePropertySchema()`. Schema's getValue/setValue handle all property access and transformation (e.g., radian/degree conversion).
+8. **Centralized accent color** — use CSS custom properties `--pix3-accent-color` (#ffcf33) and `--pix3-accent-rgb` (255, 207, 51) instead of hardcoded orange values in all UI CSS. Apply to buttons, dropdowns, panels, tabs, menus, and interactive states using `rgba(var(--pix3-accent-rgb), opacity)` for flexibility.
+9. **Light DOM by default** — use shadow DOM only when explicitly needed
+10. **Singleton services** — register with ServiceContainer, implement dispose()
+11. **Cross-reference specification** — check `docs/pix3-specification.md` for architectural decisions
+12. **Avoid bloat documentation** — Only maintain README.md, AGENTS.md, architecture.md, pix3-specification.md in docs/. Keep documentation minimal and focused on active development. **Do NOT create separate .md files for specific features or refactors**—integrate essential information directly into existing documentation files or README.md instead.
+13. **Property schemas define node properties** — Node classes must implement `static getPropertySchema()`. Inspector consumes via `getNodePropertySchema()`. Schema's getValue/setValue handle all property access and transformation (e.g., radian/degree conversion).
 
 Always verify architectural decisions against the specification before implementing features.
 

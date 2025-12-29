@@ -97,7 +97,7 @@ pix3-welcome {
   aspect-ratio: auto;
   height: 120px;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 207, 51, 0.3);
+  border: 1px solid rgba(var(--pix3-accent-rgb), 0.3);
   border-radius: 0.8rem;
   cursor: pointer;
   color: #f7fafc;
@@ -108,9 +108,9 @@ pix3-welcome {
   padding: 1rem;
 }
 .action-btn:hover {
-  background: rgba(255, 207, 51, 0.15);
-  border-color: rgba(255, 207, 51, 0.5);
-  box-shadow: 0 0 20px rgba(255, 207, 51, 0.2);
+  background: rgba(var(--pix3-accent-rgb), 0.15);
+  border-color: rgba(var(--pix3-accent-rgb), 0.5);
+  box-shadow: 0 0 20px rgba(var(--pix3-accent-rgb), 0.2);
 }
 .action-btn:active {
   transform: scale(0.98);
@@ -121,7 +121,7 @@ pix3-welcome {
   justify-content: center;
   width: 2rem;
   height: 2rem;
-  color: rgba(255, 207, 51, 0.8);
+  color: rgba(var(--pix3-accent-rgb), 0.8);
 }
 .action-label {
   font-size: 0.9rem;
@@ -169,14 +169,14 @@ pix3-welcome {
   font-weight: 500;
 }
 .recent-item:hover {
-  background: rgba(255, 207, 51, 0.15);
-  border-color: rgba(255, 207, 51, 0.3);
+  background: rgba(var(--pix3-accent-rgb), 0.15);
+  border-color: rgba(var(--pix3-accent-rgb), 0.3);
 }
 .folder-icon {
   display: inline-flex;
   align-items: center;
   flex-shrink: 0;
-  color: rgba(255, 207, 51, 0.8);
+  color: rgba(var(--pix3-accent-rgb), 0.8);
 }
 .recent-name {
   flex: 1;
@@ -206,6 +206,6 @@ pix3-welcome {
   color: #f7fafc;
 }
 .recent-remove:focus {
-  outline: 2px solid rgba(255, 207, 51, 0.6);
+  outline: 2px solid rgba(var(--pix3-accent-rgb), 0.6);
   outline-offset: 2px;
 }
