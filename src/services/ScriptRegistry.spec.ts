@@ -16,7 +16,7 @@ class TestBehavior extends BehaviorBase {
         {
           name: 'speed',
           type: 'number',
-          getValue: (b) => (b as TestBehavior).parameters.speed,
+          getValue: b => (b as TestBehavior).parameters.speed,
           setValue: (b, v) => {
             (b as TestBehavior).parameters.speed = v;
           },
@@ -35,7 +35,7 @@ class TestController extends ScriptControllerBase {
         {
           name: 'maxSpeed',
           type: 'number',
-          getValue: (c) => (c as TestController).parameters.maxSpeed,
+          getValue: c => (c as TestController).parameters.maxSpeed,
           setValue: (c, v) => {
             (c as TestController).parameters.maxSpeed = v;
           },
