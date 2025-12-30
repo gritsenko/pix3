@@ -1,8 +1,8 @@
 # Pix3 — Technical Specification
 
-Version: 1.9
+Version: 1.11
 
-Date: 2025-10-27
+Date: 2025-12-30
 
 ## 1. Introduction
 
@@ -30,12 +30,12 @@ Success metrics:
 
 ### 1.4 Document Scope and Change Management
 
-This specification covers the MVP scope and foundation architecture. Changes are tracked in the changelog at the end of the document. Version 1.5 incorporates target browser alignment, extended non-functional requirements, and deeper architectural guidance.
+This specification covers the MVP scope and foundation architecture. Changes are tracked in the changelog at the end of the document.
 
 ## 2. Key Features
 
 - Hybrid 2D/3D Scene: The editor does not have a rigid separation between 2D and 3D modes. Instead, it uses a layer system, allowing 2D interfaces to be overlaid on top of 3D scenes — ideal for creating game UIs.
-- Godot-style Scene Structure: The scene architecture is based on a hierarchy of "nodes." Each node represents an object (a sprite, a 3D model, a light source). Nodes can be saved into separate scene files (*.pix3scene) and reused (instanced) within other scenes.
+- Godot-style Scene Structure: The scene architecture is based on a hierarchy of "nodes." Each node represents an object (a sprite, a 3D model, a light source). Nodes can be saved into separate scene files (\*.pix3scene) and reused (instanced) within other scenes.
 - Local File System Integration: Pix3 works directly with the project folder on the user's disk via the File System Access API. This eliminates the need to upload/download files and provides seamless synchronization with external code editors.
 - Multi-tab Interface: Users can open and edit multiple scenes in different tabs simultaneously, simplifying work on complex projects.
 - Drag-and-Drop Assets: Project resources (images, models) can be dragged directly from the editor's file browser into the scene viewport to create nodes.
@@ -44,16 +44,19 @@ This specification covers the MVP scope and foundation architecture. Changes are
 
 ## 3. Technology Stack
 
-| Category           | Technology                  | Justification |
-|-------------------:|:---------------------------|:--------------|
-| UI Components      | Lit + fw utilities         | A lightweight library for creating fast, native, and encapsulated web components. Use the project `fw` helpers (`ComponentBase`, `inject`, and related exports) as the default building blocks for UI components instead of raw LitElement to simplify configuration (light vs shadow DOM), dependency injection, and consistency across the codebase.
-| State Management   | Valtio                     | An ultra-lightweight, high-performance state manager based on proxies. Ensures reactivity and is easy to use.
-| Rendering (MVP)    | Three.js                   | Single engine for both 3D (perspective) and 2D (orthographic) layers to minimize bundle size for playable ads.
-| 2D Overlays        | Three.js (orthographic)    | Orthographic camera + sprite/material system handles HUD & UI layers without second engine.
-| Panel Layout       | Golden Layout              | A ready-made solution for creating complex, customizable, and persistent panel layouts.
-| Language           | TypeScript                 | Strong typing to increase reliability, improve autocompletion, and simplify work with AI agents.
-| Build Tool         | Vite                       | A modern and extremely fast build tool, perfectly suited for development with native web technologies.
-| File System        | File System Access API     | Allows working with local files directly from the browser without needing Electron.
+|      Category | Technology             | Justification                                                                                                                                                                                                                                                                                                                                          |
+| ------------: | :--------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| UI Components | Lit + fw utilities     | A lightweight library for creating fast, native, and encapsulated web components. Use the project `fw` helpers (`ComponentBase`, `inject`, and related exports) as the default building blocks for UI components instead of raw LitElement to simplify configuration (light vs shadow DOM), dependency injection, and consistency across the codebase. |
+|               | State Management       | Valtio                                                                                                                                                                                                                                                                                                                                                 | An ultra-lightweight, high-performance state manager based on proxies. Ensures reactivity and is easy to use. |
+|               | Rendering (3D)         | Three.js                                                                                                                                                                                                                                                                                                                                               | Modern WebGL renderer for 3D content.                                                                         |
+|               | Panel Layout           | Golden Layout                                                                                                                                                                                                                                                                                                                                          | A ready-made solution for creating complex, customizable, and persistent panel layouts.                       |
+|               | Language               | TypeScript                                                                                                                                                                                                                                                                                                                                             | Strong typing to increase reliability, improve autocompletion, and simplify work with AI agents.              |
+|               | Build Tool             | Vite                                                                                                                                                                                                                                                                                                                                                   | A modern and extremely fast build tool, perfectly suited for development with native web technologies.        |
+|               | File System            | File System Access API                                                                                                                                                                                                                                                                                                                                 | Allows working with local files directly from the browser without needing Electron.                           |
+|  Panel Layout | Golden Layout          | A ready-made solution for creating complex, customizable, and persistent panel layouts.                                                                                                                                                                                                                                                                |
+|      Language | TypeScript             | Strong typing to increase reliability, improve autocompletion, and simplify work with AI agents.                                                                                                                                                                                                                                                       |
+|    Build Tool | Vite                   | A modern and extremely fast build tool, perfectly suited for development with native web technologies.                                                                                                                                                                                                                                                 |
+|   File System | File System Access API | Allows working with local files directly from the browser without needing Electron.                                                                                                                                                                                                                                                                    |
 
 ### 3.1 Target Platforms
 
@@ -65,7 +68,7 @@ Non-Chromium browsers (Firefox, Safari) are out of scope for MVP but should degr
 
 ## 4. Architecture
 
-The application will be built on the principles of unidirectional data flow and clear separation of concerns.
+The application is built on the principles of unidirectional data flow and clear separation of concerns.
 
 - **State**: A centralized Valtio proxy (`appState`), serving as the single source of truth for UI, scenes metadata, and selection. It is passive and contains no business logic.
 - **Nodes**: Scene nodes (inheriting from Three.js Object3D) are managed by `SceneManager` in `SceneGraph` objects. **Nodes are not stored in reactive state** — only node IDs are tracked in state for selection and hierarchy reference. This separation reduces reactivity overhead and keeps node mutations fast.
@@ -74,34 +77,32 @@ The application will be built on the principles of unidirectional data flow and 
 - **CommandDispatcher**: Primary entry point for all user actions. Ensures consistent lifecycle management, preconditions checking, and telemetry for all commands.
 - **Command Metadata**: Commands declare menu integration via metadata properties: `menuPath` (menu section), `shortcut` (display), and `addToMenu` (inclusion flag). Menu is generated from registered commands, not hardcoded.
 - **Core Managers**: Classes that orchestrate the main aspects of the editor (HistoryManager, SceneManager, LayoutManager). They manage their respective domains and emit events.
-- **Services**: Infrastructure layer for interacting with the outside world (FileSystemAPIService, ViewportRenderService). They implement `dispose()` and are registered with DI.
+- **Services**: Infrastructure layer for interacting with the outside world (FileSystemAPIService, ViewportRenderService, DialogService, LoggingService, FileWatchService). They implement `dispose()` and are registered with DI.
 - **UI Components**: "Dumb" components extending `ComponentBase` from `src/fw`. They subscribe to state changes, render based on snapshots, and dispatch commands via CommandDispatcher rather than mutating state directly.
-- **Message Bus**: Optional typed pub/sub for bridging state updates, commands, and plugins without tight coupling.
+- **Property Schema System**: Godot-inspired declarative property metadata system for dynamic inspector UI generation. Node classes expose editable properties via `static getPropertySchema()`, enabling automatic editor creation.
 
 ### Recommended component pattern
 
-Use the `fw` utilities exported from `docs/fw/index.ts` when creating UI components. Example:
+Use the `fw` utilities exported from `src/fw` when creating UI components. Example:
 
 ```typescript
-import { customElement, html, css, property, ComponentBase, inject } from 'docs/fw';
+import { customElement, html, ComponentBase, inject } from '@/fw';
 
 @customElement('my-inspector')
 export class MyInspector extends ComponentBase {
-  @property({ type: String }) title = 'Inspector';
-
   @inject()
   dataService!: DataService; // resolved from fw/di container
 
   render() {
-    return html`<div class="inspector"><h3>${this.title}</h3></div>`;
+    return html`<div class="inspector"><h3>Inspector</h3></div>`;
   }
 }
 ```
 
 Notes:
+
 - `ComponentBase` defaults to light DOM but allows opting into shadow DOM via a static `useShadowDom` flag.
 - The `inject` decorator automatically resolves services registered with the `fw/di` container. Services can be registered using the `@injectable()` helper in `fw/di`. Ensure `emitDecoratorMetadata` and `reflect-metadata` are enabled within the build configuration.
-- Plugins: An extensible mechanism that allows adding new functionality (tools, panels, commands) without modifying the core editor.
 
 ### 4.1 Core Architecture Contracts
 
@@ -109,9 +110,9 @@ Notes:
 - **Command Lifecycle (thin wrappers):** `preconditions()` → `execute()`; commands delegate to OperationService to invoke operations and never implement their own undo/redo. They remain idempotent and emit telemetry via OperationService.
 - **SceneGraph & Node Lifecycle:** `SceneManager` owns a `SceneGraph` per loaded scene. Each `SceneGraph` contains a `nodeMap` (for fast lookup) and `rootNodes` array. Nodes extend Three.js `Object3D` and are **not stored in Valtio state**. State only maintains node IDs for selection and hierarchy reference via `SceneHierarchyState.rootNodes`.
 - **HistoryManager Contract:** Maintains a bounded stack of command snapshots, integrates with collaborative locking, and exposes `canUndo`/`canRedo` signals to the UI.
-- **PluginManager Contract:** Discovers plugins (`manifest.json` with `capabilities`), validates signatures, and sandboxes command registrations per namespace.
 - **Service Layer:** Services implement `dispose()` and must be registered via DI. Singleton services load lazily on first injection.
 - **CommandDispatcher Contract:** Executes all commands; invokes preconditions, executes, and handles telemetry. All user actions route through CommandDispatcher.
+- **Property Schema Contract:** Node classes implement `static getPropertySchema(): PropertySchema` returning an object with `properties` array, `nodeType`, and optional `groups`. The Inspector uses `getNodePropertySchema()` to retrieve and render properties dynamically. Each property includes `getValue`/`setValue` closures for node interaction.
 
 ### 4.2 Glossary
 
@@ -120,6 +121,7 @@ Notes:
 - **Instance:** Inclusion of another scene file inside the active scene with optional overrides.
 - **Preset:** Saved layout configuration.
 - **Command:** Unit of business logic that mutates the state and can be undone/redone.
+- **Property Schema:** Declarative metadata describing editable properties of a node type, used for dynamic inspector UI generation.
 
 ### 4.3 Operations-first Pipeline
 
@@ -131,44 +133,126 @@ Notes:
 
 ### 4.4 Rendering Architecture Notes
 
-- **Single Engine:** All rendering (3D + 2D) is handled by Three.js to minimize complexity and bundle size. 2D overlays (HUD, selection outlines, gizmos) use an orthographic camera and sprite/material abstractions.
-- **Layer Separation:** Logical separation is maintained via internal render phases (viewport pass, overlay pass) rather than different engines. This keeps the API stable and simplifies debugging.
-- **Extensibility:** If a future dedicated 2D engine integration is ever reconsidered, it would plug in behind the same abstract interfaces (`ViewportRendererService` style facade). For now this is explicitly out of scope and removed from roadmap.
-- **Testing Path:** Planned integration tests will validate resize, DPR scaling, and render ordering across the two passes using the single-engine pipeline.
+- **Three.js Unified Pipeline:** All rendering (3D + 2D) is handled by Three.js to minimize complexity and bundle size. 2D overlays (HUD, selection outlines, gizmos) use an orthographic camera and sprite/material system.
+- **Layer Separation:** Logical separation is maintained via internal render phases (viewport pass, overlay pass) rather than different engines.
+- **Testing Path:** Planned integration tests validate resize, DPR scaling, and render ordering across the unified rendering pipeline.
 
-## Implementation status (current repository state)
+## 5. Property Schema System
 
-The repository contains a working MVP scaffold with a functional rendering pipeline and operations-first architecture. The list below summarizes concrete items already implemented and points to primary files for reference.
+### 5.1 Overview
 
-### Implemented Features
+Pix3 uses a **Godot-inspired property schema system** for dynamic object inspector UI generation. This system allows node classes to declaratively define their editable properties with type information, validation rules, and UI hints. The Inspector automatically renders appropriate editors for each property type.
 
-- **Architecture Foundation**: Operations-first pattern with OperationService as the gateway. Commands are thin wrappers delegating to operations. CommandDispatcher Service is the primary entry point for all actions. All UI and tools use Commands via CommandDispatcher for consistent lifecycle management, preconditions checking, and telemetry.
-- **State Management**: Valtio-based AppState containing UI state, scenes metadata (file paths, names, load states), selection (node IDs), and operation metadata. Nodes are explicitly NOT stored in reactive state.
-- **SceneGraph & Node Lifecycle**: `SceneManager` owns `SceneGraph` objects per scene. Each graph contains a `nodeMap` (fast lookup by ID) and `rootNodes` array. Nodes extend Three.js `Object3D` and are purely data/logic structures. State only tracks node IDs for selection and hierarchy UI consumption.
-- **Dependency Injection**: Custom DI container with `@injectable()` and `@inject()` decorators. Services implement `dispose()` and are registered with `ServiceContainer` (singleton by default). `ComponentBase` provides consistent `@inject()` support.
-- **Viewport Rendering**: Three.js-based `ViewportRenderService` with perspective pass (3D) plus orthographic overlay pass (HUD/gizmos). DPR-aware resize handling with ResizeObserver. Orbit controls and demo scene included.
-- **Scene Parsing & Validation**: `SceneManager` parses `.pix3scene` YAML files and validates with AJV. Type-safe error handling for validation failures.
-- **Build & Dev Tooling**: Vite + TypeScript project with ESLint, Prettier, Vitest, and CI workflows. Dev (`npm run dev`), build (`npm run build`), test (`npm run test`), and lint scripts functional.
-- **UI Components**: Golden Layout-based shell. Panels (Scene Tree, Viewport, Inspector, Asset Browser) implemented with `ComponentBase`. All components extend `ComponentBase` and use light DOM by default. Styles separated into `[component].ts.css` files.
-- **Command Execution**: Features implemented for selection (SelectObjectCommand/Operation), scene loading (LoadSceneCommand), and history (RedoCommand/UndoCommand). All use Operations via OperationService and CommandDispatcher.
-- **Property Schema System**: Godot-inspired dynamic property editor framework. Node classes (NodeBase, Node2D, Node3D, Sprite2D, etc.) expose properties via schema with type information, validation, and UI hints. Supports scalar, vector (2D/3D), euler, boolean, string, and enum types. Schemas inherit from parent classes matching class hierarchy.
-- **Custom Vector Editors**: Specialized Web Components (Vector2Editor, Vector3Editor, EulerEditor) display transform properties (position, rotation, scale) with X/Y/Z fields in compact grid layout. Rotation displayed in degrees with proper radian conversion. All editors support undo/redo via UpdateObjectPropertyOperation.
-- **Dynamic Inspector UI**: Object Inspector renders property fields based on node schemas organized by groups (Transform, Sprite, etc.). Transform group uses optimized grid layout with labeled X/Y/Z inputs and reset buttons. Vector properties display as single-row editors rather than separate axis fields for improved UX.
+### 5.2 Schema Structure
 
-### Known Gaps / Next Work Items
+```typescript
+interface PropertySchema {
+  nodeType: string;
+  extends?: string;
+  properties: PropertyDefinition[];
+  groups?: Record<string, { label: string; description?: string; expanded?: boolean }>;
+}
 
-- **Tests**: Unit tests exist for core managers and commands. Integration tests for property schema rendering and vector editor interactions would strengthen confidence.
-- **Performance Tuning**: Production build has chunk-size warnings. Code-splitting large optional modules would reduce initial bundle size.
-- **Fixed-Pixel Overlays**: If pixel-perfect UI chrome or guides are needed, a small helper to compute orthographic bounds from screen pixels could be added.
-- **Plugin System**: Plugin manifest validation and sandboxing are on the roadmap but not yet implemented.
-- **Collaborative Features**: Shared sessions and live cursors (post-MVP).
-- **Reset Buttons**: Transform property reset buttons are visually present but not yet functional.
+interface PropertyDefinition {
+  name: string;
+  type: PropertyType;
+  ui?: PropertyUIHints;
+  validation?: PropertyValidation;
+  defaultValue?: unknown;
+  getValue: (node: unknown) => unknown;
+  setValue: (node: unknown, value: unknown) => void;
+}
 
-## 5. Scene File Format (*.pix3scene)
+type PropertyType =
+  | 'string'
+  | 'number'
+  | 'boolean'
+  | 'vector2'
+  | 'vector3'
+  | 'vector4'
+  | 'euler'
+  | 'color'
+  | 'enum'
+  | 'select'
+  | 'object';
+```
 
-The scene file will use the YAML format to ensure readability for both humans and machines (including AI agents).
+### 5.3 Node Schema Example
 
-### 5.1 Key Principles
+```typescript
+export class Node2D extends NodeBase {
+  static getPropertySchema(): PropertySchema {
+    const baseSchema = NodeBase.getPropertySchema();
+    return {
+      nodeType: 'Node2D',
+      extends: 'NodeBase',
+      properties: [
+        ...baseSchema.properties,
+        {
+          name: 'position',
+          type: 'vector2',
+          ui: {
+            label: 'Position',
+            group: 'Transform',
+            step: 0.01,
+            precision: 2,
+          },
+          getValue: node => ({ x: node.position.x, y: node.position.y }),
+          setValue: (node, value) => {
+            node.position.x = value.x;
+            node.position.y = value.y;
+          },
+        },
+        {
+          name: 'rotation',
+          type: 'number',
+          ui: {
+            label: 'Rotation',
+            group: 'Transform',
+            step: 0.1,
+            precision: 1,
+            unit: '°',
+          },
+          getValue: node => node.rotation.z * (180 / Math.PI), // radians → degrees
+          setValue: (node, value) => {
+            node.rotation.z = value * (Math.PI / 180); // degrees → radians
+          },
+        },
+      ],
+      groups: {
+        ...baseSchema.groups,
+        Transform: { label: 'Transform', expanded: true },
+      },
+    };
+  }
+}
+```
+
+### 5.4 Inspector Integration
+
+The Inspector panel uses these utilities:
+
+- `getNodePropertySchema(node)` - Retrieves schema for a node instance
+- `getPropertiesByGroup(schema)` - Groups properties by their `group` field
+- `getPropertyDisplayValue(node, prop)` - Formats value for display
+
+Property changes are handled through `UpdateObjectPropertyOperation`, which uses the schema's `getValue`/`setValue` methods for semantic transformations.
+
+### 5.5 Custom Editors
+
+Vector and rotation properties use specialized Web Components:
+
+- `Vector2Editor` - Single-row X/Y inputs
+- `Vector3Editor` - Single-row X/Y/Z inputs
+- `EulerEditor` - X/Y/Z rotation in degrees
+
+Transform group renders with 6-column CSS Grid (1rem 1fr 1rem 1fr 1rem 1fr) with color-coded axis labels (X: red, Y: green, Z: blue).
+
+## 6. Scene File Format (\*.pix3scene)
+
+The scene file uses the YAML format to ensure readability for both humans and machines (including AI agents).
+
+### 6.1 Key Principles
 
 - Declarative: The file describes the composition and structure of the scene, not the process of its creation.
 - Asset Referencing: Assets (models, textures) are not embedded in the file but are referenced via relative paths with a res:// prefix (path from the project root).
@@ -178,43 +262,43 @@ The scene file will use the YAML format to ensure readability for both humans an
 - Versioned Schema: Each file includes a `version` field; migrations are maintained in the SceneManager and run automatically on load.
 - Conflict Resolution: Instance overrides always win over parent definitions. Duplicate IDs trigger validation errors during import.
 
-### 5.2 Example Structure
+### 6.2 Example Structure
 
 ```yaml
 # --- Metadata ---
 version: 1.0
-description: "Main scene for the first level"
+description: 'Main scene for the first level'
 
 # --- Node Hierarchy ---
 root:
   # Each node has a unique ID, type, name, and properties
-  - id: "V1StGXR8_Z5jdHi6B-myT"
-    type: "Node3D"
-    name: "World"
+  - id: 'V1StGXR8_Z5jdHi6B-myT'
+    type: 'Node3D'
+    name: 'World'
     properties:
       position: { x: 0, y: 0, z: 0 }
       rotation: { x: 0, y: 0, z: 0 }
 
     # Explicit definition of child nodes for clarity
     children:
-      - id: "b-s_1Z-4f8_c-9T_2f-3d"
+      - id: 'b-s_1Z-4f8_c-9T_2f-3d'
         # Instance of another scene (prefab)
-        instance: "res://scenes/player.pix3scene"
-        name: "Player"
+        instance: 'res://scenes/player.pix3scene'
+        name: 'Player'
         properties:
           # Overriding instance properties
           position: { x: 0, y: 1, z: 5 }
 
-      - id: "k-9f_8g-7h_6j-5k_4l-1"
-        type: "MeshInstance3D"
-        name: "Ground"
+      - id: 'k-9f_8g-7h_6j-5k_4l-1'
+        type: 'MeshInstance3D'
+        name: 'Ground'
         properties:
           # Reference to an asset
-          mesh: "res://assets/models/ground_plane.glb"
+          mesh: 'res://assets/models/ground_plane.glb'
           scale: { x: 100, y: 1, z: 100 }
 ```
 
-### 5.3 Validation Rules
+### 6.3 Validation Rules
 
 - The root section must contain at least one node entry.
 - All node IDs must be unique across the entire resolved scene graph.
@@ -222,19 +306,21 @@ root:
 - Optional `metadata` block can include analytics tags, localization keys, and QA notes.
 - Continuous integration should run schema validation (AJV + generated JSON schema) against committed scene files.
 
-## 6. MVP (Minimum Viable Product) Plan
+## 7. MVP (Minimum Viable Product) Plan
 
 - Establish Vite + TypeScript + Lit project with ESLint, Prettier, Vitest, and CI lint/test workflows.
 - Implement the basic architecture: AppState with Valtio, Command pattern contracts, and DI container wiring.
 - Integrate FileSystemAPIService to open a project folder, list assets, and load `.pix3scene` files.
 - Integrate Golden Layout to create a basic layout: Scene Tree, Viewport, Inspector, Asset Browser. Provide layout presets.
-- Implement rendering of a simple 3D scene in the viewport using Three.js, including an orthographic pass for 2D overlays (single-engine pipeline).
+- Implement rendering of a simple 3D scene in the viewport using Three.js, including an orthographic pass for 2D overlays.
 - Create SceneManager to parse and display the scene structure (`*.pix3scene`) and expose diff events.
-- Implement the `pix3-basic-tools-plugin` to add a tool for creating primitives (e.g., a cube) with undoable commands.
+- Implement commands for creating primitives (boxes, lights, cameras, sprites) with undoable operations.
 - Implement a basic Undo/Redo system using HistoryManager, wired to keyboard shortcuts and UI controls.
+- Implement property schema system for dynamic inspector UI generation.
+- Implement scene save/load/reload with file watch for external changes.
 - Deliver a playable-ad export preset (HTML bundle) and analytics logging stub.
 
-## 7. Non-Functional Requirements
+## 8. Non-Functional Requirements
 
 - **Performance:** Maintain ≥ 85 FPS in viewport on baseline hardware. Initial load (cold) < 6s, warm reload < 2s. Command execution should visually update UI within 80ms.
 - **Accessibility:** WCAG 2.1 AA minimum for editor chrome; ensure keyboard navigation for panel focus and command palette. Provide high-contrast theme preset.
@@ -242,7 +328,7 @@ root:
 - **Reliability:** Autosave layout and session state every 30 seconds. Maintain undo history for at least the last 100 commands.
 - **Internationalization:** UI copy uses i18n keys; English and Russian shipped at MVP. YAML scenes may include localized strings via `locale` blocks.
 
-## 8. Project Structure
+## 9. Project Structure
 
 ```
 /
@@ -257,49 +343,76 @@ root:
 │   │   ├── LayoutManager.ts
 │   │   ├── Operation.ts
 │   │   ├── SceneLoader.ts
+│   │   ├── SceneSaver.ts
 │   │   └── SceneManager.ts   # Owns SceneGraph and Node lifecycle (non-reactive)
 │   ├── features/             # Feature-specific commands and operations
 │   │   ├── history/
 │   │   │   ├── RedoCommand.ts
 │   │   │   └── UndoCommand.ts
 │   │   ├── properties/
+│   │   │   ├── Transform2DCompleteOperation.ts
+│   │   │   ├── TransformCompleteOperation.ts
 │   │   │   ├── UpdateObjectPropertyCommand.ts
 │   │   │   └── UpdateObjectPropertyOperation.ts
 │   │   ├── scene/
-│   │   │   └── LoadSceneCommand.ts
+│   │   │   ├── AddModelCommand.ts
+│   │   │   ├── CreateBoxCommand.ts
+│   │   │   ├── CreateCamera3DCommand.ts
+│   │   │   ├── CreateDirectionalLightCommand.ts
+│   │   │   ├── CreateGroup2DCommand.ts
+│   │   │   ├── CreateMeshInstanceCommand.ts
+│   │   │   ├── CreatePointLightCommand.ts
+│   │   │   ├── CreateSpotLightCommand.ts
+│   │   │   ├── CreateSprite2DCommand.ts
+│   │   │   ├── DeleteObjectCommand.ts
+│   │   │   ├── LoadSceneCommand.ts
+│   │   │   ├── ReloadSceneCommand.ts
+│   │   │   ├── ReparentNodeCommand.ts
+│   │   │   ├── SaveAsSceneCommand.ts
+│   │   │   └── SaveSceneCommand.ts
 │   │   └── selection/
 │   │       ├── SelectObjectCommand.ts
 │   │       └── SelectObjectOperation.ts
-│   ├── fw/                   # Framework utilities (ComponentBase, DI, helpers)
+│   ├── fw/                   # Framework utilities (ComponentBase, DI, property schema)
 │   │   ├── component-base.ts # Extends LitElement with light DOM default
 │   │   ├── di.ts             # Dependency injection container
 │   │   ├── from-query.ts
+│   │   ├── hierarchy-validation.ts
 │   │   ├── index.ts
-│   │   └── layout-component-base.ts
+│   │   ├── layout-component-base.ts
+│   │   ├── property-schema.ts
+│   │   └── property-schema-utils.ts
 │   ├── nodes/                # Node definitions (NOT in reactive state)
 │   │   ├── Node2D.ts
 │   │   ├── Node3D.ts
 │   │   ├── NodeBase.ts       # Extends Three.js Object3D; purely data/logic
 │   │   ├── 2D/
+│   │   │   ├── Group2D.ts
 │   │   │   └── Sprite2D.ts
 │   │   └── 3D/
 │   │       ├── Camera3D.ts
 │   │       ├── DirectionalLightNode.ts
 │   │       ├── GeometryMesh.ts
-│   │       ├── GlbModel.ts
-│   │       └── MeshInstance.ts
+│   │       ├── MeshInstance.ts
+│   │       ├── PointLightNode.ts
+│   │       └── SpotLightNode.ts
 │   ├── services/             # Injectable services
 │   │   ├── AssetFileActivationService.ts
-│   │   ├── AssetLoaderService.ts
 │   │   ├── CommandDispatcher.ts  # Primary entry point for all actions
+│   │   ├── CommandRegistry.ts     # Command registration and menu building
+│   │   ├── DialogService.ts
+│   │   ├── FileWatchService.ts    # Watches for external file changes
 │   │   ├── FileSystemAPIService.ts
 │   │   ├── FocusRingService.ts
-│   │   ├── index.ts
+│   │   ├── LoggingService.ts      # Centralized logging for editor
+│   │   ├── NodeRegistry.ts
 │   │   ├── OperationService.ts   # Executes operations; gateway for mutations
 │   │   ├── ProjectService.ts
 │   │   ├── ResourceManager.ts
 │   │   ├── TemplateService.ts
-│   │   └── ViewportRenderService.ts
+│   │   ├── TransformTool2d.ts
+│   │   ├── ViewportRenderService.ts
+│   │   └── index.ts
 │   ├── state/                # Valtio app state definitions (UI, metadata, selection only)
 │   │   ├── AppState.ts       # Defines reactive state shape; no Nodes here
 │   │   └── index.ts
@@ -315,9 +428,13 @@ root:
 │   │   │   ├── asset-browser-panel.ts.css
 │   │   │   ├── asset-tree.ts
 │   │   │   └── asset-tree.ts.css
+│   │   ├── logs-view/
+│   │   │   ├── logs-panel.ts
+│   │   │   └── logs-panel.ts.css
 │   │   ├── object-inspector/
 │   │   │   ├── inspector-panel.ts
-│   │   │   └── inspector-panel.ts.css
+│   │   │   ├── inspector-panel.ts.css
+│   │   │   └── property-editors.ts
 │   │   ├── scene-tree/
 │   │   │   ├── node-visuals.helper.ts
 │   │   │   ├── scene-tree-node.ts
@@ -325,13 +442,14 @@ root:
 │   │   │   ├── scene-tree-panel.ts
 │   │   │   └── scene-tree-panel.ts.css
 │   │   ├── shared/
+│   │   │   ├── pix3-confirm-dialog.ts
+│   │   │   ├── pix3-dropdown.ts
+│   │   │   ├── pix3-main-menu.ts
 │   │   │   ├── pix3-panel.ts
-│   │   │   ├── pix3-panel.ts.css
-│   │   │   ├── pix3-toolbar-button.ts
-│   │   │   ├── pix3-toolbar-button.ts.css
 │   │   │   ├── pix3-toolbar.ts
-│   │   │   └── pix3-toolbar.ts.css
+│   │   │   └── pix3-toolbar-button.ts
 │   │   ├── viewport/
+│   │   │   ├── transform-toolbar.ts
 │   │   │   ├── viewport-panel.ts
 │   │   │   └── viewport-panel.ts.css
 │   │   └── welcome/
@@ -339,55 +457,18 @@ root:
 │   │       └── pix3-welcome.ts.css
 ```
 
-## 9. Roadmap and Milestones
+## 10. Roadmap and Milestones
 
-1. **Milestone 0 — Foundation (4 weeks):** Repo bootstrap, DI utilities, layout shell, state scaffolding, CI pipeline.
-2. **Milestone 1 — Scene Authoring (6 weeks):** SceneManager MVP, viewport rendering loop, asset browser, primitive tools.
-3. **Milestone 2 — Playable Export (4 weeks):** Export preset, analytics stub, undo/redo polish, plugin SDK docs.
+1. **Milestone 0 — Foundation (completed):** Repo bootstrap, DI utilities, layout shell, state scaffolding, CI pipeline.
+2. **Milestone 1 — Scene Authoring (completed):** SceneManager MVP, viewport rendering loop, asset browser, primitive tools, property schema system.
+3. **Milestone 2 — Playable Export (in progress):** Export preset, analytics stub, undo/redo polish, plugin SDK docs.
 4. **Milestone 3 — Collaboration Preview (future):** Shared sessions, commenting, live cursors (post-MVP).
 
-## 10. Change Log
+## 11. Change Log
 
 - **1.5 (2025-09-26):** Added target platforms, non-functional requirements, detailed architecture contracts, validation rules, and roadmap updates. Synced guidance on `fw` helpers.
 - **1.7 (2025-10-01):** Removed PixiJS dual-engine plan; consolidated rendering to single Three.js pipeline (perspective + orthographic). Updated project structure, removed obsolete adapter references, clarified rendering notes.
 - **1.8 (2025-10-05):** Adopted operations-first model. Commands are thin wrappers that delegate to `OperationService`. UI invokes operations directly. Code organized into `core/features/*/{commands,operations}`. Deprecated `CommandOperationAdapter` in documentation.
 - **1.9 (2025-10-27):** Updated to reflect current architecture where Nodes are NOT in reactive state. Nodes are managed by SceneManager in SceneGraph objects. State contains only UI, scenes metadata, and selection IDs. CommandDispatcher Service is the primary entry point for all actions. Updated project structure section to annotate (non-reactive) for nodes and clarify state boundaries. Enhanced implementation status with current feature list.
-
-## 11. Plugin State Management
-
-Plugins in Pix3 can manage their own state, separate from the core application state. This allows for greater flexibility and encapsulation of functionality. Each plugin can define its own state structure and management logic, using Valtio or any other preferred state management solution.
-
-### 11.1 Plugin State Lifecycle
-
-- **Initialization:** Plugins can initialize their state when they are loaded. This is the ideal time to set up default values and prepare any necessary data structures.
-- **Updates:** Plugins should respond to relevant events or commands to update their state. This can include external events (e.g., file changes) or internal events (e.g., user actions).
-- **Persistence:** Plugins can persist their state to local storage or other storage solutions as needed. This allows users to maintain their settings and data across sessions.
-- **Disposal:** When a plugin is unloaded, it should clean up any resources, listeners, or intervals it has created. This prevents memory leaks and ensures that the application remains performant.
-
-### 11.2 Example Plugin State Management
-
-```typescript
-import { proxy, subscribe } from 'valtio';
-
-// Define the plugin state
-const pluginState = proxy({
-  count: 0,
-  text: 'Hello Pix3',
-});
-
-// Subscribe to state changes
-subscribe(pluginState, () => {
-  console.log('Plugin state updated:', pluginState);
-});
-
-// Update the state
-pluginState.count += 1;
-pluginState.text = 'Updated text';
-```
-
-### 11.3 Best Practices
-
-- Keep the plugin state isolated from the core application state to avoid unintended side effects.
-- Use descriptive and consistent naming for state properties to ensure clarity and maintainability.
-- Document the state structure and any important logic to assist other developers (and your future self).
-- Consider performance implications when designing the state management logic, especially for large or complex states.
+- **1.10 (2025-12-30):** Added comprehensive Property Schema System section (5.0-5.5). Updated technology stack to include Pixi.js v8 for 2D rendering alongside Three.js. Added LoggingService and FileWatchService to architecture. Updated feature list to reflect all implemented commands/operations. Added vector4 property type. Updated MVP plan and roadmap to reflect completed milestones. Added format:check script to project scripts.
+- **1.11 (2025-12-30):** Removed Pixi.js from technology stack. Updated to Three.js-only rendering pipeline. Removed Pixi.js references from architecture notes and rendering architecture sections. Updated MVP plan to remove 2D rendering requirements via Pixi.js.

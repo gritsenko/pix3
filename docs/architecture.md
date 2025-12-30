@@ -4,7 +4,7 @@ This document contains a high-level architecture diagram for Pix3 and notes abou
 
 ## Mermaid diagram
 
-Below is a Mermaid system diagram that represents the architecture described in `pix3-specification.md` (v1.9, operations-first).
+Below is a Mermaid system diagram that represents the architecture described in `pix3-specification.md` (v1.10, operations-first).
 
 ```mermaid
 flowchart LR
@@ -14,60 +14,75 @@ flowchart LR
     B --> D["Viewport Component"]
     B --> E["Inspector"]
     B --> F["Asset Browser"]
+    B --> G["Logs Panel"]
     E2["Property Schema Utils"]
     E -->|uses| E2
     E3["Custom Editors<br/>(Vector2/3, Euler)"]
     E -->|renders with| E3
+    H["Main Menu"]
+    I["Dropdown Components"]
+    J["Toolbar"]
   end
 
   subgraph Core
-    G["AppState (Valtio)"]
-    H["OperationService (invoke, undo, redo)"]
-    I["HistoryManager"]
-    J["SceneManager"]
-    K["PluginManager"]
-    L["Plugin State Management"]
+    K["AppState (Valtio)"]
+    L["OperationService (invoke, undo, redo)"]
+    M["HistoryManager"]
+    N["SceneManager"]
+    O["LayoutManager"]
     P["CommandDispatcher Service"]
     Q["Commands (thin wrappers)"]
-    S["Message Bus"]
+    R["Operations"]
+    S["Command Registry"]
   end
 
   subgraph Services
-    M["FileSystemAPIService"]
-    N["Telemetry / Analytics Stub"]
+    T["FileSystemAPIService"]
+    U["FileWatchService"]
+    V["DialogService"]
+    W["LoggingService"]
+    X["NodeRegistry"]
+    Y["ProjectService"]
+    Z["ResourceManager"]
+    AA["ViewportRenderService"]
   end
 
   subgraph Rendering
-    O["Three.js Pipeline (Perspective + Ortho Pass)"]
-    R["ViewportRenderService"]
+    AB["Three.js Pipeline (Perspective + Ortho Pass)"]
   end
 
   A ---|renders| D
-  D ---|uses unified pipeline| O
-  D ---|observes resize| R
-  R ---|triggers resize| O
+  D ---|uses unified pipeline| AB
+  D ---|observes resize| AA
+  AA ---|triggers resize| AB
 
-  C -->|reads| G
-  E -->|reads| G
+  C -->|reads| K
+  E -->|reads| K
+  G -->|reads| K
   P -->|executes commands| Q
-  Q -->|invokes operations| H
-  Q -->|emits events| S
-  H -->|mutates via operations| G
-  I -->|tracks| H
-  J -->|loads/parses| G
-  K -->|registers commands| P
-  L -->|manages plugin state| G
+  Q -->|invokes operations| R
+  L -->|mutates via operations| K
+  M -->|tracks| L
+  N -->|loads/parses| K
+  S -->|registers| Q
+  S -->|builds menu| H
 
-  G -->|persists layout| M
-  H -->|emits| N
-  J -->|loads scenes| M
+  K -->|persists layout| O
+  K -->|persists scenes| T
+  N -->|loads scenes| T
+  U -->|detects external changes| N
+
+  W -->|logs| G
+  AA -->|renders scene nodes| N
 
   %% All actions go through CommandDispatcher
   A -->|uses| P
+  C -->|dispatches| P
+  D -->|dispatches| P
+  E -->|creates operation| P
+  F -->|dispatches| P
 
-  S -->|notifies| A
-
-  O -->|reads scene nodes| J
+  AB -->|reads scene nodes| N
 ```
 
 ## Property Schema System
@@ -78,11 +93,11 @@ Pix3 uses a **property schema system** (Godot-inspired) for dynamic object inspe
 
 ```mermaid
 graph TD
-  Node["Node (NodeBase, Node2D, Sprite2D, etc.)"]
-  Schema["getPropertySchema()<br/>(PropertyDefinition[])"]
+  Node["Node (NodeBase, Node2D, Sprite2D, Lights, etc.)"]
+  Schema["getPropertySchema()<br/>(PropertySchema)"]
   Inspector["InspectorPanel"]
   Utils["getNodePropertySchema()<br/>getPropertiesByGroup()"]
-  Render["renderTransformGroup()<br/>renderTransformProperty()"]
+  Render["renderPropertyGroup()<br/>renderPropertyInput()"]
   Editors["Custom Editors<br/>(Vector2/3Editor, EulerEditor)"]
   Operation["UpdateObjectPropertyOperation"]
   Viewport["Viewport Updates"]
@@ -101,9 +116,9 @@ graph TD
 
 ### Key Components
 
-- **PropertySchema**: Defines typed property metadata for a node class
-- **PropertyDefinition**: Individual property with name, type, getValue/setValue, UI hints (label, group, step, unit)
-- **PropertyType**: Union type including `'vector2'`, `'vector3'`, `'euler'`, `'number'`, `'string'`, etc.
+- **PropertySchema**: Defines typed property metadata for a node class, including nodeType, properties array, and optional groups
+- **PropertyDefinition**: Individual property with name, type, getValue/setValue closures, UI hints (label, group, step, precision, unit, min, max)
+- **PropertyType**: Union type including `'string'`, `'number'`, `'boolean'`, `'vector2'`, `'vector3'`, `'vector4'`, `'euler'`, `'color'`, `'enum'`, `'select'`, `'object'`
 - **Custom Editors**: Web Components (`Vector2Editor`, `Vector3Editor`, `EulerEditor`) for grouped vector display
 - **Grid Layout**: Transform properties use 6-column CSS Grid (1rem 1fr 1rem 1fr 1rem 1fr) with color-coded X/Y/Z labels
 - **UpdateObjectPropertyOperation**: Uses schema's getValue/setValue for semantic transformations (e.g., radian/degree conversion)
@@ -117,26 +132,23 @@ export class Sprite2D extends Node2D {
   static getPropertySchema(): PropertySchema {
     return {
       ...Node2D.getPropertySchema(),
-      
-      texture: {
-        type: 'string',
-        label: 'Texture',
-        group: 'Sprite',
-        getValue: (node) => node.textureUrl || '',
-        setValue: (node, value) => {
-          // Custom logic here
+      nodeType: 'Sprite2D',
+      extends: 'Node2D',
+      properties: [
+        ...Node2D.getPropertySchema().properties,
+        {
+          name: 'texture',
+          type: 'string',
+          ui: {
+            label: 'Texture',
+            group: 'Sprite',
+          },
+          getValue: node => (node as Sprite2D).textureUrl || '',
+          setValue: (node, value) => {
+            // Custom logic here
+          },
         },
-      },
-      
-      tint: {
-        type: 'color',
-        label: 'Tint Color',
-        group: 'Sprite',
-        getValue: (node) => node.tintColor,
-        setValue: (node, value) => {
-          node.tintColor = value;
-        },
-      },
+      ],
     };
   }
 }
@@ -144,18 +156,19 @@ export class Sprite2D extends Node2D {
 
 ### Property Type Support
 
-| Type | Display | Usage |
-|------|---------|-------|
-| `'string'` | Text input | Names, URLs, IDs |
-| `'number'` | Number input | Dimensions, angles, values |
-| `'boolean'` | Checkbox | Flags, toggles |
-| `'vector2'` | Grid with X/Y inputs | 2D positions, scales |
-| `'vector3'` | Grid with X/Y/Z inputs | 3D positions, scales |
-| `'euler'` | Grid with X/Y/Z° inputs | 3D rotations (degrees) |
-| `'color'` | Color picker | Tint, highlight colors |
-| `'enum'` | Dropdown | Predefined choices |
-| `'select'` | List picker | Option selection |
-| `'object'` | Nested object | Complex data structures |
+| Type        | Display                  | Usage                      |
+| ----------- | ------------------------ | -------------------------- |
+| `'string'`  | Text input               | Names, URLs, IDs           |
+| `'number'`  | Number input             | Dimensions, angles, values |
+| `'boolean'` | Checkbox                 | Flags, toggles             |
+| `'vector2'` | Grid with X/Y inputs     | 2D positions, scales       |
+| `'vector3'` | Grid with X/Y/Z inputs   | 3D positions, scales       |
+| `'vector4'` | Grid with X/Y/Z/W inputs | Colors (RGBA), quaternions |
+| `'euler'`   | Grid with X/Y/Z° inputs  | 3D rotations (degrees)     |
+| `'color'`   | Color picker             | Tint, highlight colors     |
+| `'enum'`    | Dropdown                 | Predefined choices         |
+| `'select'`  | List picker              | Option selection           |
+| `'object'`  | Nested object            | Complex data structures    |
 
 ### Grid Layout for Transform Properties
 
@@ -177,9 +190,15 @@ Transform group (position, rotation, scale) renders as 6-column grid with color-
 }
 
 /* Color-coded X/Y/Z labels */
-.transform-field-label:nth-child(1) { color: #ff6b6b; } /* X - red */
-.transform-field-label:nth-child(3) { color: #51cf66; } /* Y - green */
-.transform-field-label:nth-child(5) { color: #4c6ef5; } /* Z - blue */
+.transform-field-label:nth-child(1) {
+  color: #ff6b6b;
+} /* X - red */
+.transform-field-label:nth-child(3) {
+  color: #51cf66;
+} /* Y - green */
+.transform-field-label:nth-child(5) {
+  color: #4c6ef5;
+} /* Z - blue */
 ```
 
 Result: Single-row display with compact axis labels and inline numeric inputs.
@@ -189,22 +208,26 @@ Result: Single-row display with compact axis labels and inline numeric inputs.
 Menu items are generated from registered commands using metadata. This pattern replaces hardcoded menu structures with a flexible, extensible approach.
 
 ### CommandMetadata Extension
+
 ```typescript
 interface CommandMetadata {
   // ... existing properties ...
-  readonly menuPath?: string;    // 'edit', 'file', 'view', 'help'
-  readonly shortcut?: string;    // '⌘Z', 'Ctrl+S' (display only)
-  readonly addToMenu?: boolean;  // Include in main menu
+  readonly menuPath?: string; // 'edit', 'file', 'view', 'help'
+  readonly shortcut?: string; // '⌘Z', 'Ctrl+S' (display only)
+  readonly addToMenu?: boolean; // Include in main menu
+  readonly menuOrder?: number; // Sort order (lower = earlier)
 }
 ```
 
 ### Menu Generation Flow
+
 1. Commands register with CommandRegistry at app startup
-2. CommandRegistry.buildMenuSections() groups commands by menuPath
+2. CommandRegistry.buildMenuSections() groups commands by menuPath and sorts by menuOrder
 3. Pix3MainMenu loads sections and renders menu items
 4. Menu clicks execute commands via CommandDispatcher
 
 ### Execution Path
+
 ```
 User clicks menu item
   ↓
@@ -215,17 +238,21 @@ CommandDispatcher.execute(command)
 Preconditions checked → Command.execute()
   ↓
 Operation performed via OperationService
+  ↓
+State updated → UI re-renders
 ```
 
 ### Example: Adding to Edit Menu
+
 ```typescript
 export class MyCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
     id: 'edit.mycommand',
     title: 'My Command',
-    menuPath: 'edit',        // Groups under Edit menu
+    menuPath: 'edit', // Groups under Edit menu
     shortcut: '⌘M',
     addToMenu: true,
+    menuOrder: 10, // Sorts relative to other menu items
   };
   // ... implementation
 }
@@ -236,29 +263,307 @@ this.commandRegistry.register(new MyCommand(dependencies));
 
 The menu automatically updates without component changes.
 
-## Roles
+## Implemented Node Types
 
-Pix3 is designed for a range of users with different priorities and workflows. The architecture supports flexible UI layouts, plugin APIs, and export options to meet these needs.
+Pix3 currently implements the following node types, each with property schema support:
 
-### Example: Adding to Edit Menu
-```typescript
-export class MyCommand extends CommandBase<void, void> {
-  readonly metadata: CommandMetadata = {
-    id: 'edit.mycommand',
-    title: 'My Command',
-    menuPath: 'edit',        // Groups under Edit menu
-    shortcut: '⌘M',
-    addToMenu: true,
-  };
-  // ... implementation
-}
+### Base Classes
 
-// In editor shell:
-this.commandRegistry.register(new MyCommand(dependencies));
+- **NodeBase**: Base class extending Three.js Object3D
+  - Properties: id, name, type, visible, locked
+  - Used as foundation for all node types
+
+### 2D Nodes
+
+- **Node2D**: Base 2D node
+  - Properties: position (vector2), rotation (number°), scale (vector2)
+  - All rotation values stored internally as radians, displayed as degrees
+
+- **Sprite2D**: 2D sprite image
+  - Properties: texture, tint, blend mode
+  - Renders via Three.js texture/material system
+
+- **Group2D**: 2D container with defined dimensions
+  - Properties: width, height (for size group)
+  - Allows positioning nested elements aligned to edges
+
+### 3D Nodes
+
+- **Node3D**: Base 3D node
+  - Properties: position (vector3), rotation (euler°), scale (vector3)
+  - Uses Three.js Euler angles for rotation
+
+- **Camera3D**: Perspective camera for 3D scene
+  - Properties: FOV, near plane, far plane
+
+- **MeshInstance**: Instance of a 3D model (GLB/GLTF)
+  - Properties: mesh path, material overrides
+  - Supports loading external models
+
+- **GeometryMesh**: Procedural geometry (Box, Sphere, etc.)
+  - Properties: geometry type, material
+
+### Lights
+
+- **DirectionalLightNode**: Directional light source
+  - Properties: color, intensity, cast shadow
+  - Used for sun-like lighting
+
+- **PointLightNode**: Point light source
+  - Properties: color, intensity, distance, decay, cast shadow
+  - Emits light in all directions from a point
+
+- **SpotLightNode**: Spot light source
+  - Properties: color, intensity, angle, penumbra, distance, decay, cast shadow
+  - Cone-shaped light with adjustable focus
+
+## Commands & Operations
+
+Pix3 implements a comprehensive set of commands and operations organized by feature:
+
+### History Commands
+
+- **UndoCommand**: Reverts last operation via HistoryManager
+- **RedoCommand**: Re-applies reverted operation
+
+### Scene Management Commands
+
+- **LoadSceneCommand**: Opens .pix3scene file from disk
+- **SaveSceneCommand**: Saves current scene to disk
+- **SaveAsSceneCommand**: Saves current scene with new filename
+- **ReloadSceneCommand**: Reloads current scene (triggered by FileWatchService on external changes)
+
+### Node Creation Commands
+
+- **CreateBoxCommand**: Creates 3D box geometry mesh
+- **CreateCamera3DCommand**: Adds perspective camera to scene
+- **CreateDirectionalLightCommand**: Adds directional light to scene
+- **CreateGroup2DCommand**: Creates 2D group container
+- **CreateMeshInstanceCommand**: Adds mesh instance from GLB/GLTF file
+- **CreatePointLightCommand**: Adds point light to scene
+- **CreateSpotLightCommand**: Adds spot light to scene
+- **CreateSprite2DCommand**: Creates 2D sprite node
+- **AddModelCommand**: Adds model from asset browser to scene
+
+### Node Manipulation Commands
+
+- **DeleteObjectCommand**: Removes selected nodes from scene
+- **ReparentNodeCommand**: Moves nodes to new parent (drag-and-drop in scene tree)
+- **UpdateGroup2DSizeCommand**: Updates Group2D width/height
+
+### Property Commands
+
+- **UpdateObjectPropertyCommand**: Updates any node property via schema
+- **Transform2DCompleteOperation**: Completes 2D transform tool operation
+- **TransformCompleteOperation**: Completes 3D transform tool operation
+
+### Selection Commands
+
+- **SelectObjectCommand**: Updates selection state with clicked/hovered node
+
+## Service Layer
+
+Pix3 implements a comprehensive service layer providing core functionality:
+
+### Core Services
+
+- **CommandDispatcher**: Primary entry point for all command execution with preconditions, telemetry
+- **CommandRegistry**: Registers commands, builds menu sections, provides command lookup
+- **OperationService**: Executes operations, manages undo/redo history, emits lifecycle events
+
+### Scene Services
+
+- **SceneManager**: Manages SceneGraph objects, node lifecycle, scene loading/saving
+- **NodeRegistry**: Maps node type strings to node classes for instantiation
+- **AssetLoader**: Loads 3D models, textures, and other assets
+
+### File System Services
+
+- **FileSystemAPIService**: Wrapper for File System Access API
+- **FileWatchService**: Monitors project directory for external changes, triggers reload
+- **ProjectService**: Manages project root directory, project metadata
+- **ResourceManager**: Manages loaded resources, handles caching
+
+### UI Services
+
+- **LayoutManager**: Manages Golden Layout panel configuration
+- **ViewportRenderService**: Handles Three.js rendering loop, resize, DPR
+- **TransformTool2d**: 2D transform gizmo and interaction
+- **FocusRingService**: Manages keyboard focus within editor UI
+
+### Utility Services
+
+- **DialogService**: Native-like dialogs for confirmations and prompts
+- **LoggingService**: Centralized logging with level filtering (debug/info/warn/error)
+- **TemplateService**: Provides scene templates and project templates
+- **AssetFileActivationService**: Activates assets from browser into scene
+
+## Rendering Pipeline
+
+Pix3 uses Three.js for all rendering:
+
+```mermaid
+graph LR
+  A[Three.js Scene] --> B[Three.js Perspective Camera]
+  C[Three.js Ortho Camera] --> D[2D Overlay Pass]
+  B --> G[WebGL Renderer]
+  D --> G
+  G --> H[Viewport]
 ```
 
-The menu automatically updates without component changes.
+- **Three.js**: Primary rendering engine for 3D content, camera systems, lighting
+- **Perspective Pass**: Renders 3D scene from perspective camera
+- **Orthographic Overlay**: Renders HUD, gizmos, UI overlays
 
-## Roles
+## UI Component Architecture
 
-Pix3 is designed for a range of users with different priorities and workflows. The architecture supports flexible UI layouts, plugin APIs, and export options to meet these needs.
+### Component Base Hierarchy
+
+```
+ComponentBase (from src/fw)
+├── Pix3EditorShell (main app container)
+│   ├── Pix3MainMenu (file/edit/view menus)
+│   ├── Pix3Toolbar (action buttons)
+│   └── Golden Layout Panels
+│       ├── Pix3Panel (base panel)
+│       ├── SceneTreePanel
+│       │   └── SceneTreeNode (recursive)
+│       ├── ViewportPanel
+│       │   └── TransformToolbar
+│       ├── InspectorPanel
+│       │   ├── Vector2Editor
+│       │   ├── Vector3Editor
+│       │   └── EulerEditor
+│       ├── AssetBrowserPanel
+│       │   └── AssetTree
+│       ├── LogsPanel
+│       └── Pix3Welcome (landing page)
+├── Pix3Dropdown
+├── Pix3DropdownButton
+├── Pix3ToolbarButton
+└── Pix3ConfirmDialog
+```
+
+### Component Guidelines
+
+- Extend `ComponentBase` (not raw LitElement)
+- Use light DOM by default, shadow DOM only when needed
+- Inject services via `@inject()` decorator
+- Subscribe to state changes via `subscribe()` from Valtio
+- Dispatch commands via `CommandDispatcher`, never mutate state directly
+- Split styles into separate `[component].ts.css` files
+- Use centralized accent color CSS variables
+
+## State Management Architecture
+
+```mermaid
+graph TD
+  A[AppState<br/>Valtio Proxy]
+  B[UI State]
+  C[Scenes Metadata]
+  D[Selection State]
+  E[Operation Metadata]
+
+  A --> B
+  A --> C
+  D -->|node IDs only| A
+  E -->|undo/redo stacks| A
+
+  F[UI Components]
+  G[SceneManager]
+  H[SceneGraph]
+
+  F -->|subscribe| A
+  F -->|dispatch commands| I[CommandDispatcher]
+
+  G -->|owns| H
+  H -->|contains nodes| J[NodeBase objects<br/>Three.js Object3D]
+  J -.not reactive.- A
+
+  I --> K[Operations]
+  K -->|mutate| J
+  K -->|update| D
+```
+
+**Key Principles:**
+
+- Nodes are **NOT** in reactive state (managed by SceneManager in SceneGraph)
+- State tracks only: UI state, scene metadata (file paths, names), selection (node IDs)
+- All node mutations flow through Operations → SceneManager → SceneGraph
+- UI subscribes to state changes, re-renders on updates
+
+## File Watch Service
+
+The FileWatchService monitors the project directory for external changes:
+
+```mermaid
+graph LR
+  A[External File Change] --> B[FileWatchService<br/>Polling]
+  B --> C{Change Detected?}
+  C -->|Yes| D[ReloadSceneCommand]
+  D --> E[OperationService]
+  E --> F[SceneManager.reload()]
+  F --> G[Scene Rebuilt]
+  C -->|No| H[Continue Monitoring]
+```
+
+- Uses polling mechanism (FileSystem API doesn't provide native watch)
+- Checks file modification timestamps
+- Triggers `ReloadSceneCommand` when scene file changes
+- Logs changes to LoggingService for debugging
+
+## Logging Service
+
+Centralized logging system with level-based filtering:
+
+```typescript
+// Usage in any component/service
+import { inject } from '@/fw';
+
+class MyService {
+  @inject()
+  private readonly logger!: LoggingService;
+
+  doSomething() {
+    this.logger.info('Operation started');
+    // ... work ...
+    this.logger.debug('Debug info', { data: 'value' });
+    this.logger.warn('Warning condition');
+    this.logger.error('Error occurred', error);
+  }
+}
+```
+
+**Features:**
+
+- Four log levels: debug, info, warn, error
+- Toggleable per-level filtering (via Logs Panel)
+- Timestamp formatting with millisecond precision
+- Scroll-to-bottom on new entries
+- Clear all logs functionality
+
+## Theme & Styling
+
+Pix3 uses CSS custom properties for theming:
+
+```css
+:root {
+  --pix3-accent-color: #ffcf33;
+  --pix3-accent-rgb: 255, 207, 51;
+
+  --color-bg-primary: #1e1e1e;
+  --color-bg-secondary: #252526;
+  --color-bg-tertiary: #2d2d2d;
+  --color-text-primary: #cccccc;
+  --color-text-subtle: #858585;
+  --color-border: #3c3c3c;
+  --color-input-bg: #3c3c3c;
+}
+```
+
+**Guidelines:**
+
+- Use `--pix3-accent-color` for direct hex references
+- Use `rgba(var(--pix3-accent-rgb), opacity)` for transparency
+- Avoid hardcoded colors in component styles
+- Define semantic color variables in theme

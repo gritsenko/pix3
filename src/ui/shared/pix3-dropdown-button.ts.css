@@ -19,7 +19,7 @@ pix3-dropdown-button {
 
 pix3-dropdown-button:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(255, 207, 51, 0.85);
+  box-shadow: 0 0 0 2px rgba(var(--pix3-accent-rgb), 0.85);
 }
 
 pix3-dropdown-button:hover:not([disabled]) {
@@ -95,17 +95,17 @@ pix3-dropdown-button[icon-only] .dropdown__caret {
 }
 
 .dropdown__item:hover:not(.dropdown__item--disabled) {
-  background: rgba(255, 207, 51, 0.2);
+  background: rgba(var(--pix3-accent-rgb), 0.2);
   cursor: pointer;
 }
 
 .dropdown__item:active:not(.dropdown__item--disabled) {
-  background: rgba(255, 207, 51, 0.25);
+  background: rgba(var(--pix3-accent-rgb), 0.25);
 }
 
 .dropdown__item:focus-visible {
   outline: none;
-  background: rgba(255, 207, 51, 0.2);
+  background: rgba(var(--pix3-accent-rgb), 0.2);
 }
 
 .dropdown__item--disabled {

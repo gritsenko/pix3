@@ -9,6 +9,10 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  
+  /* Accent color - orange */
+  --pix3-accent-color: #ffcf33;
+  --pix3-accent-rgb: 255, 207, 51;
 }
 
 html,
@@ -101,7 +105,7 @@ body > pix3-editor {
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, rgba(251, 146, 60, 0.15), rgba(251, 146, 60, 0.05));
+  background: linear-gradient(90deg, rgba(var(--pix3-accent-rgb), 0.15), rgba(var(--pix3-accent-rgb), 0.05));
   transition: all 0.2s ease;
 }
 
@@ -113,7 +117,7 @@ body > pix3-editor {
 /* Active tab top stripe - more prominent */
 .lm_tab.lm_active::before {
   height: 2px;
-  background: linear-gradient(90deg, rgba(255, 176, 112, 0.687), rgba(255, 157, 86, 0.582));
+  background: linear-gradient(90deg, rgba(var(--pix3-accent-rgb), 0.687), rgba(var(--pix3-accent-rgb), 0.582));
 }
 
 /* Hover state for inactive tabs */
