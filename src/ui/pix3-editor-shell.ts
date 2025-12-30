@@ -7,6 +7,7 @@ import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { CommandRegistry } from '@/services/CommandRegistry';
 import { FileWatchService } from '@/services/FileWatchService';
 import { DialogService, type DialogInstance } from '@/services/DialogService';
+import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
@@ -46,6 +47,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(DialogService)
   private readonly dialogService!: DialogService;
+
+  @inject(ScriptExecutionService)
+  private readonly scriptExecutionService!: ScriptExecutionService;
 
   // project open handled by <pix3-welcome>
 
@@ -114,6 +118,10 @@ export class Pix3EditorShell extends ComponentBase {
         if (host && !this.shellReady) {
           void this.layoutManager.initialize(host).then(() => {
             this.shellReady = true;
+
+            // Start script execution service once layout is ready
+            this.scriptExecutionService.start();
+
             this.requestUpdate();
           });
         }
@@ -134,6 +142,10 @@ export class Pix3EditorShell extends ComponentBase {
     this.disposeScenesSubscription = subscribe(appState.scenes, () => {
       this.updateSceneWatchers();
       this.updateViewportTitle();
+
+      // Notify script execution service of scene changes
+      const activeSceneId = appState.scenes.activeSceneId;
+      this.scriptExecutionService.onSceneChanged(activeSceneId);
     });
 
     // If the app was reloaded (HMR) and the URL indicates the editor, try to auto-open
@@ -193,6 +205,8 @@ export class Pix3EditorShell extends ComponentBase {
     }
     // Stop all file watchers
     this.fileWatchService.unwatchAll();
+    // Stop script execution service
+    this.scriptExecutionService.stop();
     super.disconnectedCallback();
   }
 

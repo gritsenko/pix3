@@ -64,7 +64,7 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
     });
 
     const parentNodeId = this.params.parentNodeId ?? null;
-    const parentNode = parentNodeId ? sceneGraph.nodeMap.get(parentNodeId) ?? null : null;
+    const parentNode = parentNodeId ? (sceneGraph.nodeMap.get(parentNodeId) ?? null) : null;
 
     const updateHierarchyState = () => {
       const hierarchy = state.scenes.hierarchies[activeSceneId];

@@ -18,6 +18,7 @@ import { Camera3D } from '@/nodes/3D/Camera3D';
 
 import { Node2D } from '@/nodes/Node2D';
 import { AssetLoader } from './AssetLoader';
+import { ScriptRegistry } from '@/services/ScriptRegistry';
 
 const ZERO_VECTOR3 = new Vector3(0, 0, 0);
 const UNIT_VECTOR3 = new Vector3(1, 1, 1);
@@ -34,6 +35,19 @@ export class SceneValidationError extends Error {
   }
 }
 
+export interface BehaviorDefinition {
+  id: string;
+  type: string;
+  enabled?: boolean;
+  parameters?: Record<string, unknown>;
+}
+
+export interface ControllerDefinition {
+  type: string;
+  enabled?: boolean;
+  parameters?: Record<string, unknown>;
+}
+
 export interface SceneNodeDefinition {
   id: string;
   type?: string;
@@ -42,6 +56,8 @@ export interface SceneNodeDefinition {
   properties?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   children?: SceneNodeDefinition[];
+  behaviors?: BehaviorDefinition[];
+  script?: ControllerDefinition;
 }
 
 export interface SceneDocument {
@@ -105,17 +121,20 @@ export class SceneLoader {
   @inject(AssetLoader)
   private readonly assetLoader!: AssetLoader;
 
+  @inject(ScriptRegistry)
+  private readonly scriptRegistry!: ScriptRegistry;
+
   constructor() {}
 
   async parseScene(sceneText: string, options: ParseSceneOptions = {}): Promise<SceneGraph> {
     let document: SceneDocument;
-    
+
     console.debug('[SceneLoader.parseScene] Starting parse', {
       contentLength: sceneText.length,
       contentPreview: sceneText.substring(0, 100),
       filePath: options.filePath,
     });
-    
+
     try {
       document = parse(sceneText) as SceneDocument;
     } catch (error) {
@@ -175,6 +194,61 @@ export class SceneLoader {
     const node = await this.createNodeFromDefinition(definition);
     index.set(node.nodeId, node);
 
+    // Attach behaviors
+    if (definition.behaviors) {
+      for (const behaviorDef of definition.behaviors) {
+        const behavior = this.scriptRegistry.createBehavior(behaviorDef.type, behaviorDef.id);
+        if (behavior) {
+          behavior.enabled = behaviorDef.enabled ?? true;
+          behavior.parameters = { ...(behaviorDef.parameters ?? {}) };
+
+          // Set parameters using PropertySchema if available
+          const schema = this.scriptRegistry.getBehaviorPropertySchema(behaviorDef.type);
+          if (schema && behaviorDef.parameters) {
+            for (const prop of schema.properties) {
+              if (behaviorDef.parameters[prop.name] !== undefined) {
+                prop.setValue(behavior, behaviorDef.parameters[prop.name]);
+              }
+            }
+          }
+
+          node.behaviors.push(behavior);
+        } else {
+          console.warn(
+            `[SceneLoader] Failed to create behavior "${behaviorDef.type}" for node "${definition.id}"`
+          );
+        }
+      }
+    }
+
+    // Attach controller (script)
+    if (definition.script) {
+      const controller = this.scriptRegistry.createController(
+        definition.script.type,
+        `${definition.id}-controller`
+      );
+      if (controller) {
+        controller.enabled = definition.script.enabled ?? true;
+        controller.parameters = { ...(definition.script.parameters ?? {}) };
+
+        // Set parameters using PropertySchema if available
+        const schema = this.scriptRegistry.getControllerPropertySchema(definition.script.type);
+        if (schema && definition.script.parameters) {
+          for (const prop of schema.properties) {
+            if (definition.script.parameters[prop.name] !== undefined) {
+              prop.setValue(controller, definition.script.parameters[prop.name]);
+            }
+          }
+        }
+
+        node.controller = controller;
+      } else {
+        console.warn(
+          `[SceneLoader] Failed to create controller "${definition.script.type}" for node "${definition.id}"`
+        );
+      }
+    }
+
     if (parent) {
       parent.adoptChild(node);
     }
@@ -207,13 +281,16 @@ export class SceneLoader {
       case 'Sprite2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
-        
+
         return new Sprite2D({
           ...baseProps,
           properties: props,
           position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
           scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
-          rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? (transform?.rotation ?? props.rotation) as number : 0,
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
           texturePath: typeof props.texturePath === 'string' ? props.texturePath : null,
           width: this.asNumber(props.width, 64),
           height: this.asNumber(props.height, 64),
@@ -245,12 +322,15 @@ export class SceneLoader {
       case 'Group2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
-        
+
         return new Group2D({
           ...baseProps,
           position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
           scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
-          rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? (transform?.rotation ?? props.rotation) as number : 0,
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
           width: this.asNumber(props.width, 100),
           height: this.asNumber(props.height, 100),
         });

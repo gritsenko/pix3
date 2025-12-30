@@ -18,7 +18,7 @@ export class PointLightNode extends Node3D {
     const intensity = typeof props.intensity === 'number' ? props.intensity : 1;
     const distance = typeof props.distance === 'number' ? props.distance : 0;
     const decay = typeof props.decay === 'number' ? props.decay : 2;
-    
+
     this.light = new PointLight(color, intensity, distance, decay);
     this.light.castShadow = true;
     this.add(this.light);

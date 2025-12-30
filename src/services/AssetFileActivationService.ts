@@ -19,8 +19,13 @@ export interface AssetActivation {
  * It dispatches appropriate commands based on file type (e.g., LoadSceneCommand for .pix3scene files).
  */
 export class AssetFileActivationService {
-  private static readonly SUPPORTED_IMAGE_EXTENSIONS =
-    new Set(['png', 'jpg', 'jpeg', 'webm', 'aif']);
+  private static readonly SUPPORTED_IMAGE_EXTENSIONS = new Set([
+    'png',
+    'jpg',
+    'jpeg',
+    'webm',
+    'aif',
+  ]);
   private static readonly UI_LAYER_NAME = 'UI Layer';
 
   @inject(CommandDispatcher)
@@ -62,13 +67,19 @@ export class AssetFileActivationService {
   private async handleImageAsset(payload: AssetActivation): Promise<void> {
     const sceneGraph = this.sceneManager.getActiveSceneGraph();
     if (!sceneGraph) {
-      console.warn('[AssetFileActivationService] Cannot create sprite without an active scene', payload);
+      console.warn(
+        '[AssetFileActivationService] Cannot create sprite without an active scene',
+        payload
+      );
       return;
     }
 
     const uiLayer = this.findUiLayer(sceneGraph);
     if (!uiLayer) {
-      console.info('[AssetFileActivationService] UI layer missing, sprite will be added to root', payload);
+      console.info(
+        '[AssetFileActivationService] UI layer missing, sprite will be added to root',
+        payload
+      );
     }
 
     const command = new CreateSprite2DCommand({

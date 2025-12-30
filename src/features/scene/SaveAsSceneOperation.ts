@@ -116,7 +116,12 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
 
         // Only update scene descriptor if we saved to project
         const descriptorForSave = state.scenes.descriptors[sceneId];
-        if (isInProject && descriptorForSave && savedFilePath && savedFilePath.startsWith('res://')) {
+        if (
+          isInProject &&
+          descriptorForSave &&
+          savedFilePath &&
+          savedFilePath.startsWith('res://')
+        ) {
           descriptorForSave.fileHandle = ref(this.params.fileHandle);
           descriptorForSave.lastModifiedTime = lastModifiedTime;
           fileWatchService.setLastKnownModifiedTime(savedFilePath, lastModifiedTime);
@@ -182,7 +187,10 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
         if (descriptor.fileHandle) {
           const file = await descriptor.fileHandle.getFile();
           descriptor.lastModifiedTime = file.lastModified;
-          fileWatchService.setLastKnownModifiedTime(descriptor.filePath, descriptor.lastModifiedTime);
+          fileWatchService.setLastKnownModifiedTime(
+            descriptor.filePath,
+            descriptor.lastModifiedTime
+          );
         }
       } catch {
         // ignore

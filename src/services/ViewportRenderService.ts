@@ -89,9 +89,16 @@ export class ViewportRendererService {
 
   private disposeObject3D(root: THREE.Object3D): void {
     root.traverse(obj => {
-      if (obj instanceof THREE.Mesh || obj instanceof THREE.LineSegments || obj instanceof THREE.Line) {
+      if (
+        obj instanceof THREE.Mesh ||
+        obj instanceof THREE.LineSegments ||
+        obj instanceof THREE.Line
+      ) {
         obj.geometry?.dispose();
-        const material = (obj as THREE.Mesh).material as THREE.Material | THREE.Material[] | undefined;
+        const material = (obj as THREE.Mesh).material as
+          | THREE.Material
+          | THREE.Material[]
+          | undefined;
         if (material instanceof THREE.Material) {
           material.dispose();
         } else if (Array.isArray(material)) {

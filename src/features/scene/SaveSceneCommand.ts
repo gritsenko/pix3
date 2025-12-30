@@ -7,7 +7,10 @@ import {
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
 import { SceneManager } from '@/core/SceneManager';
-import { SaveSceneOperation, type SaveSceneOperationParams } from '@/features/scene/SaveSceneOperation';
+import {
+  SaveSceneOperation,
+  type SaveSceneOperationParams,
+} from '@/features/scene/SaveSceneOperation';
 
 export class SaveSceneCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {

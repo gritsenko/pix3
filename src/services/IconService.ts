@@ -184,28 +184,28 @@ export class IconService {
       try {
         const icon = (feather.icons as Record<string, any>)[name];
         if (icon && typeof icon.toSvg === 'function') {
-          svg = icon.toSvg({ 
-            width: size, 
+          svg = icon.toSvg({
+            width: size,
             height: size,
-            'stroke': 'currentColor',
-            'fill': 'none',
+            stroke: 'currentColor',
+            fill: 'none',
             'stroke-width': 2,
             'stroke-linecap': 'round',
-            'stroke-linejoin': 'round'
+            'stroke-linejoin': 'round',
           });
         } else {
           console.warn(`[IconService] Icon not found: ${name}`);
           // Return fallback icon (box)
           const fallbackIcon = (feather.icons as Record<string, any>)['box'];
           if (fallbackIcon && typeof fallbackIcon.toSvg === 'function') {
-            svg = fallbackIcon.toSvg({ 
-              width: size, 
+            svg = fallbackIcon.toSvg({
+              width: size,
               height: size,
-              'stroke': 'currentColor',
-              'fill': 'none',
+              stroke: 'currentColor',
+              fill: 'none',
               'stroke-width': 2,
               'stroke-linecap': 'round',
-              'stroke-linejoin': 'round'
+              'stroke-linejoin': 'round',
             });
           }
         }
