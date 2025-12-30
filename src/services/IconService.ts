@@ -68,30 +68,41 @@ export class IconService {
     this.customIcons.set(
       'folder-outline',
       `<svg viewBox="0 0 18 14" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M1 3.5C1 2.67157 1.67157 2 2.5 2H6.5L8 4H15.5C16.3284 4 17 4.67157 17 5.5V11.5C17 12.3284 16.3284 13 15.5 13H2.5C1.67157 13 1 12.3284 1 11.5V3.5Z" 
-        fill="currentColor"/>
-</svg>`
+    <path d="M1 3.5C1 2.67157 1.67157 2 2.5 2H6.5L8 4H15.5C16.3284 4 17 4.67157 17 5.5V11.5C17 12.3284 16.3284 13 15.5 13H2.5C1.67157 13 1 12.3284 1 11.5V3.5Z"
+      stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  </svg>`
     );
 
     // Folder icon with fill for asset tree
     this.customIcons.set(
       'folder-solid',
       `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M3 7C3 5.89543 3.89543 5 5 5H9L11 8H19C20.1046 8 21 8.89543 21 10V17C21 18.1046 20.1046 19 19 19H5C3.89543 19 3 18.1046 3 17V7Z" 
-        fill="currentColor" 
-        opacity="0.95"/>
-</svg>`
+    <path d="M3 7C3 5.89543 3.89543 5 5 5H9L11 8H19C20.1046 8 21 8.89543 21 10V17C21 18.1046 20.1046 19 19 19H5C3.89543 19 3 18.1046 3 17V7Z" 
+      stroke="currentColor" 
+      stroke-width="1.5"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      fill="none"/>
+  </svg>`
     );
 
     // File icon for asset tree
     this.customIcons.set(
       'file-solid',
       `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" 
-        fill="currentColor" 
-        opacity="0.95"/>
-  <path d="M14 2V8H20" fill="rgba(0,0,0,0.06)" />
-</svg>`
+      <path d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z" 
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        fill="none"/>
+      <path d="M14 2V8H20" 
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        fill="none"/>
+    </svg>`
     );
 
     // Chevron right (caret for asset tree)
@@ -149,13 +160,29 @@ export class IconService {
       try {
         const icon = (feather.icons as Record<string, any>)[name];
         if (icon && typeof icon.toSvg === 'function') {
-          svg = icon.toSvg({ width: size, height: size });
+          svg = icon.toSvg({ 
+            width: size, 
+            height: size,
+            'stroke': 'currentColor',
+            'fill': 'none',
+            'stroke-width': 2,
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round'
+          });
         } else {
           console.warn(`[IconService] Icon not found: ${name}`);
           // Return fallback icon (box)
           const fallbackIcon = (feather.icons as Record<string, any>)['box'];
           if (fallbackIcon && typeof fallbackIcon.toSvg === 'function') {
-            svg = fallbackIcon.toSvg({ width: size, height: size });
+            svg = fallbackIcon.toSvg({ 
+              width: size, 
+              height: size,
+              'stroke': 'currentColor',
+              'fill': 'none',
+              'stroke-width': 2,
+              'stroke-linecap': 'round',
+              'stroke-linejoin': 'round'
+            });
           }
         }
       } catch (error) {
@@ -204,16 +231,23 @@ export class IconService {
    * Apply width and height attributes to an SVG string
    */
   private applySizeToSvg(svg: string, size: number): string {
-    // If SVG already has width/height, replace them
-    let result = svg.replace(/width="[^"]*"/, `width="${size}"`);
-    result = result.replace(/height="[^"]*"/, `height="${size}"`);
+    // Only modify the opening <svg ...> tag to add/replace width/height
+    const updated = svg.replace(/<svg([^>]*)>/, (_match, attrs) => {
+      // Remove any existing width/height attributes inside the opening tag (avoid touching stroke-width)
+      let newAttrs = attrs.replace(/\s(?:width|height)="[^"]*"/g, '');
 
-    // If no width/height attributes exist, add them after opening <svg tag
-    if (!result.includes('width=')) {
-      result = result.replace('<svg', `<svg width="${size}" height="${size}"`);
-    }
+      // Ensure there's a display style on the svg tag (but don't clobber existing style)
+      if (!/\bstyle\s*=/.test(newAttrs)) {
+        newAttrs = `${newAttrs} style="display:block"`;
+      }
 
-    return result;
+      // Append explicit width and height
+      newAttrs = `${newAttrs} width="${size}" height="${size}"`;
+
+      return `<svg${newAttrs}>`;
+    });
+
+    return updated;
   }
 
   /**

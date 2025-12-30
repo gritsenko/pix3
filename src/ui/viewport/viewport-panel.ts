@@ -144,7 +144,7 @@ export class ViewportPanel extends ComponentBase {
             }}"
             title="Toggle Grid (G)"
           >
-            <span class="toolbar-icon">${unsafeHTML(this.getIcon('grid'))}</span>
+            <span class="toolbar-icon">${this.iconService.getIcon('grid')}</span>
           </button>
           <button
             class="toolbar-button layer-toggle-button"
