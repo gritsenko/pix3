@@ -1,0 +1,22 @@
+version: '1.0'
+description: Test scene with rotating behavior
+
+root:
+  - id: test-box
+    type: GeometryMesh
+    name: Rotating Box
+    properties:
+      geometry: box
+      size: [1, 1, 1]
+      material:
+        color: '#ff6b6b'
+        roughness: 0.5
+        metalness: 0.3
+      transform:
+        position: [0, 0, 0]
+    behaviors:
+      - id: rotate-behavior-1
+        type: test_rotate
+        enabled: true
+        parameters:
+          rotationSpeed: 2.0
