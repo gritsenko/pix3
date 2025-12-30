@@ -404,6 +404,7 @@ root:
 │   │   ├── FileWatchService.ts    # Watches for external file changes
 │   │   ├── FileSystemAPIService.ts
 │   │   ├── FocusRingService.ts
+│   │   ├── IconService.ts         # Centralized management of scalable vector icons
 │   │   ├── LoggingService.ts      # Centralized logging for editor
 │   │   ├── NodeRegistry.ts
 │   │   ├── OperationService.ts   # Executes operations; gateway for mutations
@@ -471,4 +472,4 @@ root:
 - **1.8 (2025-10-05):** Adopted operations-first model. Commands are thin wrappers that delegate to `OperationService`. UI invokes operations directly. Code organized into `core/features/*/{commands,operations}`. Deprecated `CommandOperationAdapter` in documentation.
 - **1.9 (2025-10-27):** Updated to reflect current architecture where Nodes are NOT in reactive state. Nodes are managed by SceneManager in SceneGraph objects. State contains only UI, scenes metadata, and selection IDs. CommandDispatcher Service is the primary entry point for all actions. Updated project structure section to annotate (non-reactive) for nodes and clarify state boundaries. Enhanced implementation status with current feature list.
 - **1.10 (2025-12-30):** Added comprehensive Property Schema System section (5.0-5.5). Updated technology stack to include Pixi.js v8 for 2D rendering alongside Three.js. Added LoggingService and FileWatchService to architecture. Updated feature list to reflect all implemented commands/operations. Added vector4 property type. Updated MVP plan and roadmap to reflect completed milestones. Added format:check script to project scripts.
-- **1.11 (2025-12-30):** Removed Pixi.js from technology stack. Updated to Three.js-only rendering pipeline. Removed Pixi.js references from architecture notes and rendering architecture sections. Updated MVP plan to remove 2D rendering requirements via Pixi.js.
+- **1.11 (2025-12-30):** Removed Pixi.js from technology stack. Updated to Three.js-only rendering pipeline. Removed Pixi.js references from architecture notes and rendering architecture sections. Updated MVP plan to remove 2D rendering requirements via Pixi.js. Added details about the Icon Service under the Services section.

@@ -183,7 +183,7 @@ export class ViewportPanel extends ComponentBase {
             }}"
             title="Zoom Default (Home)"
           >
-            <span class="toolbar-icon">${this.iconService.getIcon('home')}</span>
+            <span class="toolbar-icon">${this.iconService.getIcon('zoom-default')}</span>
           </button>
           <button
             class="toolbar-button"
@@ -195,7 +195,7 @@ export class ViewportPanel extends ComponentBase {
             }}"
             title="Zoom All (F)"
           >
-            <span class="toolbar-icon">${this.iconService.getIcon('maximize-2')}</span>
+            <span class="toolbar-icon">${this.iconService.getIcon('zoom-all')}</span>
           </button>
         </div>
         <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>

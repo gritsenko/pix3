@@ -1,43 +1,87 @@
+
 # Pix3 Editor
 
-**Pix3** is a browser-based editor for building HTML5 scenes that blend 2D and 3D layers. It empowers creators to craft interactive experiences, playable ads, and multimedia content using modern web technologies.
+Pix3 is a browser-based editor for building rich HTML5 scenes that combine 2D and 3D layers. This README focuses on the current architecture, developer workflow, and how to interact with core systems.
 
-## 🚀 Quick Start
+## Architecture Overview
+
+- **Operations-first**: All mutations go through Operations executed by `OperationService`. Commands are thin wrappers that validate and dispatch operations via `CommandDispatcher`.
+- **Services / DI**: Core functionality is provided by injectable services registered in the DI container. Services implement `dispose()` and are injected via the `@inject()` decorator.
+- **State**: UI and metadata use Valtio proxies (`appState`). Scene nodes are managed by `SceneManager` and stored in `SceneGraph` objects — node instances are NOT reactive state (only their IDs appear in `appState`).
+- **Rendering**: A single Three.js pipeline handles 3D rendering plus 2D overlay passes (orthographic HUD, gizmos, selection outlines).
+- **Component Framework**: UI components extend `ComponentBase` from `src/fw` (not raw `LitElement`). `fw` provides helpers like `customElement`, `inject`, and property-schema utilities.
+- **Property Schema System**: Node classes expose editable properties via `static getPropertySchema()`; the Inspector renders editors dynamically based on these schemas.
+- **IconService**: Centralized injectable service for scalable SVG icons. Use `getIcon(name: string)` to retrieve icons consistently across components and support dynamic theming.
+
+See full specification in [docs/pix3-specification.md](docs/pix3-specification.md).
+
+## Key Concepts
+
+- **CommandDispatcher**: Primary entry point for user actions — runs command lifecycle (preconditions, execute) and delegates to operations.
+- **OperationService**: Executes operations and manages undo/redo stacks (`invoke`, `invokeAndPush`, `undo`, `redo`).
+- **SceneManager / SceneGraph**: Owns node lifecycle, loading/saving scenes, and provides non-reactive node access for performance.
+- **PropertySchema & Inspector**: Property definitions include `getValue`/`setValue` closures allowing semantic transformations (e.g., radians↔degrees).
+
+## Services (selected)
+
+- **FileSystemAPIService**: Integrates with the browser File System Access API for project folder operations.
+- **OperationService**: Central operation executor and history manager.
+- **CommandDispatcher**: Runs commands and validates preconditions.
+- **IconService**: Manages SVG icons and theming; used by UI components for consistent iconography.
+- **ViewportRenderService**: Three.js rendering orchestration for viewport and overlays.
+
+## Development Quick Start
 
 ### Prerequisites
 
 - Node.js 18+
-- npm or yarn
-- Modern Chromium-based browser (Chrome, Edge, Arc)
+- npm (or yarn)
+- Chromium-based browser for development
 
-### Development Setup
+### Setup
 
-1. **Clone and install**:
+```bash
+git clone <repository-url>
+cd pix3
+npm install
+```
 
-   ```bash
-   git clone <repository-url>
-   cd pix3
-   npm install
-   ```
+### Run Dev Server
 
-2. **Start development server**:
+```bash
+npm run dev
+```
 
-   ```bash
-   npm run dev
-   ```
+Open the app at `http://localhost:5173`.
 
-3. **Open in browser**:
-   Navigate to `http://localhost:5173`
+### Debugging (Chrome + MCP)
 
-### Debugging with Chrome & MCP (Chrome DevTools) 🔧
+Launch Chrome with remote debugging and use the MCP bridge for a tight developer feedback loop:
 
-You can debug the app using Chrome's remote DevTools and the MCP bridge. The repository includes a VS Code launch config (`.vscode/launch.json`) and an MCP server entry (`mcp.json`) to simplify this.
+```bash
+# Start Chrome (example Windows path)
+"C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe" --remote-debugging-port=9222 --user-data-dir="%LOCALAPPDATA%\\pix3-chrome-debug"
 
-1. Start the dev server:
+# Start MCP bridge from the workspace root
+npx chrome-devtools-mcp@0.12.1 --autoConnect --browserUrl=http://127.0.0.1:9222
+```
 
-   ```bash
-   npm run dev
-   ```
+## Scripts
+
+- `npm run dev` - Start Vite dev server with hot reload
+- `npm run build` - Build production bundle
+- `npm run preview` - Preview production build locally
+- `npm run lint` - Lint code
+- `npm run format` - Format code
+- `npm run test` - Run Vitest unit tests
+
+## Where to Look Next
+
+- Source & architecture: [docs/pix3-specification.md](docs/pix3-specification.md)
+- Agent guidelines: [AGENTS.md](AGENTS.md)
+- Framework helpers: `src/fw/index.ts`
+
+If you want, I can also update the top-level docs to include a small example of using `IconService` in a component, or run lint/tests after this change.
 
 2. Launch Chrome with remote debugging (the included `Launch Chrome against localhost` config in `.vscode/launch.json` uses these flags). To start manually on Windows:
 

@@ -109,6 +109,7 @@ src/
     CommandDispatcher.ts   # Primary entry point for all actions
     FileSystemAPIService.ts
     FocusRingService.ts
+    IconService.ts         # Injectable service for managing scalable vector icons. Use `getIcon(name: string)` to retrieve icons. Ensure consistent usage across components for theming and scaling.
     index.ts
     OperationService.ts    # Executes operations; gateway for mutations
     ProjectService.ts
