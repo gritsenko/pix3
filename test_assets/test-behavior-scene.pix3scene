@@ -1,0 +1,20 @@
+version: '1.0'
+description: Test scene with rotating behavior
+
+root:
+  - id: test-box
+    type: Box
+    name: Rotating Box
+    properties:
+      position: [0, 0, 0]
+      size: [1, 1, 1]
+      material:
+        color: '#ff6b6b'
+        roughness: 0.5
+        metalness: 0.3
+    behaviors:
+      - id: rotate-behavior-1
+        type: test_rotate
+        enabled: true
+        parameters:
+          rotationSpeed: 2.0
