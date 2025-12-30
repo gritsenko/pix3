@@ -11,6 +11,13 @@ import type { PropertySchema } from '@/fw';
 import type { Behavior, ScriptController } from '@/core/ScriptComponent';
 
 /**
+ * Type for classes that have a static getPropertySchema method
+ */
+export interface PropertySchemaProvider {
+  getPropertySchema(): PropertySchema;
+}
+
+/**
  * Behavior type definition for the registry
  */
 export interface BehaviorTypeInfo {
@@ -27,7 +34,7 @@ export interface BehaviorTypeInfo {
   category: string;
 
   /** Constructor for the behavior class */
-  behaviorClass: new (id: string, type: string) => Behavior;
+  behaviorClass: (new (id: string, type: string) => Behavior) & PropertySchemaProvider;
 
   /** Keywords for search */
   keywords: string[];
@@ -50,7 +57,7 @@ export interface ControllerTypeInfo {
   category: string;
 
   /** Constructor for the controller class */
-  controllerClass: new (id: string, type: string) => ScriptController;
+  controllerClass: (new (id: string, type: string) => ScriptController) & PropertySchemaProvider;
 
   /** Keywords for search */
   keywords: string[];
@@ -165,16 +172,7 @@ export class ScriptRegistry {
       return null;
     }
 
-    // Access static method through the constructor
-    const behaviorClass = typeInfo.behaviorClass as unknown as {
-      getPropertySchema(): PropertySchema;
-    };
-
-    if (typeof behaviorClass.getPropertySchema === 'function') {
-      return behaviorClass.getPropertySchema();
-    }
-
-    return null;
+    return typeInfo.behaviorClass.getPropertySchema();
   }
 
   /**
@@ -186,16 +184,7 @@ export class ScriptRegistry {
       return null;
     }
 
-    // Access static method through the constructor
-    const controllerClass = typeInfo.controllerClass as unknown as {
-      getPropertySchema(): PropertySchema;
-    };
-
-    if (typeof controllerClass.getPropertySchema === 'function') {
-      return controllerClass.getPropertySchema();
-    }
-
-    return null;
+    return typeInfo.controllerClass.getPropertySchema();
   }
 
   /**

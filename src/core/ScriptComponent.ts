@@ -36,6 +36,12 @@ export interface ScriptLifecycle {
    * Use this to clean up resources and remove event listeners.
    */
   onDetach?(): void;
+
+  /**
+   * Reset the started state (internal use only).
+   * Called when detaching to allow re-initialization on next attach.
+   */
+  resetStartedState?(): void;
 }
 
 /**
@@ -121,6 +127,13 @@ export abstract class BehaviorBase implements Behavior {
   onStart?(): void;
   onUpdate?(dt: number): void;
   onDetach?(): void;
+
+  /**
+   * Reset the started state
+   */
+  resetStartedState(): void {
+    this._started = false;
+  }
 }
 
 /**
@@ -156,6 +169,13 @@ export abstract class ScriptControllerBase implements ScriptController {
   onStart?(): void;
   onUpdate?(dt: number): void;
   onDetach?(): void;
+
+  /**
+   * Reset the started state
+   */
+  resetStartedState(): void {
+    this._started = false;
+  }
 }
 
 /**

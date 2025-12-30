@@ -189,7 +189,9 @@ export class ScriptExecutionService {
         node.controller.onDetach();
       }
       node.controller.node = null;
-      node.controller._started = false;
+      if (node.controller.resetStartedState) {
+        node.controller.resetStartedState();
+      }
     }
 
     // Detach behaviors
@@ -198,7 +200,9 @@ export class ScriptExecutionService {
         behavior.onDetach();
       }
       behavior.node = null;
-      behavior._started = false;
+      if (behavior.resetStartedState) {
+        behavior.resetStartedState();
+      }
     }
 
     // Recursively detach from children
