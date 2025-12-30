@@ -1,12 +1,16 @@
 import { ComponentBase, customElement, html, inject, state, subscribe } from '@/fw';
 import './pix3-welcome.ts.css';
 import { ProjectService } from '@/services';
+import { IconService } from '@/services/IconService';
 import { appState } from '@/state';
 
 @customElement('pix3-welcome')
 export class Pix3Welcome extends ComponentBase {
   @inject(ProjectService)
   private readonly projectService!: ProjectService;
+
+  @inject(IconService)
+  private readonly iconService!: IconService;
 
   @state()
   private recents: { id?: string; name: string; lastOpenedAt: number }[] = [];
@@ -116,32 +120,6 @@ export class Pix3Welcome extends ComponentBase {
     this.loadRecents();
   };
 
-  private crossSvg() {
-    return html`<svg
-      width="12"
-      height="12"
-      viewBox="0 0 12 12"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <path
-        d="M11 1L1 11"
-        stroke="#CBD5E1"
-        stroke-width="1.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <path
-        d="M1 1L11 11"
-        stroke="#CBD5E1"
-        stroke-width="1.5"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-    </svg>`;
-  }
-
   protected render() {
     return html`
       <div class="welcome-root" role="region" aria-label="Welcome">
@@ -153,13 +131,13 @@ export class Pix3Welcome extends ComponentBase {
           <div class="welcome-actions-grid">
             <div class="action-column">
               <button @click=${this.onOpen} class="action-btn">
-                <span class="action-icon">${this.folderSvg()}</span>
+                <span class="action-icon">${this.iconService.getIcon('folder-outline', 18)}</span>
                 <span class="action-label">Open Project</span>
               </button>
             </div>
             <div class="action-column">
               <button @click=${this.onStartNew} class="action-btn">
-                <span class="action-icon">${this.plusSvg()}</span>
+                <span class="action-icon">${this.iconService.getIcon('plus-circle-outline', 20)}</span>
                 <span class="action-label">Start New Project</span>
               </button>
             </div>
@@ -178,7 +156,7 @@ export class Pix3Welcome extends ComponentBase {
                             data-recent-index="${i}"
                             @click=${this.onRecent}
                           >
-                            <span class="folder-icon" aria-hidden="true">${this.folderSvg()}</span>
+                            <span class="folder-icon" aria-hidden="true">${this.iconService.getIcon('folder-outline', 18)}</span>
                             <span class="recent-name">${r.name}</span>
                             <span class="recent-time">${this.formatTime(r.lastOpenedAt)}</span>
                           </button>
@@ -189,7 +167,7 @@ export class Pix3Welcome extends ComponentBase {
                             @click=${this.onRemoveRecent}
                             aria-label="Remove recent"
                           >
-                            ${this.crossSvg()}
+                            ${this.iconService.getIcon('x-close', 12)}
                           </button>
                         </div>
                       </li>`
@@ -200,37 +178,6 @@ export class Pix3Welcome extends ComponentBase {
         </div>
       </div>
     `;
-  }
-
-  private plusSvg() {
-    return html`<svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <circle cx="10" cy="10" r="9" stroke="currentColor" stroke-width="1.5" />
-      <path d="M10 6V14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-      <path d="M6 10H14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
-    </svg>`;
-  }
-
-  private folderSvg() {
-    return html`<svg
-      width="18"
-      height="14"
-      viewBox="0 0 18 14"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden
-    >
-      <path
-        d="M1 3.5C1 2.67157 1.67157 2 2.5 2H6.5L8 4H15.5C16.3284 4 17 4.67157 17 5.5V11.5C17 12.3284 16.3284 13 15.5 13H2.5C1.67157 13 1 12.3284 1 11.5V3.5Z"
-        fill="#9AA4B2"
-      />
-    </svg>`;
   }
 
   // Styles moved to external CSS file (pix3-welcome.ts.css) and imported

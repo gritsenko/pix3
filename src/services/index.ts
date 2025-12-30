@@ -26,3 +26,4 @@ export {
   type DialogInstance,
   resolveDialogService,
 } from './DialogService';
+export { IconService, IconSize, type IconSizeValue } from './IconService';

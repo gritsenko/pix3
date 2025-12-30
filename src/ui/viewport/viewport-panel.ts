@@ -3,10 +3,9 @@ import { appState } from '@/state';
 import styles from './viewport-panel.ts.css?raw';
 import { ViewportRendererService, type TransformMode } from '@/services/ViewportRenderService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { IconService } from '@/services/IconService';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
 import renderTransformToolbar from './transform-toolbar';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import feather from 'feather-icons';
 
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
@@ -17,6 +16,9 @@ export class ViewportPanel extends ComponentBase {
 
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
+
+  @inject(IconService)
+  private readonly iconService!: IconService;
 
   @state()
   private transformMode: TransformMode = 'select';
@@ -124,7 +126,7 @@ export class ViewportPanel extends ComponentBase {
           @pointerup=${(e: Event) => e.stopPropagation()}
         >
           <!-- Transform mode buttons -->
-          ${renderTransformToolbar(this.transformMode, m => this.handleTransformModeChange(m))}
+          ${renderTransformToolbar(this.transformMode, m => this.handleTransformModeChange(m), this.iconService)}
           <div class="toolbar-separator"></div>
           <!-- Viewport controls -->
           <button
@@ -138,7 +140,7 @@ export class ViewportPanel extends ComponentBase {
             }}"
             title="Toggle Grid (G)"
           >
-            <span class="toolbar-icon">${unsafeHTML(this.getIcon('grid'))}</span>
+            <span class="toolbar-icon">${this.iconService.getIcon('grid')}</span>
           </button>
           <button
             class="toolbar-button"
@@ -151,7 +153,7 @@ export class ViewportPanel extends ComponentBase {
             }}"
             title="Toggle 2D Layer (2)"
           >
-            <span class="toolbar-icon">${unsafeHTML(this.getIcon('layers'))}</span>
+            <span class="toolbar-icon">${this.iconService.getIcon('layers')}</span>
           </button>
           <div class="toolbar-separator"></div>
           <button
@@ -164,7 +166,7 @@ export class ViewportPanel extends ComponentBase {
             }}"
             title="Zoom Default (Home)"
           >
-            <span class="toolbar-icon">${unsafeHTML(this.getIcon('home'))}</span>
+            <span class="toolbar-icon">${this.iconService.getIcon('home')}</span>
           </button>
           <button
             class="toolbar-button"
@@ -176,7 +178,7 @@ export class ViewportPanel extends ComponentBase {
             }}"
             title="Zoom All (F)"
           >
-            <span class="toolbar-icon">${unsafeHTML(this.getIcon('maximize-2'))}</span>
+            <span class="toolbar-icon">${this.iconService.getIcon('maximize-2')}</span>
           </button>
         </div>
         <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>
@@ -207,27 +209,6 @@ export class ViewportPanel extends ComponentBase {
 
   private zoomAll(): void {
     this.viewportRenderer.zoomAll();
-  }
-
-  private getIcon(name: string): string {
-    if (name === 'grid') {
-      return `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <path d="M6 3V21M12 3V21M18 3V21M3 6H21M3 12H21M3 18H21" 
-        stroke="currentColor" 
-        stroke-width="2" 
-        stroke-linecap="round" 
-        stroke-linejoin="round"/>
-</svg>`;
-    }
-    try {
-      const icon = (feather.icons as Record<string, any>)[name];
-      if (icon && typeof icon.toSvg === 'function') {
-        return icon.toSvg({ width: 16, height: 16 });
-      }
-    } catch (error) {
-      console.warn(`[ViewportPanel] Failed to load icon: ${name}`, error);
-    }
-    return '';
   }
 
   private handleKeyDown = (event: KeyboardEvent): void => {

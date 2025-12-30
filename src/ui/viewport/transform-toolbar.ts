@@ -1,14 +1,14 @@
 import { html, type TemplateResult } from 'lit';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import feather from 'feather-icons';
 
 import type { TransformMode } from '@/services/ViewportRenderService';
+import type { IconService } from '@/services/IconService';
 
 export type ModeChangeHandler = (mode: TransformMode) => void;
 
 export function renderTransformToolbar(
   current: TransformMode,
-  onChange: ModeChangeHandler
+  onChange: ModeChangeHandler,
+  iconService: IconService
 ): TemplateResult {
   const transformModes = [
     { mode: 'select' as const, iconName: 'mouse-pointer', label: 'Select (Q)' },
@@ -31,21 +31,11 @@ export function renderTransformToolbar(
           aria-label="${label}"
           aria-pressed="${current === mode}"
         >
-          <span class="toolbar-icon">${renderIcon(iconName)}</span>
+          <span class="toolbar-icon">${iconService.getIcon(iconName)}</span>
         </button>
       `
     )}
   `;
-}
-
-function renderIcon(name: string): TemplateResult {
-  try {
-    const icon = (feather as any).icons?.[name];
-    if (icon && typeof icon.toSvg === 'function') {
-      return html`${unsafeHTML(icon.toSvg({ width: 16, height: 16 })) as any}`;
-    }
-  } catch {}
-  return html``;
 }
 
 export default renderTransformToolbar;

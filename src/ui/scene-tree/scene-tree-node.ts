@@ -2,12 +2,11 @@ import type { TemplateResult } from 'lit';
 import { classMap } from 'lit/directives/class-map.js';
 import { ifDefined } from 'lit/directives/if-defined.js';
 import { repeat } from 'lit/directives/repeat.js';
-import { unsafeSVG } from 'lit/directives/unsafe-svg.js';
-import feather from 'feather-icons';
 
 import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
 import { appState } from '@/state';
 import { CommandDispatcher } from '@/services';
+import { IconService, IconSize } from '@/services/IconService';
 import { ServiceContainer } from '@/fw/di';
 import { SceneManager } from '@/core/SceneManager';
 import { canDropNode } from '@/fw/hierarchy-validation';
@@ -41,6 +40,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
+
+  @inject(IconService)
+  private readonly iconService!: IconService;
 
   @property({ type: Object })
   node!: SceneTreeNode;
@@ -236,21 +238,11 @@ export class SceneTreeNodeComponent extends ComponentBase {
   }
 
   private renderNodeIcon(iconName: string): TemplateResult {
-    const icon = feather.icons[iconName as keyof typeof feather.icons];
-    if (!icon) {
-      console.warn(`[SceneTreeNode] Icon not found: ${iconName}`);
-      return html`${unsafeSVG(feather.icons['box'].toSvg({ width: 16, height: 16 }))}`;
-    }
-    return html`${unsafeSVG(icon.toSvg({ width: 16, height: 16 }))}`;
+    return this.iconService.getIcon(iconName, IconSize.MEDIUM);
   }
 
   private renderToggleIcon(iconName: string): TemplateResult {
-    const icon = feather.icons[iconName as keyof typeof feather.icons];
-    if (!icon) {
-      console.warn(`[SceneTreeNode] Toggle icon not found: ${iconName}`);
-      return html`${unsafeSVG(feather.icons['box'].toSvg({ width: 14, height: 14 }))}`;
-    }
-    return html`${unsafeSVG(icon.toSvg({ width: 14, height: 14 }))}`;
+    return this.iconService.getIcon(iconName, IconSize.SMALL);
   }
 
   private onToggleNode(event: Event): void {

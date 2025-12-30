@@ -1,4 +1,5 @@
-import { ComponentBase, customElement, html, property, state } from '@/fw';
+import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
+import { IconService } from '@/services/IconService';
 import './pix3-dropdown.ts.css';
 
 export interface DropdownItem {
@@ -11,6 +12,9 @@ export interface DropdownItem {
 
 @customElement('pix3-dropdown')
 export class Pix3Dropdown extends ComponentBase {
+  @inject(IconService)
+  private readonly iconService!: IconService;
+
   @property({ type: String })
   icon = '';
 
@@ -141,16 +145,7 @@ export class Pix3Dropdown extends ComponentBase {
     return html`
       <div class="dropdown__trigger">
         <span class="dropdown__icon">${this.icon}</span>
-        <svg viewBox="0 0 12 12" class="dropdown__caret" aria-hidden="true">
-          <path
-            d="M3 4L6 7L9 4"
-            stroke="currentColor"
-            stroke-width="1.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            fill="none"
-          />
-        </svg>
+        <span class="dropdown__caret">${this.iconService.getIcon('chevron-down-caret', 12)}</span>
       </div>
       ${this.isOpen
         ? html`<div class="dropdown__menu" role="menu">

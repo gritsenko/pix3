@@ -5,6 +5,7 @@ import type { FileDescriptor } from '@/services/FileSystemAPIService';
 import { ProjectService } from '@/services/ProjectService';
 import { ResourceManager } from '@/services/ResourceManager';
 import { DialogService } from '@/services/DialogService';
+import { IconService } from '@/services/IconService';
 import { appState } from '@/state';
 import { subscribe } from 'valtio/vanilla';
 import './asset-tree.ts.css';
@@ -26,6 +27,8 @@ export class AssetTree extends ComponentBase {
   private readonly resourceManager!: ResourceManager;
   @inject(DialogService)
   private readonly dialogService!: DialogService;
+  @inject(IconService)
+  private readonly iconService!: IconService;
   // Parent will handle actions via 'asset-activate' event
 
   // root path to show, defaults to project root
@@ -774,50 +777,19 @@ export class AssetTree extends ComponentBase {
     const title = open ? 'Open folder' : 'Closed folder';
 
     return html`<span class="icon folder" role="img" aria-label=${title} title=${title}>
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path
-          d="M3 7C3 5.89543 3.89543 5 5 5H9L11 8H19C20.1046 8 21 8.89543 21 10V17C21 18.1046 20.1046 19 19 19H5C3.89543 19 3 18.1046 3 17V7Z"
-          fill="currentColor"
-          opacity="0.95"
-        />
-        ${open
-          ? html`<path d="M3 7L7 11H21" stroke="rgba(0,0,0,0.08)" stroke-width="0"></path>`
-          : null}
-      </svg>
+      ${this.iconService.getIcon('folder-solid', 24)}
     </span>`;
   }
 
   private fileIcon() {
     const title = 'File';
     return html`<span class="icon file" role="img" aria-label=${title} title=${title}>
-      <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-        <path
-          d="M14 2H6C4.89543 2 4 2.89543 4 4V20C4 21.1046 4.89543 22 6 22H18C19.1046 22 20 21.1046 20 20V8L14 2Z"
-          fill="currentColor"
-          opacity="0.95"
-        />
-        <path d="M14 2V8H20" fill="rgba(0,0,0,0.06)" />
-      </svg>
+      ${this.iconService.getIcon('file-solid', 24)}
     </span>`;
   }
 
   private caretIcon() {
-    return html`<svg
-      class="caret"
-      viewBox="0 0 12 12"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M4 2L8 6L4 10"
-        stroke="currentColor"
-        stroke-width="1.6"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-        fill="none"
-        style="opacity:0.5"
-      />
-    </svg>`;
+    return this.iconService.getIcon('chevron-right-caret', 12);
   }
 
   protected render() {

@@ -1,6 +1,5 @@
-import { ComponentBase, customElement, html, property, state } from '@/fw';
-import { unsafeHTML } from 'lit/directives/unsafe-html.js';
-import feather from 'feather-icons';
+import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
+import { IconService, IconSize } from '@/services/IconService';
 import './pix3-dropdown-button.ts.css';
 
 export interface DropdownItem {
@@ -13,6 +12,9 @@ export interface DropdownItem {
 
 @customElement('pix3-dropdown-button')
 export class Pix3DropdownButton extends ComponentBase {
+  @inject(IconService)
+  private readonly iconService!: IconService;
+
   @property({ type: String })
   icon = '';
 
@@ -143,20 +145,10 @@ export class Pix3DropdownButton extends ComponentBase {
   };
 
   protected render() {
-    const iconSvg = this.getIconSvg(this.icon);
     return html`
       <div class="dropdown__trigger">
-        <span class="dropdown__icon">${unsafeHTML(iconSvg)}</span>
-        <svg viewBox="0 0 12 12" class="dropdown__caret" aria-hidden="true">
-          <path
-            d="M3 4L6 7L9 4"
-            stroke="currentColor"
-            stroke-width="1.2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-            fill="none"
-          />
-        </svg>
+        <span class="dropdown__icon">${this.iconService.getIconOrRawSvg(this.icon, IconSize.LARGE)}</span>
+        ${this.iconService.getIcon('chevron-down-caret', 12)}
       </div>
       ${this.isOpen
         ? html`<div class="dropdown__menu" role="menu">
@@ -174,7 +166,7 @@ export class Pix3DropdownButton extends ComponentBase {
                           >
                             ${item.icon
                               ? html`<span class="dropdown__item-icon"
-                                  >${this.getItemIconSvg(item.icon)}</span
+                                  >${this.iconService.getIconOrRawSvg(item.icon, IconSize.MEDIUM)}</span
                                 >`
                               : null}
                             <span class="dropdown__item-label">${item.label}</span>
@@ -194,7 +186,7 @@ export class Pix3DropdownButton extends ComponentBase {
                         >
                           ${item.icon
                             ? html`<span class="dropdown__item-icon"
-                                >${this.getItemIconSvg(item.icon)}</span
+                                >${this.iconService.getIconOrRawSvg(item.icon, IconSize.MEDIUM)}</span
                               >`
                             : null}
                           <span class="dropdown__item-label">${item.label}</span>
@@ -203,48 +195,6 @@ export class Pix3DropdownButton extends ComponentBase {
           </div>`
         : null}
     `;
-  }
-
-  private getIconSvg(iconName: string | null): string {
-    if (!iconName) {
-      return '';
-    }
-
-    // If it already looks like SVG, return as-is
-    if (iconName.includes('<svg') || iconName.includes('<?xml')) {
-      return iconName;
-    }
-
-    // Try to resolve as feather icon name
-    try {
-      const icon = (feather.icons as Record<string, any>)[iconName];
-      if (icon && typeof icon.toSvg === 'function') {
-        return icon.toSvg({ width: 18, height: 18 });
-      }
-    } catch (error) {
-      console.warn(`[Pix3DropdownButton] Failed to load icon: ${iconName}`, error);
-    }
-
-    return '';
-  }
-
-  private getItemIconSvg(iconName: string): ReturnType<typeof html> {
-    // If it already looks like SVG, render as unsafe HTML
-    if (iconName.includes('<svg') || iconName.includes('<?xml')) {
-      return html`${unsafeHTML(iconName)}`;
-    }
-
-    // Try to resolve as feather icon name
-    try {
-      const icon = (feather.icons as Record<string, any>)[iconName];
-      if (icon && typeof icon.toSvg === 'function') {
-        return html`${unsafeHTML(icon.toSvg({ width: 16, height: 16 }))}`;
-      }
-    } catch (error) {
-      console.warn(`[Pix3DropdownButton] Failed to load item icon: ${iconName}`, error);
-    }
-
-    return html`${unsafeHTML(iconName)}`;
   }
 }
 
