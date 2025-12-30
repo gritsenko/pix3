@@ -38,6 +38,7 @@ import {
   type Active2DTransform,
   type Selection2DOverlay,
 } from '@/services/TransformTool2d';
+import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 
 export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 
@@ -55,6 +56,9 @@ export class ViewportRendererService {
 
   @inject(ResourceManager)
   private readonly resourceManager!: ResourceManager;
+
+  @inject(ScriptExecutionService)
+  private readonly scriptExecutionService!: ScriptExecutionService;
 
   private renderer?: THREE.WebGLRenderer;
   private scene?: THREE.Scene;
@@ -181,6 +185,10 @@ export class ViewportRendererService {
 
     // Start render loop
     this.startRenderLoop();
+
+    // Start script execution service
+    this.scriptExecutionService.start();
+    this.disposers.push(() => this.scriptExecutionService.stop());
 
     // Poll active scene ID for changes (avoid subscribing to entire scenes object to prevent feedback loops)
     const checkSceneChanges = () => {

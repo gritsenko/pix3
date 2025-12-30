@@ -27,3 +27,9 @@ export {
   resolveDialogService,
 } from './DialogService';
 export { IconService, IconSize, type IconSizeValue } from './IconService';
+export {
+  ScriptRegistry,
+  type BehaviorTypeInfo,
+  type ControllerTypeInfo,
+} from './ScriptRegistry';
+export { ScriptExecutionService } from './ScriptExecutionService';

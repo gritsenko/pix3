@@ -18,6 +18,7 @@ import { Camera3D } from '@/nodes/3D/Camera3D';
 
 import { Node2D } from '@/nodes/Node2D';
 import { AssetLoader } from './AssetLoader';
+import { ScriptRegistry } from '@/services/ScriptRegistry';
 
 const ZERO_VECTOR3 = new Vector3(0, 0, 0);
 const UNIT_VECTOR3 = new Vector3(1, 1, 1);
@@ -42,6 +43,14 @@ export interface SceneNodeDefinition {
   properties?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   children?: SceneNodeDefinition[];
+  controller?: {
+    type: string;
+    params?: Record<string, unknown>;
+  };
+  behaviors?: Array<{
+    type: string;
+    params?: Record<string, unknown>;
+  }>;
 }
 
 export interface SceneDocument {
@@ -174,6 +183,18 @@ export class SceneLoader {
 
     const node = await this.createNodeFromDefinition(definition);
     index.set(node.nodeId, node);
+
+    // Attach controller if specified
+    if (definition.controller) {
+      this.attachController(node, definition.controller);
+    }
+
+    // Attach behaviors if specified
+    if (definition.behaviors && Array.isArray(definition.behaviors)) {
+      for (const behaviorDef of definition.behaviors) {
+        this.attachBehavior(node, behaviorDef);
+      }
+    }
 
     if (parent) {
       parent.adoptChild(node);
@@ -523,5 +544,73 @@ export class SceneLoader {
 
   private asString(value: unknown): string | undefined {
     return typeof value === 'string' ? value : undefined;
+  }
+
+  /**
+   * Attach a controller to a node based on YAML definition
+   */
+  private attachController(
+    node: NodeBase,
+    controllerDef: { type: string; params?: Record<string, unknown> }
+  ): void {
+    const registry = ScriptRegistry.getInstance();
+    const controller = registry.createController(controllerDef.type, controllerDef.params ?? {});
+
+    if (controller) {
+      node.controller = controller;
+      controller.node = node;
+
+      // Call onAttach if defined
+      if (controller.onAttach) {
+        try {
+          controller.onAttach(node);
+        } catch (error) {
+          console.error(
+            `[SceneLoader] Error in onAttach for controller "${controllerDef.type}":`,
+            error
+          );
+        }
+      }
+
+      console.debug(`[SceneLoader] Attached controller "${controllerDef.type}" to node "${node.nodeId}"`);
+    } else {
+      console.warn(
+        `[SceneLoader] Failed to create controller "${controllerDef.type}" for node "${node.nodeId}"`
+      );
+    }
+  }
+
+  /**
+   * Attach a behavior to a node based on YAML definition
+   */
+  private attachBehavior(
+    node: NodeBase,
+    behaviorDef: { type: string; params?: Record<string, unknown> }
+  ): void {
+    const registry = ScriptRegistry.getInstance();
+    const behavior = registry.createBehavior(behaviorDef.type, behaviorDef.params ?? {});
+
+    if (behavior) {
+      node.behaviors.push(behavior);
+      behavior.node = node;
+
+      // Call onAttach if defined
+      if (behavior.onAttach) {
+        try {
+          behavior.onAttach(node);
+        } catch (error) {
+          console.error(
+            `[SceneLoader] Error in onAttach for behavior "${behaviorDef.type}":`,
+            error
+          );
+        }
+      }
+
+      console.debug(`[SceneLoader] Attached behavior "${behaviorDef.type}" to node "${node.nodeId}"`);
+    } else {
+      console.warn(
+        `[SceneLoader] Failed to create behavior "${behaviorDef.type}" for node "${node.nodeId}"`
+      );
+    }
   }
 }
