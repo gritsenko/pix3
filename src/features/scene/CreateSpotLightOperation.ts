@@ -118,7 +118,7 @@ export class CreateSpotLightOperation implements Operation<OperationInvokeResult
               rootNodes: ref([...sceneGraph.rootNodes]),
             };
           }
-          
+
           if (state.selection.primaryNodeId === nodeId) {
             state.selection.primaryNodeId = null;
           }

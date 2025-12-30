@@ -110,7 +110,11 @@ export class Pix3ToolbarButton extends ComponentBase {
 
   protected render() {
     return html`<span class="toolbar-button">
-      ${this.icon ? html`<span class="toolbar-icon">${this.iconService.getIcon(this.icon, IconSize.LARGE)}</span>` : null}
+      ${this.icon
+        ? html`<span class="toolbar-icon"
+            >${this.iconService.getIcon(this.icon, IconSize.LARGE)}</span
+          >`
+        : null}
       <slot></slot>
     </span>`;
   }

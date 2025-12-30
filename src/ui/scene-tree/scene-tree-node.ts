@@ -113,9 +113,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
       'tree-node__content--drag-over-bottom':
         this.dragOverPosition === 'bottom' && !this.isDragging,
       'tree-node__content--drop-disabled':
-        this.dragOverPosition !== null &&
-        !this.isValidDropTarget &&
-        !this.isDragging,
+        this.dragOverPosition !== null && !this.isValidDropTarget && !this.isDragging,
     });
 
     const expanderClasses = classMap({
@@ -135,7 +133,11 @@ export class SceneTreeNodeComponent extends ComponentBase {
       : html`<span class=${expanderClasses} aria-hidden="true"></span>`;
 
     return html`
-      <li class="tree-node" role="none" ?data-dragged=${this.draggedNodeId === this.node.id && this.draggedNodeId !== null}>
+      <li
+        class="tree-node"
+        role="none"
+        ?data-dragged=${this.draggedNodeId === this.node.id && this.draggedNodeId !== null}
+      >
         <div
           class=${contentClasses}
           role="treeitem"
@@ -356,11 +358,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
     // Validate the drop target for the current hover position
     if (this.draggedNodeId && this.draggedNodeId !== this.node.id && !this.isDragging) {
-      const isValid = this.validateDropTarget(
-        this.draggedNodeId,
-        this.node.id,
-        nextPosition
-      );
+      const isValid = this.validateDropTarget(this.draggedNodeId, this.node.id, nextPosition);
       // Set isValidDropTarget: true = valid/bright, false = invalid/faded
       this.isValidDropTarget = isValid;
       if (event.dataTransfer) {

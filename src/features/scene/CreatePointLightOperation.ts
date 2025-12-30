@@ -112,7 +112,7 @@ export class CreatePointLightOperation implements Operation<OperationInvokeResul
               rootNodes: ref([...sceneGraph.rootNodes]),
             };
           }
-          
+
           if (state.selection.primaryNodeId === nodeId) {
             state.selection.primaryNodeId = null;
           }

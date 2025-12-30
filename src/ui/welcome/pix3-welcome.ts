@@ -137,7 +137,9 @@ export class Pix3Welcome extends ComponentBase {
             </div>
             <div class="action-column">
               <button @click=${this.onStartNew} class="action-btn">
-                <span class="action-icon">${this.iconService.getIcon('plus-circle-outline', 20)}</span>
+                <span class="action-icon"
+                  >${this.iconService.getIcon('plus-circle-outline', 20)}</span
+                >
                 <span class="action-label">Start New Project</span>
               </button>
             </div>
@@ -156,7 +158,9 @@ export class Pix3Welcome extends ComponentBase {
                             data-recent-index="${i}"
                             @click=${this.onRecent}
                           >
-                            <span class="folder-icon" aria-hidden="true">${this.iconService.getIcon('folder-outline', 18)}</span>
+                            <span class="folder-icon" aria-hidden="true"
+                              >${this.iconService.getIcon('folder-outline', 18)}</span
+                            >
                             <span class="recent-name">${r.name}</span>
                             <span class="recent-time">${this.formatTime(r.lastOpenedAt)}</span>
                           </button>

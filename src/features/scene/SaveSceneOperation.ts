@@ -41,7 +41,9 @@ export class SaveSceneOperation implements Operation<OperationInvokeResult> {
 
     const filePath = descriptor.filePath;
     if (!filePath?.startsWith('res://')) {
-      throw new Error(`Scene must be saved within the project. Use Save As. (filePath: ${filePath})`);
+      throw new Error(
+        `Scene must be saved within the project. Use Save As. (filePath: ${filePath})`
+      );
     }
 
     const sceneManager = context.container.getService<SceneManager>(

@@ -130,7 +130,11 @@ export class ViewportPanel extends ComponentBase {
           @pointerup=${(e: Event) => e.stopPropagation()}
         >
           <!-- Transform mode buttons -->
-          ${renderTransformToolbar(this.transformMode, m => this.handleTransformModeChange(m), this.iconService)}
+          ${renderTransformToolbar(
+            this.transformMode,
+            m => this.handleTransformModeChange(m),
+            this.iconService
+          )}
           <div class="toolbar-separator"></div>
           <!-- Viewport controls -->
           <button

@@ -293,15 +293,25 @@ export class TransformTool2d {
     // DEBUG: log pointer vs all handle positions (in world space)
     const pointerWorld = this.screenToWorld2D(screenX, screenY, orthographicCamera, viewportSize);
     console.debug('[TransformTool2d] pointer vs handles:');
-    console.debug('  pointer:', pointerWorld ? `(${pointerWorld.x.toFixed(0)}, ${pointerWorld.y.toFixed(0)})` : 'null');
-    console.debug('  bounds:', `min(${overlay.combinedBounds.min.x.toFixed(0)}, ${overlay.combinedBounds.min.y.toFixed(0)}) max(${overlay.combinedBounds.max.x.toFixed(0)}, ${overlay.combinedBounds.max.y.toFixed(0)})`);
+    console.debug(
+      '  pointer:',
+      pointerWorld ? `(${pointerWorld.x.toFixed(0)}, ${pointerWorld.y.toFixed(0)})` : 'null'
+    );
+    console.debug(
+      '  bounds:',
+      `min(${overlay.combinedBounds.min.x.toFixed(0)}, ${overlay.combinedBounds.min.y.toFixed(0)}) max(${overlay.combinedBounds.max.x.toFixed(0)}, ${overlay.combinedBounds.max.y.toFixed(0)})`
+    );
     for (const h of overlay.handles) {
       const wp = h.getWorldPosition(new THREE.Vector3());
       console.debug(`  ${h.userData?.handleType}: (${wp.x.toFixed(0)}, ${wp.y.toFixed(0)})`);
     }
 
     const hits = raycaster.intersectObjects(overlay.handles, true);
-    console.debug('[TransformTool2d] raycast hits', hits.length, hits.map(h => h.object.userData?.handleType));
+    console.debug(
+      '[TransformTool2d] raycast hits',
+      hits.length,
+      hits.map(h => h.object.userData?.handleType)
+    );
     if (hits.length) {
       // Prefer actual handle meshes over the rotation connector line.
       const meshHit = hits.find(h => h.object instanceof THREE.Mesh);
@@ -438,7 +448,8 @@ export class TransformTool2d {
           const startWorldRot = startState.worldRotationZ ?? startState.rotation;
           this.setNodeWorldRotationZ(node, startWorldRot + deltaAngle);
 
-          const startWorldPos = startState.worldPosition ?? node.getWorldPosition(new THREE.Vector3());
+          const startWorldPos =
+            startState.worldPosition ?? node.getWorldPosition(new THREE.Vector3());
           const offsetFromCenter = startWorldPos.clone().sub(startCenterWorld);
           const rotatedOffset = new THREE.Vector3(
             offsetFromCenter.x * Math.cos(deltaAngle) - offsetFromCenter.y * Math.sin(deltaAngle),
@@ -487,7 +498,8 @@ export class TransformTool2d {
       for (const [nodeId, startState] of startStates) {
         const node = sceneGraph.nodeMap.get(nodeId);
         if (node && node instanceof Node2D) {
-          const startWorldPos = startState.worldPosition ?? node.getWorldPosition(new THREE.Vector3());
+          const startWorldPos =
+            startState.worldPosition ?? node.getWorldPosition(new THREE.Vector3());
           const offsetFromCenter = startWorldPos.clone().sub(startCenterWorld);
           const scaledOffset = new THREE.Vector3(
             offsetFromCenter.x * scaleFactorX,

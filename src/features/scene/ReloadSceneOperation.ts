@@ -51,7 +51,11 @@ export class ReloadSceneOperation implements Operation<OperationInvokeResult> {
 
       // When a file is being written, some browsers briefly expose a 0-byte file.
       // Retry a few times before treating this as a real invalid scene.
-      for (let attempt = 0; attempt < 3 && (!sceneText || sceneText.trim().length === 0); attempt += 1) {
+      for (
+        let attempt = 0;
+        attempt < 3 && (!sceneText || sceneText.trim().length === 0);
+        attempt += 1
+      ) {
         console.warn('[ReloadSceneOperation] Scene file empty; retrying read', {
           filePath,
           attempt: attempt + 1,
@@ -68,7 +72,7 @@ export class ReloadSceneOperation implements Operation<OperationInvokeResult> {
         });
         return { didMutate: false };
       }
-      
+
       const graph = await sceneManager.parseScene(sceneText, { filePath });
 
       // Get current scene descriptor

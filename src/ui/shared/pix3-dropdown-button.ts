@@ -147,7 +147,9 @@ export class Pix3DropdownButton extends ComponentBase {
   protected render() {
     return html`
       <div class="dropdown__trigger">
-        <span class="dropdown__icon">${this.iconService.getIconOrRawSvg(this.icon, IconSize.LARGE)}</span>
+        <span class="dropdown__icon"
+          >${this.iconService.getIconOrRawSvg(this.icon, IconSize.LARGE)}</span
+        >
         ${this.iconService.getIcon('chevron-down-caret', 12)}
       </div>
       ${this.isOpen
@@ -166,7 +168,10 @@ export class Pix3DropdownButton extends ComponentBase {
                           >
                             ${item.icon
                               ? html`<span class="dropdown__item-icon"
-                                  >${this.iconService.getIconOrRawSvg(item.icon, IconSize.MEDIUM)}</span
+                                  >${this.iconService.getIconOrRawSvg(
+                                    item.icon,
+                                    IconSize.MEDIUM
+                                  )}</span
                                 >`
                               : null}
                             <span class="dropdown__item-label">${item.label}</span>
@@ -186,7 +191,10 @@ export class Pix3DropdownButton extends ComponentBase {
                         >
                           ${item.icon
                             ? html`<span class="dropdown__item-icon"
-                                >${this.iconService.getIconOrRawSvg(item.icon, IconSize.MEDIUM)}</span
+                                >${this.iconService.getIconOrRawSvg(
+                                  item.icon,
+                                  IconSize.MEDIUM
+                                )}</span
                               >`
                             : null}
                           <span class="dropdown__item-label">${item.label}</span>

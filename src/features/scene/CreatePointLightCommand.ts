@@ -15,10 +15,7 @@ export interface CreatePointLightCommandPayload {
   nodeId: string;
 }
 
-export class CreatePointLightCommand extends CommandBase<
-  CreatePointLightCommandPayload,
-  void
-> {
+export class CreatePointLightCommand extends CommandBase<CreatePointLightCommandPayload, void> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-point-light',
     title: 'Create Point Light',

@@ -1,5 +1,6 @@
 import { Object3D } from 'three';
 import type { PropertySchema } from '@/fw';
+import type { Behavior, ScriptController } from '@/core/ScriptComponent';
 
 export interface NodeMetadata {
   [key: string]: unknown;
@@ -24,6 +25,10 @@ export class NodeBase extends Object3D {
   readonly instancePath: string | null;
   /** Whether this node can have children. */
   isContainer: boolean = true;
+  /** Behaviors attached to this node */
+  behaviors: Behavior[] = [];
+  /** Script controller attached to this node (only one per node) */
+  controller: ScriptController | null = null;
 
   constructor(props: NodeBaseProps) {
     super();
@@ -78,6 +83,48 @@ export class NodeBase extends Object3D {
       }
     }
     return null;
+  }
+
+  /**
+   * Tick method called every frame to update scripts.
+   * Calls onUpdate on enabled controller, enabled behaviors, and recursively on children.
+   * @param dt - Delta time in seconds since last frame
+   */
+  tick(dt: number): void {
+    // Update controller if enabled
+    if (this.controller && this.controller.enabled) {
+      // Call onStart on first update
+      if (!this.controller._started && this.controller.onStart) {
+        this.controller.onStart();
+        this.controller._started = true;
+      }
+      // Call onUpdate
+      if (this.controller.onUpdate) {
+        this.controller.onUpdate(dt);
+      }
+    }
+
+    // Update all enabled behaviors
+    for (const behavior of this.behaviors) {
+      if (behavior.enabled) {
+        // Call onStart on first update
+        if (!behavior._started && behavior.onStart) {
+          behavior.onStart();
+          behavior._started = true;
+        }
+        // Call onUpdate
+        if (behavior.onUpdate) {
+          behavior.onUpdate(dt);
+        }
+      }
+    }
+
+    // Recursively tick children
+    for (const child of this.children) {
+      if (child instanceof NodeBase) {
+        child.tick(dt);
+      }
+    }
   }
 
   /**
