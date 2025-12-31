@@ -7,7 +7,7 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - **Pix3** is a browser-based editor for HTML5 scenes blending 2D and 3D layers
 - **Target stack**: TypeScript + Vite, Lit web components, Valtio state, Three.js, Golden Layout
 - **Architecture model**: Operations-first with OperationService as single mutation gateway
-- **Source of truth**: `docs/pix3-specification.md` (v1.11, 2025-12-30)
+- **Source of truth**: `docs/pix3-specification.md` (v1.12, 2026-01-01)
 
 ## Essential Architecture Patterns
 
@@ -37,6 +37,18 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - UI subscribes via `subscribe(appState.section, callback)` for reactive updates
 - Use `snapshot(appState)` for read-only checks
 
+### Script Component System
+
+- **Behaviors**: Reusable components attached to nodes via `behaviors` array
+- **Script Controllers**: Primary logic scripts attached via `controller` property (one per node)
+- **Script Lifecycle**: All scripts implement `ScriptLifecycle` with `onAttach`, `onStart`, `onUpdate`, `onDetach`
+- **Property Schema**: Behaviors/controllers expose editable parameters via `static getPropertySchema()`
+- **ScriptRegistry**: Central registry for registering and creating script types
+- **ScriptExecutionService**: Manages game loop, calls `tick(dt)` on nodes, handles lifecycle
+- **Node Ticking**: Nodes have `tick(dt)` method that updates enabled scripts and recursively ticks children
+- **All script mutations must use Commands** — AttachBehaviorCommand, DetachBehaviorCommand, SetControllerCommand, ClearControllerCommand, ToggleScriptEnabledCommand
+- **Script parameters edited via UpdateObjectPropertyCommand** — Behaviors/controllers use same property schema system as nodes
+
 ### Commands and Operations
 
 - **Operations** are first-class, encapsulate all mutation logic
@@ -62,9 +74,13 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 
 ```
 src/
+  behaviors/               # Built-in behavior implementations
+    register-behaviors.ts
+    TestRotateBehavior.ts
   core/                    # Core business logic and managers
     AssetLoader.ts
     BulkOperation.ts
+    ScriptComponent.ts      # Script component interfaces and base classes
     command.ts             # Command/Operation base contracts
     HistoryManager.ts
     LayoutManager.ts
@@ -80,6 +96,19 @@ src/
       UpdateObjectPropertyOperation.ts
     scene/
       LoadSceneCommand.ts
+    scripts/
+      AttachBehaviorCommand.ts
+      AttachBehaviorOperation.ts
+      ClearControllerCommand.ts
+      ClearControllerOperation.ts
+      DetachBehaviorCommand.ts
+      DetachBehaviorOperation.ts
+      PlaySceneCommand.ts
+      SetControllerCommand.ts
+      SetControllerOperation.ts
+      StopSceneCommand.ts
+      ToggleScriptEnabledCommand.ts
+      ToggleScriptEnabledOperation.ts
     selection/
       SelectObjectCommand.ts
       SelectObjectOperation.ts
@@ -106,14 +135,18 @@ src/
   services/                # Injectable services
     AssetFileActivationService.ts
     AssetLoaderService.ts
+    BehaviorPickerService.ts
     CommandDispatcher.ts   # Primary entry point for all actions
     FileSystemAPIService.ts
     FocusRingService.ts
     IconService.ts         # Injectable service for managing scalable vector icons. Use `getIcon(name: string)` to retrieve icons. Ensure consistent usage across components for theming and scaling.
     index.ts
     OperationService.ts    # Executes operations; gateway for mutations
+    ProjectScriptLoaderService.ts
     ProjectService.ts
     ResourceManager.ts
+    ScriptExecutionService.ts
+    ScriptRegistry.ts       # Registry for behaviors and controllers
     TemplateService.ts
     ViewportRenderService.ts
   state/                   # Valtio reactive state (UI, metadata, selection only)
@@ -132,7 +165,7 @@ src/
       asset-tree.ts
       asset-tree.ts.css
     object-inspector/
-      inspector-panel.ts          # Dynamic property rendering based on schemas; grid layout for Transform group
+      inspector-panel.ts          # Dynamic property rendering based on schemas; grid layout for Transform group; Scripts & Behaviors section
       inspector-panel.ts.css      # transform-fields grid, color-coded X/Y/Z labels
       property-editors.ts         # Vector2Editor, Vector3Editor, EulerEditor Web Components
     scene-tree/

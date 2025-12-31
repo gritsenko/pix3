@@ -1,6 +1,7 @@
-import { injectable } from '@/fw/di';
+import { injectable, inject } from '@/fw/di';
 import { appState, getAppStateSnapshot } from '@/state';
 import { ServiceContainer } from '@/fw/di';
+import { CommandRegistry } from './CommandRegistry';
 import {
   createCommandContext,
   type Command,
@@ -14,7 +15,24 @@ import {
  */
 @injectable()
 export class CommandDispatcher {
+  @inject(CommandRegistry)
+  private readonly commandRegistry!: CommandRegistry;
+
   constructor() {}
+
+  /**
+   * Execute a command by its ID.
+   * @param commandId The ID of the command to execute
+   * @returns True if command executed successfully, false if not found or preconditions blocked it
+   */
+  async executeById(commandId: string): Promise<boolean> {
+    const command = this.commandRegistry.getCommand(commandId);
+    if (!command) {
+      console.error(`[CommandDispatcher] Command not found: ${commandId}`);
+      return false;
+    }
+    return this.execute(command);
+  }
 
   /**
    * Execute a command. First checks preconditions, then invokes execute.

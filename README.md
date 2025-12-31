@@ -1,4 +1,3 @@
-
 # Pix3 Editor
 
 Pix3 is a browser-based editor for building rich HTML5 scenes that combine 2D and 3D layers. This README focuses on the current architecture, developer workflow, and how to interact with core systems.
@@ -135,60 +134,76 @@ Pix3 follows a modern, modular operations-first architecture:
 
 ```
 src/
-├── core/          # Core business logic and managers
-│   ├── AssetLoader.ts
-│   ├── BulkOperation.ts
-│   ├── command.ts             # Command/Operation base contracts
-│   ├── HistoryManager.ts
-│   ├── LayoutManager.ts
-│   ├── Operation.ts
-│   ├── SceneLoader.ts
-│   ├── SceneSaver.ts
-│   └── SceneManager.ts        # Owns SceneGraph and Node lifecycle (non-reactive)
-├── features/      # Feature-specific commands and operations
-│   ├── history/
-│   │   ├── RedoCommand.ts
-│   │   └── UndoCommand.ts
-│   ├── properties/
-│   │   ├── Transform2DCompleteOperation.ts
-│   │   ├── TransformCompleteOperation.ts
-│   │   ├── UpdateObjectPropertyCommand.ts
-│   │   └── UpdateObjectPropertyOperation.ts
-│   ├── scene/
-│   │   ├── AddModelCommand.ts
-│   │   ├── AddModelOperation.ts
-│   │   ├── CreateBoxCommand.ts
-│   │   ├── CreateBoxOperation.ts
-│   │   ├── CreateCamera3DCommand.ts
-│   │   ├── CreateCamera3DOperation.ts
-│   │   ├── CreateDirectionalLightCommand.ts
-│   │   ├── CreateDirectionalLightOperation.ts
-│   │   ├── CreateGroup2DCommand.ts
-│   │   ├── CreateGroup2DOperation.ts
-│   │   ├── CreateMeshInstanceCommand.ts
-│   │   ├── CreateMeshInstanceOperation.ts
-│   │   ├── CreatePointLightCommand.ts
-│   │   ├── CreatePointLightOperation.ts
-│   │   ├── CreateSpotLightCommand.ts
-│   │   ├── CreateSpotLightOperation.ts
-│   │   ├── CreateSprite2DCommand.ts
-│   │   ├── CreateSprite2DOperation.ts
-│   │   ├── DeleteObjectCommand.ts
-│   │   ├── DeleteObjectOperation.ts
-│   │   ├── LoadSceneCommand.ts
-│   │   ├── ReloadSceneCommand.ts
-│   │   ├── ReloadSceneOperation.ts
-│   │   ├── ReparentNodeCommand.ts
-│   │   ├── ReparentNodeOperation.ts
-│   │   ├── SaveAsSceneCommand.ts
-│   │   ├── SaveAsSceneOperation.ts
-│   │   ├── SaveSceneCommand.ts
-│   │   ├── SaveSceneOperation.ts
-│   │   └── UpdateGroup2DSizeCommand.ts
-│   │   └── UpdateGroup2DSizeOperation.ts
-│   └── selection/
-│       ├── SelectObjectCommand.ts
-│       └── SelectObjectOperation.ts
+  ├── behaviors/     # Built-in behavior implementations
+  │   ├── register-behaviors.ts
+  │   └── TestRotateBehavior.ts
+  ├── core/          # Core business logic and managers
+  │   ├── AssetLoader.ts
+  │   ├── BulkOperation.ts
+  │   ├── ScriptComponent.ts      # Script component interfaces and base classes
+  │   ├── command.ts             # Command/Operation base contracts
+  │   ├── HistoryManager.ts
+  │   ├── LayoutManager.ts
+  │   ├── Operation.ts
+  │   ├── SceneLoader.ts
+  │   ├── SceneSaver.ts
+  │   └── SceneManager.ts        # Owns SceneGraph and Node lifecycle (non-reactive)
+  ├── features/      # Feature-specific commands and operations
+  │   ├── history/
+  │   │   ├── RedoCommand.ts
+  │   │   └── UndoCommand.ts
+  │   ├── properties/
+  │   │   ├── Transform2DCompleteOperation.ts
+  │   │   ├── TransformCompleteOperation.ts
+  │   │   ├── UpdateObjectPropertyCommand.ts
+  │   │   └── UpdateObjectPropertyOperation.ts
+  │   ├── scene/
+  │   │   ├── AddModelCommand.ts
+  │   │   ├── AddModelOperation.ts
+  │   │   ├── CreateBoxCommand.ts
+  │   │   ├── CreateBoxOperation.ts
+  │   │   ├── CreateCamera3DCommand.ts
+  │   │   ├── CreateCamera3DOperation.ts
+  │   │   ├── CreateDirectionalLightCommand.ts
+  │   │   ├── CreateDirectionalLightOperation.ts
+  │   │   ├── CreateGroup2DCommand.ts
+  │   │   ├── CreateGroup2DOperation.ts
+  │   │   ├── CreateMeshInstanceCommand.ts
+  │   │   ├── CreateMeshInstanceOperation.ts
+  │   │   ├── CreatePointLightCommand.ts
+  │   │   ├── CreatePointLightOperation.ts
+  │   │   ├── CreateSpotLightCommand.ts
+  │   │   ├── CreateSpotLightOperation.ts
+  │   │   ├── CreateSprite2DCommand.ts
+  │   │   ├── DeleteObjectCommand.ts
+  │   │   ├── DeleteObjectOperation.ts
+  │   │   ├── LoadSceneCommand.ts
+  │   │   ├── ReloadSceneCommand.ts
+  │   │   ├── ReloadSceneOperation.ts
+  │   │   ├── ReparentNodeCommand.ts
+  │   │   ├── ReparentNodeOperation.ts
+  │   │   ├── SaveAsSceneCommand.ts
+  │   │   ├── SaveAsSceneOperation.ts
+  │   │   ├── SaveSceneCommand.ts
+  │   │   ├── SaveSceneOperation.ts
+  │   │   └── UpdateGroup2DSizeCommand.ts
+  │   │   └── UpdateGroup2DSizeOperation.ts
+  │   ├── scripts/
+  │   │   ├── AttachBehaviorCommand.ts
+  │   │   ├── AttachBehaviorOperation.ts
+  │   │   ├── ClearControllerCommand.ts
+  │   │   ├── ClearControllerOperation.ts
+  │   │   ├── DetachBehaviorCommand.ts
+  │   │   ├── DetachBehaviorOperation.ts
+  │   │   ├── PlaySceneCommand.ts
+  │   │   ├── SetControllerCommand.ts
+  │   │   ├── SetControllerOperation.ts
+  │   │   ├── StopSceneCommand.ts
+  │   │   └── ToggleScriptEnabledCommand.ts
+  │   │   └── ToggleScriptEnabledOperation.ts
+  │   └── selection/
+  │       ├── SelectObjectCommand.ts
+  │       └── SelectObjectOperation.ts
 ├── fw/            # Framework utilities (ComponentBase, DI, property schema)
 │   ├── component-base.ts      # Extends LitElement with light DOM default
 │   ├── di.ts                  # Dependency injection container
@@ -212,23 +227,27 @@ src/
 │       ├── MeshInstance.ts
 │       ├── PointLightNode.ts
 │       └── SpotLightNode.ts
-├── services/      # Injectable services
-│   ├── AssetFileActivationService.ts
-│   ├── CommandDispatcher.ts   # Primary entry point for all actions
-│   ├── CommandRegistry.ts      # Command registration and menu building
-│   ├── DialogService.ts
-│   ├── FileWatchService.ts    # Watches for external file changes
-│   ├── FileSystemAPIService.ts
-│   ├── FocusRingService.ts
-│   ├── LoggingService.ts      # Centralized logging for the editor
-│   ├── NodeRegistry.ts
-│   ├── OperationService.ts    # Executes operations; gateway for mutations
-│   ├── ProjectService.ts
-│   ├── ResourceManager.ts
-│   ├── TemplateService.ts
-│   ├── TransformTool2d.ts
-│   ├── ViewportRenderService.ts
-│   └── index.ts
+  ├── services/      # Injectable services
+  │   ├── AssetFileActivationService.ts
+  │   ├── BehaviorPickerService.ts
+  │   ├── CommandDispatcher.ts   # Primary entry point for all actions
+  │   ├── CommandRegistry.ts      # Command registration and menu building
+  │   ├── DialogService.ts
+  │   ├── FileWatchService.ts    # Watches for external file changes
+  │   ├── FileSystemAPIService.ts
+  │   ├── FocusRingService.ts
+  │   ├── LoggingService.ts      # Centralized logging for the editor
+  │   ├── NodeRegistry.ts
+  │   ├── OperationService.ts    # Executes operations; gateway for mutations
+  │   ├── ProjectScriptLoaderService.ts
+  │   ├── ProjectService.ts
+  │   ├── ResourceManager.ts
+  │   ├── ScriptExecutionService.ts
+  │   ├── ScriptRegistry.ts       # Registry for behaviors and controllers
+  │   ├── TemplateService.ts
+  │   ├── TransformTool2d.ts
+  │   ├── ViewportRenderService.ts
+  │   └── index.ts
 ├── state/         # Valtio reactive state (UI, metadata, selection only)
 │   ├── AppState.ts            # Defines reactive state shape
 │   └── index.ts
@@ -248,7 +267,7 @@ src/
     │   ├── logs-panel.ts
     │   └── logs-panel.ts.css
     ├── object-inspector/
-    │   ├── inspector-panel.ts          # Dynamic property rendering based on schemas
+    │   ├── inspector-panel.ts          # Dynamic property rendering based on schemas; Scripts & Behaviors section
     │   ├── inspector-panel.ts.css      # transform-fields grid, color-coded X/Y/Z
     │   └── property-editors.ts         # Vector2/3Editor, EulerEditor Web Components
     ├── scene-tree/
@@ -256,8 +275,10 @@ src/
     │   ├── scene-tree-node.ts
     │   ├── scene-tree-node.ts.css
     │   ├── scene-tree-panel.ts
-    │   └── scene-tree-panel.ts.css
+    │   └── scene-tree-panel.ts.css   # Script indicators on nodes
     ├── shared/
+    │   ├── pix3-behavior-picker.ts
+    │   ├── pix3-behavior-picker.ts.css
     │   ├── pix3-confirm-dialog.ts
     │   ├── pix3-confirm-dialog.ts.css
     │   ├── pix3-dropdown.ts
@@ -268,8 +289,6 @@ src/
     │   ├── pix3-main-menu.ts.css
     │   ├── pix3-panel.ts
     │   ├── pix3-panel.ts.css
-    │   ├── pix3-toolbar-button.ts
-    │   ├── pix3-toolbar-button.ts.css
     │   ├── pix3-toolbar.ts
     │   └── pix3-toolbar.ts.css
     ├── viewport/
@@ -461,6 +480,17 @@ interface CommandMetadata {
 - **3D Nodes**: Node3D, Camera3D, MeshInstance, GeometryMesh
 - **Lights**: DirectionalLightNode, PointLightNode, SpotLightNode
 
+### Script Component System
+
+Pix3 supports attaching scripts to nodes for runtime behavior:
+
+- **Behaviors**: Reusable components that can be attached to multiple nodes
+- **Controllers**: Primary script logic for a node (one per node)
+- **Lifecycle Methods**: `onAttach`, `onStart`, `onUpdate`, `onDetach`
+- **Property Schema Integration**: Behaviors/controllers expose editable parameters via property schemas
+- **Script Registry**: Centralized registration for built-in and project scripts
+- **Script Execution Service**: Manages the game loop and script lifecycle
+
 ### Commands & Operations
 
 - **History**: Undo, Redo (with keyboard shortcuts)
@@ -468,6 +498,7 @@ interface CommandMetadata {
   - Load scene from disk
   - Save scene / Save As
   - Reload scene (automatic via file watch)
+  - Play Scene / Stop Scene
 - **Node Creation**:
   - Create 3D Box (geometry mesh)
   - Create Camera3D
@@ -481,6 +512,10 @@ interface CommandMetadata {
   - Reparent nodes (drag-and-drop in scene tree)
   - Update Group2D size
 - **Properties**: Update object properties (via inspector)
+- **Scripts**:
+  - Attach/Detach Behavior
+  - Set/Clear Controller
+  - Toggle Script Enabled
 
 ### UI Panels
 
@@ -498,6 +533,7 @@ interface CommandMetadata {
 - ResourceManager, TemplateService, AssetFileActivationService
 - DialogService, LoggingService, FocusRingService
 - TransformTool2d, NodeRegistry, ViewportRenderService
+- ScriptRegistry, BehaviorPickerService, ScriptExecutionService
 
 ### 2D/3D Rendering
 

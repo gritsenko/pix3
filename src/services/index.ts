@@ -29,3 +29,5 @@ export {
 export { IconService, IconSize, type IconSizeValue } from './IconService';
 export { ScriptRegistry, type BehaviorTypeInfo, type ControllerTypeInfo } from './ScriptRegistry';
 export { ScriptExecutionService } from './ScriptExecutionService';
+export { ProjectScriptLoaderService } from './ProjectScriptLoaderService';
+export { BehaviorPickerService } from './BehaviorPickerService';

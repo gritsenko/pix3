@@ -114,6 +114,74 @@ pix3-scene-tree-node {
   letter-spacing: 0.01em;
 }
 
+.tree-node__script-indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 0.75rem;
+  height: 0.75rem;
+  color: var(--pix3-accent-color);
+  opacity: 0.8;
+  position: relative;
+}
+
+.tree-node__script-indicator svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.script-popover {
+  position: absolute;
+  left: 100%;
+  top: 50%;
+  transform: translate(8px, -50%);
+  min-width: 10rem;
+  background: var(--pix3-bg-panel);
+  color: var(--pix3-fg-primary);
+  border: 1px solid var(--pix3-border-color);
+  box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+  padding: 8px 10px;
+  border-radius: 6px;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 120ms ease, transform 120ms ease;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.tree-node__script-indicator:hover .script-popover,
+.tree-node__script-indicator:focus .script-popover {
+  visibility: visible;
+  opacity: 1;
+  transform: translate(10px, -50%);
+  pointer-events: auto;
+}
+
+.script-popover__title {
+  font-weight: 600;
+  margin-bottom: 6px;
+  font-size: 0.85rem;
+}
+
+.script-popover__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 10rem;
+  overflow: auto;
+}
+
+.script-popover__item {
+  font-size: 0.85rem;
+  padding: 2px 0;
+}
+
+.script-popover__empty {
+  font-size: 0.85rem;
+  color: var(--pix3-fg-secondary);
+}
+
 .tree-node__type {
   display: inline-block;
   padding: 0.1rem 0.35rem;

@@ -1,8 +1,8 @@
 # Pix3 — Technical Specification
 
-Version: 1.11
+Version: 1.12
 
-Date: 2025-12-30
+Date: 2026-01-01
 
 ## 1. Introduction
 
@@ -137,13 +137,13 @@ Notes:
 - **Layer Separation:** Logical separation is maintained via internal render phases (viewport pass, overlay pass) rather than different engines.
 - **Testing Path:** Planned integration tests validate resize, DPR scaling, and render ordering across the unified rendering pipeline.
 
-## 5. Property Schema System
+## 8. Property Schema System
 
-### 5.1 Overview
+### 8.1 Overview
 
 Pix3 uses a **Godot-inspired property schema system** for dynamic object inspector UI generation. This system allows node classes to declaratively define their editable properties with type information, validation rules, and UI hints. The Inspector automatically renders appropriate editors for each property type.
 
-### 5.2 Schema Structure
+### 8.2 Schema Structure
 
 ```typescript
 interface PropertySchema {
@@ -177,7 +177,7 @@ type PropertyType =
   | 'object';
 ```
 
-### 5.3 Node Schema Example
+### 8.3 Node Schema Example
 
 ```typescript
 export class Node2D extends NodeBase {
@@ -228,7 +228,7 @@ export class Node2D extends NodeBase {
 }
 ```
 
-### 5.4 Inspector Integration
+### 8.4 Inspector Integration
 
 The Inspector panel uses these utilities:
 
@@ -238,7 +238,7 @@ The Inspector panel uses these utilities:
 
 Property changes are handled through `UpdateObjectPropertyOperation`, which uses the schema's `getValue`/`setValue` methods for semantic transformations.
 
-### 5.5 Custom Editors
+### 8.5 Custom Editors
 
 Vector and rotation properties use specialized Web Components:
 
@@ -248,11 +248,156 @@ Vector and rotation properties use specialized Web Components:
 
 Transform group renders with 6-column CSS Grid (1rem 1fr 1rem 1fr 1rem 1fr) with color-coded axis labels (X: red, Y: green, Z: blue).
 
-## 6. Scene File Format (\*.pix3scene)
+## 6. Script Component System
+
+### 6.1 Overview
+
+Pix3 includes a script component system for attaching runtime behaviors and controllers to nodes. This system enables game-like interactivity and logic within the scene editor, similar to behavior systems in Unity or Godot.
+
+### 6.2 Script Component Types
+
+The script system supports two component types:
+
+- **Behaviors**: Reusable components that can be attached to multiple nodes. Multiple behaviors can be attached to a single node. Behaviors are ideal for modular functionality (e.g., rotation, physics, animation).
+- **Script Controllers**: Primary logic scripts for a node. Only one controller can be attached per node. Controllers typically represent the main behavior or state machine for a node.
+
+### 6.3 Script Lifecycle
+
+All script components (behaviors and controllers) implement the `ScriptLifecycle` interface with the following methods:
+
+- `onAttach(node: NodeBase)`: Called when the script component is attached to a node. Use this to initialize references and set up state.
+- `onStart()`: Called on the first frame after attachment, before `onUpdate`. Use this for initialization that depends on the scene being fully loaded.
+- `onUpdate(dt: number)`: Called every frame with delta time in seconds. Use this to update state and animate properties.
+- `onDetach()`: Called when the script component is detached from a node or scene is unloaded. Use this to clean up resources and remove event listeners.
+- `resetStartedState()`: Called when detaching to allow re-initialization on next attach.
+
+### 6.4 Base Classes
+
+- **BehaviorBase**: Abstract base class for behaviors. Extend this class to create custom behaviors. Behaviors expose parameters via `static getPropertySchema()` for dynamic property editing.
+- **ScriptControllerBase**: Abstract base class for controllers. Extend this class to create custom controllers. Controllers expose parameters via `static getPropertySchema()` for dynamic property editing.
+
+### 6.5 Script Registry
+
+The `ScriptRegistry` service maintains a mapping of script component type names to their implementation classes. Each class must have a static `getPropertySchema()` method for parameter definitions.
+
+- Register behaviors: `registry.registerBehavior(info: BehaviorTypeInfo)`
+- Register controllers: `registry.registerController(info: ControllerTypeInfo)`
+- Create instances: `registry.createBehavior(typeId, instanceId)` or `registry.createController(typeId, instanceId)`
+- Get property schemas: `registry.getBehaviorPropertySchema(typeId)` or `registry.getControllerPropertySchema(typeId)`
+
+### 6.6 Script Execution Service
+
+The `ScriptExecutionService` manages the game loop and script lifecycle:
+
+- **Game Loop**: Runs `requestAnimationFrame` to tick all nodes in the active scene
+- **Node Ticking**: Calls `tick(dt)` on all root nodes, which recursively updates children
+- **Lifecycle Management**: Automatically calls `onAttach` when scenes load, `onDetach` when scenes unload
+- **Start/Stop**: Control script execution via `start()` and `stop()` methods
+- **Scene Change Handling**: Detaches old scripts and attaches new ones when scenes change
+
+### 6.7 Behavior Picker
+
+The `BehaviorPickerService` provides a modal dialog for selecting behaviors and controllers:
+
+- Promise-based API: `showPicker('behavior' | 'controller')`
+- Search and filtering by name, description, and keywords
+- Category grouping for organized display
+- Integration with inspector panel for adding scripts
+
+### 6.8 Inspector Integration
+
+The Object Inspector displays a "Scripts & Behaviors" section for each node:
+
+- Lists attached controller (if any) and behaviors
+- Provides buttons to add new behaviors or set a controller
+- Enable/disable scripts via toggle buttons
+- Remove scripts via delete buttons
+- Behaviors and controllers expose their parameter schemas for inline editing
+
+### 6.9 Node Integration
+
+Nodes store scripts in two properties:
+
+- `behaviors: Behavior[]` - Array of attached behaviors
+- `controller: ScriptController | null` - Single attached controller or null
+
+Nodes implement a `tick(dt)` method that:
+
+1. Updates enabled controller (calls `onUpdate`)
+2. Updates enabled behaviors (calls `onUpdate`)
+3. Recursively ticks children
+
+### 6.10 Scene Serialization
+
+Scripts are serialized in scene files as part of node definitions:
+
+```yaml
+root:
+  - id: 'node_001'
+    type: 'Node3D'
+    name: 'RotatingCube'
+    properties:
+      position: { x: 0, y: 0, z: 0 }
+    behaviors:
+      - id: 'behavior_001'
+        type: 'test_rotate'
+        enabled: true
+        parameters:
+          rotationSpeed: 2.5
+    controller:
+      id: 'controller_001'
+        type: 'my_controller'
+        enabled: true
+        parameters: {}
+```
+
+### 6.11 Example Behavior
+
+```typescript
+export class TestRotateBehavior extends BehaviorBase {
+  private rotationSpeed: number = 1.0;
+
+  constructor(id: string, type: string) {
+    super(id, type);
+    this.parameters = { rotationSpeed: this.rotationSpeed };
+  }
+
+  static getPropertySchema(): PropertySchema {
+    return {
+      nodeType: 'TestRotateBehavior',
+      properties: [
+        {
+          name: 'rotationSpeed',
+          type: 'number',
+          ui: {
+            label: 'Rotation Speed',
+            group: 'Behavior',
+            min: 0,
+            max: 10,
+            step: 0.1,
+          },
+          getValue: b => (b as TestRotateBehavior).parameters.rotationSpeed,
+          setValue: (b, value) => {
+            (b as TestRotateBehavior).parameters.rotationSpeed = Number(value);
+          },
+        },
+      ],
+      groups: { Behavior: { label: 'Behavior Parameters' } },
+    };
+  }
+
+  onUpdate(dt: number): void {
+    if (!this.node || !(this.node instanceof Node3D)) return;
+    this.node.rotation.y += this.rotationSpeed * dt;
+  }
+}
+```
+
+## 7. Scene File Format (\*.pix3scene)
 
 The scene file uses the YAML format to ensure readability for both humans and machines (including AI agents).
 
-### 6.1 Key Principles
+### 7.1 Key Principles
 
 - Declarative: The file describes the composition and structure of the scene, not the process of its creation.
 - Asset Referencing: Assets (models, textures) are not embedded in the file but are referenced via relative paths with a res:// prefix (path from the project root).
@@ -262,7 +407,7 @@ The scene file uses the YAML format to ensure readability for both humans and ma
 - Versioned Schema: Each file includes a `version` field; migrations are maintained in the SceneManager and run automatically on load.
 - Conflict Resolution: Instance overrides always win over parent definitions. Duplicate IDs trigger validation errors during import.
 
-### 6.2 Example Structure
+### 7.2 Example Structure
 
 ```yaml
 # --- Metadata ---
@@ -298,7 +443,7 @@ root:
           scale: { x: 100, y: 1, z: 100 }
 ```
 
-### 6.3 Validation Rules
+### 7.3 Validation Rules
 
 - The root section must contain at least one node entry.
 - All node IDs must be unique across the entire resolved scene graph.
@@ -306,7 +451,7 @@ root:
 - Optional `metadata` block can include analytics tags, localization keys, and QA notes.
 - Continuous integration should run schema validation (AJV + generated JSON schema) against committed scene files.
 
-## 7. MVP (Minimum Viable Product) Plan
+## 9. MVP (Minimum Viable Product) Plan
 
 - Establish Vite + TypeScript + Lit project with ESLint, Prettier, Vitest, and CI lint/test workflows.
 - Implement the basic architecture: AppState with Valtio, Command pattern contracts, and DI container wiring.
@@ -320,7 +465,7 @@ root:
 - Implement scene save/load/reload with file watch for external changes.
 - Deliver a playable-ad export preset (HTML bundle) and analytics logging stub.
 
-## 8. Non-Functional Requirements
+## 10. Non-Functional Requirements
 
 - **Performance:** Maintain ≥ 85 FPS in viewport on baseline hardware. Initial load (cold) < 6s, warm reload < 2s. Command execution should visually update UI within 80ms.
 - **Accessibility:** WCAG 2.1 AA minimum for editor chrome; ensure keyboard navigation for panel focus and command palette. Provide high-contrast theme preset.
@@ -328,7 +473,7 @@ root:
 - **Reliability:** Autosave layout and session state every 30 seconds. Maintain undo history for at least the last 100 commands.
 - **Internationalization:** UI copy uses i18n keys; English and Russian shipped at MVP. YAML scenes may include localized strings via `locale` blocks.
 
-## 9. Project Structure
+## 11. Project Structure
 
 ```
 /
@@ -458,14 +603,14 @@ root:
 │   │       └── pix3-welcome.ts.css
 ```
 
-## 10. Roadmap and Milestones
+## 12. Roadmap and Milestones
 
 1. **Milestone 0 — Foundation (completed):** Repo bootstrap, DI utilities, layout shell, state scaffolding, CI pipeline.
 2. **Milestone 1 — Scene Authoring (completed):** SceneManager MVP, viewport rendering loop, asset browser, primitive tools, property schema system.
 3. **Milestone 2 — Playable Export (in progress):** Export preset, analytics stub, undo/redo polish, plugin SDK docs.
 4. **Milestone 3 — Collaboration Preview (future):** Shared sessions, commenting, live cursors (post-MVP).
 
-## 11. Change Log
+## 13. Change Log
 
 - **1.5 (2025-09-26):** Added target platforms, non-functional requirements, detailed architecture contracts, validation rules, and roadmap updates. Synced guidance on `fw` helpers.
 - **1.7 (2025-10-01):** Removed PixiJS dual-engine plan; consolidated rendering to single Three.js pipeline (perspective + orthographic). Updated project structure, removed obsolete adapter references, clarified rendering notes.
@@ -473,3 +618,4 @@ root:
 - **1.9 (2025-10-27):** Updated to reflect current architecture where Nodes are NOT in reactive state. Nodes are managed by SceneManager in SceneGraph objects. State contains only UI, scenes metadata, and selection IDs. CommandDispatcher Service is the primary entry point for all actions. Updated project structure section to annotate (non-reactive) for nodes and clarify state boundaries. Enhanced implementation status with current feature list.
 - **1.10 (2025-12-30):** Added comprehensive Property Schema System section (5.0-5.5). Updated technology stack to include Pixi.js v8 for 2D rendering alongside Three.js. Added LoggingService and FileWatchService to architecture. Updated feature list to reflect all implemented commands/operations. Added vector4 property type. Updated MVP plan and roadmap to reflect completed milestones. Added format:check script to project scripts.
 - **1.11 (2025-12-30):** Removed Pixi.js from technology stack. Updated to Three.js-only rendering pipeline. Removed Pixi.js references from architecture notes and rendering architecture sections. Updated MVP plan to remove 2D rendering requirements via Pixi.js. Added details about the Icon Service under the Services section.
+- **1.12 (2026-01-01):** Added Script Component System section (6.0-6.11). Implemented behaviors and controller scripts attachments in inspector. Nodes now support `behaviors` array and optional `controller`. Added ScriptRegistry service for registering script types. Added BehaviorPickerService for modal dialog. Added ScriptExecutionService for game loop and script lifecycle management. Added commands for Attach/DetachBehavior, Set/ClearController, ToggleScriptEnabled, PlayScene, StopScene. Updated inspector panel to display "Scripts & Behaviors" section. Updated scene tree to show script indicators. Updated project structure to include `behaviors/` directory and `features/scripts/`. Added example TestRotateBehavior implementation. Updated node lifecycle with `tick(dt)` method for script updates.

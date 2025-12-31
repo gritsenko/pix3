@@ -89,6 +89,8 @@ export interface UIState {
   showLayer3D: boolean;
   /** Toggle for showing the 3D grid helper */
   showGrid: boolean;
+  /** True when the scene is in play mode (scripts running) */
+  isPlaying: boolean;
 }
 
 export interface OperationState {
@@ -158,6 +160,7 @@ export const createInitialAppState = (): AppState => ({
     showLayer2D: true,
     showLayer3D: true,
     showGrid: true,
+    isPlaying: false,
   },
   operations: {
     isExecuting: false,

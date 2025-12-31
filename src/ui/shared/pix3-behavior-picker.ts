@@ -1,0 +1,146 @@
+import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
+import { ScriptRegistry, type BehaviorTypeInfo, type ControllerTypeInfo } from '@/services/ScriptRegistry';
+import { IconService } from '@/services/IconService';
+import './pix3-behavior-picker.ts.css';
+
+type ScriptTypeInfo = BehaviorTypeInfo | ControllerTypeInfo;
+
+@customElement('pix3-behavior-picker')
+export class BehaviorPicker extends ComponentBase {
+  @inject(ScriptRegistry)
+  private readonly scriptRegistry!: ScriptRegistry;
+
+  @inject(IconService)
+  private readonly iconService!: IconService;
+
+  @property({ type: String, reflect: true })
+  public pickerId: string = '';
+
+  @property({ type: String })
+  public type: 'behavior' | 'controller' = 'behavior';
+
+  @state()
+  private searchQuery: string = '';
+
+  @state()
+  private selectedScriptId: string | null = null;
+
+  protected render() {
+    const scripts: ScriptTypeInfo[] = this.type === 'behavior' 
+      ? this.scriptRegistry.getAllBehaviorTypes() 
+      : this.scriptRegistry.getAllControllerTypes();
+      
+    const filteredScripts = scripts.filter(s => 
+      s.displayName.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+      s.description.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+      s.keywords.some(k => k.toLowerCase().includes(this.searchQuery.toLowerCase()))
+    );
+
+    const groupedScripts = new Map<string, ScriptTypeInfo[]>();
+    for (const s of filteredScripts) {
+      if (!groupedScripts.has(s.category)) {
+        groupedScripts.set(s.category, []);
+      }
+      groupedScripts.get(s.category)!.push(s);
+    }
+
+    const sortedCategories = Array.from(groupedScripts.keys()).sort();
+
+    return html`
+      <div class="dialog-backdrop" @click=${this.onBackdropClick}>
+        <div class="dialog-content behavior-picker-content" @click=${(e: Event) => e.stopPropagation()}>
+          <div class="picker-header">
+            <h2 class="dialog-title">${this.type === 'behavior' ? 'Add Behavior' : 'Set Controller'}</h2>
+            <div class="search-box">
+              ${this.iconService.getIcon('search', 16)}
+              <input 
+                type="text" 
+                placeholder="Search ${this.type}s..." 
+                .value=${this.searchQuery}
+                @input=${(e: InputEvent) => this.searchQuery = (e.target as HTMLInputElement).value}
+                @keydown=${(e: KeyboardEvent) => { if (e.key === 'Escape') this.dispatchCancel(); }}
+                autofocus
+              />
+            </div>
+          </div>
+
+          <div class="picker-body">
+            <div class="behavior-list">
+              ${sortedCategories.map(category => html`
+                <div class="category-section">
+                  <h3 class="category-title">${category}</h3>
+                  <div class="category-grid">
+                    ${groupedScripts.get(category)!.map(s => html`
+                      <div 
+                        class="behavior-item ${this.selectedScriptId === s.id ? 'selected' : ''}"
+                        @click=${() => this.selectedScriptId = s.id}
+                        @dblclick=${() => this.dispatchSelect(s)}
+                      >
+                        <div class="behavior-icon">
+                            ${this.iconService.getIcon(this.type === 'behavior' ? 'zap' : 'code', 24)}
+                        </div>
+                        <div class="behavior-info">
+                          <div class="behavior-name">${s.displayName}</div>
+                          <div class="behavior-desc">${s.description}</div>
+                        </div>
+                      </div>
+                    `)}
+                  </div>
+                </div>
+              `)}
+              ${filteredScripts.length === 0 ? html`
+                <div class="no-results">No ${this.type}s found matching "${this.searchQuery}"</div>
+              ` : ''}
+            </div>
+          </div>
+
+          <div class="dialog-actions">
+            <button class="btn-secondary" @click=${() => this.dispatchCancel()}>
+              Cancel
+            </button>
+            <button 
+              class="btn-primary" 
+              ?disabled=${!this.selectedScriptId}
+              @click=${() => {
+                const s = scripts.find(x => x.id === this.selectedScriptId);
+                if (s) this.dispatchSelect(s);
+              }}
+            >
+              ${this.type === 'behavior' ? 'Add' : 'Set'}
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private onBackdropClick(): void {
+    this.dispatchCancel();
+  }
+
+  private dispatchSelect(script: ScriptTypeInfo): void {
+    this.dispatchEvent(
+      new CustomEvent('behavior-selected', {
+        detail: { pickerId: this.pickerId, behavior: script },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private dispatchCancel(): void {
+    this.dispatchEvent(
+      new CustomEvent('behavior-picker-cancelled', {
+        detail: { pickerId: this.pickerId },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+}
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'pix3-behavior-picker': BehaviorPicker;
+  }
+}

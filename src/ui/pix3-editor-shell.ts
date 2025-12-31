@@ -7,7 +7,9 @@ import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { CommandRegistry } from '@/services/CommandRegistry';
 import { FileWatchService } from '@/services/FileWatchService';
 import { DialogService, type DialogInstance } from '@/services/DialogService';
+import { BehaviorPickerService, type BehaviorPickerInstance } from '@/services/BehaviorPickerService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
+import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
@@ -15,12 +17,15 @@ import { ReloadSceneCommand } from '@/features/scene/ReloadSceneCommand';
 import { DeleteObjectCommand } from '@/features/scene/DeleteObjectCommand';
 import { UndoCommand } from '@/features/history/UndoCommand';
 import { RedoCommand } from '@/features/history/RedoCommand';
+import { PlaySceneCommand } from '@/features/scripts/PlaySceneCommand';
+import { StopSceneCommand } from '@/features/scripts/StopSceneCommand';
 import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './shared/pix3-main-menu';
 import './shared/pix3-confirm-dialog';
+import './shared/pix3-behavior-picker';
 import './welcome/pix3-welcome';
 import './logs-view/logs-panel';
 import './pix3-editor-shell.ts.css';
@@ -48,8 +53,14 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(DialogService)
   private readonly dialogService!: DialogService;
 
+  @inject(BehaviorPickerService)
+  private readonly behaviorPickerService!: BehaviorPickerService;
+
   @inject(ScriptExecutionService)
   private readonly scriptExecutionService!: ScriptExecutionService;
+
+  @inject(ProjectScriptLoaderService)
+  private readonly projectScriptLoader!: ProjectScriptLoaderService;
 
   // project open handled by <pix3-welcome>
 
@@ -58,6 +69,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @state()
   private dialogs: DialogInstance[] = [];
+
+  @state()
+  private behaviorPickers: BehaviorPickerInstance[] = [];
 
   @property({ type: Boolean, reflect: true, attribute: 'shell-ready' })
   protected shellReady = false;
@@ -79,17 +93,27 @@ export class Pix3EditorShell extends ComponentBase {
     const deleteCommand = new DeleteObjectCommand();
     const undoCommand = new UndoCommand(this.operationService);
     const redoCommand = new RedoCommand(this.operationService);
+    const playCommand = new PlaySceneCommand(this.scriptExecutionService);
+    const stopCommand = new StopSceneCommand(this.scriptExecutionService);
     this.commandRegistry.registerMany(
       undoCommand,
       redoCommand,
       saveCommand,
       saveAsCommand,
-      deleteCommand
+      deleteCommand,
+      playCommand,
+      stopCommand
     );
 
     // Subscribe to dialog changes
     this.disposeDialogsSubscription = this.dialogService.subscribe(dialogs => {
       this.dialogs = dialogs;
+      this.requestUpdate();
+    });
+
+    // Subscribe to behavior picker changes
+    this.behaviorPickerService.subscribe(pickers => {
+      this.behaviorPickers = pickers;
       this.requestUpdate();
     });
 
@@ -118,9 +142,6 @@ export class Pix3EditorShell extends ComponentBase {
         if (host && !this.shellReady) {
           void this.layoutManager.initialize(host).then(() => {
             this.shellReady = true;
-
-            // Start script execution service once layout is ready
-            this.scriptExecutionService.start();
 
             this.requestUpdate();
           });
@@ -415,21 +436,63 @@ export class Pix3EditorShell extends ComponentBase {
           ${this.isLayoutReady ? html`` : html`<pix3-welcome></pix3-welcome>`}
         </div>
         ${this.renderDialogHost()}
+        ${this.renderPickerHost()}
       </div>
     `;
   }
 
   private renderToolbar() {
+    const isPlaying = appState.ui.isPlaying;
     return html`
       <pix3-toolbar aria-label="Editor toolbar">
         <div class="toolbar-start">
           <pix3-main-menu slot="actions"></pix3-main-menu>
         </div>
         <div class="toolbar-content">
+          <div class="toolbar-group">
+            <pix3-toolbar-button
+              icon=${isPlaying ? 'square' : 'play'}
+              label=${isPlaying ? 'Stop' : 'Play'}
+              ?toggled=${isPlaying}
+              @click=${() => this.togglePlayMode()}
+              aria-label=${isPlaying ? 'Stop Scene' : 'Play Scene'}
+            ></pix3-toolbar-button>
+          </div>
           <span> Project: ${appState.project.projectName} </span>
         </div>
       </pix3-toolbar>
     `;
+  }
+
+  private togglePlayMode() {
+    const commandId = appState.ui.isPlaying ? 'scene.stop' : 'scene.play';
+    void this.commandDispatcher.executeById(commandId);
+  }
+
+  private renderPickerHost() {
+    return html`
+      <div
+        class="picker-host"
+        @behavior-selected=${(e: CustomEvent) => this.onBehaviorSelected(e)}
+        @behavior-picker-cancelled=${(e: CustomEvent) => this.onBehaviorPickerCancelled(e)}
+      >
+        ${this.behaviorPickers.map(
+          picker => html`
+            <pix3-behavior-picker .pickerId=${picker.id} .type=${picker.type}></pix3-behavior-picker>
+          `
+        )}
+      </div>
+    `;
+  }
+
+  private onBehaviorSelected(e: CustomEvent): void {
+    const { pickerId, behavior } = e.detail;
+    this.behaviorPickerService.select(pickerId, behavior);
+  }
+
+  private onBehaviorPickerCancelled(e: CustomEvent): void {
+    const { pickerId } = e.detail;
+    this.behaviorPickerService.cancel(pickerId);
   }
 
   private renderDialogHost() {

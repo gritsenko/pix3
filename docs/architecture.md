@@ -1,10 +1,10 @@
 # Pix3 Architecture Diagram
 
-This document contains a high-level architecture diagram for Pix3 and notes about viewing and exporting diagrams in VS Code. It reflects the current operations-first model where the CommandDispatcher Service is the primary entry point for all actions, ensuring consistent lifecycle management and preconditions checking.
+This document contains a high-level architecture diagram for Pix3 and notes about viewing and exporting diagrams in VS Code. It reflects the current operations-first model where the CommandDispatcher Service is the primary entry point for all actions, ensuring consistent lifecycle management and preconditions checking. This version also includes the Script Component System for behaviors and controllers.
 
 ## Mermaid diagram
 
-Below is a Mermaid system diagram that represents the architecture described in `pix3-specification.md` (v1.10, operations-first).
+Below is a Mermaid system diagram that represents the architecture described in `pix3-specification.md` (v1.12, operations-first).
 
 ```mermaid
 flowchart LR
@@ -361,6 +361,152 @@ Pix3 implements a comprehensive set of commands and operations organized by feat
 
 - **SelectObjectCommand**: Updates selection state with clicked/hovered node
 
+### Script Commands
+
+- **AttachBehaviorCommand**: Adds a behavior to a node via behavior picker
+- **DetachBehaviorCommand**: Removes a behavior from a node
+- **SetControllerCommand**: Sets a controller on a node via behavior picker
+- **ClearControllerCommand**: Removes controller from a node
+- **ToggleScriptEnabledCommand**: Toggles enabled state of a behavior or controller
+- **PlaySceneCommand**: Starts script execution loop
+- **StopSceneCommand**: Stops script execution loop
+
+## Script Component System
+
+Pix3 includes a script component system for attaching runtime behaviors and controllers to nodes:
+
+```mermaid
+graph TD
+  A["Node"]
+  B["Behavior"]
+  C["Controller"]
+  D["ScriptRegistry"]
+  E["BehaviorBase/ControllerBase"]
+  F["ScriptExecutionService"]
+  G["Inspector"]
+  H["BehaviorPickerService"]
+
+  A -->|"behaviors[]"| B
+  A -->|"controller"| C
+  B -->|"extends"| E
+  C -->|"extends"| E
+  D -->|"creates instances"| B
+  D -->|"creates instances"| C
+  F -->|"tick dt"| A
+  G -->|"displays"| B
+  G -->|"displays"| C
+  H -->|"picker modal"| D
+
+  style A fill:#e1f5ff
+  style B fill:#fff4e6
+  style C fill:#ffe6e6
+  style D fill:#f0f9ff
+  style E fill:#f5f5f5
+  style F fill:#fff7ed
+  style G fill:#fefce8
+  style H fill:#fdf4ff
+```
+
+### Key Components
+
+- **ScriptRegistry**: Registers behavior and controller types, creates instances, provides property schemas
+- **Behavior**: Reusable script component, multiple per node
+- **Controller**: Primary script component, one per node
+- **BehaviorBase/ScriptControllerBase**: Abstract base classes with `getPropertySchema()` for parameter definitions
+- **ScriptExecutionService**: Game loop, calls `tick(dt)` on nodes, manages script lifecycle
+- **BehaviorPickerService**: Modal dialog for selecting behaviors/controllers
+- **Inspector**: Displays attached scripts, allows adding/removing/toggling
+
+### Script Lifecycle
+
+```mermaid
+sequenceDiagram
+  participant S as ScriptExecutionService
+  participant N as Node
+  participant C as Controller
+  participant B as Behavior
+
+  S->>N: tick(dt)
+  N->>C: if enabled: onUpdate(dt)
+  N->>B: for each behavior: if enabled: onUpdate(dt)
+  Note over B: Update state, animate properties
+
+  alt Scene Load
+    S->>N: onAttach(node)
+    N->>C: onAttach(node)
+    N->>B: onAttach(behavior, node)
+    S->>N: first tick: onStart()
+    N->>C: onStart()
+    N->>B: onStart()
+  end
+
+  alt Scene Unload
+    S->>N: onDetach()
+    N->>C: onDetach()
+    N->>B: onDetach()
+  end
+```
+
+### Inspector Integration
+
+The Inspector panel includes a "Scripts & Behaviors" section for each node:
+
+- **Controller Display**: Shows controller type with enable/disable and remove buttons
+- **Behaviors List**: Shows all attached behaviors with enable/disable and remove buttons
+- **Add Buttons**: "Add Behavior" and "Set Controller" buttons open behavior picker modal
+- **No Scripts State**: Displays "No scripts attached" when empty
+- **Parameter Editing**: Behaviors/controllers expose parameters via property schemas for inline editing
+
+### Script Parameter Schema
+
+Like node properties, script parameters use the property schema system:
+
+```typescript
+static getPropertySchema(): PropertySchema {
+  return {
+    nodeType: 'TestRotateBehavior',
+    properties: [
+      {
+        name: 'rotationSpeed',
+        type: 'number',
+        ui: {
+          label: 'Rotation Speed',
+          group: 'Behavior',
+          min: 0,
+          max: 10,
+          step: 0.1,
+        },
+        getValue: (b) => b.parameters.rotationSpeed,
+        setValue: (b, value) => {
+          b.parameters.rotationSpeed = Number(value);
+        },
+      },
+    ],
+    groups: { Behavior: { label: 'Behavior Parameters' } },
+  };
+}
+```
+
+### Commands for Script Management
+
+All script mutations use commands through CommandDispatcher:
+
+- **AttachBehaviorCommand/Operation**: Add a behavior to a node
+- **DetachBehaviorCommand/Operation**: Remove a behavior from a node
+- **SetControllerCommand/Operation**: Set controller on a node
+- **ClearControllerCommand/Operation**: Remove controller from a node
+- **ToggleScriptEnabledCommand/Operation**: Enable/disable a script
+- **PlaySceneCommand**: Start script execution loop
+- **StopSceneCommand**: Stop script execution loop
+
+### Built-in Behaviors
+
+Pix3 includes example behaviors for testing:
+
+- **TestRotateBehavior**: Rotates a 3D node continuously with configurable speed
+
+Additional behaviors can be registered via `ScriptRegistry.registerBehavior()`.
+
 ## Service Layer
 
 Pix3 implements a comprehensive service layer providing core functionality:
@@ -370,11 +516,14 @@ Pix3 implements a comprehensive service layer providing core functionality:
 - **CommandDispatcher**: Primary entry point for all command execution with preconditions, telemetry
 - **CommandRegistry**: Registers commands, builds menu sections, provides command lookup
 - **OperationService**: Executes operations, manages undo/redo history, emits lifecycle events
+- **ScriptRegistry**: Registers behaviors and controllers, creates instances, provides property schemas
+- **BehaviorPickerService**: Shows modal dialog for selecting behaviors/controllers
 
 ### Scene Services
 
 - **SceneManager**: Manages SceneGraph objects, node lifecycle, scene loading/saving
 - **NodeRegistry**: Maps node type strings to node classes for instantiation
+- **ScriptExecutionService**: Runs game loop, calls tick on nodes, manages script lifecycle
 - **AssetLoader**: Loads 3D models, textures, and other assets
 
 ### File System Services

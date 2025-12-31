@@ -10,6 +10,14 @@ import type { NodeBase } from '@/nodes/NodeBase';
 import type { PropertySchema, PropertyDefinition } from '@/fw';
 import { UpdateObjectPropertyOperation } from '@/features/properties/UpdateObjectPropertyOperation';
 import { OperationService } from '@/services/OperationService';
+import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { BehaviorPickerService } from '@/services/BehaviorPickerService';
+import { IconService } from '@/services/IconService';
+import { AttachBehaviorCommand } from '@/features/scripts/AttachBehaviorCommand';
+import { DetachBehaviorCommand } from '@/features/scripts/DetachBehaviorCommand';
+import { ToggleScriptEnabledCommand } from '@/features/scripts/ToggleScriptEnabledCommand';
+import { SetControllerCommand } from '@/features/scripts/SetControllerCommand';
+import { ClearControllerCommand } from '@/features/scripts/ClearControllerCommand';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
@@ -27,6 +35,15 @@ export class InspectorPanel extends ComponentBase {
 
   @inject(OperationService)
   private readonly operationService!: OperationService;
+
+  @inject(CommandDispatcher)
+  private readonly commandDispatcher!: CommandDispatcher;
+
+  @inject(BehaviorPickerService)
+  private readonly behaviorPickerService!: BehaviorPickerService;
+
+  @inject(IconService)
+  private readonly iconService!: IconService;
 
   @state()
   private selectedNodes: NodeBase[] = [];
@@ -240,8 +257,149 @@ export class InspectorPanel extends ComponentBase {
         </div>
 
         ${sortedGroups.map(([groupName, props]) => this.renderPropertyGroup(groupName, props))}
+
+        ${this.renderScriptsSection()}
       </div>
     `;
+  }
+
+  private renderScriptsSection() {
+    if (!this.primaryNode) return '';
+
+    const behaviors = this.primaryNode.behaviors || [];
+    const controller = this.primaryNode.controller;
+
+    return html`
+      <div class="property-group-section scripts-section">
+        <div class="group-header">
+          <h4 class="group-title">Scripts & Behaviors</h4>
+          <div class="group-actions">
+            <button class="btn-add-behavior" @click=${this.onSetController} title="Set Controller">
+              ${this.iconService.getIcon('zap', 14)}
+            </button>
+            <button class="btn-add-behavior" @click=${this.onAddBehavior} title="Add Behavior">
+              ${this.iconService.getIcon('plus', 14)}
+            </button>
+          </div>
+        </div>
+
+        <div class="scripts-list">
+          ${controller
+            ? html`
+                <div class="script-item controller-item">
+                  <div class="script-icon">${this.iconService.getIcon('zap', 16)}</div>
+                  <div class="script-info">
+                    <div class="script-name">${controller.type} (Controller)</div>
+                  </div>
+                  <div class="script-actions">
+                    <button
+                      class="btn-icon"
+                      @click=${() => this.onToggleController(!controller.enabled)}
+                      title=${controller.enabled ? 'Disable' : 'Enable'}
+                    >
+                      ${this.iconService.getIcon(controller.enabled ? 'check-circle' : 'circle', 16)}
+                    </button>
+                    <button class="btn-icon" @click=${() => this.onRemoveController()} title="Remove">
+                      ${this.iconService.getIcon('trash-2', 16)}
+                    </button>
+                  </div>
+                </div>
+              `
+            : ''}
+          ${behaviors.map(
+            b => html`
+              <div class="script-item behavior-item">
+                <div class="script-icon">${this.iconService.getIcon('zap', 16)}</div>
+                <div class="script-info">
+                  <div class="script-name">${b.type}</div>
+                </div>
+                <div class="script-actions">
+                  <button
+                    class="btn-icon"
+                    @click=${() => this.onToggleBehavior(b.id, !b.enabled)}
+                    title=${b.enabled ? 'Disable' : 'Enable'}
+                  >
+                    ${this.iconService.getIcon(b.enabled ? 'check-circle' : 'circle', 16)}
+                  </button>
+                  <button class="btn-icon" @click=${() => this.onRemoveBehavior(b.id)} title="Remove">
+                    ${this.iconService.getIcon('trash-2', 16)}
+                  </button>
+                </div>
+              </div>
+            `
+          )}
+          ${!controller && behaviors.length === 0
+            ? html`<div class="no-scripts">No scripts attached</div>`
+            : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  private async onAddBehavior() {
+    if (!this.primaryNode) return;
+
+    const behavior = await this.behaviorPickerService.showPicker('behavior');
+    if (behavior) {
+      const command = new AttachBehaviorCommand({
+        nodeId: this.primaryNode.id,
+        behaviorType: behavior.id,
+      });
+      void this.commandDispatcher.execute(command);
+    }
+  }
+
+  private async onSetController() {
+    if (!this.primaryNode) return;
+
+    const controller = await this.behaviorPickerService.showPicker('controller');
+    if (controller) {
+      const command = new SetControllerCommand({
+        nodeId: this.primaryNode.id,
+        controllerType: controller.id,
+      });
+      void this.commandDispatcher.execute(command);
+    }
+  }
+
+  private onRemoveBehavior(behaviorId: string) {
+    if (!this.primaryNode) return;
+
+    const command = new DetachBehaviorCommand({
+      nodeId: this.primaryNode.id,
+      behaviorId,
+    });
+    void this.commandDispatcher.execute(command);
+  }
+
+  private onRemoveController() {
+    if (!this.primaryNode || !this.primaryNode.controller) return;
+
+    const command = new ClearControllerCommand({ nodeId: this.primaryNode.id });
+    void this.commandDispatcher.execute(command);
+  }
+
+  private onToggleBehavior(behaviorId: string, enabled: boolean) {
+    if (!this.primaryNode) return;
+
+    const command = new ToggleScriptEnabledCommand({
+      nodeId: this.primaryNode.id,
+      scriptType: 'behavior',
+      scriptId: behaviorId,
+      enabled,
+    });
+    void this.commandDispatcher.execute(command);
+  }
+
+  private onToggleController(enabled: boolean) {
+    if (!this.primaryNode) return;
+
+    const command = new ToggleScriptEnabledCommand({
+      nodeId: this.primaryNode.id,
+      scriptType: 'controller',
+      enabled,
+    });
+    void this.commandDispatcher.execute(command);
   }
 
   private renderPropertyGroup(groupName: string, props: PropertyDefinition[]) {

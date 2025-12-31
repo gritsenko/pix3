@@ -32,6 +32,8 @@ export interface SceneTreeNode {
   properties: Record<string, unknown>;
   children: SceneTreeNode[];
   isContainer: boolean;
+  hasController: boolean;
+  hasBehaviors: boolean;
 }
 
 @customElement('pix3-scene-tree-node')
@@ -44,6 +46,8 @@ export class SceneTreeNodeComponent extends ComponentBase {
   @inject(IconService)
   private readonly iconService!: IconService;
 
+  @inject(SceneManager)
+  private readonly sceneManager!: SceneManager;
   @property({ type: Object })
   node!: SceneTreeNode;
 
@@ -175,6 +179,38 @@ export class SceneTreeNodeComponent extends ComponentBase {
           <span class="tree-node__label">
             <span class="tree-node__header">
               <span class="tree-node__name"> ${this.node.name} </span>
+              ${this.node.hasController || this.node.hasBehaviors
+                ? (() => {
+                    const scene = this.sceneManager.getActiveSceneGraph();
+                    const nodeObj = scene ? scene.nodeMap.get(this.node.id) : undefined;
+                    const controllerName = nodeObj?.controller ? nodeObj.controller.type : null;
+                    const behaviors = (nodeObj?.behaviors || []).map((b: any) => b.type);
+                    return html`
+                      <span
+                        class="tree-node__script-indicator"
+                        title=${controllerName ? `Controller: ${controllerName}` : 'Behaviors attached'}
+                        tabindex="0"
+                        aria-haspopup="true"
+                      >
+                        ${this.iconService.getIcon('zap', 12)}
+                        <div class="script-popover" role="dialog" aria-label="Attached scripts">
+                          <div class="script-popover__title">Attached scripts</div>
+                          <ul class="script-popover__list">
+                            ${controllerName
+                              ? html`<li class="script-popover__item"><strong>Controller:</strong> ${controllerName}</li>`
+                              : null}
+                            ${behaviors.length > 0
+                              ? behaviors.map((t: string) => html`<li class="script-popover__item">${t}</li>`)
+                              : null}
+                            ${!controllerName && behaviors.length === 0
+                              ? html`<li class="script-popover__empty">No scripts attached</li>`
+                              : null}
+                          </ul>
+                        </div>
+                      </span>
+                    `;
+                  })()
+                : ''}
             </span>
             ${this.node.instancePath
               ? html`<span class="tree-node__instance">${this.node.instancePath}</span>`

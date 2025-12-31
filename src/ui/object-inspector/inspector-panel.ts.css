@@ -119,7 +119,113 @@ pix3-panel {
   outline: none;
   border-color: var(--color-accent, #4e8df5);
 }
+/* Scripts Section */
+.scripts-section {
+  margin-top: 0.5rem;
+}
 
+.scripts-section .group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.group-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-add-behavior {
+  background: transparent;
+  border: 1px solid var(--color-border, #333);
+  color: var(--color-text-primary, #eee);
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.btn-add-behavior:hover {
+  background: var(--color-bg-hover, #333);
+  border-color: var(--color-accent, #ffcf33);
+}
+
+.scripts-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.script-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  background: var(--color-bg-item, #222);
+  border-radius: 4px;
+  border: 1px solid transparent;
+}
+
+.script-item:hover {
+  border-color: var(--color-border, #333);
+}
+
+.script-icon {
+  color: var(--color-accent, #ffcf33);
+  display: flex;
+  align-items: center;
+}
+
+.script-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.script-name {
+  font-size: 0.8rem;
+  color: var(--color-text-primary, #eee);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.script-actions {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-icon {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #aaa);
+  cursor: pointer;
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  border-radius: 2px;
+}
+
+.btn-icon:hover {
+  color: var(--color-text-primary, #eee);
+  background: var(--color-bg-hover, #333);
+}
+
+.btn-icon[title='Remove']:hover {
+  color: #ff4444;
+}
+
+.no-scripts {
+  font-size: 0.75rem;
+  color: var(--color-text-subtle, #666);
+  font-style: italic;
+  text-align: center;
+  padding: 8px;
+}
 .property-input:disabled {
   opacity: 0.5;
   cursor: not-allowed;
