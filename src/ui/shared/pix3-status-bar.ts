@@ -1,8 +1,8 @@
-import { ComponentBase, customElement, html, inject, state, css, unsafeCSS } from '@/fw';
+import { ComponentBase, customElement, html, inject, state } from '@/fw';
 import { LoggingService } from '@/services/LoggingService';
 import { subscribe } from 'valtio/vanilla';
 import { appState } from '@/state';
-import styles from './pix3-status-bar.ts.css?raw';
+import './pix3-status-bar.ts.css';
 
 interface StatusMessage {
   text: string;
@@ -43,7 +43,10 @@ export class Pix3StatusBar extends ComponentBase {
     this.disposeLogListener = this.logger.subscribe(entry => {
       // Show important messages in status bar
       if (entry.level === 'error' || entry.level === 'warn' || entry.level === 'info') {
-        this.showMessage(entry.message, entry.level === 'error' ? 'error' : entry.level);
+        this.showMessage(
+          entry.message,
+          entry.level === 'error' ? 'error' : entry.level === 'warn' ? 'warning' : 'info'
+        );
       }
     });
 

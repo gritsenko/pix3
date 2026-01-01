@@ -16,10 +16,32 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - Extend `ComponentBase` from `src/fw` (not raw `LitElement`)
 - Default to **light DOM** for global style integration
 - Use shadow DOM only when explicitly needed: `static useShadowDom = true`
-- Import helpers from `src/fw`: `customElement`, `property`, `state`, `css`, `html`, `inject`
+- Import helpers from `src/fw`: `customElement`, `property`, `state`, `css`, `html`, `inject`, `unsafeCSS`
 - Split styles into separate CSS files: `[component].ts.css`
 - Use @ aliases for core imports: `@/fw`, `@/state`, `@/core`, `@/services`
-- **Light DOM CSS**: use component tag selector (e.g., `pix3-toolbar-button`) and attribute selectors instead of `:host` (which only works in shadow DOM)
+
+**Light DOM Components (default)**:
+
+- No `static useShadowDom` needed (defaults to false)
+- Import CSS directly: `import './component-name.ts.css';`
+- No `static styles` property needed
+- No `css` or `unsafeCSS` imports needed
+- **CSS**: use component tag selector for scoping: `pix3-component-name .class-name { }`
+- Use attribute selectors instead of `:host` (which only works in shadow DOM)
+
+**Shadow DOM Components** (when explicitly enabled):
+
+- Set `static useShadowDom = true;`
+- Import CSS with `?raw` suffix: `import styles from './component-name.ts.css?raw';`
+- Add `static styles = css`${unsafeCSS(styles)}`;` property
+- Import `css` and `unsafeCSS` from `@/fw`
+- **CSS**: use `:host` selector for component root styling
+- Styles are encapsulated and don't affect global styles
+
+Examples:
+
+- Light DOM: `pix3-scene-tree-panel.ts`, `pix3-logs-panel.ts`, `pix3-status-bar.ts`
+- Shadow DOM: `pix3-panel.ts`, `pix3-toolbar.ts`, `pix3-viewport-panel.ts`
 
 ### Dependency Injection
 

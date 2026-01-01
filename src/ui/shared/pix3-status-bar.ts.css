@@ -1,4 +1,4 @@
-.status-bar {
+pix3-status-bar .status-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -13,21 +13,22 @@
   z-index: 1000;
 }
 
-.status-left {
+pix3-status-bar .status-left {
   display: flex;
   align-items: center;
   gap: 12px;
   flex: 1;
   min-width: 0;
+  white-space: nowrap;
 }
 
-.status-right {
+pix3-status-bar .status-right {
   display: flex;
   align-items: center;
   gap: 12px;
 }
 
-.status-message {
+pix3-status-bar .status-message {
   display: inline-flex;
   align-items: center;
   white-space: nowrap;
@@ -36,27 +37,27 @@
   animation: slideIn 0.2s ease-out;
 }
 
-.status-message.info {
+pix3-status-bar .status-message.info {
   color: rgba(96, 165, 250, 0.9);
 }
 
-.status-message.success {
+pix3-status-bar .status-message.success {
   color: rgba(74, 222, 128, 0.9);
 }
 
-.status-message.warning {
+pix3-status-bar .status-message.warning {
   color: rgba(251, 191, 36, 0.9);
 }
 
-.status-message.error {
+pix3-status-bar .status-message.error {
   color: rgba(248, 113, 113, 0.9);
 }
 
-.status-ready {
+pix3-status-bar .status-ready {
   color: rgba(74, 222, 128, 0.7);
 }
 
-.status-indicator {
+pix3-status-bar .status-indicator {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -67,13 +68,13 @@
   font-weight: 500;
 }
 
-.status-indicator.playing {
+pix3-status-bar .status-indicator.playing {
   background: rgba(74, 222, 128, 0.15);
   color: rgba(74, 222, 128, 0.9);
   animation: pulse 2s ease-in-out infinite;
 }
 
-.status-project {
+pix3-status-bar .status-project {
   color: rgba(243, 244, 246, 0.6);
 }
 
@@ -89,7 +90,8 @@
 }
 
 @keyframes pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
   }
   50% {
