@@ -31,3 +31,8 @@ export { ScriptRegistry, type BehaviorTypeInfo, type ControllerTypeInfo } from '
 export { ScriptExecutionService } from './ScriptExecutionService';
 export { ProjectScriptLoaderService } from './ProjectScriptLoaderService';
 export { BehaviorPickerService } from './BehaviorPickerService';
+export {
+  ScriptCompilerService,
+  type CompilationResult,
+  type CompilationError,
+} from './ScriptCompilerService';

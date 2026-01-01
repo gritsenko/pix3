@@ -7,9 +7,13 @@ import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { CommandRegistry } from '@/services/CommandRegistry';
 import { FileWatchService } from '@/services/FileWatchService';
 import { DialogService, type DialogInstance } from '@/services/DialogService';
-import { BehaviorPickerService, type BehaviorPickerInstance } from '@/services/BehaviorPickerService';
+import {
+  BehaviorPickerService,
+  type BehaviorPickerInstance,
+} from '@/services/BehaviorPickerService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
+import { ScriptCompilerService } from '@/services/ScriptCompilerService';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
@@ -60,7 +64,10 @@ export class Pix3EditorShell extends ComponentBase {
   private readonly scriptExecutionService!: ScriptExecutionService;
 
   @inject(ProjectScriptLoaderService)
-  private readonly projectScriptLoader!: ProjectScriptLoaderService;
+  private readonly _projectScriptLoader!: ProjectScriptLoaderService; // Injected to ensure service initialization
+
+  @inject(ScriptCompilerService)
+  private readonly _scriptCompiler!: ScriptCompilerService; // Injected to ensure service initialization
 
   // project open handled by <pix3-welcome>
 
@@ -435,8 +442,7 @@ export class Pix3EditorShell extends ComponentBase {
           <div class="layout-host" role="application" aria-busy=${!this.isLayoutReady}></div>
           ${this.isLayoutReady ? html`` : html`<pix3-welcome></pix3-welcome>`}
         </div>
-        ${this.renderDialogHost()}
-        ${this.renderPickerHost()}
+        ${this.renderDialogHost()} ${this.renderPickerHost()}
       </div>
     `;
   }
@@ -478,7 +484,10 @@ export class Pix3EditorShell extends ComponentBase {
       >
         ${this.behaviorPickers.map(
           picker => html`
-            <pix3-behavior-picker .pickerId=${picker.id} .type=${picker.type}></pix3-behavior-picker>
+            <pix3-behavior-picker
+              .pickerId=${picker.id}
+              .type=${picker.type}
+            ></pix3-behavior-picker>
           `
         )}
       </div>

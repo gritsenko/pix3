@@ -12,6 +12,9 @@ dist
 dist-ssr
 *.local
 
+# esbuild-wasm - copied from node_modules during postinstall
+public/esbuild.wasm
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

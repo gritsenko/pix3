@@ -257,7 +257,6 @@ export class InspectorPanel extends ComponentBase {
         </div>
 
         ${sortedGroups.map(([groupName, props]) => this.renderPropertyGroup(groupName, props))}
-
         ${this.renderScriptsSection()}
       </div>
     `;
@@ -297,9 +296,16 @@ export class InspectorPanel extends ComponentBase {
                       @click=${() => this.onToggleController(!controller.enabled)}
                       title=${controller.enabled ? 'Disable' : 'Enable'}
                     >
-                      ${this.iconService.getIcon(controller.enabled ? 'check-circle' : 'circle', 16)}
+                      ${this.iconService.getIcon(
+                        controller.enabled ? 'check-circle' : 'circle',
+                        16
+                      )}
                     </button>
-                    <button class="btn-icon" @click=${() => this.onRemoveController()} title="Remove">
+                    <button
+                      class="btn-icon"
+                      @click=${() => this.onRemoveController()}
+                      title="Remove"
+                    >
                       ${this.iconService.getIcon('trash-2', 16)}
                     </button>
                   </div>
@@ -321,7 +327,11 @@ export class InspectorPanel extends ComponentBase {
                   >
                     ${this.iconService.getIcon(b.enabled ? 'check-circle' : 'circle', 16)}
                   </button>
-                  <button class="btn-icon" @click=${() => this.onRemoveBehavior(b.id)} title="Remove">
+                  <button
+                    class="btn-icon"
+                    @click=${() => this.onRemoveBehavior(b.id)}
+                    title="Remove"
+                  >
                     ${this.iconService.getIcon('trash-2', 16)}
                   </button>
                 </div>

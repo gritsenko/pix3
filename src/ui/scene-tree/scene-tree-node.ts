@@ -188,7 +188,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
                     return html`
                       <span
                         class="tree-node__script-indicator"
-                        title=${controllerName ? `Controller: ${controllerName}` : 'Behaviors attached'}
+                        title=${controllerName
+                          ? `Controller: ${controllerName}`
+                          : 'Behaviors attached'}
                         tabindex="0"
                         aria-haspopup="true"
                       >
@@ -197,10 +199,14 @@ export class SceneTreeNodeComponent extends ComponentBase {
                           <div class="script-popover__title">Attached scripts</div>
                           <ul class="script-popover__list">
                             ${controllerName
-                              ? html`<li class="script-popover__item"><strong>Controller:</strong> ${controllerName}</li>`
+                              ? html`<li class="script-popover__item">
+                                  <strong>Controller:</strong> ${controllerName}
+                                </li>`
                               : null}
                             ${behaviors.length > 0
-                              ? behaviors.map((t: string) => html`<li class="script-popover__item">${t}</li>`)
+                              ? behaviors.map(
+                                  (t: string) => html`<li class="script-popover__item">${t}</li>`
+                                )
                               : null}
                             ${!controllerName && behaviors.length === 0
                               ? html`<li class="script-popover__empty">No scripts attached</li>`

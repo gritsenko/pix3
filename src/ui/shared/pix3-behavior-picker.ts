@@ -1,5 +1,9 @@
 import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
-import { ScriptRegistry, type BehaviorTypeInfo, type ControllerTypeInfo } from '@/services/ScriptRegistry';
+import {
+  ScriptRegistry,
+  type BehaviorTypeInfo,
+  type ControllerTypeInfo,
+} from '@/services/ScriptRegistry';
 import { IconService } from '@/services/IconService';
 import './pix3-behavior-picker.ts.css';
 
@@ -26,14 +30,16 @@ export class BehaviorPicker extends ComponentBase {
   private selectedScriptId: string | null = null;
 
   protected render() {
-    const scripts: ScriptTypeInfo[] = this.type === 'behavior' 
-      ? this.scriptRegistry.getAllBehaviorTypes() 
-      : this.scriptRegistry.getAllControllerTypes();
-      
-    const filteredScripts = scripts.filter(s => 
-      s.displayName.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-      s.description.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
-      s.keywords.some(k => k.toLowerCase().includes(this.searchQuery.toLowerCase()))
+    const scripts: ScriptTypeInfo[] =
+      this.type === 'behavior'
+        ? this.scriptRegistry.getAllBehaviorTypes()
+        : this.scriptRegistry.getAllControllerTypes();
+
+    const filteredScripts = scripts.filter(
+      s =>
+        s.displayName.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        s.description.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+        s.keywords.some(k => k.toLowerCase().includes(this.searchQuery.toLowerCase()))
     );
 
     const groupedScripts = new Map<string, ScriptTypeInfo[]>();
@@ -48,17 +54,25 @@ export class BehaviorPicker extends ComponentBase {
 
     return html`
       <div class="dialog-backdrop" @click=${this.onBackdropClick}>
-        <div class="dialog-content behavior-picker-content" @click=${(e: Event) => e.stopPropagation()}>
+        <div
+          class="dialog-content behavior-picker-content"
+          @click=${(e: Event) => e.stopPropagation()}
+        >
           <div class="picker-header">
-            <h2 class="dialog-title">${this.type === 'behavior' ? 'Add Behavior' : 'Set Controller'}</h2>
+            <h2 class="dialog-title">
+              ${this.type === 'behavior' ? 'Add Behavior' : 'Set Controller'}
+            </h2>
             <div class="search-box">
               ${this.iconService.getIcon('search', 16)}
-              <input 
-                type="text" 
-                placeholder="Search ${this.type}s..." 
+              <input
+                type="text"
+                placeholder="Search ${this.type}s..."
                 .value=${this.searchQuery}
-                @input=${(e: InputEvent) => this.searchQuery = (e.target as HTMLInputElement).value}
-                @keydown=${(e: KeyboardEvent) => { if (e.key === 'Escape') this.dispatchCancel(); }}
+                @input=${(e: InputEvent) =>
+                  (this.searchQuery = (e.target as HTMLInputElement).value)}
+                @keydown=${(e: KeyboardEvent) => {
+                  if (e.key === 'Escape') this.dispatchCancel();
+                }}
                 autofocus
               />
             </div>
@@ -66,40 +80,51 @@ export class BehaviorPicker extends ComponentBase {
 
           <div class="picker-body">
             <div class="behavior-list">
-              ${sortedCategories.map(category => html`
-                <div class="category-section">
-                  <h3 class="category-title">${category}</h3>
-                  <div class="category-grid">
-                    ${groupedScripts.get(category)!.map(s => html`
-                      <div 
-                        class="behavior-item ${this.selectedScriptId === s.id ? 'selected' : ''}"
-                        @click=${() => this.selectedScriptId = s.id}
-                        @dblclick=${() => this.dispatchSelect(s)}
-                      >
-                        <div class="behavior-icon">
-                            ${this.iconService.getIcon(this.type === 'behavior' ? 'zap' : 'code', 24)}
-                        </div>
-                        <div class="behavior-info">
-                          <div class="behavior-name">${s.displayName}</div>
-                          <div class="behavior-desc">${s.description}</div>
-                        </div>
-                      </div>
-                    `)}
+              ${sortedCategories.map(
+                category => html`
+                  <div class="category-section">
+                    <h3 class="category-title">${category}</h3>
+                    <div class="category-grid">
+                      ${groupedScripts.get(category)!.map(
+                        s => html`
+                          <div
+                            class="behavior-item ${this.selectedScriptId === s.id
+                              ? 'selected'
+                              : ''}"
+                            @click=${() => (this.selectedScriptId = s.id)}
+                            @dblclick=${() => this.dispatchSelect(s)}
+                          >
+                            <div class="behavior-icon">
+                              ${this.iconService.getIcon(
+                                this.type === 'behavior' ? 'zap' : 'code',
+                                24
+                              )}
+                            </div>
+                            <div class="behavior-info">
+                              <div class="behavior-name">${s.displayName}</div>
+                              <div class="behavior-desc">${s.description}</div>
+                            </div>
+                          </div>
+                        `
+                      )}
+                    </div>
                   </div>
-                </div>
-              `)}
-              ${filteredScripts.length === 0 ? html`
-                <div class="no-results">No ${this.type}s found matching "${this.searchQuery}"</div>
-              ` : ''}
+                `
+              )}
+              ${filteredScripts.length === 0
+                ? html`
+                    <div class="no-results">
+                      No ${this.type}s found matching "${this.searchQuery}"
+                    </div>
+                  `
+                : ''}
             </div>
           </div>
 
           <div class="dialog-actions">
-            <button class="btn-secondary" @click=${() => this.dispatchCancel()}>
-              Cancel
-            </button>
-            <button 
-              class="btn-primary" 
+            <button class="btn-secondary" @click=${() => this.dispatchCancel()}>Cancel</button>
+            <button
+              class="btn-primary"
               ?disabled=${!this.selectedScriptId}
               @click=${() => {
                 const s = scripts.find(x => x.id === this.selectedScriptId);
