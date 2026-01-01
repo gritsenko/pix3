@@ -80,9 +80,12 @@ The `@pix3/engine` module provides:
 ### Compilation
 
 - Scripts are compiled in-browser using esbuild-wasm (no Node.js required)
+- Compilation is triggered automatically when a project is opened
 - Compilation is debounced (300ms) to avoid excessive rebuilds
 - Errors are logged to the console with file/line information
-- Changes to `.ts` files trigger automatic recompilation
+- To recompile after changes, reload the project or restart Play Mode
+
+**Note**: Automatic file watching for live reload is planned for a future update.
 
 ## Development Quick Start
 
