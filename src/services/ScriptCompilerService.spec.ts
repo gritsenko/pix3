@@ -1,6 +1,6 @@
 /**
  * Test for ScriptCompilerService
- * 
+ *
  * This test verifies that the ScriptCompilerService can:
  * 1. Initialize esbuild-wasm
  * 2. Compile user TypeScript scripts
@@ -31,7 +31,7 @@ describe('ScriptCompilerService', () => {
   it('should have a bundle method that accepts a Map of files', () => {
     const files = new Map<string, string>();
     files.set('test.ts', 'export class TestClass {}');
-    
+
     expect(compiler.bundle).toBeDefined();
     // Would call: await compiler.bundle(files);
   });
