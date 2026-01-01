@@ -28,6 +28,8 @@ const createImportMapShim = () => {
   // Create blob URL for the module
   const blob = new Blob([moduleCode], { type: 'application/javascript' });
   const blobUrl = URL.createObjectURL(blob);
+  // Note: This blob URL is intentionally not revoked as it needs to remain
+  // available for the lifetime of the application for dynamic imports to work
 
   // Inject import map into document
   const importMap = document.createElement('script');

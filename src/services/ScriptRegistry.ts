@@ -98,6 +98,20 @@ export class ScriptRegistry {
   }
 
   /**
+   * Unregister a behavior type
+   */
+  unregisterBehavior(id: string): boolean {
+    return this.behaviors.delete(id);
+  }
+
+  /**
+   * Unregister a controller type
+   */
+  unregisterController(id: string): boolean {
+    return this.controllers.delete(id);
+  }
+
+  /**
    * Get a behavior type by ID
    */
   getBehaviorType(id: string): BehaviorTypeInfo | undefined {

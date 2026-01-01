@@ -109,7 +109,7 @@ export class ScriptCompilerService {
       const warnings = result.warnings.map(w => this.formatMessage(w));
       const code = result.outputFiles?.[0]?.text ?? '';
 
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env?.DEV) {
         console.log('[ScriptCompiler] Compilation successful:', {
           filesCount: files.size,
           warningsCount: warnings.length,

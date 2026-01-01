@@ -236,9 +236,11 @@ export class ProjectScriptLoaderService {
    * Clear all scripts registered by this service
    */
   private clearRegisteredScripts(): void {
-    // Note: ScriptRegistry doesn't have an unregister method yet
-    // For now, we just clear our tracking set
-    // TODO: Add unregister methods to ScriptRegistry if needed
+    for (const scriptId of this.registeredScriptIds) {
+      // Try both behavior and controller registries
+      this.scriptRegistry.unregisterBehavior(scriptId);
+      this.scriptRegistry.unregisterController(scriptId);
+    }
     this.registeredScriptIds.clear();
   }
 
