@@ -13,8 +13,9 @@
  * 5. Return the compiled JavaScript code ready for dynamic import
  */
 
-import { injectable } from '@/fw/di';
+import { injectable, inject } from '@/fw/di';
 import * as esbuild from 'esbuild-wasm';
+import { LoggingService } from './LoggingService';
 
 export interface CompilationResult {
   /** Compiled JavaScript code as ESM module */
@@ -37,6 +38,9 @@ export interface CompilationError {
 
 @injectable()
 export class ScriptCompilerService {
+  @inject(LoggingService)
+  private readonly logger!: LoggingService;
+
   private initialized = false;
   private initPromise: Promise<void> | null = null;
 
@@ -56,14 +60,15 @@ export class ScriptCompilerService {
 
     this.initPromise = (async () => {
       try {
+        this.logger.info('Initializing script compiler...');
         await esbuild.initialize({
           wasmURL: '/esbuild.wasm',
           worker: true,
         });
         this.initialized = true;
-        console.log('[ScriptCompiler] esbuild-wasm initialized successfully');
+        this.logger.info('Script compiler initialized successfully');
       } catch (error) {
-        console.error('[ScriptCompiler] Failed to initialize esbuild-wasm:', error);
+        this.logger.error('Failed to initialize script compiler', error);
         throw new Error(`Failed to initialize script compiler: ${error}`);
       }
     })();
@@ -109,17 +114,21 @@ export class ScriptCompilerService {
       const warnings = result.warnings.map(w => this.formatMessage(w));
       const code = result.outputFiles?.[0]?.text ?? '';
 
-      if (import.meta.env?.DEV) {
-        console.log('[ScriptCompiler] Compilation successful:', {
-          filesCount: files.size,
-          warningsCount: warnings.length,
-          outputSize: code.length,
-        });
+      if (warnings.length > 0) {
+        warnings.forEach(warning => this.logger.warn(`Script compilation warning: ${warning}`));
       }
+
+      this.logger.info(
+        `Scripts compiled successfully (${files.size} files, ${code.length} bytes)`
+      );
 
       return { code, warnings };
     } catch (error: any) {
       const compilationError = this.parseCompilationError(error);
+      this.logger.error(
+        `Script compilation failed: ${compilationError.message}`,
+        compilationError
+      );
       throw compilationError;
     }
   }

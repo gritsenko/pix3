@@ -9,6 +9,7 @@ import { ScriptRegistry } from './ScriptRegistry';
 import { ScriptCompilerService } from './ScriptCompilerService';
 import type { CompilationError } from './ScriptCompilerService';
 import { FileWatchService } from './FileWatchService';
+import { LoggingService } from './LoggingService';
 
 /**
  * ProjectScriptLoaderService
@@ -36,6 +37,9 @@ export class ProjectScriptLoaderService {
 
   @inject(FileWatchService)
   private readonly _fileWatch!: FileWatchService; // Injected to ensure service initialization
+
+  @inject(LoggingService)
+  private readonly logger!: LoggingService;
 
   private disposeSubscription?: () => void;
   private debounceTimer: number | null = null;
@@ -74,17 +78,19 @@ export class ProjectScriptLoaderService {
    */
   private async performSyncAndBuild(): Promise<void> {
     try {
+      this.logger.info('Compiling project scripts...');
+
       // Step 1: List all .ts files in scripts/ directory
       const entries = await this.fs.listDirectory('scripts');
       const tsFiles = entries.filter(e => e.kind === 'file' && e.name.endsWith('.ts'));
 
       if (tsFiles.length === 0) {
-        console.log('[ProjectScriptLoader] No TypeScript files found in scripts/');
+        this.logger.info('No TypeScript files found in scripts/ directory');
         this.clearRegisteredScripts();
         return;
       }
 
-      console.log(`[ProjectScriptLoader] Found ${tsFiles.length} script files, compiling...`);
+      this.logger.info(`Found ${tsFiles.length} script file(s), compiling...`);
 
       // Step 2: Read file contents into a Map
       const filesMap = new Map<string, string>();
@@ -93,12 +99,12 @@ export class ProjectScriptLoaderService {
           const content = await this.fs.readTextFile(file.path);
           filesMap.set(file.path, content);
         } catch (error) {
-          console.error(`[ProjectScriptLoader] Failed to read ${file.path}:`, error);
+          this.logger.error(`Failed to read ${file.path}`, error);
         }
       }
 
       if (filesMap.size === 0) {
-        console.warn('[ProjectScriptLoader] No files could be read');
+        this.logger.warn('No script files could be read');
         return;
       }
 
@@ -111,18 +117,12 @@ export class ProjectScriptLoaderService {
         return;
       }
 
-      // Log warnings if any
-      if (compilationResult.warnings.length > 0) {
-        console.warn('[ProjectScriptLoader] Compilation warnings:', compilationResult.warnings);
-      }
-
       // Step 4: Load the compiled bundle
       await this.loadBundle(compilationResult.code);
 
-      console.log('[ProjectScriptLoader] Scripts compiled and loaded successfully');
+      this.logger.info(`✓ Scripts compiled and loaded successfully`);
     } catch (error) {
-      console.error('[ProjectScriptLoader] Failed to sync and build scripts:', error);
-      // TODO: Display error in UI console
+      this.logger.error('Failed to compile scripts', error);
     }
   }
 
@@ -156,7 +156,7 @@ export class ProjectScriptLoaderService {
         }
       }
     } catch (error) {
-      console.error('[ProjectScriptLoader] Failed to load compiled bundle:', error);
+      this.logger.error('Failed to load compiled bundle', error);
       throw error;
     } finally {
       // Clean up blob URL
@@ -204,7 +204,7 @@ export class ProjectScriptLoaderService {
         keywords: ['project', 'behavior', className.toLowerCase(), sourceFile.toLowerCase()],
       });
       this.registeredScriptIds.add(scriptId);
-      console.log(`[ProjectScriptLoader] Registered behavior: ${className}`);
+      this.logger.info(`Registered behavior: ${className}`);
     }
 
     if (isController) {
@@ -217,7 +217,7 @@ export class ProjectScriptLoaderService {
         keywords: ['project', 'controller', className.toLowerCase(), sourceFile.toLowerCase()],
       });
       this.registeredScriptIds.add(scriptId);
-      console.log(`[ProjectScriptLoader] Registered controller: ${className}`);
+      this.logger.info(`Registered controller: ${className}`);
     }
   }
 
@@ -252,11 +252,8 @@ export class ProjectScriptLoaderService {
       ? `${error.file}:${error.line ?? '?'}:${error.column ?? '?'}`
       : 'unknown location';
 
-    const errorMessage = `Script compilation failed at ${location}: ${error.message}`;
-    console.error(`[ProjectScriptLoader] ${errorMessage}`, error.details);
-
-    // TODO: Display in UI console/notification
-    // For now, just log to console
+    const errorMessage = `Compilation failed at ${location}: ${error.message}`;
+    this.logger.error(errorMessage, error.details);
   }
 
   dispose(): void {

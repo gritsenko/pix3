@@ -30,6 +30,7 @@ import './shared/pix3-toolbar-button';
 import './shared/pix3-main-menu';
 import './shared/pix3-confirm-dialog';
 import './shared/pix3-behavior-picker';
+import './shared/pix3-status-bar';
 import './welcome/pix3-welcome';
 import './logs-view/logs-panel';
 import './pix3-editor-shell.ts.css';
@@ -442,6 +443,7 @@ export class Pix3EditorShell extends ComponentBase {
           <div class="layout-host" role="application" aria-busy=${!this.isLayoutReady}></div>
           ${this.isLayoutReady ? html`` : html`<pix3-welcome></pix3-welcome>`}
         </div>
+        <pix3-status-bar></pix3-status-bar>
         ${this.renderDialogHost()} ${this.renderPickerHost()}
       </div>
     `;

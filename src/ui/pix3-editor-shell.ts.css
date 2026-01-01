@@ -8,7 +8,7 @@ pix3-editor-shell {
 
 .editor-shell {
   display: grid;
-  grid-template-rows: auto 1fr;
+  grid-template-rows: auto 1fr auto;
   min-block-size: 100vh;
   min-block-size: 100dvh;
   background: var(--pix3-shell-background, #1b1e24);
