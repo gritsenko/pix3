@@ -173,6 +173,7 @@ export class OperationService {
     try {
       const undone = await this.history.undo();
       if (undone) {
+        this.state.scenes.nodeDataChangeSignal = this.state.scenes.nodeDataChangeSignal + 1;
         this.emit({ type: 'operation:undone', entry, timestamp: Date.now() });
         const nextSnapshot = this.history.snapshot();
         const nextUndoEntry = nextSnapshot.undoEntries[nextSnapshot.undoEntries.length - 1] ?? null;
@@ -202,6 +203,7 @@ export class OperationService {
     try {
       const redone = await this.history.redo();
       if (redone) {
+        this.state.scenes.nodeDataChangeSignal = this.state.scenes.nodeDataChangeSignal + 1;
         this.emit({ type: 'operation:redone', entry, timestamp: Date.now() });
         const nextSnapshot = this.history.snapshot();
         const nextUndoEntry = nextSnapshot.undoEntries[nextSnapshot.undoEntries.length - 1] ?? null;
@@ -366,6 +368,7 @@ export class OperationService {
     state.operations.isExecuting = state.operations.pendingCommandCount > 0;
     if (didMutate) {
       state.operations.lastCommandId = metadata.id;
+      state.scenes.nodeDataChangeSignal = state.scenes.nodeDataChangeSignal + 1;
     }
     if (pushedToHistory) {
       state.operations.lastUndoableCommandId = metadata.id;

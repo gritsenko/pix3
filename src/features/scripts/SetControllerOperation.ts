@@ -69,7 +69,6 @@ export class SetControllerOperation implements Operation<OperationInvokeResult> 
     const detach = (controller: typeof previous | null) => {
       if (!controller) return;
       if (controller.onDetach) controller.onDetach();
-      if (controller.resetStartedState) controller.resetStartedState();
       controller.node = null;
     };
 

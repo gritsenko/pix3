@@ -351,9 +351,11 @@ export class InspectorPanel extends ComponentBase {
 
     const behavior = await this.behaviorPickerService.showPicker('behavior');
     if (behavior) {
+      const behaviorId = `${behavior.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
       const command = new AttachBehaviorCommand({
-        nodeId: this.primaryNode.id,
+        nodeId: this.primaryNode.nodeId,
         behaviorType: behavior.id,
+        behaviorId,
       });
       void this.commandDispatcher.execute(command);
     }
@@ -365,7 +367,7 @@ export class InspectorPanel extends ComponentBase {
     const controller = await this.behaviorPickerService.showPicker('controller');
     if (controller) {
       const command = new SetControllerCommand({
-        nodeId: this.primaryNode.id,
+        nodeId: this.primaryNode.nodeId,
         controllerType: controller.id,
       });
       void this.commandDispatcher.execute(command);
@@ -376,7 +378,7 @@ export class InspectorPanel extends ComponentBase {
     if (!this.primaryNode) return;
 
     const command = new DetachBehaviorCommand({
-      nodeId: this.primaryNode.id,
+      nodeId: this.primaryNode.nodeId,
       behaviorId,
     });
     void this.commandDispatcher.execute(command);
@@ -385,7 +387,7 @@ export class InspectorPanel extends ComponentBase {
   private onRemoveController() {
     if (!this.primaryNode || !this.primaryNode.controller) return;
 
-    const command = new ClearControllerCommand({ nodeId: this.primaryNode.id });
+    const command = new ClearControllerCommand({ nodeId: this.primaryNode.nodeId });
     void this.commandDispatcher.execute(command);
   }
 
@@ -393,7 +395,7 @@ export class InspectorPanel extends ComponentBase {
     if (!this.primaryNode) return;
 
     const command = new ToggleScriptEnabledCommand({
-      nodeId: this.primaryNode.id,
+      nodeId: this.primaryNode.nodeId,
       scriptType: 'behavior',
       scriptId: behaviorId,
       enabled,
@@ -405,7 +407,7 @@ export class InspectorPanel extends ComponentBase {
     if (!this.primaryNode) return;
 
     const command = new ToggleScriptEnabledCommand({
-      nodeId: this.primaryNode.id,
+      nodeId: this.primaryNode.nodeId,
       scriptType: 'controller',
       enabled,
     });

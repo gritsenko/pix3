@@ -6,8 +6,16 @@
  */
 
 import { injectable, inject } from '@/fw/di';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager, type SceneGraph } from '@/core/SceneManager';
 import { NodeBase } from '@/nodes/NodeBase';
+
+interface NodeStateSnapshot {
+  nodeId: string;
+  position: { x: number; y: number; z: number };
+  rotation: { x: number; y: number; z: number };
+  scale: { x: number; y: number; z: number };
+  visible: boolean;
+}
 
 @injectable()
 export class ScriptExecutionService {
@@ -18,6 +26,7 @@ export class ScriptExecutionService {
   private lastTimestamp: number = 0;
   private isRunning: boolean = false;
   private currentSceneId: string | null = null;
+  private nodeStateSnapshots: Map<string, NodeStateSnapshot[]> = new Map();
 
   constructor() {}
 
@@ -32,6 +41,12 @@ export class ScriptExecutionService {
 
     this.isRunning = true;
     this.lastTimestamp = performance.now();
+
+    const scene = this.sceneManager.getActiveSceneGraph();
+    if (scene) {
+      this.captureNodeState(scene);
+    }
+
     this.scheduleNextFrame();
 
     console.log('[ScriptExecutionService] Started script execution loop');
@@ -51,6 +66,13 @@ export class ScriptExecutionService {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+
+    const scene = this.sceneManager.getActiveSceneGraph();
+    if (scene) {
+      this.restoreNodeState(scene);
+    }
+
+    this.nodeStateSnapshots.delete(this.currentSceneId ?? '');
 
     // Detach all scripts from current scene
     this.detachScriptsFromScene();
@@ -177,6 +199,10 @@ export class ScriptExecutionService {
     for (const rootNode of scene.rootNodes) {
       this.detachScriptsFromNode(rootNode);
     }
+
+    for (const rootNode of scene.rootNodes) {
+      this.resetScriptStartedState(rootNode);
+    }
   }
 
   /**
@@ -189,9 +215,6 @@ export class ScriptExecutionService {
         node.controller.onDetach();
       }
       node.controller.node = null;
-      if (node.controller.resetStartedState) {
-        node.controller.resetStartedState();
-      }
     }
 
     // Detach behaviors
@@ -200,9 +223,6 @@ export class ScriptExecutionService {
         behavior.onDetach();
       }
       behavior.node = null;
-      if (behavior.resetStartedState) {
-        behavior.resetStartedState();
-      }
     }
 
     // Recursively detach from children
@@ -214,9 +234,117 @@ export class ScriptExecutionService {
   }
 
   /**
+   * Recursively reset started state for all scripts in a node and its children
+   */
+  private resetScriptStartedState(node: NodeBase): void {
+    // Reset controller
+    if (node.controller && node.controller.resetStartedState) {
+      node.controller.resetStartedState();
+    }
+
+    // Reset behaviors
+    for (const behavior of node.behaviors) {
+      if (behavior.resetStartedState) {
+        behavior.resetStartedState();
+      }
+    }
+
+    // Recursively reset children
+    for (const child of node.children) {
+      if (child instanceof NodeBase) {
+        this.resetScriptStartedState(child);
+      }
+    }
+  }
+
+  /**
    * Dispose the service
    */
   dispose(): void {
     this.stop();
+  }
+
+  /**
+   * Capture the current state of all nodes in the scene
+   */
+  private captureNodeState(scene: SceneGraph): void {
+    const snapshots: NodeStateSnapshot[] = [];
+
+    for (const rootNode of scene.rootNodes) {
+      this.captureNodeStateRecursive(rootNode, snapshots);
+    }
+
+    this.nodeStateSnapshots.set(this.currentSceneId ?? '', snapshots);
+    console.debug('[ScriptExecutionService] Captured state for', snapshots.length, 'nodes');
+  }
+
+  /**
+   * Recursively capture state of a node and its children
+   */
+  private captureNodeStateRecursive(node: NodeBase, snapshots: NodeStateSnapshot[]): void {
+    const snapshot: NodeStateSnapshot = {
+      nodeId: node.nodeId,
+      position: { x: node.position.x, y: node.position.y, z: node.position.z },
+      rotation: { x: node.rotation.x, y: node.rotation.y, z: node.rotation.z },
+      scale: { x: node.scale.x, y: node.scale.y, z: node.scale.z },
+      visible: node.visible,
+    };
+    snapshots.push(snapshot);
+
+    for (const child of node.children) {
+      if (child instanceof NodeBase) {
+        this.captureNodeStateRecursive(child, snapshots);
+      }
+    }
+  }
+
+  /**
+   * Restore the captured state of all nodes in the scene
+   */
+  private restoreNodeState(scene: SceneGraph): void {
+    const sceneId = this.currentSceneId ?? '';
+    const snapshots = this.nodeStateSnapshots.get(sceneId);
+
+    if (!snapshots) {
+      console.warn('[ScriptExecutionService] No state snapshots found for scene:', sceneId);
+      return;
+    }
+
+    const snapshotMap = new Map(snapshots.map(s => [s.nodeId, s]));
+    let restoredCount = 0;
+
+    for (const rootNode of scene.rootNodes) {
+      restoredCount += this.restoreNodeStateRecursive(rootNode, snapshotMap);
+    }
+
+    console.debug('[ScriptExecutionService] Restored state for', restoredCount, 'nodes');
+  }
+
+  /**
+   * Recursively restore state of a node and its children
+   */
+  private restoreNodeStateRecursive(
+    node: NodeBase,
+    snapshotMap: Map<string, NodeStateSnapshot>
+  ): number {
+    const snapshot = snapshotMap.get(node.nodeId);
+    let restoredCount = 0;
+
+    if (snapshot) {
+      node.position.set(snapshot.position.x, snapshot.position.y, snapshot.position.z);
+      node.rotation.set(snapshot.rotation.x, snapshot.rotation.y, snapshot.rotation.z);
+      node.scale.set(snapshot.scale.x, snapshot.scale.y, snapshot.scale.z);
+      node.visible = snapshot.visible;
+      node.updateMatrix();
+      restoredCount = 1;
+    }
+
+    for (const child of node.children) {
+      if (child instanceof NodeBase) {
+        restoredCount += this.restoreNodeStateRecursive(child, snapshotMap);
+      }
+    }
+
+    return restoredCount;
   }
 }

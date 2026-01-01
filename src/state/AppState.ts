@@ -40,6 +40,8 @@ export interface ScenesState {
   lastLoadedAt: number | null;
   /** FIFO queue of scene file paths scheduled for loading. */
   pendingScenePaths: string[];
+  /** Counter incremented when node data (properties, scripts) changes but hierarchy remains unchanged. */
+  nodeDataChangeSignal: number;
 }
 
 export type ProjectStatus = 'idle' | 'selecting' | 'ready' | 'error';
@@ -139,6 +141,7 @@ export const createInitialAppState = (): AppState => ({
     loadError: null,
     lastLoadedAt: null,
     pendingScenePaths: [STARTUP_SCENE_URI],
+    nodeDataChangeSignal: 0,
   },
   selection: {
     nodeIds: [],

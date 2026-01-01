@@ -57,6 +57,9 @@ export class SceneTreePanel extends ComponentBase {
   private lastLoadedAt = appState.scenes.lastLoadedAt;
 
   @state()
+  private lastNodeDataChangeSignal = appState.scenes.nodeDataChangeSignal;
+
+  @state()
   private createNodeItems: Array<{
     label: string;
     items: Array<{ id: string; label: string; icon: string; color: string }>;
@@ -147,18 +150,20 @@ export class SceneTreePanel extends ComponentBase {
     const nextLoadState = appState.scenes.loadState;
     const nextLoadError = appState.scenes.loadError;
     const nextLastLoadedAt = appState.scenes.lastLoadedAt;
+    const nextNodeDataChangeSignal = appState.scenes.nodeDataChangeSignal;
     const nextDescriptor = this.resolveActiveSceneDescriptor();
     const nextHierarchyRoots = this.resolveActiveHierarchyNodes();
 
     // Detect if hierarchy reference changed (new array was assigned)
     const hierarchyChanged = this.lastHierarchyRef !== nextHierarchyRoots;
 
-    // Only rebuild tree if scene changed, load state changed, hierarchy changed, or scene was marked dirty/reloaded
+    // Only rebuild tree if scene changed, load state changed, hierarchy changed, scene was marked dirty/reloaded, or node data changed
     const needsRebuild =
       sceneChanged ||
       this.loadState !== nextLoadState ||
       this.loadError !== nextLoadError ||
       this.lastLoadedAt !== nextLastLoadedAt ||
+      this.lastNodeDataChangeSignal !== nextNodeDataChangeSignal ||
       hierarchyChanged;
 
     this.activeSceneId = nextSceneId;
@@ -166,6 +171,7 @@ export class SceneTreePanel extends ComponentBase {
     this.loadState = nextLoadState;
     this.loadError = nextLoadError;
     this.lastLoadedAt = nextLastLoadedAt;
+    this.lastNodeDataChangeSignal = nextNodeDataChangeSignal;
     this.lastHierarchyRef = nextHierarchyRoots;
 
     if (needsRebuild) {
