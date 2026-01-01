@@ -7,6 +7,7 @@ import type {
 import { SceneManager } from '@/core/SceneManager';
 import { getAppStateSnapshot } from '@/state';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
+import { LoggingService } from '@/services/LoggingService';
 
 export interface SaveSceneOperationParams {
   /** Optional scene id to save (defaults to active scene). */
@@ -52,11 +53,16 @@ export class SaveSceneOperation implements Operation<OperationInvokeResult> {
     const fileSystem = context.container.getService<FileSystemAPIService>(
       context.container.getOrCreateToken(FileSystemAPIService)
     );
+    const logger = context.container.getService<LoggingService>(
+      context.container.getOrCreateToken(LoggingService)
+    );
 
     const sceneGraph = sceneManager.getSceneGraph(sceneId);
     if (!sceneGraph) {
       throw new Error(`Scene graph not found: ${sceneId}`);
     }
+
+    logger.info('Saving scene...');
 
     const sceneYaml = sceneManager.serializeScene(sceneGraph);
     if (!sceneYaml || sceneYaml.trim().length === 0) {
@@ -64,6 +70,8 @@ export class SaveSceneOperation implements Operation<OperationInvokeResult> {
     }
 
     await fileSystem.writeTextFile(filePath, sceneYaml);
+
+    logger.info(`✓ Scene saved: ${descriptor.name || filePath}`);
 
     const beforeSnapshot = context.snapshot;
 

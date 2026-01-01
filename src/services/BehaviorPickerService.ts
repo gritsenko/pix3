@@ -19,7 +19,9 @@ export class BehaviorPickerService {
   /**
    * Show the behavior picker modal and return a promise that resolves to the selected behavior or null if cancelled.
    */
-  public async showPicker(type: 'behavior' | 'controller' = 'behavior'): Promise<ScriptTypeInfo | null> {
+  public async showPicker(
+    type: 'behavior' | 'controller' = 'behavior'
+  ): Promise<ScriptTypeInfo | null> {
     return new Promise((resolve, reject) => {
       const id = `picker-${this.nextId++}`;
       const instance: BehaviorPickerInstance = {

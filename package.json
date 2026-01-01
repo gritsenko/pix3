@@ -12,12 +12,14 @@
     "format": "prettier --write src/**/*.{ts,css}",
     "format:check": "prettier --check src/**/*.{ts,css}",
     "test": "vitest run",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "postinstall": "node -e \"require('fs').copyFileSync('node_modules/esbuild-wasm/esbuild.wasm', 'public/esbuild.wasm')\""
   },
   "dependencies": {
     "@types/three": "^0.180.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
+    "esbuild-wasm": "^0.24.0",
     "feather-icons": "^4.29.2",
     "golden-layout": "^2.6.0",
     "lit": "^3.3.1",

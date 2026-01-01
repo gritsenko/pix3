@@ -85,13 +85,13 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
               },
             ],
           },
-          // {
-          //   type: 'component',
-          //   componentType: PANEL_COMPONENT_TYPES.logs,
-          //   title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.logs],
-          //   height: 25,
-          //   isClosable: true,
-          // },
+          {
+            type: 'component',
+            componentType: PANEL_COMPONENT_TYPES.logs,
+            title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.logs],
+            height: 25,
+            isClosable: true,
+          },
         ],
       },
 

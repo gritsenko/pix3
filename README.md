@@ -28,6 +28,64 @@ See full specification in [docs/pix3-specification.md](docs/pix3-specification.m
 - **CommandDispatcher**: Runs commands and validates preconditions.
 - **IconService**: Manages SVG icons and theming; used by UI components for consistent iconography.
 - **ViewportRenderService**: Three.js rendering orchestration for viewport and overlays.
+- **ScriptCompilerService**: In-browser TypeScript compilation using esbuild-wasm for user scripts.
+- **ProjectScriptLoaderService**: Manages user script lifecycle — compiles, loads, and registers scripts from the project's `scripts/` directory.
+
+## User Scripts
+
+Pix3 supports writing custom game logic in TypeScript. User scripts are automatically compiled in the browser using esbuild-wasm, enabling rapid iteration without external build tools.
+
+### Writing Scripts
+
+1. Create `.ts` files in your project's `scripts/` directory
+2. Import from `@pix3/engine` to access editor APIs:
+   ```typescript
+   import { ScriptControllerBase } from '@pix3/engine';
+   
+   export class MyController extends ScriptControllerBase {
+     static getPropertySchema() {
+       return {
+         nodeType: 'MyController',
+         properties: [
+           {
+             name: 'speed',
+             type: 'number',
+             getValue: (obj: any) => obj.parameters.speed ?? 10,
+             setValue: (obj: any, value: any) => { obj.parameters.speed = value; },
+             uiHints: { label: 'Speed', min: 0, max: 100 }
+           }
+         ],
+         groups: {}
+       };
+     }
+     
+     onUpdate(dt: number): void {
+       // Your game logic here
+     }
+   }
+   ```
+
+3. Scripts are automatically compiled and registered when the project loads
+4. Attach scripts to nodes via the Inspector panel
+
+### Available APIs
+
+The `@pix3/engine` module provides:
+- `ScriptControllerBase` - Base class for node controllers
+- `BehaviorBase` - Base class for reusable behaviors
+- `NodeBase`, `Node2D`, `Node3D` - Node types
+- `appState` - Reactive application state
+- Property schema types for defining editable parameters
+
+### Compilation
+
+- Scripts are compiled in-browser using esbuild-wasm (no Node.js required)
+- Compilation is triggered automatically when a project is opened
+- Compilation is debounced (300ms) to avoid excessive rebuilds
+- Errors are logged to the console with file/line information
+- To recompile after changes, reload the project or restart Play Mode
+
+**Note**: Automatic file watching for live reload is planned for a future update.
 
 ## Development Quick Start
 

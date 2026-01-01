@@ -8,6 +8,7 @@ import { SceneManager } from '@/core/SceneManager';
 import { getAppStateSnapshot } from '@/state';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
 import { FileWatchService } from '@/services/FileWatchService';
+import { LoggingService } from '@/services/LoggingService';
 import { ref } from 'valtio/vanilla';
 
 export interface SaveAsSceneOperationParams {
@@ -47,6 +48,9 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
     const fileWatchService = context.container.getService<FileWatchService>(
       context.container.getOrCreateToken(FileWatchService)
     );
+    const logger = context.container.getService<LoggingService>(
+      context.container.getOrCreateToken(LoggingService)
+    );
 
     // Get the scene to save (either specified or active)
     const sceneId = this.params.sceneId ?? state.scenes.activeSceneId;
@@ -59,18 +63,10 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
       throw new Error(`Scene not found: ${sceneId}`);
     }
 
-    console.debug('[SaveAsSceneOperation] Found scene graph', {
-      sceneId,
-      rootNodeCount: sceneGraph.rootNodes.length,
-      version: sceneGraph.version,
-    });
+    logger.info('Saving scene as...');
 
     // Serialize the scene
     const sceneYaml = sceneManager.serializeScene(sceneGraph);
-    console.debug('[SaveAsSceneOperation] Serialized scene', {
-      yamlLength: sceneYaml.length,
-      yamlPreview: sceneYaml.substring(0, 200),
-    });
 
     // Validate that we have content to save
     if (!sceneYaml || sceneYaml.trim().length === 0) {
@@ -226,10 +222,7 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
     const beforeSnapshot = context.snapshot;
     const afterSnapshot = getAppStateSnapshot();
 
-    console.debug('[SaveAsSceneOperation] Operation completed successfully', {
-      savedFilePath,
-      isInProject,
-    });
+    logger.info(`✓ Scene saved as: ${savedFilePath}`);
 
     return {
       didMutate: true,

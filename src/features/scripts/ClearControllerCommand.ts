@@ -9,10 +9,7 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import {
-  ClearControllerOperation,
-  type ClearControllerParams,
-} from './ClearControllerOperation';
+import { ClearControllerOperation, type ClearControllerParams } from './ClearControllerOperation';
 
 export class ClearControllerCommand extends CommandBase<object, void> {
   readonly metadata: CommandMetadata = {

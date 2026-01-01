@@ -1,0 +1,98 @@
+.status-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  height: 24px;
+  background: rgba(19, 22, 27, 0.95);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(243, 244, 246, 0.8);
+  font-size: 0.75rem;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+  backdrop-filter: blur(10px);
+  z-index: 1000;
+}
+
+.status-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+  min-width: 0;
+}
+
+.status-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-message {
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: slideIn 0.2s ease-out;
+}
+
+.status-message.info {
+  color: rgba(96, 165, 250, 0.9);
+}
+
+.status-message.success {
+  color: rgba(74, 222, 128, 0.9);
+}
+
+.status-message.warning {
+  color: rgba(251, 191, 36, 0.9);
+}
+
+.status-message.error {
+  color: rgba(248, 113, 113, 0.9);
+}
+
+.status-ready {
+  color: rgba(74, 222, 128, 0.7);
+}
+
+.status-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: rgba(96, 165, 250, 0.15);
+  color: rgba(96, 165, 250, 0.9);
+  font-weight: 500;
+}
+
+.status-indicator.playing {
+  background: rgba(74, 222, 128, 0.15);
+  color: rgba(74, 222, 128, 0.9);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-project {
+  color: rgba(243, 244, 246, 0.6);
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
