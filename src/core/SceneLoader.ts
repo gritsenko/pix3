@@ -40,21 +40,6 @@ export interface ComponentDefinition {
   type: string;
   enabled?: boolean;
   config?: Record<string, unknown>;
-  // Legacy support
-  parameters?: Record<string, unknown>;
-}
-
-export interface BehaviorDefinition {
-  id: string;
-  type: string;
-  enabled?: boolean;
-  parameters?: Record<string, unknown>;
-}
-
-export interface ControllerDefinition {
-  type: string;
-  enabled?: boolean;
-  parameters?: Record<string, unknown>;
 }
 
 export interface SceneNodeDefinition {
@@ -65,11 +50,7 @@ export interface SceneNodeDefinition {
   properties?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   children?: SceneNodeDefinition[];
-  // New unified format
   components?: ComponentDefinition[];
-  // Legacy format - kept for backward compatibility
-  behaviors?: BehaviorDefinition[];
-  script?: ControllerDefinition;
 }
 
 export interface SceneDocument {
@@ -206,7 +187,7 @@ export class SceneLoader {
     const node = await this.createNodeFromDefinition(definition);
     index.set(node.nodeId, node);
 
-    // New unified format: components array
+    // Load components
     if (definition.components) {
       for (const componentDef of definition.components) {
         const componentId = componentDef.id || `${definition.id}-${componentDef.type}-${Date.now()}`;
@@ -215,8 +196,7 @@ export class SceneLoader {
         if (component) {
           component.enabled = componentDef.enabled ?? true;
           
-          // Use config if available, otherwise fall back to parameters for legacy support
-          const configData = componentDef.config ?? componentDef.parameters ?? {};
+          const configData = componentDef.config ?? {};
           component.config = { ...configData };
 
           // Set config values using PropertySchema if available
@@ -235,62 +215,6 @@ export class SceneLoader {
             `[SceneLoader] Failed to create component "${componentDef.type}" for node "${definition.id}"`
           );
         }
-      }
-    }
-
-    // Legacy format: behaviors array (for backward compatibility)
-    if (definition.behaviors) {
-      for (const behaviorDef of definition.behaviors) {
-        const behavior = this.scriptRegistry.createBehavior(behaviorDef.type, behaviorDef.id);
-        if (behavior) {
-          behavior.enabled = behaviorDef.enabled ?? true;
-          behavior.config = { ...(behaviorDef.parameters ?? {}) };
-
-          // Set parameters using PropertySchema if available
-          const schema = this.scriptRegistry.getBehaviorPropertySchema(behaviorDef.type);
-          if (schema && behaviorDef.parameters) {
-            for (const prop of schema.properties) {
-              if (behaviorDef.parameters[prop.name] !== undefined) {
-                prop.setValue(behavior, behaviorDef.parameters[prop.name]);
-              }
-            }
-          }
-
-          node.addComponent(behavior);
-        } else {
-          console.warn(
-            `[SceneLoader] Failed to create behavior "${behaviorDef.type}" for node "${definition.id}"`
-          );
-        }
-      }
-    }
-
-    // Legacy format: script/controller (for backward compatibility)
-    if (definition.script) {
-      const controller = this.scriptRegistry.createController(
-        definition.script.type,
-        `${definition.id}-controller`
-      );
-      if (controller) {
-        controller.enabled = definition.script.enabled ?? true;
-        controller.config = { ...(definition.script.parameters ?? {}) };
-
-        // Set parameters using PropertySchema if available
-        const schema = this.scriptRegistry.getControllerPropertySchema(definition.script.type);
-        if (schema && definition.script.parameters) {
-          for (const prop of schema.properties) {
-            if (definition.script.parameters[prop.name] !== undefined) {
-              prop.setValue(controller, definition.script.parameters[prop.name]);
-            }
-          }
-        }
-
-        (controller as any)._isController = true; // Mark for backward compatibility
-        node.addComponent(controller);
-      } else {
-        console.warn(
-          `[SceneLoader] Failed to create controller "${definition.script.type}" for node "${definition.id}"`
-        );
       }
     }
 

@@ -14,8 +14,7 @@ const createImportMapShim = () => {
   // Generate module code that re-exports the global API
   const moduleCode = `
     const api = window.__PIX3_ENGINE__;
-    export const BehaviorBase = api.BehaviorBase;
-    export const ScriptControllerBase = api.ScriptControllerBase;
+    export const Script = api.Script;
     export const NodeBase = api.NodeBase;
     export const Node2D = api.Node2D;
     export const Node3D = api.Node3D;
@@ -46,7 +45,7 @@ const createImportMapShim = () => {
 
 createImportMapShim();
 
-// Register built-in behaviors before loading any scenes
+// Register built-in script components before loading any scenes
 import { registerBuiltInScripts } from './behaviors/register-behaviors';
 registerBuiltInScripts();
 

@@ -12,8 +12,8 @@
  */
 
 // Core script system
-export { BehaviorBase, ScriptControllerBase, Script } from '@/core/ScriptComponent';
-export type { Behavior, ScriptController, ScriptComponent, Constructor } from '@/core/ScriptComponent';
+export { Script } from '@/core/ScriptComponent';
+export type { ScriptComponent, Constructor } from '@/core/ScriptComponent';
 
 // Node system
 export { NodeBase } from '@/nodes/NodeBase';
