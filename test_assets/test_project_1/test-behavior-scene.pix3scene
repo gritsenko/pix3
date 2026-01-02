@@ -1,5 +1,5 @@
 version: '1.0'
-description: Test scene with rotating behavior
+description: Test scene with rotating component
 
 root:
   - id: test-box
@@ -14,9 +14,9 @@ root:
         metalness: 0.3
       transform:
         position: [0, 0, 0]
-    behaviors:
-      - id: rotate-behavior-1
+    components:
+      - id: rotate-component-1
         type: test_rotate
         enabled: true
-        parameters:
+        config:
           rotationSpeed: 2.0
