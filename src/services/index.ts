@@ -32,6 +32,11 @@ export { ScriptExecutionService } from './ScriptExecutionService';
 export { ProjectScriptLoaderService } from './ProjectScriptLoaderService';
 export { BehaviorPickerService } from './BehaviorPickerService';
 export {
+  ScriptCreatorService,
+  type ScriptCreationParams,
+  type ScriptCreationInstance,
+} from './ScriptCreatorService';
+export {
   ScriptCompilerService,
   type CompilationResult,
   type CompilationError,

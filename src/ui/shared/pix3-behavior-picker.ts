@@ -59,9 +59,15 @@ export class BehaviorPicker extends ComponentBase {
           @click=${(e: Event) => e.stopPropagation()}
         >
           <div class="picker-header">
-            <h2 class="dialog-title">
-              ${this.type === 'behavior' ? 'Add Behavior' : 'Set Controller'}
-            </h2>
+            <div class="picker-header-row">
+              <h2 class="dialog-title">
+                ${this.type === 'behavior' ? 'Add Behavior' : 'Set Controller'}
+              </h2>
+              <button class="btn-create-new" @click=${this.dispatchCreateNew} title="Create new script file">
+                ${this.iconService.getIcon('plus', 16)}
+                Create New
+              </button>
+            </div>
             <div class="search-box">
               ${this.iconService.getIcon('search', 16)}
               <input
@@ -157,6 +163,16 @@ export class BehaviorPicker extends ComponentBase {
     this.dispatchEvent(
       new CustomEvent('behavior-picker-cancelled', {
         detail: { pickerId: this.pickerId },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private dispatchCreateNew(): void {
+    this.dispatchEvent(
+      new CustomEvent('behavior-picker-create-new', {
+        detail: { pickerId: this.pickerId, type: this.type },
         bubbles: true,
         composed: true,
       })

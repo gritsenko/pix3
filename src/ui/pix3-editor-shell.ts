@@ -11,6 +11,10 @@ import {
   BehaviorPickerService,
   type BehaviorPickerInstance,
 } from '@/services/BehaviorPickerService';
+import {
+  ScriptCreatorService,
+  type ScriptCreationInstance,
+} from '@/services/ScriptCreatorService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { ScriptCompilerService } from '@/services/ScriptCompilerService';
@@ -30,6 +34,7 @@ import './shared/pix3-toolbar-button';
 import './shared/pix3-main-menu';
 import './shared/pix3-confirm-dialog';
 import './shared/pix3-behavior-picker';
+import './shared/pix3-script-creator';
 import './shared/pix3-status-bar';
 import './welcome/pix3-welcome';
 import './logs-view/logs-panel';
@@ -61,6 +66,9 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(BehaviorPickerService)
   private readonly behaviorPickerService!: BehaviorPickerService;
 
+  @inject(ScriptCreatorService)
+  private readonly scriptCreatorService!: ScriptCreatorService;
+
   @inject(ScriptExecutionService)
   private readonly scriptExecutionService!: ScriptExecutionService;
 
@@ -80,6 +88,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @state()
   private behaviorPickers: BehaviorPickerInstance[] = [];
+
+  @state()
+  private scriptCreators: ScriptCreationInstance[] = [];
 
   @property({ type: Boolean, reflect: true, attribute: 'shell-ready' })
   protected shellReady = false;
@@ -122,6 +133,12 @@ export class Pix3EditorShell extends ComponentBase {
     // Subscribe to behavior picker changes
     this.behaviorPickerService.subscribe(pickers => {
       this.behaviorPickers = pickers;
+      this.requestUpdate();
+    });
+
+    // Subscribe to script creator changes
+    this.scriptCreatorService.subscribe(creators => {
+      this.scriptCreators = creators;
       this.requestUpdate();
     });
 
@@ -444,7 +461,7 @@ export class Pix3EditorShell extends ComponentBase {
           ${this.isLayoutReady ? html`` : html`<pix3-welcome></pix3-welcome>`}
         </div>
         <pix3-status-bar></pix3-status-bar>
-        ${this.renderDialogHost()} ${this.renderPickerHost()}
+        ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
       </div>
     `;
   }
@@ -483,6 +500,7 @@ export class Pix3EditorShell extends ComponentBase {
         class="picker-host"
         @behavior-selected=${(e: CustomEvent) => this.onBehaviorSelected(e)}
         @behavior-picker-cancelled=${(e: CustomEvent) => this.onBehaviorPickerCancelled(e)}
+        @behavior-picker-create-new=${(e: CustomEvent) => this.onBehaviorPickerCreateNew(e)}
       >
         ${this.behaviorPickers.map(
           picker => html`
@@ -504,6 +522,51 @@ export class Pix3EditorShell extends ComponentBase {
   private onBehaviorPickerCancelled(e: CustomEvent): void {
     const { pickerId } = e.detail;
     this.behaviorPickerService.cancel(pickerId);
+  }
+
+  private onBehaviorPickerCreateNew(e: CustomEvent): void {
+    const { pickerId, type } = e.detail;
+    // First cancel the picker
+    this.behaviorPickerService.cancel(pickerId);
+    // Then show the script creator - we'll handle the result in the inspector
+    // This event will bubble up to the inspector which initiated the picker
+    this.dispatchEvent(
+      new CustomEvent('script-creator-requested', {
+        detail: { type },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private renderScriptCreatorHost() {
+    return html`
+      <div
+        class="script-creator-host"
+        @script-create-confirmed=${(e: CustomEvent) => this.onScriptCreateConfirmed(e)}
+        @script-create-cancelled=${(e: CustomEvent) => this.onScriptCreateCancelled(e)}
+      >
+        ${this.scriptCreators.map(
+          creator => html`
+            <pix3-script-creator
+              .dialogId=${creator.id}
+              .defaultName=${creator.params.defaultName || creator.params.scriptName}
+              .scriptType=${creator.params.scriptType}
+            ></pix3-script-creator>
+          `
+        )}
+      </div>
+    `;
+  }
+
+  private onScriptCreateConfirmed(e: CustomEvent): void {
+    const { dialogId, scriptName } = e.detail;
+    void this.scriptCreatorService.confirm(dialogId, scriptName);
+  }
+
+  private onScriptCreateCancelled(e: CustomEvent): void {
+    const { dialogId } = e.detail;
+    this.scriptCreatorService.cancel(dialogId);
   }
 
   private renderDialogHost() {
