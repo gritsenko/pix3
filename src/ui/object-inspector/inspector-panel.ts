@@ -12,6 +12,8 @@ import { UpdateObjectPropertyOperation } from '@/features/properties/UpdateObjec
 import { OperationService } from '@/services/OperationService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { BehaviorPickerService } from '@/services/BehaviorPickerService';
+import { ScriptCreatorService } from '@/services/ScriptCreatorService';
+import { ScriptRegistry } from '@/services/ScriptRegistry';
 import { IconService } from '@/services/IconService';
 import { AttachBehaviorCommand } from '@/features/scripts/AttachBehaviorCommand';
 import { DetachBehaviorCommand } from '@/features/scripts/DetachBehaviorCommand';
@@ -42,6 +44,12 @@ export class InspectorPanel extends ComponentBase {
   @inject(BehaviorPickerService)
   private readonly behaviorPickerService!: BehaviorPickerService;
 
+  @inject(ScriptCreatorService)
+  private readonly scriptCreatorService!: ScriptCreatorService;
+
+  @inject(ScriptRegistry)
+  private readonly scriptRegistry!: ScriptRegistry;
+
   @inject(IconService)
   private readonly iconService!: IconService;
 
@@ -59,6 +67,7 @@ export class InspectorPanel extends ComponentBase {
 
   private disposeSelectionSubscription?: () => void;
   private disposeSceneSubscription?: () => void;
+  private scriptCreatorRequestedHandler?: (e: Event) => void;
 
   connectedCallback() {
     super.connectedCallback();
@@ -69,6 +78,14 @@ export class InspectorPanel extends ComponentBase {
       this.updateSelectedNodes();
     });
     this.updateSelectedNodes();
+
+    // Listen for script creator requested event from editor shell
+    this.scriptCreatorRequestedHandler = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { type } = customEvent.detail;
+      void this.handleScriptCreatorRequested(type);
+    };
+    window.addEventListener('script-creator-requested', this.scriptCreatorRequestedHandler as EventListener);
   }
 
   disconnectedCallback() {
@@ -77,6 +94,50 @@ export class InspectorPanel extends ComponentBase {
     this.disposeSelectionSubscription = undefined;
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
+    if (this.scriptCreatorRequestedHandler) {
+      window.removeEventListener('script-creator-requested', this.scriptCreatorRequestedHandler as EventListener);
+      this.scriptCreatorRequestedHandler = undefined;
+    }
+  }
+
+  private async handleScriptCreatorRequested(type: 'behavior' | 'controller'): Promise<void> {
+    if (!this.primaryNode) return;
+
+    const defaultName = this.primaryNode.name || 'NewScript';
+    const scriptName = await this.scriptCreatorService.showCreator({
+      scriptName: defaultName,
+      scriptType: type,
+    });
+
+    if (scriptName) {
+      // Wait a bit for compilation to complete
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Find the newly created script in the registry
+      const scriptId = `project:${scriptName}.ts:${scriptName}${type === 'controller' ? 'Controller' : 'Behavior'}`;
+      
+      if (type === 'controller') {
+        const controllerType = this.scriptRegistry.getControllerType(scriptId);
+        if (controllerType) {
+          const command = new SetControllerCommand({
+            nodeId: this.primaryNode.nodeId,
+            controllerType: controllerType.id,
+          });
+          void this.commandDispatcher.execute(command);
+        }
+      } else {
+        const behaviorType = this.scriptRegistry.getBehaviorType(scriptId);
+        if (behaviorType) {
+          const behaviorId = `${behaviorType.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+          const command = new AttachBehaviorCommand({
+            nodeId: this.primaryNode.nodeId,
+            behaviorType: behaviorType.id,
+            behaviorId,
+          });
+          void this.commandDispatcher.execute(command);
+        }
+      }
+    }
   }
 
   private updateSelectedNodes(): void {
