@@ -203,7 +203,6 @@ export class ProjectScriptLoaderService {
     });
     this.registeredScriptIds.add(scriptId);
     this.logger.info(`Registered component: ${className}`);
-    }
   }
 
   /**
