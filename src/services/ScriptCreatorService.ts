@@ -5,6 +5,7 @@ import { ProjectScriptLoaderService } from './ProjectScriptLoaderService';
 export interface ScriptCreationParams {
   scriptName: string;
   scriptType: 'behavior' | 'controller';
+  defaultName?: string;
 }
 
 export interface ScriptCreationInstance {

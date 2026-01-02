@@ -1,5 +1,4 @@
-import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
-import { IconService } from '@/services/IconService';
+import { ComponentBase, customElement, html, property, state } from '@/fw';
 import './pix3-script-creator.ts.css';
 
 export interface ScriptCreationOptions {
@@ -9,9 +8,6 @@ export interface ScriptCreationOptions {
 
 @customElement('pix3-script-creator')
 export class ScriptCreator extends ComponentBase {
-  @inject(IconService)
-  private readonly iconService!: IconService;
-
   @property({ type: String, reflect: true })
   public dialogId: string = '';
 

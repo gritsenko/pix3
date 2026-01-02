@@ -550,7 +550,7 @@ export class Pix3EditorShell extends ComponentBase {
           creator => html`
             <pix3-script-creator
               .dialogId=${creator.id}
-              .defaultName=${creator.params.defaultName}
+              .defaultName=${creator.params.defaultName || creator.params.scriptName}
               .scriptType=${creator.params.scriptType}
             ></pix3-script-creator>
           `
