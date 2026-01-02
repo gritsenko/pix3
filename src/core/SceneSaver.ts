@@ -126,26 +126,41 @@ export class SceneSaver {
       definition.instance = node.instancePath;
     }
 
-    // Serialize behaviors
-    if (node.behaviors && node.behaviors.length > 0) {
-      definition.behaviors = node.behaviors.map(b => ({
-        id: b.id,
-        type: b.type,
-        enabled: b.enabled,
-        parameters: b.parameters && Object.keys(b.parameters).length > 0 ? b.parameters : undefined,
+    // Serialize components (new unified format)
+    // We'll save in the new format if there are components that aren't marked as legacy
+    const hasNonLegacyComponents = node.components.some(c => !(c as any)._isController);
+    
+    if (hasNonLegacyComponents && node.components.length > 0) {
+      // Save in new unified format
+      definition.components = node.components.map(c => ({
+        id: c.id,
+        type: c.type,
+        enabled: c.enabled,
+        config: c.config && Object.keys(c.config).length > 0 ? c.config : undefined,
       }));
-    }
+    } else {
+      // Save in legacy format for backward compatibility
+      // Serialize behaviors
+      if (node.behaviors && node.behaviors.length > 0) {
+        definition.behaviors = node.behaviors.map(b => ({
+          id: b.id,
+          type: b.type,
+          enabled: b.enabled,
+          parameters: b.config && Object.keys(b.config).length > 0 ? b.config : undefined,
+        }));
+      }
 
-    // Serialize controller script
-    if (node.controller) {
-      definition.script = {
-        type: node.controller.type,
-        enabled: node.controller.enabled,
-        parameters:
-          node.controller.parameters && Object.keys(node.controller.parameters).length > 0
-            ? node.controller.parameters
-            : undefined,
-      };
+      // Serialize controller script
+      if (node.controller) {
+        definition.script = {
+          type: node.controller.type,
+          enabled: node.controller.enabled,
+          parameters:
+            node.controller.config && Object.keys(node.controller.config).length > 0
+              ? node.controller.config
+              : undefined,
+        };
+      }
     }
 
     // Recursively serialize children
