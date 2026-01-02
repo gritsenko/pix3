@@ -87,18 +87,39 @@
 }
 
 .log-entry {
-  padding: 4px 12px;
+  padding: 4px 8px;
   border-bottom: 1px solid #2d2d30;
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
+  flex-direction: column;
   line-height: 1.4;
   white-space: pre-wrap;
   word-wrap: break-word;
 }
 
+.log-entry.expandable {
+  cursor: pointer;
+}
+
 .log-entry:hover {
   background-color: #2d2d30;
+}
+
+.log-main {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.log-chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #858585;
+  margin-top: 1px;
 }
 
 .log-entry.debug {
@@ -134,9 +155,13 @@
   word-break: break-word;
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
   font-size: 11px;
-  color: #d4d4d4;
-  margin-top: 4px;
+  color: #cccccc;
+  margin: 4px 0 4px 24px;
+  padding: 8px;
+  background-color: #1a1a1a;
+  border-radius: 4px;
   white-space: pre-wrap;
+  border: 1px solid #333;
 }
 
 .log-timestamp {
