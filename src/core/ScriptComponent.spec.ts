@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NodeBase } from '@/nodes/NodeBase';
-import { Script, type ScriptComponent } from '@/core/ScriptComponent';
+import { Script } from '@/core/ScriptComponent';
 
 // Test component implementation
 class TestComponent extends Script {
@@ -13,7 +13,7 @@ class TestComponent extends Script {
   attachCalled = false;
   detachCalled = false;
 
-  override onAttach(node: NodeBase): void {
+  override onAttach(_node: NodeBase): void {
     this.attachCalled = true;
   }
 
@@ -21,7 +21,7 @@ class TestComponent extends Script {
     this.startCalled = true;
   }
 
-  override onUpdate(dt: number): void {
+  override onUpdate(_dt: number): void {
     this.updateCount++;
   }
 
