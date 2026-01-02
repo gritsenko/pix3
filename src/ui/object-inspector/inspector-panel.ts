@@ -17,11 +17,9 @@ import { ScriptRegistry } from '@/services/ScriptRegistry';
 import { IconService } from '@/services/IconService';
 import { DialogService } from '@/services/DialogService';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
-import { AttachBehaviorCommand } from '@/features/scripts/AttachBehaviorCommand';
-import { DetachBehaviorCommand } from '@/features/scripts/DetachBehaviorCommand';
+import { AddComponentCommand } from '@/features/scripts/AddComponentCommand';
+import { RemoveComponentCommand } from '@/features/scripts/RemoveComponentCommand';
 import { ToggleScriptEnabledCommand } from '@/features/scripts/ToggleScriptEnabledCommand';
-import { SetControllerCommand } from '@/features/scripts/SetControllerCommand';
-import { ClearControllerCommand } from '@/features/scripts/ClearControllerCommand';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
@@ -144,13 +142,12 @@ export class InspectorPanel extends ComponentBase {
     }
   }
 
-  private async handleScriptCreatorRequested(type: 'behavior' | 'controller'): Promise<void> {
+  private async handleScriptCreatorRequested(): Promise<void> {
     if (!this.primaryNode) return;
 
-    const suffix = type === 'controller' ? 'Controller' : 'Behavior';
     const defaultName = this.primaryNode.name || 'NewScript';
     const urlSafeBaseName = this.toUrlSafeClassName(defaultName);
-    const fullClassName = `${urlSafeBaseName}${suffix}`;
+    const fullClassName = `${urlSafeBaseName}`;
     const fileName = `${fullClassName}.ts`;
 
     // Check if file already exists
@@ -168,7 +165,6 @@ export class InspectorPanel extends ComponentBase {
 
     const scriptName = await this.scriptCreatorService.showCreator({
       scriptName: urlSafeBaseName,
-      scriptType: type,
     });
 
     if (scriptName) {
@@ -176,29 +172,17 @@ export class InspectorPanel extends ComponentBase {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Find the newly created script in the registry
-      // scriptName now includes the suffix (Controller or Behavior)
       const scriptId = `project:${scriptName}.ts:${scriptName}`;
 
-      if (type === 'controller') {
-        const controllerType = this.scriptRegistry.getControllerType(scriptId);
-        if (controllerType) {
-          const command = new SetControllerCommand({
-            nodeId: this.primaryNode.nodeId,
-            controllerType: controllerType.id,
-          });
-          void this.commandDispatcher.execute(command);
-        }
-      } else {
-        const behaviorType = this.scriptRegistry.getBehaviorType(scriptId);
-        if (behaviorType) {
-          const behaviorId = `${behaviorType.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-          const command = new AttachBehaviorCommand({
-            nodeId: this.primaryNode.nodeId,
-            behaviorType: behaviorType.id,
-            behaviorId,
-          });
-          void this.commandDispatcher.execute(command);
-        }
+      const componentType = this.scriptRegistry.getComponentType(scriptId);
+      if (componentType) {
+        const componentId = `${componentType.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+        const command = new AddComponentCommand({
+          nodeId: this.primaryNode.nodeId,
+          componentType: componentType.id,
+          componentId,
+        });
+        void this.commandDispatcher.execute(command);
       }
     }
   }
@@ -389,71 +373,38 @@ export class InspectorPanel extends ComponentBase {
   private renderScriptsSection() {
     if (!this.primaryNode) return '';
 
-    const behaviors = this.primaryNode.behaviors || [];
-    const controller = this.primaryNode.controller;
+    const components = this.primaryNode.components || [];
 
     return html`
       <div class="property-group-section scripts-section">
         <div class="group-header">
-          <h4 class="group-title">Scripts & Behaviors</h4>
+          <h4 class="group-title">Script Components</h4>
           <div class="group-actions">
-            <button class="btn-add-behavior" @click=${this.onSetController} title="Set Controller">
-              ${this.iconService.getIcon('zap', 14)}
-            </button>
-            <button class="btn-add-behavior" @click=${this.onAddBehavior} title="Add Behavior">
+            <button class="btn-add-behavior" @click=${this.onAddBehavior} title="Add Component">
               ${this.iconService.getIcon('plus', 14)}
             </button>
           </div>
         </div>
 
         <div class="scripts-list">
-          ${controller
-            ? html`
-                <div class="script-item controller-item">
-                  <div class="script-icon">${this.iconService.getIcon('zap', 16)}</div>
-                  <div class="script-info">
-                    <div class="script-name">${controller.type} (Controller)</div>
-                  </div>
-                  <div class="script-actions">
-                    <button
-                      class="btn-icon"
-                      @click=${() => this.onToggleController(!controller.enabled)}
-                      title=${controller.enabled ? 'Disable' : 'Enable'}
-                    >
-                      ${this.iconService.getIcon(
-                        controller.enabled ? 'check-circle' : 'circle',
-                        16
-                      )}
-                    </button>
-                    <button
-                      class="btn-icon"
-                      @click=${() => this.onRemoveController()}
-                      title="Remove"
-                    >
-                      ${this.iconService.getIcon('trash-2', 16)}
-                    </button>
-                  </div>
-                </div>
-              `
-            : ''}
-          ${behaviors.map(
-            b => html`
-              <div class="script-item behavior-item">
+          ${components.map(
+            c => html`
+              <div class="script-item component-item">
                 <div class="script-icon">${this.iconService.getIcon('zap', 16)}</div>
                 <div class="script-info">
-                  <div class="script-name">${b.type}</div>
+                  <div class="script-name">${c.type}</div>
                 </div>
                 <div class="script-actions">
                   <button
                     class="btn-icon"
-                    @click=${() => this.onToggleBehavior(b.id, !b.enabled)}
-                    title=${b.enabled ? 'Disable' : 'Enable'}
+                    @click=${() => this.onToggleComponent(c.id, !c.enabled)}
+                    title=${c.enabled ? 'Disable' : 'Enable'}
                   >
-                    ${this.iconService.getIcon(b.enabled ? 'check-circle' : 'circle', 16)}
+                    ${this.iconService.getIcon(c.enabled ? 'check-circle' : 'circle', 16)}
                   </button>
                   <button
                     class="btn-icon"
-                    @click=${() => this.onRemoveBehavior(b.id)}
+                    @click=${() => this.onRemoveComponent(c.id)}
                     title="Remove"
                   >
                     ${this.iconService.getIcon('trash-2', 16)}
@@ -462,8 +413,8 @@ export class InspectorPanel extends ComponentBase {
               </div>
             `
           )}
-          ${!controller && behaviors.length === 0
-            ? html`<div class="no-scripts">No scripts attached</div>`
+          ${components.length === 0
+            ? html`<div class="no-scripts">No components attached</div>`
             : ''}
         </div>
       </div>
@@ -473,66 +424,34 @@ export class InspectorPanel extends ComponentBase {
   private async onAddBehavior() {
     if (!this.primaryNode) return;
 
-    const behavior = await this.behaviorPickerService.showPicker('behavior');
-    if (behavior) {
-      const behaviorId = `${behavior.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-      const command = new AttachBehaviorCommand({
+    const component = await this.behaviorPickerService.showPicker();
+    if (component) {
+      const componentId = `${component.id}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+      const command = new AddComponentCommand({
         nodeId: this.primaryNode.nodeId,
-        behaviorType: behavior.id,
-        behaviorId,
+        componentType: component.id,
+        componentId,
       });
       void this.commandDispatcher.execute(command);
     }
   }
 
-  private async onSetController() {
+  private onRemoveComponent(componentId: string) {
     if (!this.primaryNode) return;
 
-    const controller = await this.behaviorPickerService.showPicker('controller');
-    if (controller) {
-      const command = new SetControllerCommand({
-        nodeId: this.primaryNode.nodeId,
-        controllerType: controller.id,
-      });
-      void this.commandDispatcher.execute(command);
-    }
-  }
-
-  private onRemoveBehavior(behaviorId: string) {
-    if (!this.primaryNode) return;
-
-    const command = new DetachBehaviorCommand({
+    const command = new RemoveComponentCommand({
       nodeId: this.primaryNode.nodeId,
-      behaviorId,
+      componentId,
     });
     void this.commandDispatcher.execute(command);
   }
 
-  private onRemoveController() {
-    if (!this.primaryNode || !this.primaryNode.controller) return;
-
-    const command = new ClearControllerCommand({ nodeId: this.primaryNode.nodeId });
-    void this.commandDispatcher.execute(command);
-  }
-
-  private onToggleBehavior(behaviorId: string, enabled: boolean) {
+  private onToggleComponent(componentId: string, enabled: boolean) {
     if (!this.primaryNode) return;
 
     const command = new ToggleScriptEnabledCommand({
       nodeId: this.primaryNode.nodeId,
-      scriptType: 'behavior',
-      scriptId: behaviorId,
-      enabled,
-    });
-    void this.commandDispatcher.execute(command);
-  }
-
-  private onToggleController(enabled: boolean) {
-    if (!this.primaryNode) return;
-
-    const command = new ToggleScriptEnabledCommand({
-      nodeId: this.primaryNode.nodeId,
-      scriptType: 'controller',
+      componentId,
       enabled,
     });
     void this.commandDispatcher.execute(command);

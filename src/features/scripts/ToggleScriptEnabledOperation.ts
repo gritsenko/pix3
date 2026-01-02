@@ -1,5 +1,5 @@
 /**
- * ToggleScriptEnabledOperation - Toggle enabled state of a behavior or controller
+ * ToggleScriptEnabledOperation - Toggle enabled state of a component
  */
 
 import type {
@@ -12,8 +12,7 @@ import { SceneManager } from '@/core/SceneManager';
 
 export interface ToggleScriptEnabledParams {
   nodeId: string;
-  scriptType: 'behavior' | 'controller';
-  scriptId?: string; // Required for behaviors, not used for controllers
+  componentId: string;
   enabled: boolean;
 }
 
@@ -25,10 +24,10 @@ export class ToggleScriptEnabledOperation implements Operation<OperationInvokeRe
     this.params = params;
     this.metadata = {
       id: 'scripts.toggle-enabled',
-      title: 'Toggle Script Enabled',
-      description: `Toggle ${params.scriptType} enabled state`,
+      title: 'Toggle Component Enabled',
+      description: `Toggle component enabled state`,
       affectsNodeStructure: false,
-      tags: ['scripts', params.scriptType],
+      tags: ['scripts', 'component'],
     };
   }
 
@@ -50,61 +49,26 @@ export class ToggleScriptEnabledOperation implements Operation<OperationInvokeRe
       return { didMutate: false };
     }
 
-    let previousEnabled: boolean;
-    let scriptName: string;
-
-    if (this.params.scriptType === 'behavior') {
-      if (!this.params.scriptId) {
-        console.error('[ToggleScriptEnabledOperation] scriptId required for behavior');
-        return { didMutate: false };
-      }
-
-      const behavior = node.behaviors.find(b => b.id === this.params.scriptId);
-      if (!behavior) {
-        console.error(
-          `[ToggleScriptEnabledOperation] Behavior "${this.params.scriptId}" not found`
-        );
-        return { didMutate: false };
-      }
-
-      previousEnabled = behavior.enabled;
-      behavior.enabled = this.params.enabled;
-      scriptName = behavior.type;
-    } else {
-      // controller
-      if (!node.controller) {
-        console.error('[ToggleScriptEnabledOperation] No controller attached to node');
-        return { didMutate: false };
-      }
-
-      previousEnabled = node.controller.enabled;
-      node.controller.enabled = this.params.enabled;
-      scriptName = node.controller.type;
+    const component = node.components.find(c => c.id === this.params.componentId);
+    if (!component) {
+      console.error(
+        `[ToggleScriptEnabledOperation] Component "${this.params.componentId}" not found`
+      );
+      return { didMutate: false };
     }
+
+    const previousEnabled = component.enabled;
+    component.enabled = this.params.enabled;
 
     return {
       didMutate: true,
       commit: {
-        label: `${this.params.enabled ? 'Enable' : 'Disable'} ${scriptName}`,
+        label: `Toggle ${component.type} ${this.params.enabled ? 'On' : 'Off'}`,
         undo: async () => {
-          if (this.params.scriptType === 'behavior' && this.params.scriptId) {
-            const behavior = node.behaviors.find(b => b.id === this.params.scriptId);
-            if (behavior) {
-              behavior.enabled = previousEnabled;
-            }
-          } else if (node.controller) {
-            node.controller.enabled = previousEnabled;
-          }
+          component.enabled = previousEnabled;
         },
         redo: async () => {
-          if (this.params.scriptType === 'behavior' && this.params.scriptId) {
-            const behavior = node.behaviors.find(b => b.id === this.params.scriptId);
-            if (behavior) {
-              behavior.enabled = this.params.enabled;
-            }
-          } else if (node.controller) {
-            node.controller.enabled = this.params.enabled;
-          }
+          component.enabled = this.params.enabled;
         },
       },
     };
