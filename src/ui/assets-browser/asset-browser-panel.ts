@@ -23,6 +23,8 @@ export class AssetBrowserPanel extends ComponentBase {
   @state()
   private selectedItemName: string | null = null;
 
+  private scriptFileCreatedHandler?: (e: Event) => void;
+
   private onAssetActivate = async (e: Event) => {
     const detail = (e as CustomEvent<AssetActivation>).detail;
     if (!detail) return;
@@ -151,6 +153,48 @@ export class AssetBrowserPanel extends ComponentBase {
   private setAssetTreeRef = (element: Element | undefined) => {
     this.assetTreeRef = element as HTMLElement | null;
   };
+
+  connectedCallback(): void {
+    super.connectedCallback();
+
+    this.scriptFileCreatedHandler = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { filePath } = customEvent.detail;
+      void this.onScriptFileCreated(filePath);
+    };
+
+    window.addEventListener('script-file-created', this.scriptFileCreatedHandler as EventListener);
+  }
+
+  disconnectedCallback(): void {
+    super.disconnectedCallback();
+
+    if (this.scriptFileCreatedHandler) {
+      window.removeEventListener(
+        'script-file-created',
+        this.scriptFileCreatedHandler as EventListener
+      );
+      this.scriptFileCreatedHandler = undefined;
+    }
+  }
+
+  private async onScriptFileCreated(filePath: string): Promise<void> {
+    try {
+      if (!this.assetTreeRef) {
+        console.warn('[AssetBrowserPanel] assetTreeRef is null, cannot select file');
+        return;
+      }
+      const assetTree = this.assetTreeRef as any;
+      if (!assetTree.selectPath || typeof assetTree.selectPath !== 'function') {
+        console.warn('[AssetBrowserPanel] selectPath method not found on asset tree');
+        return;
+      }
+      await assetTree.selectPath(filePath);
+      console.log('[AssetBrowserPanel] Selected newly created script file:', filePath);
+    } catch (error) {
+      console.error('[AssetBrowserPanel] Failed to select newly created script file:', error);
+    }
+  }
 
   protected render() {
     return html`

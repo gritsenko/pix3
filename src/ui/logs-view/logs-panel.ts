@@ -81,6 +81,45 @@ export class LogsPanel extends ComponentBase {
     });
   }
 
+  private formatErrorDetails(data: unknown): string {
+    if (!data || typeof data !== 'object') {
+      return '';
+    }
+
+    const errorData = data as Record<string, unknown>;
+    const parts: string[] = [];
+
+    if (errorData.file) {
+      parts.push(`File: ${String(errorData.file)}`);
+    }
+    if (errorData.line !== undefined) {
+      parts.push(`Line: ${String(errorData.line)}`);
+    }
+    if (errorData.column !== undefined) {
+      parts.push(`Column: ${String(errorData.column)}`);
+    }
+    if (errorData.details && typeof errorData.details === 'object') {
+      const details = errorData.details as Record<string, unknown>;
+      if (details.message) {
+        parts.push(`Message: ${String(details.message)}`);
+      }
+      if (details.text) {
+        parts.push(`Error: ${String(details.text)}`);
+      }
+      if (details.stack) {
+        parts.push(`Stack: ${String(details.stack)}`);
+      }
+    } else if (errorData.message && typeof errorData.message === 'string') {
+      parts.push(`Message: ${errorData.message}`);
+    }
+
+    if (parts.length === 0) {
+      return '';
+    }
+
+    return `\n    ${parts.join('\n    ')}`;
+  }
+
   private renderLevelToggle(level: LogLevel) {
     const isEnabled = this.enabledLevels.has(level);
     return html`
@@ -123,6 +162,11 @@ export class LogsPanel extends ComponentBase {
                       <li class="log-entry ${log.level}">
                         <span class="log-level">${log.level.toUpperCase()}</span>
                         <span class="log-message">${log.message}</span>
+                        ${log.data
+                          ? html`<pre class="log-details">
+${this.formatErrorDetails(log.data)}</pre
+                            >`
+                          : ''}
                         <span class="log-timestamp">${this.formatTime(log.timestamp)}</span>
                       </li>
                     `

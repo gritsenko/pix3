@@ -129,6 +129,68 @@ export class AssetTree extends ComponentBase {
     await this.startRename(this.selectedPath);
   }
 
+  /**
+   * Programmatically select a file/folder by its path
+   * Expands parent directories if needed and ensures the path is visible
+   */
+  public async selectPath(targetPath: string): Promise<void> {
+    const normalizedPath = targetPath.startsWith('.') ? targetPath.slice(1) : targetPath;
+    const searchPath = normalizedPath.startsWith('/') ? normalizedPath.slice(1) : normalizedPath;
+
+    const findAndSelectNode = async (nodes: Node[], pathSegments: string[]): Promise<boolean> => {
+      const [currentSegment, ...remainingSegments] = pathSegments;
+
+      for (const node of nodes) {
+        if (node.name === currentSegment) {
+          if (remainingSegments.length === 0) {
+            // Found the target node
+            this.selectedPath = node.path;
+            this.tree = [...this.tree];
+            return true;
+          } else if (node.kind === 'directory' && node.children) {
+            // Need to go deeper, ensure this directory is expanded
+            if (!node.expanded) {
+              await this.expandNode(node);
+            }
+            // Recursively search in children
+            if (await findAndSelectNode(node.children, remainingSegments)) {
+              return true;
+            }
+          } else if (node.kind === 'directory' && node.children === null) {
+            // Directory not loaded yet, load it
+            await this.expandNode(node);
+            // Now search again with loaded children
+            if (node.children && (await findAndSelectNode(node.children, remainingSegments))) {
+              return true;
+            }
+          }
+        }
+      }
+      return false;
+    };
+
+    // Split path into segments
+    const pathSegments = this.splitPath(searchPath);
+
+    // Start searching from root
+    const found = await findAndSelectNode(this.tree, pathSegments);
+
+    if (!found) {
+      console.warn('[AssetTree] Path not found in tree:', targetPath);
+      // Force refresh and try again
+      await this.loadRoot();
+      await findAndSelectNode(this.tree, pathSegments);
+    }
+  }
+
+  private splitPath(path: string): string[] {
+    return path
+      .replace(/^[\\/]+/, '')
+      .replace(/\\+/g, '/')
+      .split('/')
+      .filter(segment => segment.length > 0 && segment !== '.');
+  }
+
   protected async firstUpdated(): Promise<void> {
     await this.loadRoot();
     // Subscribe only to lastModifiedDirectoryPath changes (file system changes)

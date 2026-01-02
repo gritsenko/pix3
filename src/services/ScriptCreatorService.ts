@@ -76,13 +76,32 @@ export class ScriptCreatorService {
     if (!instance) return;
 
     try {
-      // Create the script file
-      const fileName = `${scriptName}.ts`;
+      // Create the script file with suffix
+      const suffix = instance.params.scriptType === 'controller' ? 'Controller' : 'Behavior';
+      const className = `${scriptName}${suffix}`;
+      const fileName = `${className}.ts`;
       const filePath = `scripts/${fileName}`;
-      
+
+      // Check if file already exists
+      try {
+        const entries = await this.fs.listDirectory('scripts');
+        const fileExists = entries.some(e => e.kind === 'file' && e.name === fileName);
+
+        if (fileExists) {
+          throw new Error(`File "${fileName}" already exists in scripts/ directory`);
+        }
+      } catch (error) {
+        // Directory might not exist yet, that's ok
+        if (!(error as Error).message.includes('File')) {
+          console.log('[ScriptCreator] Scripts directory does not exist yet');
+        } else {
+          throw error;
+        }
+      }
+
       // Generate script template
       const template = this.generateScriptTemplate(scriptName, instance.params.scriptType);
-      
+
       // Ensure scripts directory exists
       try {
         await this.fs.createDirectory('scripts');
@@ -90,15 +109,23 @@ export class ScriptCreatorService {
         // Directory might already exist, that's ok
         console.log('[ScriptCreator] Scripts directory already exists or created');
       }
-      
+
       // Write the script file
       await this.fs.writeTextFile(filePath, template);
-      
+
       // Trigger script compilation
       await this.scriptLoader.syncAndBuild();
-      
-      // Resolve with the created script name
-      instance.resolve(scriptName);
+
+      // Emit event for asset browser to select the new file
+      window.dispatchEvent(
+        new CustomEvent('script-file-created', {
+          detail: { filePath },
+          bubbles: true,
+        })
+      );
+
+      // Resolve with the created script name (with suffix)
+      instance.resolve(className);
     } catch (error) {
       console.error('[ScriptCreator] Failed to create script:', error);
       instance.reject(error as Error);
@@ -118,7 +145,10 @@ export class ScriptCreatorService {
   /**
    * Generate a script template based on type
    */
-  private generateScriptTemplate(scriptName: string, scriptType: 'behavior' | 'controller'): string {
+  private generateScriptTemplate(
+    scriptName: string,
+    scriptType: 'behavior' | 'controller'
+  ): string {
     const baseClass = scriptType === 'controller' ? 'ScriptControllerBase' : 'BehaviorBase';
     const typeLabel = scriptType === 'controller' ? 'Controller' : 'Behavior';
 

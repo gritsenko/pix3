@@ -129,6 +129,16 @@
   word-break: break-word;
 }
 
+.log-details {
+  flex: 1;
+  word-break: break-word;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 11px;
+  color: #d4d4d4;
+  margin-top: 4px;
+  white-space: pre-wrap;
+}
+
 .log-timestamp {
   flex-shrink: 0;
   width: 80px;

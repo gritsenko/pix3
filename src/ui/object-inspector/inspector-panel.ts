@@ -15,6 +15,8 @@ import { BehaviorPickerService } from '@/services/BehaviorPickerService';
 import { ScriptCreatorService } from '@/services/ScriptCreatorService';
 import { ScriptRegistry } from '@/services/ScriptRegistry';
 import { IconService } from '@/services/IconService';
+import { DialogService } from '@/services/DialogService';
+import { FileSystemAPIService } from '@/services/FileSystemAPIService';
 import { AttachBehaviorCommand } from '@/features/scripts/AttachBehaviorCommand';
 import { DetachBehaviorCommand } from '@/features/scripts/DetachBehaviorCommand';
 import { ToggleScriptEnabledCommand } from '@/features/scripts/ToggleScriptEnabledCommand';
@@ -53,6 +55,12 @@ export class InspectorPanel extends ComponentBase {
   @inject(IconService)
   private readonly iconService!: IconService;
 
+  @inject(DialogService)
+  private readonly dialogService!: DialogService;
+
+  @inject(FileSystemAPIService)
+  private readonly fileSystemAPI!: FileSystemAPIService;
+
   @state()
   private selectedNodes: NodeBase[] = [];
 
@@ -85,7 +93,10 @@ export class InspectorPanel extends ComponentBase {
       const { type } = customEvent.detail;
       void this.handleScriptCreatorRequested(type);
     };
-    window.addEventListener('script-creator-requested', this.scriptCreatorRequestedHandler as EventListener);
+    window.addEventListener(
+      'script-creator-requested',
+      this.scriptCreatorRequestedHandler as EventListener
+    );
   }
 
   disconnectedCallback() {
@@ -95,27 +106,79 @@ export class InspectorPanel extends ComponentBase {
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
     if (this.scriptCreatorRequestedHandler) {
-      window.removeEventListener('script-creator-requested', this.scriptCreatorRequestedHandler as EventListener);
+      window.removeEventListener(
+        'script-creator-requested',
+        this.scriptCreatorRequestedHandler as EventListener
+      );
       this.scriptCreatorRequestedHandler = undefined;
+    }
+  }
+
+  private toUrlSafeClassName(name: string): string {
+    let cleaned = name;
+
+    // Remove invalid characters (keep only alphanumeric and spaces)
+    cleaned = cleaned.replace(/[^a-zA-Z0-9_\s]/g, '');
+
+    // Convert to PascalCase:
+    // 1. Split by spaces and underscores
+    // 2. Capitalize first letter of each word
+    // 3. Join together
+    const words = cleaned.split(/[\s_]+/).filter(w => w.length > 0);
+    const pascalCase = words
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join('');
+
+    // If result is empty, use default
+    return pascalCase || 'New';
+  }
+
+  private async checkIfScriptFileExists(fileName: string): Promise<boolean> {
+    try {
+      const entries = await this.fileSystemAPI.listDirectory('scripts');
+      return entries.some(e => e.kind === 'file' && e.name === fileName);
+    } catch (error) {
+      // Directory might not exist yet
+      console.log('[InspectorPanel] scripts directory does not exist yet');
+      return false;
     }
   }
 
   private async handleScriptCreatorRequested(type: 'behavior' | 'controller'): Promise<void> {
     if (!this.primaryNode) return;
 
+    const suffix = type === 'controller' ? 'Controller' : 'Behavior';
     const defaultName = this.primaryNode.name || 'NewScript';
+    const urlSafeBaseName = this.toUrlSafeClassName(defaultName);
+    const fullClassName = `${urlSafeBaseName}${suffix}`;
+    const fileName = `${fullClassName}.ts`;
+
+    // Check if file already exists
+    const fileExists = await this.checkIfScriptFileExists(fileName);
+    if (fileExists) {
+      await this.dialogService.showConfirmation({
+        title: 'Script Already Exists',
+        message: `A script file named "${fileName}" already exists in the scripts/ folder. Please choose a different name.`,
+        confirmLabel: 'OK',
+        cancelLabel: 'Cancel',
+        isDangerous: false,
+      });
+      return;
+    }
+
     const scriptName = await this.scriptCreatorService.showCreator({
-      scriptName: defaultName,
+      scriptName: urlSafeBaseName,
       scriptType: type,
     });
 
     if (scriptName) {
       // Wait a bit for compilation to complete
       await new Promise(resolve => setTimeout(resolve, 1000));
-      
+
       // Find the newly created script in the registry
-      const scriptId = `project:${scriptName}.ts:${scriptName}${type === 'controller' ? 'Controller' : 'Behavior'}`;
-      
+      // scriptName now includes the suffix (Controller or Behavior)
+      const scriptId = `project:${scriptName}.ts:${scriptName}`;
+
       if (type === 'controller') {
         const controllerType = this.scriptRegistry.getControllerType(scriptId);
         if (controllerType) {

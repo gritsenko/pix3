@@ -29,9 +29,15 @@ export class ScriptCreator extends ComponentBase {
   }
 
   protected render() {
+    const fullClassName = this.getFullClassName();
+    const fileName = `${fullClassName}.ts`;
+
     return html`
       <div class="dialog-backdrop" @click=${this.onBackdropClick}>
-        <div class="dialog-content script-creator-content" @click=${(e: Event) => e.stopPropagation()}>
+        <div
+          class="dialog-content script-creator-content"
+          @click=${(e: Event) => e.stopPropagation()}
+        >
           <div class="dialog-header">
             <h2 class="dialog-title">
               Create New ${this.scriptType === 'controller' ? 'Controller' : 'Behavior'}
@@ -62,7 +68,7 @@ export class ScriptCreator extends ComponentBase {
                 : ''}
               <div class="help-text">
                 The script will be created in the <code>scripts/</code> folder as
-                <code>${this.getFileName()}.ts</code>
+                <code>${fileName}</code>
               </div>
             </div>
           </div>
@@ -88,6 +94,12 @@ export class ScriptCreator extends ComponentBase {
     // Convert to PascalCase if not already
     const pascalCase = name.charAt(0).toUpperCase() + name.slice(1);
     return pascalCase;
+  }
+
+  private getFullClassName(): string {
+    const fileName = this.getFileName();
+    const suffix = this.scriptType === 'controller' ? 'Controller' : 'Behavior';
+    return `${fileName}${suffix}`;
   }
 
   private isValidScriptName(): boolean {
