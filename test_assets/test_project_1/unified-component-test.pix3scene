@@ -1,0 +1,21 @@
+version: '1.0'
+description: Test scene with unified component system
+
+root:
+  - id: test-box-unified
+    type: GeometryMesh
+    name: Rotating Box (Unified Components)
+    properties:
+      geometry: box
+      size: [1, 1, 1]
+      material:
+        color: '#4e8df5'
+        roughness: 0.5
+        metalness: 0.3
+      transform:
+        position: [0, 0, 0]
+    components:
+      - type: test_rotate
+        enabled: true
+        config:
+          rotationSpeed: 2.0
