@@ -1,6 +1,6 @@
 import { Object3D } from 'three';
 import type { PropertySchema } from '@/fw';
-import type { ScriptComponent, Behavior, ScriptController, Constructor } from '@/core/ScriptComponent';
+import type { ScriptComponent, Constructor } from '@/core/ScriptComponent';
 
 export interface NodeMetadata {
   [key: string]: unknown;
@@ -27,25 +27,6 @@ export class NodeBase extends Object3D {
   isContainer: boolean = true;
   /** Script components attached to this node */
   readonly components: ScriptComponent[] = [];
-  
-  // Legacy fields - kept for backward compatibility during migration
-  /** @deprecated Use components instead */
-  get behaviors(): Behavior[] {
-    return this.components.filter(c => 'parameters' in c) as Behavior[];
-  }
-  /** @deprecated Use components instead */
-  get controller(): ScriptController | null {
-    // For backward compatibility, return the first component that was registered as a controller
-    const ctrl = this.components.find(c => (c as any)._isController);
-    return ctrl ? (ctrl as ScriptController) : null;
-  }
-  set controller(value: ScriptController | null) {
-    // For backward compatibility, mark this component as a controller
-    if (value) {
-      (value as any)._isController = true;
-      this.addComponent(value);
-    }
-  }
 
   constructor(props: NodeBaseProps) {
     super();

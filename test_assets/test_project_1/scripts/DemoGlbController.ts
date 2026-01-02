@@ -1,18 +1,18 @@
 /**
  * DemoGlbController - Auto-generated script
  *
- * Controller for node logic
+ * Component for node logic
  */
 
-import { ScriptControllerBase } from '@/core/ScriptComponent';
+import { Script } from '@/core/ScriptComponent';
 import type { PropertySchema } from '@/fw';
 
-export class DemoGlbController extends ScriptControllerBase {
+export class DemoGlbController extends Script {
   constructor(id: string, type: string) {
     super(id, type);
-    // Initialize default parameters
-    this.parameters = {
-      // Add your parameters here
+    // Initialize default config
+    this.config = {
+      // Add your config here
     };
   }
 
@@ -28,21 +28,21 @@ export class DemoGlbController extends ScriptControllerBase {
         //   ui: {
         //     label: 'Speed',
         //     description: 'Movement speed',
-        //     group: 'Controller',
+        //     group: 'Component',
         //     min: 0,
         //     max: 10,
         //     step: 0.1,
         //   },
-        //   getValue: (script: unknown) => (script as DemoGlbController).parameters.speed,
+        //   getValue: (script: unknown) => (script as DemoGlbController).config.speed,
         //   setValue: (script: unknown, value: unknown) => {
-        //     (script as DemoGlbController).parameters.speed = Number(value);
+        //     (script as DemoGlbController).config.speed = Number(value);
         //   },
         // },
       ],
       groups: {
-        Controller: {
-          label: 'Controller Parameters',
-          description: 'Configuration for demoglb controller',
+        Component: {
+          label: 'Component Parameters',
+          description: 'Configuration for demoglb component',
           expanded: true,
         },
       },

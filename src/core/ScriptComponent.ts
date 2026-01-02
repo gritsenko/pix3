@@ -110,49 +110,6 @@ export abstract class Script implements ScriptComponent {
   }
 }
 
-// Legacy interfaces and classes - kept for backward compatibility during migration
-/**
- * @deprecated Use ScriptComponent instead
- */
-export interface Behavior extends ScriptComponent {
-  /** @deprecated Use config instead */
-  parameters: Record<string, unknown>;
-}
-
-/**
- * @deprecated Use ScriptComponent instead
- */
-export interface ScriptController extends ScriptComponent {
-  /** @deprecated Use config instead */
-  parameters: Record<string, unknown>;
-}
-
-/**
- * @deprecated Use Script instead
- * Base class for behaviors providing default implementations.
- */
-export abstract class BehaviorBase extends Script implements Behavior {
-  get parameters(): Record<string, unknown> {
-    return this.config;
-  }
-  set parameters(value: Record<string, unknown>) {
-    this.config = value;
-  }
-}
-
-/**
- * @deprecated Use Script instead
- * Base class for script controllers providing default implementations.
- */
-export abstract class ScriptControllerBase extends Script implements ScriptController {
-  get parameters(): Record<string, unknown> {
-    return this.config;
-  }
-  set parameters(value: Record<string, unknown>) {
-    this.config = value;
-  }
-}
-
 /**
  * Type guard to check if an object is a ScriptComponent
  */
@@ -165,20 +122,4 @@ export function isScriptComponent(obj: unknown): obj is ScriptComponent {
     'enabled' in obj &&
     'config' in obj
   );
-}
-
-/**
- * @deprecated Use isScriptComponent instead
- * Type guard to check if an object is a Behavior
- */
-export function isBehavior(obj: unknown): obj is Behavior {
-  return isScriptComponent(obj);
-}
-
-/**
- * @deprecated Use isScriptComponent instead
- * Type guard to check if an object is a ScriptController
- */
-export function isScriptController(obj: unknown): obj is ScriptController {
-  return isScriptComponent(obj);
 }

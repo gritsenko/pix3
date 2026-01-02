@@ -2,7 +2,7 @@ import { injectable, inject } from '@/fw/di';
 import { subscribe } from 'valtio/vanilla';
 
 import { appState } from '@/state';
-import { ScriptControllerBase, BehaviorBase } from '@/core/ScriptComponent';
+import { Script } from '@/core/ScriptComponent';
 
 import { FileSystemAPIService } from './FileSystemAPIService';
 import { ScriptRegistry } from './ScriptRegistry';
@@ -165,7 +165,7 @@ export class ProjectScriptLoaderService {
   }
 
   /**
-   * Try to register a class as a Behavior or ScriptController
+   * Try to register a class as a Script component
    */
   private tryRegisterScriptClass(className: string, classValue: unknown, sourceFile: string): void {
     // Check if it's a class constructor
@@ -180,13 +180,12 @@ export class ProjectScriptLoaderService {
       return;
     }
 
-    // Determine if it's a Behavior or Controller by checking prototype chain
-    const isBehavior = this.isSubclassOf(ctor, BehaviorBase);
-    const isController = this.isSubclassOf(ctor, ScriptControllerBase);
+    // Check if it extends Script by checking prototype chain
+    const isScript = this.isSubclassOf(ctor, Script);
 
-    if (!isBehavior && !isController) {
+    if (!isScript) {
       console.warn(
-        `[ProjectScriptLoader] ${className} has getPropertySchema but doesn't extend BehaviorBase or ScriptControllerBase`
+        `[ProjectScriptLoader] ${className} has getPropertySchema but doesn't extend Script`
       );
       return;
     }
@@ -194,30 +193,16 @@ export class ProjectScriptLoaderService {
     // Create unique ID for this script
     const scriptId = `project:${sourceFile}:${className}`;
 
-    if (isBehavior) {
-      this.scriptRegistry.registerBehavior({
-        id: scriptId,
-        displayName: className,
-        description: `Project behavior from ${sourceFile}`,
-        category: 'Project',
-        behaviorClass: ctor,
-        keywords: ['project', 'behavior', className.toLowerCase(), sourceFile.toLowerCase()],
-      });
-      this.registeredScriptIds.add(scriptId);
-      this.logger.info(`Registered behavior: ${className}`);
-    }
-
-    if (isController) {
-      this.scriptRegistry.registerController({
-        id: scriptId,
-        displayName: className,
-        description: `Project controller from ${sourceFile}`,
-        category: 'Project',
-        controllerClass: ctor,
-        keywords: ['project', 'controller', className.toLowerCase(), sourceFile.toLowerCase()],
-      });
-      this.registeredScriptIds.add(scriptId);
-      this.logger.info(`Registered controller: ${className}`);
+    this.scriptRegistry.registerComponent({
+      id: scriptId,
+      displayName: className,
+      description: `Project component from ${sourceFile}`,
+      category: 'Project',
+      componentClass: ctor,
+      keywords: ['project', 'component', className.toLowerCase(), sourceFile.toLowerCase()],
+    });
+    this.registeredScriptIds.add(scriptId);
+    this.logger.info(`Registered component: ${className}`);
     }
   }
 
@@ -237,9 +222,7 @@ export class ProjectScriptLoaderService {
    */
   private clearRegisteredScripts(): void {
     for (const scriptId of this.registeredScriptIds) {
-      // Try both behavior and controller registries
-      this.scriptRegistry.unregisterBehavior(scriptId);
-      this.scriptRegistry.unregisterController(scriptId);
+      this.scriptRegistry.unregisterComponent(scriptId);
     }
     this.registeredScriptIds.clear();
   }

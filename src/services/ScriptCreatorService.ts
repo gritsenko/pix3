@@ -4,7 +4,6 @@ import { ProjectScriptLoaderService } from './ProjectScriptLoaderService';
 
 export interface ScriptCreationParams {
   scriptName: string;
-  scriptType: 'behavior' | 'controller';
   defaultName?: string;
 }
 
@@ -76,9 +75,8 @@ export class ScriptCreatorService {
     if (!instance) return;
 
     try {
-      // Create the script file with suffix
-      const suffix = instance.params.scriptType === 'controller' ? 'Controller' : 'Behavior';
-      const className = `${scriptName}${suffix}`;
+      // Create the script file
+      const className = `${scriptName}`;
       const fileName = `${className}.ts`;
       const filePath = `scripts/${fileName}`;
 
@@ -100,7 +98,7 @@ export class ScriptCreatorService {
       }
 
       // Generate script template
-      const template = this.generateScriptTemplate(scriptName, instance.params.scriptType);
+      const template = this.generateScriptTemplate(scriptName);
 
       // Ensure scripts directory exists
       try {
@@ -124,7 +122,7 @@ export class ScriptCreatorService {
         })
       );
 
-      // Resolve with the created script name (with suffix)
+      // Resolve with the created script name
       instance.resolve(className);
     } catch (error) {
       console.error('[ScriptCreator] Failed to create script:', error);
@@ -143,36 +141,30 @@ export class ScriptCreatorService {
   }
 
   /**
-   * Generate a script template based on type
+   * Generate a script template
    */
-  private generateScriptTemplate(
-    scriptName: string,
-    scriptType: 'behavior' | 'controller'
-  ): string {
-    const baseClass = scriptType === 'controller' ? 'ScriptControllerBase' : 'BehaviorBase';
-    const typeLabel = scriptType === 'controller' ? 'Controller' : 'Behavior';
-
+  private generateScriptTemplate(scriptName: string): string {
     return `/**
- * ${scriptName}${typeLabel} - Auto-generated script
+ * ${scriptName} - Auto-generated script component
  *
- * ${scriptType === 'controller' ? 'Controller for node logic' : 'Reusable behavior component'}
+ * Custom script component for node logic
  */
 
-import { ${baseClass} } from '@/core/ScriptComponent';
+import { Script } from '@/core/ScriptComponent';
 import type { PropertySchema } from '@/fw';
 
-export class ${scriptName}${typeLabel} extends ${baseClass} {
+export class ${scriptName} extends Script {
   constructor(id: string, type: string) {
     super(id, type);
-    // Initialize default parameters
-    this.parameters = {
-      // Add your parameters here
+    // Initialize default config
+    this.config = {
+      // Add your config here
     };
   }
 
   static getPropertySchema(): PropertySchema {
     return {
-      nodeType: '${scriptName}${typeLabel}',
+      nodeType: '${scriptName}',
       properties: [
         // Add property definitions here
         // Example:
@@ -182,21 +174,21 @@ export class ${scriptName}${typeLabel} extends ${baseClass} {
         //   ui: {
         //     label: 'Speed',
         //     description: 'Movement speed',
-        //     group: '${typeLabel}',
+        //     group: 'Component',
         //     min: 0,
         //     max: 10,
         //     step: 0.1,
         //   },
-        //   getValue: (script: unknown) => (script as ${scriptName}${typeLabel}).parameters.speed,
+        //   getValue: (script: unknown) => (script as ${scriptName}).config.speed,
         //   setValue: (script: unknown, value: unknown) => {
-        //     (script as ${scriptName}${typeLabel}).parameters.speed = Number(value);
+        //     (script as ${scriptName}).config.speed = Number(value);
         //   },
         // },
       ],
       groups: {
-        ${typeLabel}: {
-          label: '${typeLabel} Parameters',
-          description: 'Configuration for ${scriptName.toLowerCase()} ${scriptType}',
+        Component: {
+          label: 'Component Parameters',
+          description: 'Configuration for ${scriptName.toLowerCase()} component',
           expanded: true,
         },
       },
@@ -204,12 +196,12 @@ export class ${scriptName}${typeLabel} extends ${baseClass} {
   }
 
   onAttach(): void {
-    console.log(\`[${scriptName}${typeLabel}] Attached to node "\${this.node?.name}" (\${this.node?.nodeId})\`);
+    console.log(\`[${scriptName}] Attached to node "\${this.node?.name}" (\${this.node?.nodeId})\`);
     // Initialize script when attached to a node
   }
 
   onStart(): void {
-    console.log(\`[${scriptName}${typeLabel}] Starting on node "\${this.node?.name}"\`);
+    console.log(\`[${scriptName}] Starting on node "\${this.node?.name}"\`);
     // Called on the first frame after attachment
   }
 
@@ -219,7 +211,7 @@ export class ${scriptName}${typeLabel} extends ${baseClass} {
   }
 
   onDetach(): void {
-    console.log(\`[${scriptName}${typeLabel}] Detached from node "\${this.node?.name}"\`);
+    console.log(\`[${scriptName}] Detached from node "\${this.node?.name}"\`);
     // Clean up resources when detached
   }
 }
