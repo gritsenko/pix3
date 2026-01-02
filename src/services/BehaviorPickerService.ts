@@ -1,33 +1,27 @@
 import { injectable } from '@/fw/di';
-import type { BehaviorTypeInfo, ControllerTypeInfo } from './ScriptRegistry';
+import type { ComponentTypeInfo } from './ScriptRegistry';
 
-export type ScriptTypeInfo = BehaviorTypeInfo | ControllerTypeInfo;
-
-export interface BehaviorPickerInstance {
+export interface ComponentPickerInstance {
   id: string;
-  type: 'behavior' | 'controller';
-  resolve: (result: ScriptTypeInfo | null) => void;
+  resolve: (result: ComponentTypeInfo | null) => void;
   reject: (error: Error) => void;
 }
 
 @injectable()
 export class BehaviorPickerService {
-  private pickers = new Map<string, BehaviorPickerInstance>();
+  private pickers = new Map<string, ComponentPickerInstance>();
   private nextId = 0;
-  private listeners = new Set<(pickers: BehaviorPickerInstance[]) => void>();
+  private listeners = new Set<(pickers: ComponentPickerInstance[]) => void>();
 
   /**
-   * Show the behavior picker modal and return a promise that resolves to the selected behavior or null if cancelled.
+   * Show the component picker modal and return a promise that resolves to the selected component or null if cancelled.
    */
-  public async showPicker(
-    type: 'behavior' | 'controller' = 'behavior'
-  ): Promise<ScriptTypeInfo | null> {
+  public async showPicker(): Promise<ComponentTypeInfo | null> {
     return new Promise((resolve, reject) => {
       const id = `picker-${this.nextId++}`;
-      const instance: BehaviorPickerInstance = {
+      const instance: ComponentPickerInstance = {
         id,
-        type,
-        resolve: (result: ScriptTypeInfo | null) => {
+        resolve: (result: ComponentTypeInfo | null) => {
           this.pickers.delete(id);
           this.notifyListeners();
           resolve(result);
@@ -47,25 +41,25 @@ export class BehaviorPickerService {
   /**
    * Get all active pickers for rendering
    */
-  public getPickers(): BehaviorPickerInstance[] {
+  public getPickers(): ComponentPickerInstance[] {
     return Array.from(this.pickers.values());
   }
 
   /**
    * Subscribe to picker changes
    */
-  public subscribe(listener: (pickers: BehaviorPickerInstance[]) => void): () => void {
+  public subscribe(listener: (pickers: ComponentPickerInstance[]) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
   }
 
   /**
-   * Select a script by ID
+   * Select a component by ID
    */
-  public select(pickerId: string, script: ScriptTypeInfo): void {
+  public select(pickerId: string, component: ComponentTypeInfo): void {
     const instance = this.pickers.get(pickerId);
     if (instance) {
-      instance.resolve(script);
+      instance.resolve(component);
     }
   }
 

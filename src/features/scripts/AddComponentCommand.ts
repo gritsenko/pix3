@@ -1,5 +1,5 @@
 /**
- * ClearControllerCommand - Command to remove a controller from a node
+ * AddComponentCommand - Command to add a component to a node
  */
 
 import {
@@ -9,19 +9,19 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { ClearControllerOperation, type ClearControllerParams } from './ClearControllerOperation';
+import { AddComponentOperation, type AddComponentParams } from './AddComponentOperation';
 
-export class ClearControllerCommand extends CommandBase<object, void> {
+export class AddComponentCommand extends CommandBase<object, void> {
   readonly metadata: CommandMetadata = {
-    id: 'scripts.clear-controller',
-    title: 'Clear Controller',
-    description: 'Remove a controller script from a node',
-    keywords: ['clear', 'remove', 'controller', 'script'],
+    id: 'scripts.add-component',
+    title: 'Add Component',
+    description: 'Add a script component to a node',
+    keywords: ['add', 'component', 'script'],
   };
 
-  private readonly params: ClearControllerParams;
+  private readonly params: AddComponentParams;
 
-  constructor(params: ClearControllerParams) {
+  constructor(params: AddComponentParams) {
     super();
     this.params = params;
   }
@@ -30,7 +30,7 @@ export class ClearControllerCommand extends CommandBase<object, void> {
     const operations = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );
-    const op = new ClearControllerOperation(this.params);
+    const op = new AddComponentOperation(this.params);
     const pushed = await operations.invokeAndPush(op);
     return { didMutate: pushed, payload: {} };
   }

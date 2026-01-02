@@ -35,17 +35,11 @@ export class SceneValidationError extends Error {
   }
 }
 
-export interface BehaviorDefinition {
-  id: string;
+export interface ComponentDefinition {
+  id?: string;
   type: string;
   enabled?: boolean;
-  parameters?: Record<string, unknown>;
-}
-
-export interface ControllerDefinition {
-  type: string;
-  enabled?: boolean;
-  parameters?: Record<string, unknown>;
+  config?: Record<string, unknown>;
 }
 
 export interface SceneNodeDefinition {
@@ -56,8 +50,7 @@ export interface SceneNodeDefinition {
   properties?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   children?: SceneNodeDefinition[];
-  behaviors?: BehaviorDefinition[];
-  script?: ControllerDefinition;
+  components?: ComponentDefinition[];
 }
 
 export interface SceneDocument {
@@ -194,58 +187,34 @@ export class SceneLoader {
     const node = await this.createNodeFromDefinition(definition);
     index.set(node.nodeId, node);
 
-    // Attach behaviors
-    if (definition.behaviors) {
-      for (const behaviorDef of definition.behaviors) {
-        const behavior = this.scriptRegistry.createBehavior(behaviorDef.type, behaviorDef.id);
-        if (behavior) {
-          behavior.enabled = behaviorDef.enabled ?? true;
-          behavior.parameters = { ...(behaviorDef.parameters ?? {}) };
+    // Load components
+    if (definition.components) {
+      for (const componentDef of definition.components) {
+        const componentId = componentDef.id || `${definition.id}-${componentDef.type}-${Date.now()}`;
+        const component = this.scriptRegistry.createComponent(componentDef.type, componentId);
+        
+        if (component) {
+          component.enabled = componentDef.enabled ?? true;
+          
+          const configData = componentDef.config ?? {};
+          component.config = { ...configData };
 
-          // Set parameters using PropertySchema if available
-          const schema = this.scriptRegistry.getBehaviorPropertySchema(behaviorDef.type);
-          if (schema && behaviorDef.parameters) {
+          // Set config values using PropertySchema if available
+          const schema = this.scriptRegistry.getComponentPropertySchema(componentDef.type);
+          if (schema && configData) {
             for (const prop of schema.properties) {
-              if (behaviorDef.parameters[prop.name] !== undefined) {
-                prop.setValue(behavior, behaviorDef.parameters[prop.name]);
+              if (configData[prop.name] !== undefined) {
+                prop.setValue(component, configData[prop.name]);
               }
             }
           }
 
-          node.behaviors.push(behavior);
+          node.addComponent(component);
         } else {
           console.warn(
-            `[SceneLoader] Failed to create behavior "${behaviorDef.type}" for node "${definition.id}"`
+            `[SceneLoader] Failed to create component "${componentDef.type}" for node "${definition.id}"`
           );
         }
-      }
-    }
-
-    // Attach controller (script)
-    if (definition.script) {
-      const controller = this.scriptRegistry.createController(
-        definition.script.type,
-        `${definition.id}-controller`
-      );
-      if (controller) {
-        controller.enabled = definition.script.enabled ?? true;
-        controller.parameters = { ...(definition.script.parameters ?? {}) };
-
-        // Set parameters using PropertySchema if available
-        const schema = this.scriptRegistry.getControllerPropertySchema(definition.script.type);
-        if (schema && definition.script.parameters) {
-          for (const prop of schema.properties) {
-            if (definition.script.parameters[prop.name] !== undefined) {
-              prop.setValue(controller, definition.script.parameters[prop.name]);
-            }
-          }
-        }
-
-        node.controller = controller;
-      } else {
-        console.warn(
-          `[SceneLoader] Failed to create controller "${definition.script.type}" for node "${definition.id}"`
-        );
       }
     }
 

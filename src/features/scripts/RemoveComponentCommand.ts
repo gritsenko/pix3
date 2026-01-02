@@ -1,3 +1,7 @@
+/**
+ * RemoveComponentCommand - Command to remove a component from a node
+ */
+
 import {
   CommandBase,
   type CommandExecutionResult,
@@ -5,19 +9,19 @@ import {
   type CommandContext,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { SetControllerOperation, type SetControllerParams } from './SetControllerOperation';
+import { RemoveComponentOperation, type RemoveComponentParams } from './RemoveComponentOperation';
 
-export class SetControllerCommand extends CommandBase<object, void> {
+export class RemoveComponentCommand extends CommandBase<object, void> {
   readonly metadata: CommandMetadata = {
-    id: 'scripts.set-controller',
-    title: 'Set Controller',
-    description: 'Set a controller script for a node',
-    keywords: ['set', 'controller', 'script'],
+    id: 'scripts.remove-component',
+    title: 'Remove Component',
+    description: 'Remove a script component from a node',
+    keywords: ['remove', 'component', 'script'],
   };
 
-  private readonly params: SetControllerParams;
+  private readonly params: RemoveComponentParams;
 
-  constructor(params: SetControllerParams) {
+  constructor(params: RemoveComponentParams) {
     super();
     this.params = params;
   }
@@ -26,7 +30,7 @@ export class SetControllerCommand extends CommandBase<object, void> {
     const operations = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );
-    const op = new SetControllerOperation(this.params);
+    const op = new RemoveComponentOperation(this.params);
     const pushed = await operations.invokeAndPush(op);
     return { didMutate: pushed, payload: {} };
   }

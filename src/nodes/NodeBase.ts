@@ -1,6 +1,6 @@
 import { Object3D } from 'three';
 import type { PropertySchema } from '@/fw';
-import type { Behavior, ScriptController } from '@/core/ScriptComponent';
+import type { ScriptComponent, Constructor } from '@/core/ScriptComponent';
 
 export interface NodeMetadata {
   [key: string]: unknown;
@@ -25,10 +25,8 @@ export class NodeBase extends Object3D {
   readonly instancePath: string | null;
   /** Whether this node can have children. */
   isContainer: boolean = true;
-  /** Behaviors attached to this node */
-  behaviors: Behavior[] = [];
-  /** Script controller attached to this node (only one per node) */
-  controller: ScriptController | null = null;
+  /** Script components attached to this node */
+  readonly components: ScriptComponent[] = [];
 
   constructor(props: NodeBaseProps) {
     super();
@@ -86,35 +84,88 @@ export class NodeBase extends Object3D {
   }
 
   /**
+   * Add a script component to this node.
+   * If the node's scene is already running, calls onStart immediately.
+   * @param component - The script component to add
+   */
+  addComponent(component: ScriptComponent): void {
+    if (this.components.includes(component)) {
+      console.warn(`[NodeBase] Component ${component.id} is already attached to node ${this.nodeId}`);
+      return;
+    }
+
+    // Attach to node
+    component.node = this;
+    this.components.push(component);
+
+    // Call onAttach if defined
+    if (component.onAttach) {
+      component.onAttach(this);
+    }
+
+    // If the scene is already running (node has been started), start the component immediately
+    // We detect this by checking if any existing component has been started
+    const sceneRunning = this.components.some(c => c._started);
+    if (sceneRunning && component.enabled && component.onStart) {
+      component.onStart();
+      component._started = true;
+    }
+  }
+
+  /**
+   * Get a component of a specific type from this node.
+   * @param type - The constructor/class of the component type to find
+   * @returns The first component of the specified type, or null if not found
+   */
+  getComponent<T extends ScriptComponent>(type: Constructor<T>): T | null {
+    const component = this.components.find(c => c instanceof type);
+    return component ? (component as T) : null;
+  }
+
+  /**
+   * Remove a script component from this node.
+   * Calls onDetach and removes it from the components array.
+   * @param component - The script component to remove
+   */
+  removeComponent(component: ScriptComponent): void {
+    const index = this.components.indexOf(component);
+    if (index === -1) {
+      console.warn(`[NodeBase] Component ${component.id} is not attached to node ${this.nodeId}`);
+      return;
+    }
+
+    // Call onDetach if defined
+    if (component.onDetach) {
+      component.onDetach();
+    }
+
+    // Reset started state
+    if (component.resetStartedState) {
+      component.resetStartedState();
+    }
+
+    // Remove from node
+    component.node = null;
+    this.components.splice(index, 1);
+  }
+
+  /**
    * Tick method called every frame to update scripts.
-   * Calls onUpdate on enabled controller, enabled behaviors, and recursively on children.
+   * Calls onUpdate on enabled components and recursively on children.
    * @param dt - Delta time in seconds since last frame
    */
   tick(dt: number): void {
-    // Update controller if enabled
-    if (this.controller && this.controller.enabled) {
-      // Call onStart on first update
-      if (!this.controller._started && this.controller.onStart) {
-        this.controller.onStart();
-        this.controller._started = true;
-      }
-      // Call onUpdate
-      if (this.controller.onUpdate) {
-        this.controller.onUpdate(dt);
-      }
-    }
-
-    // Update all enabled behaviors
-    for (const behavior of this.behaviors) {
-      if (behavior.enabled) {
+    // Update all enabled components
+    for (const component of this.components) {
+      if (component.enabled) {
         // Call onStart on first update
-        if (!behavior._started && behavior.onStart) {
-          behavior.onStart();
-          behavior._started = true;
+        if (!component._started && component.onStart) {
+          component.onStart();
+          component._started = true;
         }
         // Call onUpdate
-        if (behavior.onUpdate) {
-          behavior.onUpdate(dt);
+        if (component.onUpdate) {
+          component.onUpdate(dt);
         }
       }
     }

@@ -40,19 +40,19 @@ Pix3 supports writing custom game logic in TypeScript. User scripts are automati
 1. Create `.ts` files in your project's `scripts/` directory
 2. Import from `@pix3/engine` to access editor APIs:
    ```typescript
-   import { ScriptControllerBase } from '@pix3/engine';
+   import { Script } from '@pix3/engine';
    
-   export class MyController extends ScriptControllerBase {
+   export class MyComponent extends Script {
      static getPropertySchema() {
        return {
-         nodeType: 'MyController',
+         nodeType: 'MyComponent',
          properties: [
            {
              name: 'speed',
              type: 'number',
-             getValue: (obj: any) => obj.parameters.speed ?? 10,
-             setValue: (obj: any, value: any) => { obj.parameters.speed = value; },
-             uiHints: { label: 'Speed', min: 0, max: 100 }
+             getValue: (obj: any) => obj.config.speed ?? 10,
+             setValue: (obj: any, value: any) => { obj.config.speed = value; },
+             ui: { label: 'Speed', min: 0, max: 100 }
            }
          ],
          groups: {}
@@ -71,11 +71,40 @@ Pix3 supports writing custom game logic in TypeScript. User scripts are automati
 ### Available APIs
 
 The `@pix3/engine` module provides:
-- `ScriptControllerBase` - Base class for node controllers
-- `BehaviorBase` - Base class for reusable behaviors
+- `Script` - Base class for script components (recommended)
+- `ScriptControllerBase` - Legacy base class for controllers (deprecated, use `Script`)
+- `BehaviorBase` - Legacy base class for behaviors (deprecated, use `Script`)
 - `NodeBase`, `Node2D`, `Node3D` - Node types
 - `appState` - Reactive application state
 - Property schema types for defining editable parameters
+
+### Script Component System
+
+Pix3 uses a unified component system (similar to Unity). All scripts are `ScriptComponent` instances that can be added to nodes:
+
+```typescript
+// Add components to nodes
+node.addComponent(new MyComponent('id', 'MyComponent'));
+
+// Find components by type
+const component = node.getComponent(MyComponent);
+
+// Remove components
+node.removeComponent(component);
+```
+
+**YAML Scene Format:**
+```yaml
+root:
+  - id: player
+    type: Node3D
+    components:
+      - type: MyComponent
+        config:
+          speed: 5.0
+```
+
+**Legacy format** with separate `script` and `behaviors` is still supported for backward compatibility.
 
 ### Compilation
 

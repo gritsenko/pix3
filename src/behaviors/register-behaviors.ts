@@ -1,8 +1,8 @@
 /**
- * Register built-in behaviors and controllers
+ * Register built-in script components
  *
  * This module registers all built-in script components with the ScriptRegistry.
- * Import this module early in the application lifecycle to ensure behaviors
+ * Import this module early in the application lifecycle to ensure components
  * are available when scenes are loaded.
  */
 
@@ -11,22 +11,22 @@ import { ScriptRegistry } from '@/services/ScriptRegistry';
 import { TestRotateBehavior } from './TestRotateBehavior';
 
 /**
- * Register all built-in behaviors and controllers
+ * Register all built-in script components
  */
 export function registerBuiltInScripts(): void {
   const container = ServiceContainer.getInstance();
   const token = container.getOrCreateToken(ScriptRegistry);
   const registry = container.getService<ScriptRegistry>(token);
 
-  // Register test/example behaviors
-  registry.registerBehavior({
+  // Register test/example components
+  registry.registerComponent({
     id: 'test_rotate',
     displayName: 'Test Rotate',
     description: 'Rotates a 3D node continuously (for testing)',
     category: 'Test',
-    behaviorClass: TestRotateBehavior,
+    componentClass: TestRotateBehavior,
     keywords: ['rotate', 'test', 'animation'],
   });
 
-  console.log('[ScriptRegistry] Registered built-in behaviors and controllers');
+  console.log('[ScriptRegistry] Registered built-in script components');
 }

@@ -126,26 +126,14 @@ export class SceneSaver {
       definition.instance = node.instancePath;
     }
 
-    // Serialize behaviors
-    if (node.behaviors && node.behaviors.length > 0) {
-      definition.behaviors = node.behaviors.map(b => ({
-        id: b.id,
-        type: b.type,
-        enabled: b.enabled,
-        parameters: b.parameters && Object.keys(b.parameters).length > 0 ? b.parameters : undefined,
+    // Serialize components
+    if (node.components.length > 0) {
+      definition.components = node.components.map(c => ({
+        id: c.id,
+        type: c.type,
+        enabled: c.enabled,
+        config: c.config && Object.keys(c.config).length > 0 ? c.config : undefined,
       }));
-    }
-
-    // Serialize controller script
-    if (node.controller) {
-      definition.script = {
-        type: node.controller.type,
-        enabled: node.controller.enabled,
-        parameters:
-          node.controller.parameters && Object.keys(node.controller.parameters).length > 0
-            ? node.controller.parameters
-            : undefined,
-      };
     }
 
     // Recursively serialize children

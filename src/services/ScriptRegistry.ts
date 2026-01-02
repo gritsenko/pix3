@@ -1,14 +1,12 @@
 /**
- * ScriptRegistry - Registry for behaviors and script controllers
+ * ScriptRegistry - Registry for script components
  *
- * Similar to NodeRegistry, this service maintains a mapping of script component
- * type names to their implementation classes. Each class must have a static
- * getPropertySchema() method for parameter definitions.
+ * Maintains a unified registry of script components.
  */
 
 import { injectable } from '@/fw/di';
 import type { PropertySchema } from '@/fw';
-import type { Behavior, ScriptController } from '@/core/ScriptComponent';
+import type { ScriptComponent } from '@/core/ScriptComponent';
 
 /**
  * Type for classes that have a static getPropertySchema method
@@ -18,212 +16,113 @@ export interface PropertySchemaProvider {
 }
 
 /**
- * Behavior type definition for the registry
+ * Component type definition for the unified registry
  */
-export interface BehaviorTypeInfo {
+export interface ComponentTypeInfo {
   /** Unique identifier/type name */
   id: string;
 
   /** Display name for UI */
   displayName: string;
 
-  /** Description of what this behavior does */
+  /** Description of what this component does */
   description: string;
 
   /** Category for grouping in UI */
   category: string;
 
-  /** Constructor for the behavior class */
-  behaviorClass: (new (id: string, type: string) => Behavior) & PropertySchemaProvider;
+  /** Constructor for the component class */
+  componentClass: (new (id: string, type: string) => ScriptComponent) & PropertySchemaProvider;
 
   /** Keywords for search */
   keywords: string[];
 }
 
 /**
- * Controller type definition for the registry
- */
-export interface ControllerTypeInfo {
-  /** Unique identifier/type name */
-  id: string;
-
-  /** Display name for UI */
-  displayName: string;
-
-  /** Description of what this controller does */
-  description: string;
-
-  /** Category for grouping in UI */
-  category: string;
-
-  /** Constructor for the controller class */
-  controllerClass: (new (id: string, type: string) => ScriptController) & PropertySchemaProvider;
-
-  /** Keywords for search */
-  keywords: string[];
-}
-
-/**
- * Registry service for script components (behaviors and controllers)
+ * Registry service for script components
  */
 @injectable()
 export class ScriptRegistry {
-  private behaviors = new Map<string, BehaviorTypeInfo>();
-  private controllers = new Map<string, ControllerTypeInfo>();
+  // Unified component registry
+  private components = new Map<string, ComponentTypeInfo>();
 
   constructor() {
-    // Register built-in behaviors and controllers here
-    // For now, registry starts empty - behaviors/controllers will be registered
+    // Register built-in components here
+    // For now, registry starts empty - components will be registered
     // by feature modules or plugins
   }
 
   /**
-   * Register a behavior type
+   * Register a component type (new unified API)
    */
-  registerBehavior(info: BehaviorTypeInfo): void {
-    if (this.behaviors.has(info.id)) {
-      console.warn(`[ScriptRegistry] Behavior "${info.id}" is already registered. Overwriting.`);
+  registerComponent(info: ComponentTypeInfo): void {
+    if (this.components.has(info.id)) {
+      console.warn(`[ScriptRegistry] Component "${info.id}" is already registered. Overwriting.`);
     }
-    this.behaviors.set(info.id, info);
+    this.components.set(info.id, info);
   }
 
   /**
-   * Register a controller type
+   * Unregister a component type
    */
-  registerController(info: ControllerTypeInfo): void {
-    if (this.controllers.has(info.id)) {
-      console.warn(`[ScriptRegistry] Controller "${info.id}" is already registered. Overwriting.`);
-    }
-    this.controllers.set(info.id, info);
+  unregisterComponent(id: string): boolean {
+    return this.components.delete(id);
   }
 
   /**
-   * Unregister a behavior type
+   * Get a component type by ID
    */
-  unregisterBehavior(id: string): boolean {
-    return this.behaviors.delete(id);
+  getComponentType(id: string): ComponentTypeInfo | undefined {
+    return this.components.get(id);
   }
 
   /**
-   * Unregister a controller type
+   * Get all registered component types
    */
-  unregisterController(id: string): boolean {
-    return this.controllers.delete(id);
+  getAllComponentTypes(): ComponentTypeInfo[] {
+    return Array.from(this.components.values());
   }
 
   /**
-   * Get a behavior type by ID
+   * Create a component instance from a type ID
    */
-  getBehaviorType(id: string): BehaviorTypeInfo | undefined {
-    return this.behaviors.get(id);
-  }
-
-  /**
-   * Get a controller type by ID
-   */
-  getControllerType(id: string): ControllerTypeInfo | undefined {
-    return this.controllers.get(id);
-  }
-
-  /**
-   * Get all registered behavior types
-   */
-  getAllBehaviorTypes(): BehaviorTypeInfo[] {
-    return Array.from(this.behaviors.values());
-  }
-
-  /**
-   * Get all registered controller types
-   */
-  getAllControllerTypes(): ControllerTypeInfo[] {
-    return Array.from(this.controllers.values());
-  }
-
-  /**
-   * Create a behavior instance from a type ID
-   */
-  createBehavior(typeId: string, instanceId: string): Behavior | null {
-    const typeInfo = this.behaviors.get(typeId);
-    if (!typeInfo) {
-      console.error(`[ScriptRegistry] Behavior type "${typeId}" not found in registry.`);
+  createComponent(typeId: string, instanceId: string): ScriptComponent | null {
+    const componentInfo = this.components.get(typeId);
+    if (!componentInfo) {
+      console.error(`[ScriptRegistry] Component type "${typeId}" not found in registry.`);
       return null;
     }
 
     try {
-      const behavior = new typeInfo.behaviorClass(instanceId, typeId);
-      return behavior;
+      return new componentInfo.componentClass(instanceId, typeId);
     } catch (error) {
-      console.error(`[ScriptRegistry] Failed to instantiate behavior "${typeId}":`, error);
+      console.error(`[ScriptRegistry] Failed to instantiate component "${typeId}":`, error);
       return null;
     }
   }
 
   /**
-   * Create a controller instance from a type ID
+   * Get property schema for a component type
    */
-  createController(typeId: string, instanceId: string): ScriptController | null {
-    const typeInfo = this.controllers.get(typeId);
-    if (!typeInfo) {
-      console.error(`[ScriptRegistry] Controller type "${typeId}" not found in registry.`);
+  getComponentPropertySchema(typeId: string): PropertySchema | null {
+    const componentInfo = this.components.get(typeId);
+    if (!componentInfo) {
       return null;
     }
 
-    try {
-      const controller = new typeInfo.controllerClass(instanceId, typeId);
-      return controller;
-    } catch (error) {
-      console.error(`[ScriptRegistry] Failed to instantiate controller "${typeId}":`, error);
-      return null;
-    }
+    return componentInfo.componentClass.getPropertySchema();
   }
 
   /**
-   * Get property schema for a behavior type
+   * Search components by keyword
    */
-  getBehaviorPropertySchema(typeId: string): PropertySchema | null {
-    const typeInfo = this.behaviors.get(typeId);
-    if (!typeInfo) {
-      return null;
-    }
-
-    return typeInfo.behaviorClass.getPropertySchema();
-  }
-
-  /**
-   * Get property schema for a controller type
-   */
-  getControllerPropertySchema(typeId: string): PropertySchema | null {
-    const typeInfo = this.controllers.get(typeId);
-    if (!typeInfo) {
-      return null;
-    }
-
-    return typeInfo.controllerClass.getPropertySchema();
-  }
-
-  /**
-   * Search behaviors by keyword
-   */
-  searchBehaviors(query: string): BehaviorTypeInfo[] {
+  searchComponents(query: string): ComponentTypeInfo[] {
     const lowercaseQuery = query.toLowerCase();
-    return this.getAllBehaviorTypes().filter(
-      behavior =>
-        behavior.displayName.toLowerCase().includes(lowercaseQuery) ||
-        behavior.description.toLowerCase().includes(lowercaseQuery) ||
-        behavior.keywords.some(keyword => keyword.toLowerCase().includes(lowercaseQuery))
-    );
-  }
-
-  /**
-   * Search controllers by keyword
-   */
-  searchControllers(query: string): ControllerTypeInfo[] {
-    const lowercaseQuery = query.toLowerCase();
-    return this.getAllControllerTypes().filter(
-      controller =>
-        controller.displayName.toLowerCase().includes(lowercaseQuery) ||
-        controller.description.toLowerCase().includes(lowercaseQuery) ||
-        controller.keywords.some(keyword => keyword.toLowerCase().includes(lowercaseQuery))
+    return this.getAllComponentTypes().filter(
+      component =>
+        component.displayName.toLowerCase().includes(lowercaseQuery) ||
+        component.description.toLowerCase().includes(lowercaseQuery) ||
+        component.keywords.some(keyword => keyword.toLowerCase().includes(lowercaseQuery))
     );
   }
 
@@ -231,7 +130,6 @@ export class ScriptRegistry {
    * Dispose the registry
    */
   dispose(): void {
-    this.behaviors.clear();
-    this.controllers.clear();
+    this.components.clear();
   }
 }
