@@ -1,7 +1,7 @@
 /**
  * Script Component System
  *
- * Defines the core interfaces for behaviors and script controllers.
+ * Defines the core interfaces for the unified script component system.
  * This system follows the PropertySchema pattern for dynamic parameter configuration.
  */
 
@@ -9,10 +9,34 @@ import type { PropertySchema } from '@/fw';
 import type { NodeBase } from '@/nodes/NodeBase';
 
 /**
- * Base lifecycle interface for script components (behaviors and controllers).
- * All script components implement these lifecycle methods.
+ * Type helper for constructors
  */
-export interface ScriptLifecycle {
+export type Constructor<T> = new (...args: any[]) => T;
+
+/**
+ * ScriptComponent - Unified interface for all script components.
+ * Replaces the previous dual system of behaviors and controllers.
+ * All scripts implement this interface with lifecycle methods and configuration.
+ */
+export interface ScriptComponent {
+  /** Unique identifier for this component instance */
+  readonly id: string;
+
+  /** Type name of this component (matches registry key) */
+  readonly type: string;
+
+  /** Reference to the node this component is attached to */
+  node: NodeBase | null;
+
+  /** Whether this component is currently active and receiving updates */
+  enabled: boolean;
+
+  /** Configuration object for this component's parameters */
+  config: Record<string, unknown>;
+
+  /** Flag to track if onStart has been called */
+  _started: boolean;
+
   /**
    * Called when the script component is attached to a node.
    * Use this to initialize references and set up state.
@@ -45,163 +69,116 @@ export interface ScriptLifecycle {
 }
 
 /**
- * Behavior - A reusable component that can be attached to nodes.
- * Multiple behaviors can be attached to a single node.
- * Behaviors have parameters that can be configured via PropertySchema.
+ * Abstract base class for script components providing default implementations.
+ * Extend this class to create custom script components.
  */
-export interface Behavior extends ScriptLifecycle {
-  /** Unique identifier for this behavior instance */
+export abstract class Script implements ScriptComponent {
   readonly id: string;
-
-  /** Type name of this behavior (matches registry key) */
   readonly type: string;
+  node: NodeBase | null = null;
+  enabled: boolean = true;
+  config: Record<string, unknown> = {};
+  _started: boolean = false;
 
-  /** Reference to the node this behavior is attached to */
-  node: NodeBase | null;
+  constructor(id: string, type: string) {
+    this.id = id;
+    this.type = type;
+  }
 
-  /** Whether this behavior is currently active and receiving updates */
-  enabled: boolean;
+  /**
+   * Get the property schema for this component's parameters.
+   * Override this method to define editable parameters.
+   */
+  static getPropertySchema(): PropertySchema {
+    return {
+      nodeType: 'Script',
+      properties: [],
+      groups: {},
+    };
+  }
 
-  /** Parameter storage - values configured via PropertySchema */
+  onAttach?(node: NodeBase): void;
+  onStart?(): void;
+  onUpdate?(dt: number): void;
+  onDetach?(): void;
+
+  /**
+   * Reset the started state
+   */
+  resetStartedState(): void {
+    this._started = false;
+  }
+}
+
+// Legacy interfaces and classes - kept for backward compatibility during migration
+/**
+ * @deprecated Use ScriptComponent instead
+ */
+export interface Behavior extends ScriptComponent {
+  /** @deprecated Use config instead */
   parameters: Record<string, unknown>;
-
-  /** Flag to track if onStart has been called */
-  _started: boolean;
 }
 
 /**
- * Script Controller - A single controller attached to a node.
- * Only one controller can be attached per node.
- * Controllers are typically used for primary node logic.
+ * @deprecated Use ScriptComponent instead
  */
-export interface ScriptController extends ScriptLifecycle {
-  /** Unique identifier for this controller instance */
-  readonly id: string;
-
-  /** Type name of this controller (matches registry key) */
-  readonly type: string;
-
-  /** Reference to the node this controller is attached to */
-  node: NodeBase | null;
-
-  /** Whether this controller is currently active and receiving updates */
-  enabled: boolean;
-
-  /** Parameter storage - values configured via PropertySchema */
+export interface ScriptController extends ScriptComponent {
+  /** @deprecated Use config instead */
   parameters: Record<string, unknown>;
-
-  /** Flag to track if onStart has been called */
-  _started: boolean;
 }
 
 /**
+ * @deprecated Use Script instead
  * Base class for behaviors providing default implementations.
- * Extend this class to create custom behaviors.
  */
-export abstract class BehaviorBase implements Behavior {
-  readonly id: string;
-  readonly type: string;
-  node: NodeBase | null = null;
-  enabled: boolean = true;
-  parameters: Record<string, unknown> = {};
-  _started: boolean = false;
-
-  constructor(id: string, type: string) {
-    this.id = id;
-    this.type = type;
+export abstract class BehaviorBase extends Script implements Behavior {
+  get parameters(): Record<string, unknown> {
+    return this.config;
   }
-
-  /**
-   * Get the property schema for this behavior's parameters.
-   * Override this method to define editable parameters.
-   */
-  static getPropertySchema(): PropertySchema {
-    return {
-      nodeType: 'BehaviorBase',
-      properties: [],
-      groups: {},
-    };
-  }
-
-  onAttach?(node: NodeBase): void;
-  onStart?(): void;
-  onUpdate?(dt: number): void;
-  onDetach?(): void;
-
-  /**
-   * Reset the started state
-   */
-  resetStartedState(): void {
-    this._started = false;
+  set parameters(value: Record<string, unknown>) {
+    this.config = value;
   }
 }
 
 /**
+ * @deprecated Use Script instead
  * Base class for script controllers providing default implementations.
- * Extend this class to create custom controllers.
  */
-export abstract class ScriptControllerBase implements ScriptController {
-  readonly id: string;
-  readonly type: string;
-  node: NodeBase | null = null;
-  enabled: boolean = true;
-  parameters: Record<string, unknown> = {};
-  _started: boolean = false;
-
-  constructor(id: string, type: string) {
-    this.id = id;
-    this.type = type;
+export abstract class ScriptControllerBase extends Script implements ScriptController {
+  get parameters(): Record<string, unknown> {
+    return this.config;
   }
-
-  /**
-   * Get the property schema for this controller's parameters.
-   * Override this method to define editable parameters.
-   */
-  static getPropertySchema(): PropertySchema {
-    return {
-      nodeType: 'ScriptControllerBase',
-      properties: [],
-      groups: {},
-    };
-  }
-
-  onAttach?(node: NodeBase): void;
-  onStart?(): void;
-  onUpdate?(dt: number): void;
-  onDetach?(): void;
-
-  /**
-   * Reset the started state
-   */
-  resetStartedState(): void {
-    this._started = false;
+  set parameters(value: Record<string, unknown>) {
+    this.config = value;
   }
 }
 
 /**
+ * Type guard to check if an object is a ScriptComponent
+ */
+export function isScriptComponent(obj: unknown): obj is ScriptComponent {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'id' in obj &&
+    'type' in obj &&
+    'enabled' in obj &&
+    'config' in obj
+  );
+}
+
+/**
+ * @deprecated Use isScriptComponent instead
  * Type guard to check if an object is a Behavior
  */
 export function isBehavior(obj: unknown): obj is Behavior {
-  return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    'id' in obj &&
-    'type' in obj &&
-    'enabled' in obj &&
-    'parameters' in obj
-  );
+  return isScriptComponent(obj);
 }
 
 /**
+ * @deprecated Use isScriptComponent instead
  * Type guard to check if an object is a ScriptController
  */
 export function isScriptController(obj: unknown): obj is ScriptController {
-  return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    'id' in obj &&
-    'type' in obj &&
-    'enabled' in obj &&
-    'parameters' in obj
-  );
+  return isScriptComponent(obj);
 }
