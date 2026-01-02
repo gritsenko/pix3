@@ -61,15 +61,17 @@ Examples:
 
 ### Script Component System
 
-- **Behaviors**: Reusable components attached to nodes via `behaviors` array
-- **Script Controllers**: Primary logic scripts attached via `controller` property (one per node)
-- **Script Lifecycle**: All scripts implement `ScriptLifecycle` with `onAttach`, `onStart`, `onUpdate`, `onDetach`
-- **Property Schema**: Behaviors/controllers expose editable parameters via `static getPropertySchema()`
-- **ScriptRegistry**: Central registry for registering and creating script types
+- **Unified Component System**: All scripts are `ScriptComponent` instances attached via `node.components` array (Unity-style)
+- **Script Base Class**: Extend `Script` abstract class for custom components (replaces separate `BehaviorBase` and `ScriptControllerBase`)
+- **Script Lifecycle**: All scripts implement lifecycle methods: `onAttach`, `onStart`, `onUpdate`, `onDetach`
+- **Property Schema**: Components expose editable parameters via `static getPropertySchema()`
+- **ScriptRegistry**: Central registry for registering and creating script types (now supports unified components)
 - **ScriptExecutionService**: Manages game loop, calls `tick(dt)` on nodes, handles lifecycle
-- **Node Ticking**: Nodes have `tick(dt)` method that updates enabled scripts and recursively ticks children
-- **All script mutations must use Commands** — AttachBehaviorCommand, DetachBehaviorCommand, SetControllerCommand, ClearControllerCommand, ToggleScriptEnabledCommand
-- **Script parameters edited via UpdateObjectPropertyCommand** — Behaviors/controllers use same property schema system as nodes
+- **Node Ticking**: Nodes have `tick(dt)` method that updates enabled components and recursively ticks children
+- **Component API**: Use `node.addComponent()`, `node.removeComponent()`, `node.getComponent<T>(type)` for component management
+- **All component mutations must use Commands** — AddComponentCommand, RemoveComponentCommand (legacy commands still supported)
+- **Component config via UpdateObjectPropertyCommand** — Components use same property schema system as nodes
+- **Backward Compatibility**: Legacy `behaviors` array and `controller` property still accessible via getters/setters
 
 ### Commands and Operations
 
@@ -270,6 +272,7 @@ src/
 11. **Cross-reference specification** — check `docs/pix3-specification.md` for architectural decisions
 12. **Avoid bloat documentation** — Only maintain README.md, AGENTS.md, architecture.md, pix3-specification.md in docs/. Keep documentation minimal and focused on active development. **Do NOT create separate .md files for specific features or refactors**—integrate essential information directly into existing documentation files or README.md instead.
 13. **Property schemas define node properties** — Node classes must implement `static getPropertySchema()`. Inspector consumes via `getNodePropertySchema()`. Schema's getValue/setValue handle all property access and transformation (e.g., radian/degree conversion).
+14. **Unified component system** — All scripts are `ScriptComponent` instances. Use `Script` base class for new components. Use `node.addComponent()`, `node.removeComponent()`, `node.getComponent<T>()` for component management. Legacy `behaviors`/`controller` APIs maintained for backward compatibility.
 
 Always verify architectural decisions against the specification before implementing features.
 
