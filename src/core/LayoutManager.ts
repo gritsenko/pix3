@@ -174,10 +174,10 @@ export class LayoutManagerService {
 
     // Add a new viewport tab to the stack
     try {
-      // Use the layout's addComponent method instead of stack's addChild
-      // to properly create a new component item
+      // In Golden Layout 2.x, we need to use newItemAtLocation to create a component
+      // The stack needs a location-based API call rather than direct addChild
       const componentConfig = {
-        type: 'component',
+        type: 'component' as const,
         componentType: PANEL_COMPONENT_TYPES.viewport,
         title: title,
         isClosable: true,
@@ -186,8 +186,13 @@ export class LayoutManagerService {
         },
       };
       
-      // Use the layout-level API to add the component to the stack
-      this.viewportStack.addChild(componentConfig);
+      // Use the layout's API to add the item at the stack's location
+      // This properly creates and registers the component
+      const location = {
+        parentId: this.viewportStack.id,
+      };
+      
+      this.layout.newItemAtLocation(componentConfig, location);
       console.log('[LayoutManager] Opened new tab for scene:', sceneId);
     } catch (error) {
       console.error('[LayoutManager] Failed to open scene tab:', error);
