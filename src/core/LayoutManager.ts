@@ -112,6 +112,7 @@ export class LayoutManagerService {
   private readonly state: AppState;
   private container: HTMLElement | null = null;
   private viewportContainer: any = null;
+  private viewportStack: any = null; // Reference to the main viewport stack for multi-tab support
 
   constructor(state: AppState = appState) {
     this.state = state;
@@ -149,6 +150,77 @@ export class LayoutManagerService {
     if (this.viewportContainer) {
       this.viewportContainer.setTitle(title);
     }
+  }
+
+  /**
+   * Open a scene or prefab in a new viewport tab (or focus existing tab).
+   * @param sceneId - Unique identifier for the scene
+   * @param title - Display title for the tab
+   */
+  openSceneTab(sceneId: string, title: string): void {
+    if (!this.layout || !this.viewportStack) {
+      console.warn('[LayoutManager] Cannot open scene tab: layout not initialized');
+      return;
+    }
+
+    // Check if a tab with this sceneId already exists
+    const existingComponent = this.findComponentBySceneId(sceneId);
+    if (existingComponent) {
+      // Focus the existing tab
+      existingComponent.focus();
+      console.log('[LayoutManager] Focused existing tab for scene:', sceneId);
+      return;
+    }
+
+    // Add a new viewport tab to the stack
+    try {
+      this.viewportStack.addChild({
+        type: 'component',
+        componentType: PANEL_COMPONENT_TYPES.viewport,
+        title: title,
+        isClosable: true,
+        componentState: {
+          sceneId: sceneId,
+        },
+      });
+      console.log('[LayoutManager] Opened new tab for scene:', sceneId);
+    } catch (error) {
+      console.error('[LayoutManager] Failed to open scene tab:', error);
+    }
+  }
+
+  /**
+   * Find a viewport component by sceneId
+   */
+  private findComponentBySceneId(sceneId: string): any | null {
+    if (!this.layout) {
+      return null;
+    }
+
+    // Search through all components in the layout
+    const findInContainer = (container: any): any | null => {
+      if (!container) return null;
+      
+      // Check if this is a component with matching sceneId
+      if (container.componentType === PANEL_COMPONENT_TYPES.viewport) {
+        const state = container.state || container.componentState;
+        if (state?.sceneId === sceneId) {
+          return container;
+        }
+      }
+
+      // Recursively search children
+      if (container.contentItems) {
+        for (const child of container.contentItems) {
+          const found = findInContainer(child);
+          if (found) return found;
+        }
+      }
+
+      return null;
+    };
+
+    return findInContainer(this.layout.rootItem);
   }
 
   private async loadDefaultLayout(): Promise<void> {
@@ -205,10 +277,20 @@ export class LayoutManagerService {
         // Store reference to viewport container for dynamic title updates
         if (componentType === PANEL_COMPONENT_TYPES.viewport) {
           this.viewportContainer = container;
+          // Store the parent stack for multi-tab support
+          if (container.parent?.type === 'stack') {
+            this.viewportStack = container.parent;
+          }
         }
 
         const element = document.createElement(tagName);
         element.setAttribute('data-panel-id', componentType);
+        // Pass componentState to the element for sceneId support
+        if (container.state) {
+          Object.entries(container.state).forEach(([key, value]) => {
+            element.setAttribute(`data-${key}`, String(value));
+          });
+        }
         container.element.append(element);
         container.on('destroy', () => {
           element.remove();

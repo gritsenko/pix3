@@ -4,6 +4,7 @@ import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { AddModelCommand } from '@/features/scene/AddModelCommand';
 import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
 import { SceneManager } from '@/core/SceneManager';
+import { LayoutManagerService } from '@/core/LayoutManager';
 import type { SceneGraph } from '@/core/SceneManager';
 
 export interface AssetActivation {
@@ -34,6 +35,9 @@ export class AssetFileActivationService {
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
 
+  @inject(LayoutManagerService)
+  private readonly layoutManager!: LayoutManagerService;
+
   /**
    * Handle activation of an asset file from the project tree.
    * @param payload File activation details including extension and resource path
@@ -47,10 +51,15 @@ export class AssetFileActivationService {
       return;
     }
 
-    if (extension === 'pix3scene') {
+    if (extension === 'pix3scene' || extension === 'pix3node') {
       const sceneId = this.deriveSceneId(resourcePath);
+      
+      // Load the scene into memory
       const command = new LoadSceneCommand({ filePath: resourcePath, sceneId });
       await this.commandDispatcher.execute(command);
+      
+      // Open in a new viewport tab
+      this.layoutManager.openSceneTab(sceneId, name);
       return;
     }
 

@@ -32,6 +32,10 @@ export class ViewportPanel extends ComponentBase {
   @state()
   private showLayer3D = false;
 
+  /** Scene ID for this viewport tab (from Golden Layout componentState) */
+  @state()
+  private sceneId: string | null = null;
+
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
     if (!entry) {
@@ -55,6 +59,14 @@ export class ViewportPanel extends ComponentBase {
 
   connectedCallback() {
     super.connectedCallback();
+    
+    // Read sceneId from data attribute (set by Golden Layout)
+    const sceneIdAttr = this.getAttribute('data-sceneId') || this.getAttribute('data-sceneid');
+    if (sceneIdAttr) {
+      this.sceneId = sceneIdAttr;
+      console.log('[ViewportPanel] Initialized with sceneId:', this.sceneId);
+    }
+    
     // ResizeObserver will be set up in firstUpdated when host element is available
     this.disposeSceneSubscription = subscribe(appState.scenes, () => {
       this.syncViewportScene();
@@ -73,6 +85,9 @@ export class ViewportPanel extends ComponentBase {
     this.addEventListener('pointerdown', this.handleCanvasPointerDown);
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
     this.addEventListener('pointerup', this.handleCanvasPointerUp);
+    
+    // Add focus handler to set active scene when this viewport gains focus
+    this.addEventListener('focus', this.handleFocus, true);
   }
 
   disconnectedCallback() {
@@ -86,10 +101,21 @@ export class ViewportPanel extends ComponentBase {
     this.removeEventListener('pointerdown', this.handleCanvasPointerDown);
     this.removeEventListener('pointermove', this.handleCanvasPointerMove);
     this.removeEventListener('pointerup', this.handleCanvasPointerUp);
+    this.removeEventListener('focus', this.handleFocus, true);
     this.pointerDownPos = undefined;
     this.pointerDownTime = undefined;
     this.isDragging = false;
   }
+
+  /**
+   * Handle viewport gaining focus - set this scene as active
+   */
+  private handleFocus = (): void => {
+    if (this.sceneId && this.sceneId !== appState.scenes.activeSceneId) {
+      console.log('[ViewportPanel] Setting active scene:', this.sceneId);
+      appState.scenes.activeSceneId = this.sceneId;
+    }
+  };
 
   protected firstUpdated(): void {
     this.canvas = this.renderRoot.querySelector<HTMLCanvasElement>('.viewport-canvas') ?? undefined;
