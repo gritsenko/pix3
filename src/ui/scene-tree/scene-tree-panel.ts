@@ -214,10 +214,11 @@ export class SceneTreePanel extends ComponentBase {
       return [];
     }
     const hierarchy = appState.scenes.hierarchies[sceneId];
-    if (!hierarchy) {
+    if (!hierarchy || !hierarchy.rootNode) {
       return [];
     }
-    return (hierarchy.rootNodes ?? []) as NodeBase[];
+    // Return children of the SceneNode root instead of an array of roots
+    return hierarchy.rootNode.children.filter((child: any) => child instanceof NodeBase) as NodeBase[];
   }
 
   /**
