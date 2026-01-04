@@ -163,19 +163,11 @@ export class ScriptExecutionService {
    * Recursively attach scripts to a node and its children
    */
   private attachScriptsToNode(node: NodeBase): void {
-    // Attach controller
-    if (node.controller) {
-      node.controller.node = node;
-      if (node.controller.onAttach) {
-        node.controller.onAttach(node);
-      }
-    }
-
-    // Attach behaviors
-    for (const behavior of node.behaviors) {
-      behavior.node = node;
-      if (behavior.onAttach) {
-        behavior.onAttach(node);
+    // Attach all components
+    for (const component of node.components) {
+      component.node = node;
+      if (component.onAttach) {
+        component.onAttach(node);
       }
     }
 
@@ -212,20 +204,12 @@ export class ScriptExecutionService {
    * Recursively detach scripts from a node and its children
    */
   private detachScriptsFromNode(node: NodeBase): void {
-    // Detach controller
-    if (node.controller) {
-      if (node.controller.onDetach) {
-        node.controller.onDetach();
+    // Detach all components
+    for (const component of node.components) {
+      if (component.onDetach) {
+        component.onDetach();
       }
-      node.controller.node = null;
-    }
-
-    // Detach behaviors
-    for (const behavior of node.behaviors) {
-      if (behavior.onDetach) {
-        behavior.onDetach();
-      }
-      behavior.node = null;
+      component.node = null;
     }
 
     // Recursively detach from children
@@ -240,15 +224,10 @@ export class ScriptExecutionService {
    * Recursively reset started state for all scripts in a node and its children
    */
   private resetScriptStartedState(node: NodeBase): void {
-    // Reset controller
-    if (node.controller && node.controller.resetStartedState) {
-      node.controller.resetStartedState();
-    }
-
-    // Reset behaviors
-    for (const behavior of node.behaviors) {
-      if (behavior.resetStartedState) {
-        behavior.resetStartedState();
+    // Reset components
+    for (const component of node.components) {
+      if (component.resetStartedState) {
+        component.resetStartedState();
       }
     }
 

@@ -765,10 +765,10 @@ export class ViewportRendererService {
 
       objectsToRemove.forEach(obj => this.scene!.remove(obj));
 
-      // Add scene graph root nodes and create visual representations for 2D nodes
-      sceneGraph.rootNodes.forEach(node => {
-        this.processNodeForRendering(node);
-      });
+      // Add scene graph root node and create visual representations for 2D nodes
+      if (sceneGraph.rootNode) {
+        this.processNodeForRendering(sceneGraph.rootNode);
+      }
 
       this.updateSelection();
     } catch (err) {
