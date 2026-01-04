@@ -60,7 +60,9 @@ export class CreateSprite2DCommand extends CommandBase<CreateSprite2DCommandPayl
 
     // Get the created node ID from the scene graph
     const activeSceneGraph = sceneManager.getActiveSceneGraph();
-    const nodeId = activeSceneGraph?.rootNodes[activeSceneGraph.rootNodes.length - 1]?.nodeId || '';
+    // Get the last child of the rootNode (which would be the newly created sprite)
+    const lastChild = activeSceneGraph?.rootNode.children[activeSceneGraph.rootNode.children.length - 1];
+    const nodeId = (lastChild as any)?.nodeId || '';
 
     return { didMutate: pushed, payload: { nodeId } };
   }

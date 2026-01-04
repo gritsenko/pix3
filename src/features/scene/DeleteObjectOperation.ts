@@ -215,7 +215,7 @@ export class DeleteObjectOperation implements Operation<OperationInvokeResult> {
       if (info.index >= 0 && info.index < sceneGraph.rootNodes.length) {
         sceneGraph.rootNodes.splice(info.index, 0, info.node);
       } else {
-        sceneGraph.rootNodes.push(info.node);
+        sceneGraph.rootNode.adoptChild(info.node);
       }
     }
   }

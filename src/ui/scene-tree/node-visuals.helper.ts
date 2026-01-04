@@ -19,6 +19,11 @@ const NODE_3D_COLOR = '#fe9ebeff';
  * @returns An object with the color and icon name for the node.
  */
 export function getNodeVisuals(node: NodeBase): { color: string; icon: string } {
+  // Check if this is a prefab instance
+  if (node.instancePath) {
+    return { color: '#b19cd9', icon: 'link' }; // Purple color for instances
+  }
+  
   if (node instanceof Sprite2D) {
     return { color: NODE_2D_COLOR, icon: 'image' };
   }

@@ -92,8 +92,9 @@ export class AssetFileActivationService {
   }
 
   private findUiLayer(sceneGraph: SceneGraph) {
-    return sceneGraph.rootNodes.find(
-      node => node.type === 'Group2D' && node.name === AssetFileActivationService.UI_LAYER_NAME
+    // Look in the children of the root SceneNode
+    return sceneGraph.rootNode.children.find(
+      (node: any) => node.type === 'Group2D' && node.name === AssetFileActivationService.UI_LAYER_NAME
     );
   }
 

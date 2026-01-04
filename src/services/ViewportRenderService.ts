@@ -341,7 +341,7 @@ export class ViewportRendererService {
         if (sceneGraph) {
           // Find the first selected node
           const firstSelectedNodeId = nodeIds[0];
-          const firstSelectedNode = this.findNodeById(firstSelectedNodeId, sceneGraph.rootNodes);
+          const firstSelectedNode = this.findNodeById(firstSelectedNodeId, [sceneGraph.rootNode]);
 
           if (firstSelectedNode && firstSelectedNode instanceof Node3D) {
             // Attach transform controls to the selected object
@@ -663,7 +663,7 @@ export class ViewportRendererService {
     const primaryNodeId = appState.selection.primaryNodeId;
 
     for (const nodeId of nodeIds) {
-      const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
+      const node = this.findNodeById(nodeId, [sceneGraph.rootNode]);
       if (node && node instanceof Node3D) {
         this.selectedObjects.add(node);
 
@@ -1063,7 +1063,7 @@ export class ViewportRendererService {
     for (const [nodeId, box] of this.selectionBoxes.entries()) {
       const sceneGraph = this.sceneManager.getActiveSceneGraph();
       if (sceneGraph) {
-        const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
+        const node = this.findNodeById(nodeId, [sceneGraph.rootNode]);
         if (node && node instanceof Node3D) {
           const newBox = new THREE.Box3().setFromObject(node);
           box.box.copy(newBox);
@@ -1423,7 +1423,7 @@ export class ViewportRendererService {
             for (const [nodeId, box] of this.selectionBoxes.entries()) {
               const sceneGraph = this.sceneManager.getActiveSceneGraph();
               if (sceneGraph) {
-                const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
+                const node = this.findNodeById(nodeId, [sceneGraph.rootNode]);
                 if (node && node instanceof Node3D) {
                   const newBox = new THREE.Box3().setFromObject(node);
                   box.box.copy(newBox);
@@ -1435,7 +1435,7 @@ export class ViewportRendererService {
             for (const [nodeId, gizmo] of this.selectionGizmos.entries()) {
               const sceneGraph = this.sceneManager.getActiveSceneGraph();
               if (sceneGraph) {
-                const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
+                const node = this.findNodeById(nodeId, [sceneGraph.rootNode]);
                 if (node && node instanceof Node3D) {
                   node.updateMatrixWorld(true);
                   if (gizmo instanceof THREE.PointLightHelper) {

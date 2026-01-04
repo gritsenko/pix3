@@ -343,8 +343,8 @@ export class SceneTreePanel extends ComponentBase {
         const targetIndex = targetNode.parentNode.children.indexOf(targetNode);
         newIndex = position === 'before' ? targetIndex : targetIndex + 1;
       } else {
-        // Target is at root level
-        const targetIndex = sceneGraph.rootNodes.indexOf(targetNode);
+        // Target is at root level (child of SceneNode)
+        const targetIndex = sceneGraph.rootNode.children.indexOf(targetNode);
         newIndex = position === 'before' ? targetIndex : targetIndex + 1;
       }
     } else {

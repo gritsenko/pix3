@@ -32,19 +32,18 @@ export class SceneSaver {
    */
   serializeScene(graph: SceneGraph): string {
     console.debug('[SceneSaver] Starting serialization', {
-      rootNodeCount: graph.rootNodes.length,
+      rootNodeId: graph.rootNode.nodeId,
       version: graph.version,
     });
 
-    const rootDefinitions: SceneNodeDefinition[] = graph.rootNodes.map(node =>
-      this.serializeNode(node)
-    );
+    // Serialize the single root node
+    const rootDefinition = this.serializeNode(graph.rootNode);
 
     const document: SceneDocument = {
       version: graph.version ?? '1.0.0',
       description: graph.description,
       metadata: graph.metadata,
-      root: rootDefinitions,
+      root: [rootDefinition], // Always wrap in array for YAML format
     };
 
     // Custom YAML stringification to keep vectors as inline arrays
@@ -95,13 +94,35 @@ export class SceneSaver {
 
     console.debug('[SceneSaver] Serialization complete', {
       yamlLength: yaml.length,
-      rootDefinitionCount: rootDefinitions.length,
     });
 
     return yaml;
   }
 
   private serializeNode(node: NodeBase): SceneNodeDefinition {
+    // Handle prefab instances specially
+    if (node.instancePath) {
+      // For instance nodes, only serialize the instance path and local property overrides
+      const definition: SceneNodeDefinition = {
+        id: node.nodeId,
+        type: node.type !== 'Instance' ? node.type : undefined,
+        name: node.name,
+        instance: node.instancePath,
+      };
+      
+      // Serialize local transform overrides for instance nodes
+      const properties = this.serializeNodeProperties(node);
+      if (Object.keys(properties).length > 0) {
+        definition.properties = properties;
+      }
+      
+      // Do NOT serialize children or components for instance nodes
+      // They come from the prefab file
+      
+      return definition;
+    }
+    
+    // Normal node serialization (not an instance)
     // First, get the properties (this might modify the type for DirectionalLightNode)
     const properties = this.serializeNodeProperties(node);
 
@@ -120,10 +141,6 @@ export class SceneSaver {
       definition.type = 'PointLightNode';
     } else if (node instanceof SpotLightNode) {
       definition.type = 'SpotLightNode';
-    }
-
-    if (node.instancePath) {
-      definition.instance = node.instancePath;
     }
 
     // Serialize components

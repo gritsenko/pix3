@@ -73,7 +73,7 @@ export class CreatePointLightOperation implements Operation<OperationInvokeResul
     }
 
     // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
+    sceneGraph.rootNode.adoptChild(node);
     sceneGraph.nodeMap.set(nodeId, node);
 
     // Update the state hierarchy
@@ -102,7 +102,7 @@ export class CreatePointLightOperation implements Operation<OperationInvokeResul
       commit: {
         label: `Create ${lightName}`,
         undo: () => {
-          sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
+          sceneGraph.rootNode.children = sceneGraph.rootNode.children.filter(n => n.nodeId !== nodeId);
           sceneGraph.nodeMap.delete(nodeId);
 
           const currentHierarchy = state.scenes.hierarchies[activeSceneId];
@@ -119,7 +119,7 @@ export class CreatePointLightOperation implements Operation<OperationInvokeResul
           state.selection.nodeIds = state.selection.nodeIds.filter(id => id !== nodeId);
         },
         redo: () => {
-          sceneGraph.rootNodes.push(node);
+          sceneGraph.rootNode.adoptChild(node);
           sceneGraph.nodeMap.set(nodeId, node);
 
           const currentHierarchy = state.scenes.hierarchies[activeSceneId];

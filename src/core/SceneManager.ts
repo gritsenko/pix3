@@ -6,7 +6,7 @@ import type { NodeBase } from '../nodes/NodeBase';
 export interface SceneGraph {
   version: string;
   description?: string;
-  rootNodes: NodeBase[];
+  rootNode: NodeBase;
   nodeMap: Map<string, NodeBase>;
   metadata: Record<string, unknown>;
 }
@@ -36,7 +36,7 @@ export class SceneManager {
     if (process.env.NODE_ENV === 'development') {
       console.debug('[SceneManager] setActiveSceneGraph', {
         sceneId,
-        rootCount: graph.rootNodes.length,
+        rootNodeId: graph.rootNode.nodeId,
       });
     }
   }

@@ -4,6 +4,7 @@ import { Euler, MathUtils, Vector2, Vector3 } from 'three';
 import { injectable, inject } from '@/fw/di';
 import { NodeBase, type NodeBaseProps } from '@/nodes/NodeBase';
 import { Node3D } from '@/nodes/Node3D';
+import { SceneNode } from '@/nodes/SceneNode';
 import { MeshInstance } from '@/nodes/3D/MeshInstance';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { Group2D } from '@/nodes/2D/Group2D';
@@ -19,6 +20,7 @@ import { Camera3D } from '@/nodes/3D/Camera3D';
 import { Node2D } from '@/nodes/Node2D';
 import { AssetLoader } from './AssetLoader';
 import { ScriptRegistry } from '@/services/ScriptRegistry';
+import { FileSystemAPIService } from '@/services/FileSystemAPIService';
 
 const ZERO_VECTOR3 = new Vector3(0, 0, 0);
 const UNIT_VECTOR3 = new Vector3(1, 1, 1);
@@ -117,6 +119,9 @@ export class SceneLoader {
   @inject(ScriptRegistry)
   private readonly scriptRegistry!: ScriptRegistry;
 
+  @inject(FileSystemAPIService)
+  private readonly fileSystemService!: FileSystemAPIService;
+
   constructor() {}
 
   async parseScene(sceneText: string, options: ParseSceneOptions = {}): Promise<SceneGraph> {
@@ -151,23 +156,66 @@ export class SceneLoader {
     }
 
     const nodeIndex = new Map<string, NodeBase>();
-    const rootNodes: NodeBase[] = [];
-
-    for (const definition of document.root ?? []) {
-      const rootNode = await this.instantiateNode(
-        definition,
+    let rootNode: SceneNode;
+    
+    const rootDefinitions = document.root ?? [];
+    
+    // Check if this is a single-root scene (new format) with a SceneNode
+    if (rootDefinitions.length === 1 && rootDefinitions[0].type === 'Scene') {
+      // New format: single SceneNode root
+      rootNode = await this.instantiateNode(
+        rootDefinitions[0],
         null,
         nodeIndex,
         options.filePath ?? 'unknown'
-      );
-      rootNodes.push(rootNode);
+      ) as SceneNode;
+    } else {
+      // Legacy format: multiple roots or non-Scene root
+      // Create a new SceneNode and parent all existing roots to it
+      console.debug('[SceneLoader.parseScene] Migrating legacy multi-root scene to single root');
+      
+      rootNode = new SceneNode({
+        id: `scene-root-${Date.now()}`,
+        name: 'SceneRoot',
+      });
+      nodeIndex.set(rootNode.nodeId, rootNode);
+      
+      // If no roots exist, create default World 3D and UI Layer
+      if (rootDefinitions.length === 0) {
+        const world3D = new Node3D({
+          id: `world-3d-${Date.now()}`,
+          name: 'World 3D',
+        });
+        nodeIndex.set(world3D.nodeId, world3D);
+        rootNode.adoptChild(world3D);
+        
+        const uiLayer = new Group2D({
+          id: `ui-layer-${Date.now()}`,
+          name: 'UI Layer',
+          width: 800,
+          height: 600,
+        });
+        nodeIndex.set(uiLayer.nodeId, uiLayer);
+        rootNode.adoptChild(uiLayer);
+      } else {
+        // Parent existing roots to the new SceneNode
+        for (const definition of rootDefinitions) {
+          const childNode = await this.instantiateNode(
+            definition,
+            rootNode,
+            nodeIndex,
+            options.filePath ?? 'unknown'
+          );
+          // Node is already parented in instantiateNode
+        }
+      }
     }
 
     return {
       version: document.version,
       description: document.description,
       metadata: document.metadata ?? {},
-      rootNodes,
+      rootNode,
       nodeMap: nodeIndex,
     };
   }
@@ -182,6 +230,11 @@ export class SceneLoader {
       throw new SceneValidationError(`Duplicate node id "${definition.id}" detected.`, [
         sceneIdentifier,
       ]);
+    }
+
+    // Handle prefab instances (external .pix3node files)
+    if (definition.instance) {
+      return await this.instantiatePrefabNode(definition, parent, index, sceneIdentifier);
     }
 
     const node = await this.createNodeFromDefinition(definition);
@@ -230,6 +283,145 @@ export class SceneLoader {
     return node;
   }
 
+  /**
+   * Instantiate a node from a prefab file (.pix3node).
+   * Loads the external file, parses it, and grafts the prefab content as children.
+   * Property overrides from the parent scene are applied over the prefab defaults.
+   */
+  private async instantiatePrefabNode(
+    definition: SceneNodeDefinition,
+    parent: NodeBase | null,
+    index: Map<string, NodeBase>,
+    sceneIdentifier: string
+  ): Promise<NodeBase> {
+    const instancePath = definition.instance!;
+    
+    console.debug('[SceneLoader] Loading prefab instance', {
+      nodeId: definition.id,
+      instancePath,
+    });
+
+    try {
+      // Fetch the prefab file content
+      const prefabContent = await this.fetchPrefabContent(instancePath);
+      
+      // Parse the prefab scene
+      const prefabGraph = await this.parseScene(prefabContent, { filePath: instancePath });
+      
+      // Get the root node from the prefab
+      const prefabRoot = prefabGraph.rootNode;
+      
+      // Create the instance node with the definition's id and overrides
+      const node = await this.createNodeFromDefinition({
+        ...definition,
+        type: definition.type ?? prefabRoot.type,
+      });
+      
+      // Set the instance path for tracking
+      (node as any).instancePath = instancePath;
+      
+      index.set(node.nodeId, node);
+      
+      // Graft prefab children to the instance node
+      for (const prefabChild of prefabRoot.children) {
+        if (prefabChild instanceof NodeBase) {
+          // Re-parent prefab children to the instance node
+          node.adoptChild(prefabChild);
+          // Also add to the node index
+          this.addNodeAndDescendantsToIndex(prefabChild, index);
+        }
+      }
+      
+      // Apply property overrides from the parent scene definition
+      if (definition.properties) {
+        this.applyPropertyOverrides(node, definition.properties);
+      }
+      
+      if (parent) {
+        parent.adoptChild(node);
+      }
+      
+      return node;
+    } catch (error) {
+      console.error(`[SceneLoader] Failed to load prefab "${instancePath}":`, error);
+      // Fallback: create a placeholder node
+      const node = new NodeBase({
+        id: definition.id,
+        name: definition.name ?? 'Instance (Error)',
+        type: definition.type ?? 'Instance',
+        instancePath,
+      });
+      index.set(node.nodeId, node);
+      if (parent) {
+        parent.adoptChild(node);
+      }
+      return node;
+    }
+  }
+
+  /**
+   * Fetch the content of a prefab file from the file system.
+   */
+  private async fetchPrefabContent(resourcePath: string): Promise<string> {
+    // Remove res:// prefix if present
+    const cleanPath = resourcePath.replace(/^res:\/\//i, '');
+    
+    // Use FileSystemAPIService to read the file
+    const content = await this.fileSystemService.readTextFile(cleanPath);
+    
+    return content;
+  }
+
+  /**
+   * Recursively add a node and all its descendants to the index.
+   */
+  private addNodeAndDescendantsToIndex(node: NodeBase, index: Map<string, NodeBase>): void {
+    index.set(node.nodeId, node);
+    for (const child of node.children) {
+      if (child instanceof NodeBase) {
+        this.addNodeAndDescendantsToIndex(child, index);
+      }
+    }
+  }
+
+  /**
+   * Apply property overrides to a node.
+   */
+  private applyPropertyOverrides(node: NodeBase, overrides: Record<string, unknown>): void {
+    // For now, just merge properties - in the future, this could use PropertySchema
+    Object.assign(node.properties, overrides);
+    
+    // Apply transform overrides for 3D nodes
+    if (node instanceof Node3D) {
+      const transform = overrides.transform as Record<string, unknown> | undefined;
+      if (transform) {
+        if (transform.position) {
+          const pos = this.readVector3(transform.position, node.position);
+          node.position.copy(pos);
+        }
+        if (transform.rotationEuler || transform.rotation) {
+          const rot = this.readVector3(
+            transform.rotationEuler ?? transform.rotation,
+            new Vector3(
+              MathUtils.radToDeg(node.rotation.x),
+              MathUtils.radToDeg(node.rotation.y),
+              MathUtils.radToDeg(node.rotation.z)
+            )
+          );
+          node.rotation.set(
+            MathUtils.degToRad(rot.x),
+            MathUtils.degToRad(rot.y),
+            MathUtils.degToRad(rot.z)
+          );
+        }
+        if (transform.scale) {
+          const scale = this.readVector3(transform.scale, node.scale);
+          node.scale.copy(scale);
+        }
+      }
+    }
+  }
+
   private async createNodeFromDefinition(definition: SceneNodeDefinition): Promise<NodeBase> {
     const baseProps: NodeBaseProps = {
       id: definition.id,
@@ -247,6 +439,11 @@ export class SceneLoader {
     }
 
     switch (definition.type) {
+      case 'Scene': {
+        return new SceneNode({
+          ...baseProps,
+        });
+      }
       case 'Sprite2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);

@@ -62,7 +62,7 @@ export class CreateBoxOperation implements Operation<OperationInvokeResult> {
     });
 
     // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
+    sceneGraph.rootNode.adoptChild(node);
     sceneGraph.nodeMap.set(nodeId, node);
 
     // Update the state hierarchy - REPLACE the entire object to trigger reactivity
@@ -93,7 +93,7 @@ export class CreateBoxOperation implements Operation<OperationInvokeResult> {
         label: `Create ${boxName}`,
         undo: () => {
           // Remove from scene graph
-          sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
+          sceneGraph.rootNode.children = sceneGraph.rootNode.children.filter(n => n.nodeId !== nodeId);
           sceneGraph.nodeMap.delete(nodeId);
 
           // Dispose the node
@@ -116,7 +116,7 @@ export class CreateBoxOperation implements Operation<OperationInvokeResult> {
         },
         redo: async () => {
           // Re-add to scene graph
-          sceneGraph.rootNodes.push(node);
+          sceneGraph.rootNode.adoptChild(node);
           sceneGraph.nodeMap.set(nodeId, node);
 
           // Update state hierarchy

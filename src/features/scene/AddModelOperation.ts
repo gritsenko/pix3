@@ -64,7 +64,7 @@ export class AddModelOperation implements Operation<OperationInvokeResult> {
     }
 
     // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
+    sceneGraph.rootNode.adoptChild(node);
     sceneGraph.nodeMap.set(nodeId, node);
 
     // Update the state hierarchy - REPLACE the entire object to trigger reactivity
@@ -122,7 +122,7 @@ export class AddModelOperation implements Operation<OperationInvokeResult> {
         },
         redo: () => {
           // Re-add node to scene graph
-          sceneGraph.rootNodes.push(node);
+          sceneGraph.rootNode.adoptChild(node);
           sceneGraph.nodeMap.set(nodeId, node);
 
           // Update state hierarchy - replace to trigger reactivity

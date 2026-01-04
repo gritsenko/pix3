@@ -132,7 +132,9 @@ export class ScriptExecutionService {
     const scene = this.sceneManager.getActiveSceneGraph();
     if (scene) {
       // Tick all root nodes (which will recursively tick children)
-      for (const rootNode of scene.rootNodes) {
+      // Single root: iterate over rootNode
+      const rootNode = scene.rootNode;
+      if (rootNode) {
         rootNode.tick(dt);
       }
     }
@@ -150,7 +152,9 @@ export class ScriptExecutionService {
       return;
     }
 
-    for (const rootNode of scene.rootNodes) {
+    // Single root: attach to rootNode and its children
+    const rootNode = scene.rootNode;
+    if (rootNode) {
       this.attachScriptsToNode(rootNode);
     }
   }
@@ -196,11 +200,10 @@ export class ScriptExecutionService {
       return;
     }
 
-    for (const rootNode of scene.rootNodes) {
+    // Single root: detach from rootNode and its children
+    const rootNode = scene.rootNode;
+    if (rootNode) {
       this.detachScriptsFromNode(rootNode);
-    }
-
-    for (const rootNode of scene.rootNodes) {
       this.resetScriptStartedState(rootNode);
     }
   }
@@ -270,7 +273,9 @@ export class ScriptExecutionService {
   private captureNodeState(scene: SceneGraph): void {
     const snapshots: NodeStateSnapshot[] = [];
 
-    for (const rootNode of scene.rootNodes) {
+    // Single root: capture rootNode and its children
+    const rootNode = scene.rootNode;
+    if (rootNode) {
       this.captureNodeStateRecursive(rootNode, snapshots);
     }
 
@@ -313,7 +318,9 @@ export class ScriptExecutionService {
     const snapshotMap = new Map(snapshots.map(s => [s.nodeId, s]));
     let restoredCount = 0;
 
-    for (const rootNode of scene.rootNodes) {
+    // Single root: restore rootNode and its children
+    const rootNode = scene.rootNode;
+    if (rootNode) {
       restoredCount += this.restoreNodeStateRecursive(rootNode, snapshotMap);
     }
 

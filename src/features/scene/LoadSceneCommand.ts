@@ -151,7 +151,7 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
         version: graph.version ?? null,
         description: graph.description ?? null,
         // Store Three.js nodes as non-proxied references to avoid DOM Illegal invocation errors
-        rootNodes: ref(graph.rootNodes),
+        rootNode: ref(graph.rootNode),
         metadata: graph.metadata ?? {},
       };
       state.scenes.loadState = 'ready';

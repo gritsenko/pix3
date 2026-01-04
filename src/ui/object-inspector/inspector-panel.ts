@@ -208,12 +208,12 @@ export class InspectorPanel extends ComponentBase {
 
     // Find selected nodes
     this.selectedNodes = nodeIds
-      .map(nodeId => this.findNodeById(nodeId, sceneGraph.rootNodes))
+      .map(nodeId => this.findNodeById(nodeId, [sceneGraph.rootNode]))
       .filter((node): node is NodeBase => node !== null);
 
     // Find primary node
     this.primaryNode = primaryNodeId
-      ? this.findNodeById(primaryNodeId, sceneGraph.rootNodes)
+      ? this.findNodeById(primaryNodeId, [sceneGraph.rootNode])
       : this.selectedNodes.length > 0
         ? this.selectedNodes[0]
         : null;

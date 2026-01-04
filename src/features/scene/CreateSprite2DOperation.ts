@@ -101,7 +101,7 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       if (targetParent) {
         targetParent.adoptChild(node);
       } else {
-        sceneGraph.rootNodes.push(node);
+        sceneGraph.rootNode.adoptChild(node);
       }
       sceneGraph.nodeMap.set(nodeId, node);
       updateHierarchyState();
@@ -112,7 +112,7 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       if (targetParent) {
         targetParent.disownChild(node);
       } else {
-        sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
+        sceneGraph.rootNode.children = sceneGraph.rootNode.children.filter(n => n.nodeId !== nodeId);
       }
       sceneGraph.nodeMap.delete(nodeId);
       updateHierarchyState();

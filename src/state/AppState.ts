@@ -23,7 +23,7 @@ export interface SceneDescriptor {
 export interface SceneHierarchyState {
   version: string | null;
   description: string | null;
-  rootNodes: any[]; // NodeBase instances (avoiding circular dependency)
+  rootNode: any | null; // Single SceneNode root (avoiding circular dependency)
   metadata: Record<string, unknown>;
 }
 

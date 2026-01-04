@@ -138,7 +138,7 @@ export class ReparentNodeOperation implements Operation<OperationInvokeResult> {
       if (newIndex >= 0 && newIndex < sceneGraph.rootNodes.length) {
         sceneGraph.rootNodes.splice(newIndex, 0, nodeToMove);
       } else {
-        sceneGraph.rootNodes.push(nodeToMove);
+        sceneGraph.rootNode.adoptChild(nodeToMove);
       }
     }
 
@@ -215,7 +215,7 @@ export class ReparentNodeOperation implements Operation<OperationInvokeResult> {
       if (this.previousIndex >= 0 && this.previousIndex < sceneGraph.rootNodes.length) {
         sceneGraph.rootNodes.splice(this.previousIndex, 0, nodeToMove);
       } else {
-        sceneGraph.rootNodes.push(nodeToMove);
+        sceneGraph.rootNode.adoptChild(nodeToMove);
       }
     }
 

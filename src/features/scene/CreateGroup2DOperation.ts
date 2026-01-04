@@ -64,7 +64,7 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
     });
 
     // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
+    sceneGraph.rootNode.adoptChild(node);
     sceneGraph.nodeMap.set(nodeId, node);
 
     // Update the state hierarchy - REPLACE the entire object to trigger reactivity
@@ -95,7 +95,7 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
         label: `Create ${groupName}`,
         undo: () => {
           // Remove from scene graph
-          sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
+          sceneGraph.rootNode.children = sceneGraph.rootNode.children.filter(n => n.nodeId !== nodeId);
           sceneGraph.nodeMap.delete(nodeId);
 
           // Update state hierarchy
@@ -123,7 +123,7 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
         },
         redo: () => {
           // Re-add to scene graph
-          sceneGraph.rootNodes.push(node);
+          sceneGraph.rootNode.adoptChild(node);
           sceneGraph.nodeMap.set(nodeId, node);
 
           // Update state hierarchy
