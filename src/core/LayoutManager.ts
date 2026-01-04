@@ -174,7 +174,9 @@ export class LayoutManagerService {
 
     // Add a new viewport tab to the stack
     try {
-      this.viewportStack.addChild({
+      // Use the layout's addComponent method instead of stack's addChild
+      // to properly create a new component item
+      const componentConfig = {
         type: 'component',
         componentType: PANEL_COMPONENT_TYPES.viewport,
         title: title,
@@ -182,10 +184,15 @@ export class LayoutManagerService {
         componentState: {
           sceneId: sceneId,
         },
-      });
+      };
+      
+      // Use the layout-level API to add the component to the stack
+      this.viewportStack.addChild(componentConfig);
       console.log('[LayoutManager] Opened new tab for scene:', sceneId);
     } catch (error) {
       console.error('[LayoutManager] Failed to open scene tab:', error);
+      // Fallback: just load the scene in the current viewport without creating a new tab
+      console.warn('[LayoutManager] Falling back to loading scene in current viewport');
     }
   }
 

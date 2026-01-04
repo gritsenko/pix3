@@ -784,11 +784,22 @@ export class ViewportRendererService {
   private processNodeForRendering(node: NodeBase, parent2DVisualRoot?: THREE.Object3D): void {
     if (!this.scene) return;
 
-    // Add 3D nodes to the scene if they don't have a parent, or if their parent is a SceneNode
-    // (SceneNode is a container that shouldn't be rendered itself, but its children should be added to the scene)
-    if (node instanceof Node3D && (!node.parent || node.parent instanceof SceneNode)) {
-      this.scene.add(node);
-      node.layers.set(LAYER_3D); // 3D nodes use layer 0
+    // For Node3D nodes:
+    // - If the parent is SceneNode (or no parent), add to scene (top-level 3D nodes)
+    // - If the parent is another Node3D, DON'T add to scene (they're already part of their parent's hierarchy)
+    // - Node3D extends Object3D, so Three.js handles parent-child relationships automatically
+    // - We only need to add the TOP-LEVEL 3D nodes to the scene
+    if (node instanceof Node3D) {
+      const pix3Parent = this.findPix3Parent(node);
+      if (!pix3Parent || pix3Parent instanceof SceneNode) {
+        // This is a top-level 3D node (parent is SceneNode or null)
+        // Only add if it's not already in the scene
+        if (node.parent !== this.scene) {
+          this.scene.add(node);
+        }
+        node.layers.set(LAYER_3D); // 3D nodes use layer 0
+      }
+      // If parent is another Node3D, skip adding to scene - it's already part of the parent's Three.js hierarchy
     }
 
     let current2DVisualRoot = parent2DVisualRoot;
@@ -812,6 +823,30 @@ export class ViewportRendererService {
     for (const child of node.children) {
       this.processNodeForRendering(child, current2DVisualRoot);
     }
+  }
+
+  /**
+   * Find the Pix3 logical parent of a node by traversing up the scene graph.
+   * This is needed because when nodes are added to the Three.js scene, their parent
+   * property gets overwritten by Three.js, breaking the Pix3 hierarchy reference.
+   */
+  private findPix3Parent(node: NodeBase): NodeBase | null {
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) return null;
+
+    // Search for this node in the scene graph and return its parent
+    const findParent = (searchNode: NodeBase, targetId: string): NodeBase | null => {
+      for (const child of searchNode.children) {
+        if (child.nodeId === targetId) {
+          return searchNode;
+        }
+        const found = findParent(child, targetId);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    return findParent(sceneGraph.rootNode, node.nodeId);
   }
 
   /**
