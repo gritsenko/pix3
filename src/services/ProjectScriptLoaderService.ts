@@ -48,10 +48,13 @@ export class ProjectScriptLoaderService {
   // Track scripts from this project for cleanup
   private registeredScriptIds = new Set<string>();
 
+  // Disable auto-compilation for MVP - handled by external compiler
+  enableAutoCompilation = false;
+
   constructor() {
     // Watch for project status changes to trigger initial compilation
     this.disposeSubscription = subscribe(appState.project, () => {
-      if (appState.project.status === 'ready') {
+      if (appState.project.status === 'ready' && this.enableAutoCompilation) {
         void this.syncAndBuild();
       }
     });

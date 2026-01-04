@@ -111,8 +111,10 @@ export class ScriptCreatorService {
       // Write the script file
       await this.fs.writeTextFile(filePath, template);
 
-      // Trigger script compilation
-      await this.scriptLoader.syncAndBuild();
+      // Trigger script compilation only if auto-compilation is enabled
+      if (this.scriptLoader.enableAutoCompilation) {
+        await this.scriptLoader.syncAndBuild();
+      }
 
       // Emit event for asset browser to select the new file
       window.dispatchEvent(
