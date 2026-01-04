@@ -230,6 +230,9 @@ export class LayoutManagerService {
 
     this.layout.loadLayout(DEFAULT_LAYOUT_CONFIG);
 
+    // Find and store the viewport stack after layout is loaded
+    this.findAndStoreViewportStack();
+
     // Inline logic from InitializeLayoutCommand
     const previousLayoutReady = this.state.ui.isLayoutReady;
     const previousPanelVisibility = { ...this.state.ui.panelVisibility };
@@ -255,6 +258,44 @@ export class LayoutManagerService {
     this.state.ui.isLayoutReady = true;
     this.state.ui.panelVisibility = nextPanelVisibility;
     this.state.ui.focusedPanelId = nextFocusedPanelId;
+  }
+
+  /**
+   * Find and store the viewport stack reference after layout is loaded
+   */
+  private findAndStoreViewportStack(): void {
+    if (!this.layout) return;
+
+    const findViewportStack = (item: any): any | null => {
+      if (!item) return null;
+
+      // Check if this is a stack containing a viewport component
+      if (item.type === 'stack' && item.contentItems) {
+        for (const child of item.contentItems) {
+          if (child.componentType === PANEL_COMPONENT_TYPES.viewport) {
+            return item;
+          }
+        }
+      }
+
+      // Recursively search children
+      if (item.contentItems) {
+        for (const child of item.contentItems) {
+          const found = findViewportStack(child);
+          if (found) return found;
+        }
+      }
+
+      return null;
+    };
+
+    this.viewportStack = findViewportStack(this.layout.rootItem);
+    
+    if (this.viewportStack) {
+      console.log('[LayoutManager] Viewport stack found and stored');
+    } else {
+      console.warn('[LayoutManager] Viewport stack not found in layout');
+    }
   }
 
   dispose(): void {

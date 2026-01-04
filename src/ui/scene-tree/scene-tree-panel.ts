@@ -217,8 +217,9 @@ export class SceneTreePanel extends ComponentBase {
     if (!hierarchy || !hierarchy.rootNode) {
       return [];
     }
-    // Return children of the SceneNode root instead of an array of roots
-    return hierarchy.rootNode.children.filter((child: any) => child instanceof NodeBase) as NodeBase[];
+    // Return the SceneNode root itself as the single top-level node
+    // (Users should see the SceneNode in the tree, not just its children)
+    return [hierarchy.rootNode];
   }
 
   /**

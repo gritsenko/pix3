@@ -12,6 +12,7 @@ import { MathUtils } from 'three';
 import { NodeBase } from '@/nodes/NodeBase';
 import { Node2D } from '@/nodes/Node2D';
 import { Node3D } from '@/nodes/Node3D';
+import { SceneNode } from '@/nodes/SceneNode';
 import { Group2D } from '@/nodes/2D/Group2D';
 import { Sprite2D } from '@/nodes/2D/Sprite2D';
 import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
@@ -783,8 +784,9 @@ export class ViewportRendererService {
   private processNodeForRendering(node: NodeBase, parent2DVisualRoot?: THREE.Object3D): void {
     if (!this.scene) return;
 
-    // Add 3D nodes to the scene with layer 0
-    if (node instanceof Node3D && !node.parent) {
+    // Add 3D nodes to the scene if they don't have a parent, or if their parent is a SceneNode
+    // (SceneNode is a container that shouldn't be rendered itself, but its children should be added to the scene)
+    if (node instanceof Node3D && (!node.parent || node.parent instanceof SceneNode)) {
       this.scene.add(node);
       node.layers.set(LAYER_3D); // 3D nodes use layer 0
     }
