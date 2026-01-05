@@ -8,7 +8,6 @@ import { FileSystemAPIService } from './FileSystemAPIService';
 import { ScriptRegistry } from './ScriptRegistry';
 import { ScriptCompilerService } from './ScriptCompilerService';
 import type { CompilationError } from './ScriptCompilerService';
-import { FileWatchService } from './FileWatchService';
 import { LoggingService } from './LoggingService';
 
 /**
@@ -34,9 +33,6 @@ export class ProjectScriptLoaderService {
 
   @inject(ScriptCompilerService)
   private readonly compiler!: ScriptCompilerService;
-
-  @inject(FileWatchService)
-  private readonly _fileWatch!: FileWatchService; // Injected to ensure service initialization
 
   @inject(LoggingService)
   private readonly logger!: LoggingService;
