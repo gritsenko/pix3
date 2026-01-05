@@ -17,8 +17,6 @@
   },
   "dependencies": {
     "@types/three": "^0.180.0",
-    "ajv": "^8.17.1",
-    "ajv-formats": "^3.0.1",
     "esbuild-wasm": "^0.24.0",
     "feather-icons": "^4.29.2",
     "golden-layout": "^2.6.0",
@@ -40,7 +38,6 @@
     "eslint-plugin-lit-a11y": "^5.1.1",
     "eslint-plugin-prettier": "^5.5.4",
     "happy-dom": "^18.0.1",
-    "jsdom": "^27.0.0",
     "prettier": "^3.6.2",
     "typescript": "~5.8.3",
     "vite": "^7.1.7",

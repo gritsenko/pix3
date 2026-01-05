@@ -6,7 +6,7 @@
     "useDefineForClassFields": false,
     "module": "ESNext",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-  "types": ["vite/client", "vitest"],
+    "types": ["vite/client", "vitest"],
     "skipLibCheck": true,
 
     /* Bundler mode */
@@ -15,29 +15,23 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-    
+
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@/components/*": ["src/components/*"],
       "@/core/*": ["src/core/*"],
-      "@/plugins/*": ["src/plugins/*"],
-      "@/rendering/*": ["src/rendering/*"],
       "@/services/*": ["src/services/*"],
       "@/state/*": ["src/state/*"],
-      "@/styles/*": ["src/styles/*"],
       "@/fw/*": ["src/fw/*"]
     },
 
     /* Linting */
-  "strict": true,
-  "noUnusedLocals": true,
-  "noUnusedParameters": true,
-  "noFallthroughCasesInSwitch": true,
-  "noUncheckedSideEffectImports": true
-  // Enable highlighting and error reporting for unused code
-  // Remove erasableSyntaxOnly (not a valid TS option)
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedSideEffectImports": true
   },
   "include": ["src"]
 }
