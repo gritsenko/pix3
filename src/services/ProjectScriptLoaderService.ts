@@ -3,9 +3,10 @@ import { subscribe } from 'valtio/vanilla';
 
 import { appState } from '@/state';
 import { Script } from '@/core/ScriptComponent';
-
+import type { ScriptComponent } from '@/core/ScriptComponent';
 import { FileSystemAPIService } from './FileSystemAPIService';
 import { ScriptRegistry } from './ScriptRegistry';
+import type { PropertySchemaProvider } from './ScriptRegistry';
 import { ScriptCompilerService } from './ScriptCompilerService';
 import type { CompilationError } from './ScriptCompilerService';
 import { LoggingService } from './LoggingService';
@@ -192,14 +193,19 @@ export class ProjectScriptLoaderService {
     // Create unique ID for this script
     const scriptId = `project:${sourceFile}:${className}`;
 
+    // Cast the dynamic constructor to the expected registry type
+    const typedCtor = ctor as unknown as (new (id: string, type: string) => ScriptComponent) &
+      PropertySchemaProvider;
+
     this.scriptRegistry.registerComponent({
       id: scriptId,
       displayName: className,
       description: `Project component from ${sourceFile}`,
       category: 'Project',
-      componentClass: ctor,
+      componentClass: typedCtor,
       keywords: ['project', 'component', className.toLowerCase(), sourceFile.toLowerCase()],
     });
+
     this.registeredScriptIds.add(scriptId);
     this.logger.info(`Registered component: ${className}`);
   }

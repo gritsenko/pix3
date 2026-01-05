@@ -139,7 +139,10 @@ export class SelectObjectOperation implements Operation<OperationInvokeResult> {
     const result: string[] = [];
     const collect = (list: readonly { nodeId?: string; id?: string; children?: unknown[] }[]) => {
       for (const node of list) {
-        result.push(node.nodeId || node.id);
+        const id = node.nodeId ?? node.id;
+        if (typeof id === 'string' && id.length > 0) {
+          result.push(id);
+        }
         if (Array.isArray(node.children) && node.children.length) {
           collect(
             node.children as readonly { nodeId?: string; id?: string; children?: unknown[] }[]

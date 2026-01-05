@@ -16,7 +16,8 @@ export interface NodeTypeInfo {
   displayName: string;
   description: string;
   category: '2D' | '3D';
-  commandClass: new (...args: unknown[]) => Command<unknown, unknown>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  commandClass: new (...args: any[]) => Command<unknown, unknown>;
   color: string;
   icon: string;
   keywords: string[];
