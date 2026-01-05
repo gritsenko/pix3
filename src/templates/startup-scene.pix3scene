@@ -54,17 +54,7 @@ root:
             rotationEuler: [0, 45, 0]
             scale: [1, 1, 1]
         children: []
-      - id: demo-glb
-        type: MeshInstance
-        name: Demo Glb
-        properties:
-          src: templ://Duck.glb
-          size: [1, 1, 1]
-          transform:
-            position: [0, 0, 0]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
-        children: []
+
   - id: ui-layer
     type: Group2D
     name: UI Layer
@@ -80,6 +70,9 @@ root:
         name: Logo Sprite
         properties:
           texturePath: templ://pix3-logo.png
-          position: [0, 0]
-          scale: [0.01, 0.01]
-          rotation: 0
+          width: 64
+          height: 64
+          transform:
+            position: [0, 0]
+            scale: [1, 1]
+            rotation: 0

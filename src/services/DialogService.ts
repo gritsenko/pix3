@@ -4,15 +4,20 @@ export interface DialogOptions {
   title: string;
   message: string;
   confirmLabel?: string;
+  secondaryLabel?: string;
   cancelLabel?: string;
   isDangerous?: boolean;
+  secondaryIsDangerous?: boolean;
 }
 
 export interface DialogInstance {
   id: string;
   options: DialogOptions;
-  resolve: (result: boolean) => void;
+  resolve: (result: unknown) => void;
   reject: (error: Error) => void;
+  confirmValue: unknown;
+  cancelValue: unknown;
+  secondaryValue?: unknown;
 }
 
 @injectable()
@@ -35,16 +40,62 @@ export class DialogService {
           isDangerous: false,
           ...options,
         },
-        resolve: (result: boolean) => {
+        resolve: (result: unknown) => {
           this.dialogs.delete(id);
           this.notifyListeners();
-          resolve(result);
+          resolve(Boolean(result));
         },
         reject: (error: Error) => {
           this.dialogs.delete(id);
           this.notifyListeners();
           reject(error);
         },
+        confirmValue: true,
+        cancelValue: false,
+      };
+
+      this.dialogs.set(id, instance);
+      this.notifyListeners();
+    });
+  }
+
+  /**
+   * Show a 3-way confirmation dialog.
+   * Returns: 'confirm' | 'secondary' | 'cancel'
+   */
+  public async showChoice(
+    options: DialogOptions & { secondaryLabel: string }
+  ): Promise<'confirm' | 'secondary' | 'cancel'> {
+    return new Promise((resolve, reject) => {
+      const id = `dialog-${this.nextId++}`;
+      const instance: DialogInstance = {
+        id,
+        options: {
+          confirmLabel: 'Confirm',
+          cancelLabel: 'Cancel',
+          isDangerous: false,
+          secondaryIsDangerous: false,
+          ...options,
+        },
+        resolve: (result: unknown) => {
+          this.dialogs.delete(id);
+          this.notifyListeners();
+          if (result === 'secondary') {
+            resolve('secondary');
+          } else if (result === 'confirm') {
+            resolve('confirm');
+          } else {
+            resolve('cancel');
+          }
+        },
+        reject: (error: Error) => {
+          this.dialogs.delete(id);
+          this.notifyListeners();
+          reject(error);
+        },
+        confirmValue: 'confirm',
+        secondaryValue: 'secondary',
+        cancelValue: 'cancel',
       };
 
       this.dialogs.set(id, instance);
@@ -73,7 +124,7 @@ export class DialogService {
   public confirm(id: string): void {
     const instance = this.dialogs.get(id);
     if (instance) {
-      instance.resolve(true);
+      instance.resolve(instance.confirmValue);
     }
   }
 
@@ -83,7 +134,14 @@ export class DialogService {
   public cancel(id: string): void {
     const instance = this.dialogs.get(id);
     if (instance) {
-      instance.resolve(false);
+      instance.resolve(instance.cancelValue);
+    }
+  }
+
+  public secondary(id: string): void {
+    const instance = this.dialogs.get(id);
+    if (instance) {
+      instance.resolve(instance.secondaryValue ?? instance.cancelValue);
     }
   }
 

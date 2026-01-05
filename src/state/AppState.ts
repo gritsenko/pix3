@@ -6,6 +6,40 @@ export const DEFAULT_THEME: ThemeName = 'dark';
 
 export type SceneLoadState = 'idle' | 'loading' | 'ready' | 'error';
 
+export type EditorTabType = 'scene' | 'prefab' | 'script' | 'texture';
+
+export interface CameraState {
+  position: { x: number; y: number; z: number };
+  target: { x: number; y: number; z: number };
+  zoom?: number;
+}
+
+export interface TabSelectionState {
+  nodeIds: string[];
+  primaryNodeId: string | null;
+}
+
+export interface EditorTab {
+  /** Unique tab id. Recommended: `${type}:${resourceId}`. */
+  id: string;
+  /** Resource identifier (e.g. `res://scenes/level.pix3scene`). */
+  resourceId: string;
+  type: EditorTabType;
+  title: string;
+  isDirty: boolean;
+  /** Optional type-specific state (camera, selection, scroll position, etc.). */
+  contextState?: {
+    camera?: CameraState;
+    selection?: TabSelectionState;
+    [key: string]: unknown;
+  };
+}
+
+export interface TabsState {
+  tabs: EditorTab[];
+  activeTabId: string | null;
+}
+
 export interface SceneDescriptor {
   id: string;
   /** File-system path relative to the project root, e.g. `res://scenes/level-1.pix3scene`. */
@@ -42,6 +76,9 @@ export interface ScenesState {
   pendingScenePaths: string[];
   /** Counter incremented when node data (properties, scripts) changes but hierarchy remains unchanged. */
   nodeDataChangeSignal: number;
+
+  /** Per-scene camera state keyed by scene id. */
+  cameraStates: Record<string, CameraState>;
 }
 
 export type ProjectStatus = 'idle' | 'selecting' | 'ready' | 'error';
@@ -114,6 +151,7 @@ export interface TelemetryState {
 export interface AppState {
   project: ProjectState;
   scenes: ScenesState;
+  tabs: TabsState;
   selection: SelectionState;
   ui: UIState;
   operations: OperationState;
@@ -142,6 +180,11 @@ export const createInitialAppState = (): AppState => ({
     lastLoadedAt: null,
     pendingScenePaths: [STARTUP_SCENE_URI],
     nodeDataChangeSignal: 0,
+    cameraStates: {},
+  },
+  tabs: {
+    tabs: [],
+    activeTabId: null,
   },
   selection: {
     nodeIds: [],

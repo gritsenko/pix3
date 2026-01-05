@@ -1,10 +1,10 @@
 import { injectable, inject } from '@/fw/di';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
-import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { AddModelCommand } from '@/features/scene/AddModelCommand';
 import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
 import { SceneManager } from '@/core/SceneManager';
 import type { SceneGraph } from '@/core/SceneManager';
+import { EditorTabService } from '@/services/EditorTabService';
 
 export interface AssetActivation {
   name: string;
@@ -34,6 +34,9 @@ export class AssetFileActivationService {
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
 
+  @inject(EditorTabService)
+  private readonly editorTabService!: EditorTabService;
+
   /**
    * Handle activation of an asset file from the project tree.
    * @param payload File activation details including extension and resource path
@@ -48,9 +51,7 @@ export class AssetFileActivationService {
     }
 
     if (extension === 'pix3scene') {
-      const sceneId = this.deriveSceneId(resourcePath);
-      const command = new LoadSceneCommand({ filePath: resourcePath, sceneId });
-      await this.commandDispatcher.execute(command);
+      await this.editorTabService.focusOrOpenScene(resourcePath);
       return;
     }
 
@@ -102,15 +103,6 @@ export class AssetFileActivationService {
     return stripped || 'Sprite2D';
   }
 
-  private deriveSceneId(resourcePath: string): string {
-    const withoutScheme = resourcePath.replace(/^res:\/\//i, '').replace(/^templ:\/\//i, '');
-    const withoutExtension = withoutScheme.replace(/\.[^./]+$/i, '');
-    const normalized = withoutExtension
-      .replace(/[^a-z0-9]+/gi, '-')
-      .replace(/^-+|-+$/g, '')
-      .toLowerCase();
-    return normalized || 'scene';
-  }
 }
 
 injectable()(AssetFileActivationService);

@@ -261,8 +261,8 @@ export class SceneLoader {
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
           texturePath: typeof props.texturePath === 'string' ? props.texturePath : null,
-          width: this.asNumber(props.width, 64),
-          height: this.asNumber(props.height, 64),
+          width: this.asNumber(props.width, undefined),
+          height: this.asNumber(props.height, undefined),
         });
       }
       case 'Group':
@@ -559,7 +559,7 @@ export class SceneLoader {
       : undefined;
   }
 
-  private asNumber(value: unknown, fallback: number): number {
+  private asNumber<T>(value: unknown, fallback: T): number | T {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
   }
 

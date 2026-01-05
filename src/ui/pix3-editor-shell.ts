@@ -18,7 +18,6 @@ import {
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { ScriptCompilerService } from '@/services/ScriptCompilerService';
-import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
 import { ReloadSceneCommand } from '@/features/scene/ReloadSceneCommand';
@@ -29,6 +28,7 @@ import { PlaySceneCommand } from '@/features/scripts/PlaySceneCommand';
 import { StopSceneCommand } from '@/features/scripts/StopSceneCommand';
 import { appState } from '@/state';
 import { ProjectService } from '@/services';
+import { EditorTabService } from '@/services/EditorTabService';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './shared/pix3-main-menu';
@@ -36,6 +36,7 @@ import './shared/pix3-confirm-dialog';
 import './shared/pix3-behavior-picker';
 import './shared/pix3-script-creator';
 import './shared/pix3-status-bar';
+import './shared/pix3-background';
 import './welcome/pix3-welcome';
 import './logs-view/logs-panel';
 import './pix3-editor-shell.ts.css';
@@ -56,6 +57,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(CommandRegistry)
   private readonly commandRegistry!: CommandRegistry;
+
+  @inject(EditorTabService)
+  private readonly editorTabService!: EditorTabService;
 
   @inject(FileWatchService)
   private readonly fileWatchService!: FileWatchService;
@@ -102,6 +106,7 @@ export class Pix3EditorShell extends ComponentBase {
   private keyboardHandler?: (e: KeyboardEvent) => void;
   private watchedSceneIds = new Set<string>();
   private watchedScenePaths = new Map<string, string>();
+  private tabsInitialized = false;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -165,21 +170,24 @@ export class Pix3EditorShell extends ComponentBase {
         }
         const host = this.renderRoot.querySelector<HTMLDivElement>('.layout-host');
         if (host && !this.shellReady) {
-          void this.layoutManager.initialize(host).then(() => {
+          void this.layoutManager.initialize(host).then(async () => {
             this.shellReady = true;
-
             this.requestUpdate();
-          });
-        }
 
-        // Load pending startup scene once project is ready
-        const pending = appState.scenes.pendingScenePaths[0];
-        if (pending) {
-          if (process.env.NODE_ENV === 'development') {
-            console.debug('[Pix3Editor] Loading startup scene', { pending });
-          }
-          const command = new LoadSceneCommand({ filePath: pending });
-          void this.commandDispatcher.execute(command);
+            // Open startup scene when no tabs exist.
+            if (!this.tabsInitialized) {
+              this.tabsInitialized = true;
+              if (appState.tabs.tabs.length === 0) {
+                const pending = appState.scenes.pendingScenePaths[0];
+                if (pending) {
+                  if (process.env.NODE_ENV === 'development') {
+                    console.debug('[Pix3Editor] Opening startup scene tab', { pending });
+                  }
+                  await this.editorTabService.openResourceTab('scene', pending);
+                }
+              }
+            }
+          });
         }
       }
     });
@@ -187,7 +195,6 @@ export class Pix3EditorShell extends ComponentBase {
     // Subscribe to scene descriptor changes to start/stop file watching
     this.disposeScenesSubscription = subscribe(appState.scenes, () => {
       this.updateSceneWatchers();
-      this.updateViewportTitle();
 
       // Notify script execution service of scene changes
       const activeSceneId = appState.scenes.activeSceneId;
@@ -387,31 +394,6 @@ export class Pix3EditorShell extends ComponentBase {
   }
 
   /**
-   * Update viewport tab title based on active scene name and file name.
-   */
-  private updateViewportTitle(): void {
-    const activeSceneId = appState.scenes.activeSceneId;
-    if (!activeSceneId) {
-      this.layoutManager.setViewportTitle('Viewport');
-      return;
-    }
-
-    const descriptor = appState.scenes.descriptors[activeSceneId];
-    if (!descriptor) {
-      this.layoutManager.setViewportTitle('Viewport');
-      return;
-    }
-
-    // Extract file name from path (e.g., "res://scenes/level-1.pix3scene" -> "level-1.pix3scene")
-    const normalizedPath = descriptor.filePath.replace(/\\/g, '/');
-    const segments = normalizedPath.split('/').filter(Boolean);
-    const fileName = segments.length ? segments[segments.length - 1] : descriptor.filePath;
-
-    // Use file name as viewport title (e.g., "level-1.pix3scene")
-    this.layoutManager.setViewportTitle(fileName);
-  }
-
-  /**
    * Handle external file change detection - reload the scene.
    */
   private handleFileChanged(sceneId: string, filePath: string): void {
@@ -440,14 +422,18 @@ export class Pix3EditorShell extends ComponentBase {
       await this.layoutManager.initialize(host);
       this.shellReady = true;
 
-      // Load pending startup scene if project is already ready
-      const pending = appState.scenes.pendingScenePaths[0];
-      if (pending) {
-        if (process.env.NODE_ENV === 'development') {
-          console.debug('[Pix3Editor] Loading startup scene', { pending });
+      // Open startup scene when no tabs exist.
+      if (!this.tabsInitialized) {
+        this.tabsInitialized = true;
+        if (appState.tabs.tabs.length === 0) {
+          const pending = appState.scenes.pendingScenePaths[0];
+          if (pending) {
+            if (process.env.NODE_ENV === 'development') {
+              console.debug('[Pix3Editor] Opening startup scene tab', { pending });
+            }
+            await this.editorTabService.openResourceTab('scene', pending);
+          }
         }
-        const command = new LoadSceneCommand({ filePath: pending });
-        await this.commandDispatcher.execute(command);
       }
     }
   }
@@ -575,6 +561,7 @@ export class Pix3EditorShell extends ComponentBase {
         class="dialog-host"
         @dialog-confirmed=${(e: CustomEvent) => this.onDialogConfirmed(e)}
         @dialog-cancelled=${(e: CustomEvent) => this.onDialogCancelled(e)}
+        @dialog-secondary=${(e: CustomEvent) => this.onDialogSecondary(e)}
       >
         ${this.dialogs.map(
           dialog => html`
@@ -583,13 +570,20 @@ export class Pix3EditorShell extends ComponentBase {
               .title=${dialog.options.title}
               .message=${dialog.options.message}
               .confirmLabel=${dialog.options.confirmLabel || 'Confirm'}
+              .secondaryLabel=${dialog.options.secondaryLabel || ''}
               .cancelLabel=${dialog.options.cancelLabel || 'Cancel'}
               .isDangerous=${dialog.options.isDangerous || false}
+              .secondaryIsDangerous=${dialog.options.secondaryIsDangerous || false}
             ></pix3-confirm-dialog>
           `
         )}
       </div>
     `;
+  }
+
+  private onDialogSecondary(e: CustomEvent): void {
+    const { dialogId } = e.detail;
+    this.dialogService.secondary(dialogId);
   }
 }
 

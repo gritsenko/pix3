@@ -57,6 +57,8 @@ export class ViewportRendererService {
   private readonly resourceManager!: ResourceManager;
 
   private renderer?: THREE.WebGLRenderer;
+  private canvas?: HTMLCanvasElement;
+  private canvasHost?: HTMLElement;
   private scene?: THREE.Scene;
   private camera?: THREE.PerspectiveCamera;
   private orthographicCamera?: THREE.OrthographicCamera;
@@ -73,6 +75,8 @@ export class ViewportRendererService {
   private selection2DOverlay?: Selection2DOverlay;
   private active2DTransform?: Active2DTransform;
   private animationId?: number;
+  private pollIntervalId?: number;
+  private isPaused = true;
   private disposers: Array<() => void> = [];
   private gridHelper?: THREE.GridHelper;
   private transformStartStates = new Map<
@@ -108,7 +112,30 @@ export class ViewportRendererService {
     });
   }
 
+  /**
+   * Backwards-compatible initialization. Prefer calling attachToHost() which will
+   * ensure a single shared renderer + canvas instance.
+   */
   initialize(canvas: HTMLCanvasElement): void {
+    this.canvas = canvas;
+    this.ensureInitialized();
+  }
+
+  /**
+   * Ensure the renderer is initialized exactly once.
+   * If no canvas was provided, a new canvas will be created.
+   */
+  ensureInitialized(): void {
+    if (this.renderer) {
+      return;
+    }
+
+    const canvas = this.canvas ?? document.createElement('canvas');
+    this.canvas = canvas;
+    if (!canvas.classList.contains('viewport-canvas')) {
+      canvas.classList.add('viewport-canvas');
+    }
+
     // Create Three.js renderer
     this.renderer = new THREE.WebGLRenderer({
       canvas,
@@ -186,8 +213,7 @@ export class ViewportRendererService {
       this.handleTransformCompleted();
     });
 
-    // Start render loop
-    this.startRenderLoop();
+    // Render loop will start on first attach/resume
 
     // Poll active scene ID for changes (avoid subscribing to entire scenes object to prevent feedback loops)
     const checkSceneChanges = () => {
@@ -198,9 +224,13 @@ export class ViewportRendererService {
       }
     };
 
-    // Check scene changes every frame
-    const pollInterval = setInterval(checkSceneChanges, 100);
-    this.disposers.push(() => clearInterval(pollInterval));
+    this.pollIntervalId = window.setInterval(checkSceneChanges, 100);
+    this.disposers.push(() => {
+      if (this.pollIntervalId) {
+        clearInterval(this.pollIntervalId);
+        this.pollIntervalId = undefined;
+      }
+    });
 
     // Subscribe to selection changes
     const unsubscribeSelection = subscribe(appState.selection, () => {
@@ -223,6 +253,124 @@ export class ViewportRendererService {
 
     // Initial sync
     checkSceneChanges();
+  }
+
+  getCanvasElement(): HTMLCanvasElement | undefined {
+    return this.canvas;
+  }
+
+  /**
+   * Attach the shared canvas to a host element. The canvas will be physically
+   * moved in the DOM to avoid multiple WebGL contexts.
+   */
+  attachToHost(host: HTMLElement): void {
+    this.ensureInitialized();
+    if (!this.canvas || !this.renderer) return;
+
+    if (this.canvasHost !== host) {
+      this.canvasHost = host;
+      try {
+        host.appendChild(this.canvas);
+      } catch {
+        // ignore
+      }
+    }
+
+    // Ensure controls point at the active dom element.
+    try {
+      this.orbitControls?.connect(this.renderer.domElement);
+
+      if (this.scene && this.transformControls) {
+        try {
+          this.scene.remove(this.transformControls as unknown as THREE.Object3D);
+        } catch {
+          // ignore
+        }
+      }
+
+      this.transformControls?.dispose();
+      if (this.camera) {
+        this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
+        const mode: 'translate' | 'rotate' | 'scale' =
+          this.currentTransformMode === 'rotate'
+            ? 'rotate'
+            : this.currentTransformMode === 'scale'
+              ? 'scale'
+              : 'translate';
+        this.transformControls.setMode(mode);
+        this.transformControls.size = 0.6;
+        this.transformControls.addEventListener('dragging-changed', (event: any) => {
+          this.setOrbitEnabled(!event.value);
+          if (event.value && this.transformControls?.object) {
+            this.captureTransformStartState(this.transformControls.object);
+          }
+        });
+        this.transformControls.addEventListener('objectChange', () => {
+          this.updateSelectionBoxes();
+        });
+        this.transformControls.addEventListener('mouseUp', () => {
+          this.handleTransformCompleted();
+        });
+
+        // TransformControls is a control object, not a Three.js object,
+        // so we don't add it to the scene. It is attached to the DOM via attach() method.
+      }
+    } catch {
+      // ignore
+    }
+
+    this.resume();
+  }
+
+  pause(): void {
+    this.isPaused = true;
+    if (this.animationId) {
+      cancelAnimationFrame(this.animationId);
+      this.animationId = undefined;
+    }
+  }
+
+  resume(): void {
+    if (!this.renderer) {
+      this.ensureInitialized();
+    }
+    if (!this.renderer) return;
+
+    if (!this.isPaused) return;
+    this.isPaused = false;
+    this.startRenderLoop();
+  }
+
+  captureCameraState(): {
+    position: { x: number; y: number; z: number };
+    target: { x: number; y: number; z: number };
+    zoom?: number;
+  } | null {
+    if (!this.camera || !this.orbitControls) return null;
+    const position = this.camera.position;
+    const target = this.orbitControls.target;
+    return {
+      position: { x: position.x, y: position.y, z: position.z },
+      target: { x: target.x, y: target.y, z: target.z },
+      zoom: this.camera.zoom,
+    };
+  }
+
+  applyCameraState(state: {
+    position: { x: number; y: number; z: number };
+    target: { x: number; y: number; z: number };
+    zoom?: number;
+  }): void {
+    this.ensureInitialized();
+    if (!this.camera || !this.orbitControls) return;
+
+    this.camera.position.set(state.position.x, state.position.y, state.position.z);
+    this.orbitControls.target.set(state.target.x, state.target.y, state.target.z);
+    if (typeof state.zoom === 'number') {
+      this.camera.zoom = state.zoom;
+      this.camera.updateProjectionMatrix();
+    }
+    this.orbitControls.update();
   }
 
   private setOrbitEnabled(enabled: boolean): void {
@@ -548,7 +696,7 @@ export class ViewportRendererService {
         visualRoot.scale.set(node.scale.x, node.scale.y, 1);
         const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
         if (sizeGroup) {
-          sizeGroup.scale.set(node.width, node.height, 1);
+          sizeGroup.scale.set(node.width ?? 64, node.height ?? 64, 1);
         }
         visualRoot.visible = node.visible;
       }
@@ -950,8 +1098,8 @@ export class ViewportRendererService {
                   const image = texture.source.data as HTMLImageElement;
                   if (image && image.width && image.height) {
                     // Update node's width/height to match texture (if not already set from scene file)
-                    // Only update if dimensions are still at placeholder values
-                    if (node.width === 64 && node.height === 64) {
+                    // Only update if dimensions are still at placeholder values (undefined)
+                    if (node.width === undefined || node.height === undefined) {
                       node.width = image.width;
                       node.height = image.height;
                     }
@@ -1033,7 +1181,7 @@ export class ViewportRendererService {
     root.layers.set(LAYER_2D);
 
     const sizeGroup = new THREE.Group();
-    sizeGroup.scale.set(node.width, node.height, 1);
+    sizeGroup.scale.set(node.width ?? 64, node.height ?? 64, 1);
     sizeGroup.layers.set(LAYER_2D);
     sizeGroup.add(mesh);
     root.add(sizeGroup);
@@ -1410,6 +1558,11 @@ export class ViewportRendererService {
 
   private startRenderLoop(): void {
     const render = () => {
+      if (this.isPaused) {
+        this.animationId = undefined;
+        return;
+      }
+
       this.animationId = requestAnimationFrame(render);
 
       if (this.renderer && this.scene && this.camera) {
@@ -1533,6 +1686,7 @@ export class ViewportRendererService {
       }
     };
 
+    this.isPaused = false;
     render();
   }
 

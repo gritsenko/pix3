@@ -48,6 +48,18 @@ body > pix3-editor {
   height: 100%;
 }
 
+/* Golden Layout Customizations */
+
+/* Hide the background tab header when other tabs are present in the editor stack */
+.lm_tabs:has(.lm_tab:nth-child(2)) .lm_tab[title="Pix3"] {
+  display: none !important;
+}
+
+/* Ensure the background tab doesn't show a close button even if hovered */
+.lm_tab[title="Pix3"] .lm_close_tab {
+  display: none !important;
+}
+
 /* Global scrollbar styling */
 ::-webkit-scrollbar {
   width: 8px;

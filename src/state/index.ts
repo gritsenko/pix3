@@ -18,6 +18,7 @@ export const resetAppState = (): void => {
   const defaults = createInitialAppState();
   appState.project = defaults.project;
   appState.scenes = defaults.scenes;
+  appState.tabs = defaults.tabs;
   appState.selection = defaults.selection;
   appState.ui = defaults.ui;
   appState.operations = defaults.operations;
@@ -28,6 +29,9 @@ export { DEFAULT_THEME, THEME_IDS, createInitialAppState } from './AppState';
 
 export type {
   AppState,
+  CameraState,
+  EditorTab,
+  EditorTabType,
   OperationState,
   PanelVisibilityState,
   ProjectState,
@@ -37,6 +41,7 @@ export type {
   SceneLoadState,
   ScenesState,
   SelectionState,
+  TabsState,
   TelemetryState,
   ThemeName,
   UIState,

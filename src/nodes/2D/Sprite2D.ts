@@ -10,15 +10,15 @@ export interface Sprite2DProps extends Omit<Node2DProps, 'type'> {
 export class Sprite2D extends Node2D {
   readonly texturePath: string | null;
   /** Width in pixels. Defaults to texture width when loaded, or 64 as placeholder. */
-  width: number;
+  width: number | undefined;
   /** Height in pixels. Defaults to texture height when loaded, or 64 as placeholder. */
-  height: number;
+  height: number | undefined;
 
   constructor(props: Sprite2DProps) {
     super(props, 'Sprite2D');
     this.texturePath = props.texturePath ?? null;
-    this.width = props.width ?? 64;
-    this.height = props.height ?? 64;
+    this.width = props.width;
+    this.height = props.height;
     this.isContainer = false;
   }
 
@@ -60,7 +60,7 @@ export class Sprite2D extends Node2D {
             min: 1,
             unit: 'px',
           },
-          getValue: (node: unknown) => (node as Sprite2D).width,
+          getValue: (node: unknown) => (node as Sprite2D).width ?? 64,
           setValue: (node: unknown, value: unknown) => {
             (node as Sprite2D).width = Number(value);
           },
@@ -77,7 +77,7 @@ export class Sprite2D extends Node2D {
             min: 1,
             unit: 'px',
           },
-          getValue: (node: unknown) => (node as Sprite2D).height,
+          getValue: (node: unknown) => (node as Sprite2D).height ?? 64,
           setValue: (node: unknown, value: unknown) => {
             (node as Sprite2D).height = Number(value);
           },

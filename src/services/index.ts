@@ -26,6 +26,7 @@ export {
   type DialogInstance,
   resolveDialogService,
 } from './DialogService';
+export { EditorTabService } from './EditorTabService';
 export { IconService, IconSize, type IconSizeValue } from './IconService';
 export { ScriptRegistry, type BehaviorTypeInfo, type ControllerTypeInfo } from './ScriptRegistry';
 export { ScriptExecutionService } from './ScriptExecutionService';

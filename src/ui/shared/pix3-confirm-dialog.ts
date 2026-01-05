@@ -16,10 +16,16 @@ export class ConfirmDialog extends ComponentBase {
   public confirmLabel: string = 'Confirm';
 
   @property({ type: String, reflect: true })
+  public secondaryLabel: string = '';
+
+  @property({ type: String, reflect: true })
   public cancelLabel: string = 'Cancel';
 
   @property({ type: Boolean, reflect: true })
   public isDangerous: boolean = false;
+
+  @property({ type: Boolean, reflect: true })
+  public secondaryIsDangerous: boolean = false;
 
   protected render() {
     return html`
@@ -41,6 +47,16 @@ export class ConfirmDialog extends ComponentBase {
             <button class="btn-cancel" @click=${() => this.dispatchCancel()}>
               ${this.cancelLabel}
             </button>
+            ${this.secondaryLabel
+              ? html`
+                  <button
+                    class="btn-confirm ${this.secondaryIsDangerous ? 'dangerous' : ''}"
+                    @click=${() => this.dispatchSecondary()}
+                  >
+                    ${this.secondaryLabel}
+                  </button>
+                `
+              : null}
             <button
               class="btn-confirm ${this.isDangerous ? 'dangerous' : ''}"
               @click=${() => this.dispatchConfirm()}
@@ -70,6 +86,16 @@ export class ConfirmDialog extends ComponentBase {
   private dispatchCancel(): void {
     this.dispatchEvent(
       new CustomEvent('dialog-cancelled', {
+        detail: { dialogId: this.dialogId },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private dispatchSecondary(): void {
+    this.dispatchEvent(
+      new CustomEvent('dialog-secondary', {
         detail: { dialogId: this.dialogId },
         bubbles: true,
         composed: true,
