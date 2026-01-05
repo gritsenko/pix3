@@ -9,26 +9,18 @@ describe('ScriptCreatorService', () => {
   });
 
   describe('generateScriptTemplate', () => {
-    it('should generate controller template with correct class name', () => {
-      const template = (service as any).generateScriptTemplate('PlayerMovement', 'controller');
+    it('should generate template with correct class name', () => {
+      const gen = service as unknown as { generateScriptTemplate(name: string): string };
+      const template = gen.generateScriptTemplate('PlayerMovement');
 
-      expect(template).toContain(
-        'export class PlayerMovementController extends ScriptControllerBase'
-      );
-      expect(template).toContain("nodeType: 'PlayerMovementController'");
-      expect(template).toContain('import { ScriptControllerBase } from');
-    });
-
-    it('should generate behavior template with correct class name', () => {
-      const template = (service as any).generateScriptTemplate('RotateObject', 'behavior');
-
-      expect(template).toContain('export class RotateObjectBehavior extends BehaviorBase');
-      expect(template).toContain("nodeType: 'RotateObjectBehavior'");
-      expect(template).toContain('import { BehaviorBase } from');
+      expect(template).toContain('export class PlayerMovement extends Script');
+      expect(template).toContain("nodeType: 'PlayerMovement'");
+      expect(template).toContain('import { Script } from');
     });
 
     it('should include lifecycle methods', () => {
-      const template = (service as any).generateScriptTemplate('Test', 'controller');
+      const gen = service as unknown as { generateScriptTemplate(name: string): string };
+      const template = gen.generateScriptTemplate('Test');
 
       expect(template).toContain('onAttach()');
       expect(template).toContain('onStart()');
@@ -37,7 +29,8 @@ describe('ScriptCreatorService', () => {
     });
 
     it('should include property schema boilerplate', () => {
-      const template = (service as any).generateScriptTemplate('Test', 'controller');
+      const gen = service as unknown as { generateScriptTemplate(name: string): string };
+      const template = gen.generateScriptTemplate('Test');
 
       expect(template).toContain('static getPropertySchema(): PropertySchema');
       expect(template).toContain('properties: [');
@@ -45,24 +38,27 @@ describe('ScriptCreatorService', () => {
     });
 
     it('should include constructor with parameters initialization', () => {
-      const template = (service as any).generateScriptTemplate('Test', 'behavior');
+      const gen = service as unknown as { generateScriptTemplate(name: string): string };
+      const template = gen.generateScriptTemplate('Test');
 
       expect(template).toContain('constructor(id: string, type: string)');
       expect(template).toContain('super(id, type)');
-      expect(template).toContain('this.parameters = {');
+      expect(template).toContain('this.config = {');
     });
 
     it('should include helpful comments and examples', () => {
-      const template = (service as any).generateScriptTemplate('MyScript', 'controller');
+      const gen = service as unknown as { generateScriptTemplate(name: string): string };
+      const template = gen.generateScriptTemplate('MyScript');
 
       expect(template).toContain('Auto-generated script');
       expect(template).toContain('// Implement your update logic here');
     });
 
     it('should use correct import paths', () => {
-      const template = (service as any).generateScriptTemplate('Test', 'behavior');
+      const gen = service as unknown as { generateScriptTemplate(name: string): string };
+      const template = gen.generateScriptTemplate('Test');
 
-      expect(template).toContain("import { BehaviorBase } from '@/core/ScriptComponent'");
+      expect(template).toContain("import { Script } from '@/core/ScriptComponent'");
       expect(template).toContain("import type { PropertySchema } from '@/fw'");
     });
   });
@@ -73,7 +69,6 @@ describe('ScriptCreatorService', () => {
 
       void service.showCreator({
         scriptName: 'TestScript',
-        scriptType: 'controller',
       });
 
       expect(service.getCreators()).toHaveLength(1);
@@ -83,7 +78,6 @@ describe('ScriptCreatorService', () => {
     it('should remove creator after cancellation', () => {
       void service.showCreator({
         scriptName: 'TestScript',
-        scriptType: 'controller',
       });
 
       const creatorId = service.getCreators()[0].id;

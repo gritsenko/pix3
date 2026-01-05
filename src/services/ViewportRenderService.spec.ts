@@ -15,13 +15,17 @@ describe('ViewportRendererService', () => {
     });
 
     // Minimal stubs for dependencies used by createSprite2DVisual
-    (service as any).scene = { add: vi.fn() } as any;
+    const svc = service as unknown as {
+      scene?: { add: (...args: unknown[]) => void };
+      createSprite2DVisual?: (s: Sprite2D) => unknown;
+    };
+    svc.scene = { add: vi.fn() };
 
     // Create a sprite with templ scheme
     const sprite = new Sprite2D({ id: 'test-sprite', texturePath: 'templ://pix3-logo.png' });
 
     // Call private method reflectively
-    const mesh = (service as any).createSprite2DVisual(sprite);
+    const mesh = svc.createSprite2DVisual?.(sprite);
 
     expect(mesh).toBeDefined();
 
@@ -43,12 +47,21 @@ describe('ViewportRendererService', () => {
 
     // stub the TextureLoader to observe direct load attempts
     const loadSpy = vi.fn();
-    vi.spyOn((THREE as any).TextureLoader.prototype, 'load').mockImplementation(loadSpy);
+    const three = THREE as unknown as {
+      TextureLoader: {
+        prototype: { load: (...args: unknown[]) => void };
+      };
+    };
+    vi.spyOn(three.TextureLoader.prototype, 'load').mockImplementation(loadSpy);
 
-    (service as any).scene = { add: vi.fn() } as any;
+    const svc = service as unknown as {
+      scene?: { add: (...args: unknown[]) => void };
+      createSprite2DVisual?: (s: Sprite2D) => unknown;
+    };
+    svc.scene = { add: vi.fn() };
 
     const sprite = new Sprite2D({ id: 'test-sprite-2', texturePath: 'templ://pix3-logo.png' });
-    (service as any).createSprite2DVisual(sprite);
+    svc.createSprite2DVisual?.(sprite);
 
     // Wait a tick to run async failure handler
     await Promise.resolve();

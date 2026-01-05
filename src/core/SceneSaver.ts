@@ -1,5 +1,5 @@
 import { stringify } from 'yaml';
-import { MathUtils, PerspectiveCamera } from 'three';
+import { MathUtils, PerspectiveCamera, OrthographicCamera } from 'three';
 
 import { injectable } from '@/fw/di';
 import { NodeBase } from '@/nodes/NodeBase';
@@ -216,10 +216,20 @@ export class SceneSaver {
       props.width = node.width;
       props.height = node.height;
     } else if (node instanceof GeometryMesh) {
-      const mesh = node as any;
-      if (mesh.geometry) props.geometry = mesh.geometry;
-      if (mesh.size) props.size = mesh.size;
-      if (mesh.material) props.material = mesh.material;
+      const mesh = node as GeometryMesh & {
+        geometry?: unknown;
+        size?: unknown;
+        material?: unknown;
+      };
+      if (typeof mesh.geometry === 'string') props.geometry = mesh.geometry;
+      if (Array.isArray(mesh.size)) props.size = mesh.size as [number, number, number];
+      if (typeof mesh.material === 'object' && mesh.material !== null) {
+        props.material = mesh.material as {
+          color?: string;
+          roughness?: number;
+          metalness?: number;
+        };
+      }
     } else if (node instanceof DirectionalLightNode) {
       props.color = '#' + node.light.color.getHexString();
       props.intensity = node.light.intensity;
@@ -239,15 +249,17 @@ export class SceneSaver {
       if (node.camera instanceof PerspectiveCamera) {
         props.projection = 'perspective';
         props.fov = node.camera.fov;
-      } else {
+        props.near = node.camera.near;
+        props.far = node.camera.far;
+      } else if (node.camera instanceof OrthographicCamera) {
         props.projection = 'orthographic';
+        props.near = node.camera.near;
+        props.far = node.camera.far;
       }
-      props.near = node.camera.near;
-      props.far = node.camera.far;
     } else if (node instanceof MeshInstance) {
-      const mesh = node as any;
-      if (mesh.src) {
-        props.src = mesh.src;
+      const inst = node as MeshInstance;
+      if (inst.src) {
+        props.src = inst.src as string;
       }
     }
 

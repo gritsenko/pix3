@@ -38,7 +38,8 @@ export class Pix3Panel extends ComponentBase {
   private readonly instanceId = panelCounter++;
 
   private onSlotChange(): void {
-    const slot = (this.renderRoot as any)?.querySelector?.('slot:not([name])');
+    const rootEl = this.renderRoot as ShadowRoot | HTMLElement;
+    const slot = rootEl.querySelector('slot:not([name])') as HTMLSlotElement | null;
     if (!slot) {
       this.hasBodyContent = false;
       return;
@@ -90,7 +91,8 @@ export class Pix3Panel extends ComponentBase {
       : undefined;
 
     const ariaDescribedBy = descriptionId ? descriptionId : undefined;
-    const hasHeader = this.title || (this.renderRoot as any)?.querySelector?.('[slot="actions"]');
+    const rootEl = this.renderRoot as ShadowRoot | HTMLElement;
+    const hasHeader = this.title || Boolean(rootEl?.querySelector?.('[slot="actions"]'));
 
     return html`
       <section

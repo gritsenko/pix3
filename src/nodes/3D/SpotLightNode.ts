@@ -1,6 +1,7 @@
 import { Color, SpotLight } from 'three';
 import { Node3D, type Node3DProps } from '@/nodes/Node3D';
 import type { PropertySchema } from '@/fw/property-schema';
+import { defineProperty, mergeSchemas } from '@/fw/property-schema';
 
 export interface SpotLightNodeProps extends Omit<Node3DProps, 'type'> {
   color?: string;
@@ -29,83 +30,63 @@ export class SpotLightNode extends Node3D {
   }
 
   static override getPropertySchema(): PropertySchema {
-    return {
-      ...super.getPropertySchema(),
-      color: {
-        name: 'color',
-        label: 'Color',
-        type: 'string',
-        group: 'Light',
-        getValue: (node: SpotLightNode) => '#' + node.light.color.getHexString(),
-        setValue: (node: SpotLightNode, value: string) => {
-          node.light.color.set(value).convertSRGBToLinear();
-        },
-      },
-      intensity: {
-        name: 'intensity',
-        label: 'Intensity',
-        type: 'number',
-        group: 'Light',
-        uiHints: { step: 0.1, precision: 2 },
-        getValue: (node: SpotLightNode) => node.light.intensity,
-        setValue: (node: SpotLightNode, value: number) => {
-          node.light.intensity = value;
-        },
-      },
-      distance: {
-        name: 'distance',
-        label: 'Range',
-        type: 'number',
-        group: 'Light',
-        uiHints: { step: 0.1, precision: 2 },
-        getValue: (node: SpotLightNode) => node.light.distance,
-        setValue: (node: SpotLightNode, value: number) => {
-          node.light.distance = value;
-        },
-      },
-      angle: {
-        name: 'angle',
-        label: 'Angle',
-        type: 'number',
-        group: 'Light',
-        uiHints: { unit: '°', step: 0.1, precision: 1 },
-        getValue: (node: SpotLightNode) => (node.light.angle * 180) / Math.PI,
-        setValue: (node: SpotLightNode, value: number) => {
-          node.light.angle = (value * Math.PI) / 180;
-        },
-      },
-      penumbra: {
-        name: 'penumbra',
-        label: 'Penumbra',
-        type: 'number',
-        group: 'Light',
-        uiHints: { step: 0.01, precision: 2 },
-        getValue: (node: SpotLightNode) => node.light.penumbra,
-        setValue: (node: SpotLightNode, value: number) => {
-          node.light.penumbra = value;
-        },
-      },
-      decay: {
-        name: 'decay',
-        label: 'Decay',
-        type: 'number',
-        group: 'Light',
-        uiHints: { step: 0.1, precision: 2 },
-        getValue: (node: SpotLightNode) => node.light.decay,
-        setValue: (node: SpotLightNode, value: number) => {
-          node.light.decay = value;
-        },
-      },
-      castShadow: {
-        name: 'castShadow',
-        label: 'Cast Shadow',
-        type: 'boolean',
-        group: 'Light',
-        getValue: (node: SpotLightNode) => node.light.castShadow,
-        setValue: (node: SpotLightNode, value: boolean) => {
-          node.light.castShadow = value;
-        },
-      },
+    const base = super.getPropertySchema();
+    const props: PropertySchema = {
+      nodeType: 'SpotLight',
+      properties: [
+        defineProperty('color', 'color', {
+          ui: { label: 'Color', group: 'Light' },
+          getValue: (n: unknown) => '#' + (n as SpotLightNode).light.color.getHexString(),
+          setValue: (n: unknown, v: unknown) => {
+            (n as SpotLightNode).light.color.set(String(v)).convertSRGBToLinear();
+          },
+        }),
+        defineProperty('intensity', 'number', {
+          ui: { label: 'Intensity', group: 'Light', step: 0.1, precision: 2 },
+          getValue: (n: unknown) => (n as SpotLightNode).light.intensity,
+          setValue: (n: unknown, v: unknown) => {
+            (n as SpotLightNode).light.intensity = Number(v);
+          },
+        }),
+        defineProperty('distance', 'number', {
+          ui: { label: 'Range', group: 'Light', step: 0.1, precision: 2 },
+          getValue: (n: unknown) => (n as SpotLightNode).light.distance,
+          setValue: (n: unknown, v: unknown) => {
+            (n as SpotLightNode).light.distance = Number(v);
+          },
+        }),
+        defineProperty('angle', 'number', {
+          ui: { label: 'Angle', group: 'Light', unit: '°', step: 0.1, precision: 1 },
+          getValue: (n: unknown) => ((n as SpotLightNode).light.angle * 180) / Math.PI,
+          setValue: (n: unknown, v: unknown) => {
+            (n as SpotLightNode).light.angle = (Number(v) * Math.PI) / 180;
+          },
+        }),
+        defineProperty('penumbra', 'number', {
+          ui: { label: 'Penumbra', group: 'Light', step: 0.01, precision: 2 },
+          getValue: (n: unknown) => (n as SpotLightNode).light.penumbra,
+          setValue: (n: unknown, v: unknown) => {
+            (n as SpotLightNode).light.penumbra = Number(v);
+          },
+        }),
+        defineProperty('decay', 'number', {
+          ui: { label: 'Decay', group: 'Light', step: 0.1, precision: 2 },
+          getValue: (n: unknown) => (n as SpotLightNode).light.decay,
+          setValue: (n: unknown, v: unknown) => {
+            (n as SpotLightNode).light.decay = Number(v);
+          },
+        }),
+        defineProperty('castShadow', 'boolean', {
+          ui: { label: 'Cast Shadow', group: 'Light' },
+          getValue: (n: unknown) => (n as SpotLightNode).light.castShadow,
+          setValue: (n: unknown, v: unknown) => {
+            (n as SpotLightNode).light.castShadow = Boolean(v);
+          },
+        }),
+      ],
+      groups: { Light: { label: 'Light', expanded: true } },
     };
+
+    return mergeSchemas(base, props);
   }
 }

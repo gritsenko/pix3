@@ -11,10 +11,7 @@ import '../shared/pix3-dropdown-button';
 import './asset-tree';
 import './asset-browser-panel.ts.css';
 
-// Helper interface to access private members of AssetTree (for internal use only)
-interface AssetTreeInternal extends AssetTree {
-  selectedPath: string | null;
-}
+// Use public API on AssetTree to query selected path (do not access internals)
 
 @customElement('pix3-asset-browser-panel')
 export class AssetBrowserPanel extends ComponentBase {
@@ -67,8 +64,7 @@ export class AssetBrowserPanel extends ComponentBase {
 
   private onDeleteClick = () => {
     try {
-      const assetTree = this.assetTreeRef as AssetTreeInternal | null;
-      const selectedPath = assetTree?.selectedPath;
+      const selectedPath = this.assetTreeRef?.getSelectedPath?.();
 
       if (!selectedPath) {
         console.warn('[AssetBrowserPanel] No item selected for deletion');

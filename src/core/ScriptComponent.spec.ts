@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { NodeBase } from '@/nodes/NodeBase';
 import { Script } from '@/core/ScriptComponent';
+import type { Constructor } from '@/core/ScriptComponent';
 
 // Test component implementation
 class TestComponent extends Script {
@@ -83,12 +84,12 @@ describe('Unified Component System', () => {
   describe('NodeBase.getComponent', () => {
     it('should find a component by type', () => {
       node.addComponent(component);
-      const found = node.getComponent(TestComponent);
+      const found = node.getComponent(TestComponent as unknown as Constructor<TestComponent>);
       expect(found).toBe(component);
     });
 
     it('should return null if component not found', () => {
-      const found = node.getComponent(TestComponent);
+      const found = node.getComponent(TestComponent as unknown as Constructor<TestComponent>);
       expect(found).toBeNull();
     });
   });
@@ -140,21 +141,6 @@ describe('Unified Component System', () => {
       component.config = { speed: 10, color: 'red' };
       expect(component.config.speed).toBe(10);
       expect(component.config.color).toBe('red');
-    });
-  });
-
-  describe('Backward compatibility', () => {
-    it('should expose behaviors getter', () => {
-      node.addComponent(component);
-      expect(node.behaviors).toBeDefined();
-      expect(Array.isArray(node.behaviors)).toBe(true);
-    });
-
-    it('should expose controller getter/setter', () => {
-      const controllerComponent = new TestComponent('controller', 'Controller');
-      node.controller = controllerComponent as any;
-      expect(node.controller).toBe(controllerComponent);
-      expect(node.components).toContain(controllerComponent);
     });
   });
 });

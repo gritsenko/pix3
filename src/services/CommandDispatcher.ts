@@ -75,7 +75,7 @@ export class CommandDispatcher {
    * Check if command preconditions are satisfied.
    */
   private async checkPreconditions(
-    command: Command<any, any>,
+    command: Command<unknown, unknown>,
     context: CommandContext
   ): Promise<CommandPreconditionResult> {
     if (!command.preconditions) {

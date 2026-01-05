@@ -9,7 +9,7 @@ import * as EngineAPI from './fw/engine-api';
 interface WindowWithEngine extends Window {
   __PIX3_ENGINE__: typeof EngineAPI;
 }
-(window as WindowWithEngine).__PIX3_ENGINE__ = EngineAPI;
+(window as unknown as WindowWithEngine).__PIX3_ENGINE__ = EngineAPI;
 
 // Create dynamic import map for @pix3/engine
 // This allows user scripts to import from '@pix3/engine' at runtime

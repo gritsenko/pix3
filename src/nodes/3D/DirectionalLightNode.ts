@@ -1,6 +1,7 @@
 import { Color, DirectionalLight } from 'three';
 import { Node3D, type Node3DProps } from '@/nodes/Node3D';
 import type { PropertySchema } from '@/fw/property-schema';
+import { defineProperty, mergeSchemas } from '@/fw/property-schema';
 
 export interface DirectionalLightNodeProps extends Omit<Node3DProps, 'type'> {
   color?: string;
@@ -20,39 +21,35 @@ export class DirectionalLightNode extends Node3D {
   }
 
   static override getPropertySchema(): PropertySchema {
-    return {
-      ...super.getPropertySchema(),
-      color: {
-        name: 'color',
-        label: 'Color',
-        type: 'string',
-        group: 'Light',
-        getValue: (node: DirectionalLightNode) => '#' + node.light.color.getHexString(),
-        setValue: (node: DirectionalLightNode, value: string) => {
-          node.light.color.set(value).convertSRGBToLinear();
-        },
-      },
-      intensity: {
-        name: 'intensity',
-        label: 'Intensity',
-        type: 'number',
-        group: 'Light',
-        uiHints: { step: 0.1, precision: 2 },
-        getValue: (node: DirectionalLightNode) => node.light.intensity,
-        setValue: (node: DirectionalLightNode, value: number) => {
-          node.light.intensity = value;
-        },
-      },
-      castShadow: {
-        name: 'castShadow',
-        label: 'Cast Shadow',
-        type: 'boolean',
-        group: 'Light',
-        getValue: (node: DirectionalLightNode) => node.light.castShadow,
-        setValue: (node: DirectionalLightNode, value: boolean) => {
-          node.light.castShadow = value;
-        },
-      },
+    const base = super.getPropertySchema();
+    const props: PropertySchema = {
+      nodeType: 'DirectionalLight',
+      properties: [
+        defineProperty('color', 'color', {
+          ui: { label: 'Color', group: 'Light' },
+          getValue: (n: unknown) => '#' + (n as DirectionalLightNode).light.color.getHexString(),
+          setValue: (n: unknown, v: unknown) => {
+            (n as DirectionalLightNode).light.color.set(String(v)).convertSRGBToLinear();
+          },
+        }),
+        defineProperty('intensity', 'number', {
+          ui: { label: 'Intensity', group: 'Light', step: 0.1, precision: 2 },
+          getValue: (n: unknown) => (n as DirectionalLightNode).light.intensity,
+          setValue: (n: unknown, v: unknown) => {
+            (n as DirectionalLightNode).light.intensity = Number(v);
+          },
+        }),
+        defineProperty('castShadow', 'boolean', {
+          ui: { label: 'Cast Shadow', group: 'Light' },
+          getValue: (n: unknown) => (n as DirectionalLightNode).light.castShadow,
+          setValue: (n: unknown, v: unknown) => {
+            (n as DirectionalLightNode).light.castShadow = Boolean(v);
+          },
+        }),
+      ],
+      groups: { Light: { label: 'Light', expanded: true } },
     };
+
+    return mergeSchemas(base, props);
   }
 }

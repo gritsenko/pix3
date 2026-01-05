@@ -255,8 +255,17 @@ export class ScriptCompilerService {
       };
     }
 
+    // Safely extract message from unknown error object without using `any`
+    const maybeMessage =
+      error &&
+      typeof error === 'object' &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+        ? ((error as { message?: unknown }).message as string)
+        : 'Unknown compilation error';
+
     return {
-      message: error.message || 'Unknown compilation error',
+      message: maybeMessage,
       details: error,
     };
   }

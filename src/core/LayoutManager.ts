@@ -122,8 +122,8 @@ export class LayoutManagerService {
   private readonly state: AppState;
   private container: HTMLElement | null = null;
   private editorStack: Stack | null = null;
-  private editorTabContainers = new Map<string, ComponentItem>();
-  private editorTabItems = new Map<string, ComponentItem>();
+  private editorTabContainers = new Map<string, ContentItem>();
+  private editorTabItems = new Map<string, ContentItem>();
   private editorTabFocusedListeners = new Set<(tabId: string) => void>();
   private editorTabCloseRequestedListeners = new Set<(tabId: string) => void>();
 
@@ -191,10 +191,10 @@ export class LayoutManagerService {
     // Reconcile our bookkeeping with Golden Layout: the app can keep a tab in state even if the
     // corresponding GL item was closed/destroyed (or not tracked due to async timing).
     try {
-      const root = (this.layout as any).rootItem;
+      const root = (this.layout as unknown as { rootItem?: ContentItem }).rootItem;
       const itemInLayout = this.findViewportByTabId(root, tab.id);
       if (itemInLayout) {
-        this.editorTabItems.set(tab.id, itemInLayout);
+        this.editorTabItems.set(tab.id, itemInLayout as ContentItem);
         this.updateEditorTabTitle(tab.id, tab.title);
         return;
       }
@@ -236,15 +236,20 @@ export class LayoutManagerService {
       if (this.editorStack && this.editorStack.contentItems) {
         for (let i = 0; i < this.editorStack.contentItems.length; i++) {
           const item = this.editorStack.contentItems[i];
+          const itemInfo = item as ContentItem & {
+            type?: string;
+            componentType?: string;
+            container?: { state?: { tabId?: string } };
+          };
           console.log(
             '[LayoutManager]   Item',
             i,
             '- type:',
-            item.type,
+            itemInfo.type,
             'component:',
-            item.componentType,
+            itemInfo.componentType,
             'tabId:',
-            (item.container?.state as any)?.tabId
+            itemInfo.container?.state?.tabId
           );
         }
       }
@@ -277,10 +282,12 @@ export class LayoutManagerService {
     }
     try {
       console.log('[LayoutManager] Removing editor tab:', tabId);
-      item.close();
+      const closableItem = item as ContentItem & { close?: () => void };
+      closableItem.close?.();
     } catch {
       try {
-        item.destroy?.();
+        const destroyableItem = item as ContentItem & { destroy?: () => void };
+        destroyableItem.destroy?.();
       } catch {
         // ignore
       }
@@ -298,7 +305,8 @@ export class LayoutManagerService {
     // Fallback: if map is not yet updated, search the tree manually
     if (!item) {
       console.log('[LayoutManager] Item not in map, searching tree...');
-      item = this.findViewportByTabId((this.layout as any).rootItem, tabId);
+      const rootItem = (this.layout as unknown as { rootItem?: ContentItem }).rootItem;
+      item = this.findViewportByTabId(rootItem, tabId);
       if (item) {
         console.log('[LayoutManager] Found item in tree');
         this.editorTabItems.set(tabId, item);
@@ -309,13 +317,18 @@ export class LayoutManagerService {
     if (!item && this.editorStack && this.editorStack.contentItems) {
       console.log('[LayoutManager] Searching editor stack content items...');
       for (const contentItem of this.editorStack.contentItems) {
-        const itemTabId = (contentItem.container?.state as any)?.tabId;
+        const ci = contentItem as ContentItem & {
+          container?: { state?: { tabId?: string } };
+          type?: string;
+          componentType?: string;
+        };
+        const itemTabId = ci.container?.state?.tabId;
         if (
-          contentItem.type === 'component' &&
-          contentItem.componentType === PANEL_COMPONENT_TYPES.viewport &&
+          ci.type === 'component' &&
+          ci.componentType === PANEL_COMPONENT_TYPES.viewport &&
           itemTabId === tabId
         ) {
-          item = contentItem;
+          item = contentItem as ContentItem;
           console.log('[LayoutManager] Found item in editor stack');
           this.editorTabItems.set(tabId, item);
           break;
@@ -331,16 +344,31 @@ export class LayoutManagerService {
     console.log('[LayoutManager] Found item, attempting to focus...');
 
     try {
-      if (item.parent && typeof item.parent.setActiveComponentItem === 'function') {
+      const parent = (item as ContentItem & { parent?: unknown }).parent as
+        | {
+            setActiveComponentItem?: (it: ComponentItem, focus?: boolean) => void;
+          }
+        | undefined;
+      if (parent && typeof parent.setActiveComponentItem === 'function') {
         console.log('[LayoutManager] Calling setActiveComponentItem on parent');
-        item.parent.setActiveComponentItem(item, true);
+        if ((item as ContentItem).type === 'component') {
+          parent.setActiveComponentItem?.(item as ComponentItem, true);
+        }
       } else {
         console.log('[LayoutManager] Parent or method not available, trying direct stack focus');
         // If parent not available, try to find the parent stack from the item
-        const parentStack = this.findClosestStack(item);
-        if (parentStack && typeof parentStack.setActiveComponentItem === 'function') {
+        const parentStack = this.findClosestStack(
+          item as unknown as ContentItem & {
+            setActiveComponentItem?: (it: ComponentItem, focus?: boolean) => void;
+          }
+        );
+        if (
+          parentStack &&
+          typeof parentStack.setActiveComponentItem === 'function' &&
+          (item as ContentItem).type === 'component'
+        ) {
           console.log('[LayoutManager] Found parent stack, calling setActiveComponentItem');
-          parentStack.setActiveComponentItem(item, true);
+          parentStack.setActiveComponentItem(item as ComponentItem, true);
         }
       }
     } catch (error) {
@@ -348,28 +376,37 @@ export class LayoutManagerService {
     }
   }
 
-  private findViewportByTabId(node: ContentItem | null, tabId: string): ContentItem | null {
-    if (!node) return null;
+  private findViewportByTabId(
+    node: ContentItem | null | undefined,
+    tabId: string
+  ): ContentItem | undefined {
+    if (!node) return undefined;
+    const nodeInfo = node as ContentItem & {
+      type?: string;
+      componentType?: string;
+      container?: { state?: { tabId?: string } };
+    };
     if (
-      node.type === 'component' &&
-      (node as ComponentItem).componentType === PANEL_COMPONENT_TYPES.viewport &&
-      ((node as ComponentItem).container?.state as { tabId?: string })?.tabId === tabId
+      nodeInfo.type === 'component' &&
+      nodeInfo.componentType === PANEL_COMPONENT_TYPES.viewport &&
+      nodeInfo.container?.state?.tabId === tabId
     ) {
-      return node;
+      return node as ContentItem;
     }
-    const children: ContentItem[] = (node as { contentItems?: ContentItem[] }).contentItems ?? [];
+    const children: ContentItem[] = nodeInfo.contentItems ?? [];
     for (const child of children) {
       const found = this.findViewportByTabId(child, tabId);
       if (found) return found;
     }
-    return null;
+    return undefined;
   }
 
   updateEditorTabTitle(tabId: string, title: string): void {
     const container = this.editorTabContainers.get(tabId);
     if (container) {
       try {
-        container.setTitle(title);
+        const c = container as ContentItem & { setTitle?: (title: string) => void };
+        c.setTitle?.(title);
       } catch {
         // ignore
       }
@@ -379,7 +416,8 @@ export class LayoutManagerService {
     const item = this.editorTabItems.get(tabId);
     if (item) {
       try {
-        item.setTitle?.(title);
+        const it = item as ContentItem & { setTitle?: (title: string) => void };
+        it.setTitle?.(title);
       } catch {
         // ignore
       }
@@ -397,9 +435,21 @@ export class LayoutManagerService {
 
     // Track active editor tab focus changes.
     try {
-      this.layout.on('activeContentItemChanged' as 'stateChanged', (item: ComponentItem) => {
+      // GoldenLayout's typings are not ideal here; use a narrow handler type
+      const layoutApi = this.layout as unknown as {
+        on: (name: string, handler: (...args: unknown[]) => void) => void;
+      };
+      layoutApi.on('activeContentItemChanged', (...args: unknown[]) => {
         try {
-          const componentType = item?.componentType;
+          const item = args[0] as ContentItem | undefined;
+          const itemInfo = item as
+            | (ContentItem & {
+                componentType?: string;
+                container?: { state?: { tabId?: string } };
+              })
+            | undefined;
+
+          const componentType = itemInfo?.componentType;
           if (
             componentType !== PANEL_COMPONENT_TYPES.viewport &&
             componentType !== PANEL_COMPONENT_TYPES.background
@@ -412,14 +462,14 @@ export class LayoutManagerService {
           this.ensureEditorStack();
 
           // Track the current "main editor" stack so new tabs open in the same area.
-          const parentStack = this.findClosestStack(item);
+          const parentStack = itemInfo ? this.findClosestStack(itemInfo) : undefined;
           if (parentStack) {
             this.editorStack = parentStack;
           }
 
           if (componentType !== PANEL_COMPONENT_TYPES.viewport) return;
 
-          const tabId = item?.container?.state?.tabId;
+          const tabId = itemInfo?.container?.state?.tabId;
           if (typeof tabId !== 'string' || !tabId) return;
           for (const listener of this.editorTabFocusedListeners) {
             listener(tabId);
@@ -477,19 +527,25 @@ export class LayoutManagerService {
         container.setTitle(PANEL_DISPLAY_TITLES[componentType as PanelComponentType]);
 
         if (componentType === PANEL_COMPONENT_TYPES.viewport) {
-          const tabId = (container.state as any)?.tabId;
+          const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
           if (typeof tabId === 'string' && tabId) {
-            this.editorTabContainers.set(tabId, container);
+            this.editorTabContainers.set(tabId, container as unknown as ContentItem);
 
             // Override GoldenLayout close so we can show Save/Don't Save/Cancel for dirty tabs.
             // GoldenLayout's default close is synchronous; we keep the tab open and only remove
             // it after EditorTabService confirms.
             try {
-              const originalClose = container.close.bind(container);
-              (container as any).close = () => {
+              const containerAny = container as unknown as {
+                close?: () => void;
+                __pix3OriginalClose?: unknown;
+                _parent?: ContentItem;
+                state?: { tabId?: string };
+              };
+              const originalClose = containerAny.close?.bind(container);
+              containerAny.close = () => {
                 // If no one is listening yet (early init), fall back to default close.
                 if (this.editorTabCloseRequestedListeners.size === 0) {
-                  originalClose();
+                  originalClose?.();
                   return;
                 }
 
@@ -502,13 +558,13 @@ export class LayoutManagerService {
                 }
               };
               // Keep a reference in case we need to fall back to original behavior.
-              (container as any).__pix3OriginalClose = originalClose;
+              containerAny.__pix3OriginalClose = originalClose;
             } catch {
               // ignore
             }
 
             try {
-              const parent = (container as any)._parent;
+              const parent = (container as unknown as { _parent?: ContentItem })._parent;
               if (parent) {
                 this.editorTabItems.set(tabId, parent);
               }
@@ -523,7 +579,7 @@ export class LayoutManagerService {
 
         // Forward tab id into the element for the editor-tab component.
         if (componentType === PANEL_COMPONENT_TYPES.viewport) {
-          const tabId = (container.state as any)?.tabId;
+          const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
           if (typeof tabId === 'string' && tabId) {
             element.setAttribute('tab-id', tabId);
           }
@@ -533,7 +589,7 @@ export class LayoutManagerService {
         container.on('destroy', () => {
           try {
             if (componentType === PANEL_COMPONENT_TYPES.viewport) {
-              const tabId = (container.state as any)?.tabId;
+              const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
               if (typeof tabId === 'string' && tabId) {
                 this.editorTabContainers.delete(tabId);
                 this.editorTabItems.delete(tabId);
@@ -552,7 +608,7 @@ export class LayoutManagerService {
     if (!this.layout) return;
 
     try {
-      const root = (this.layout as any).rootItem;
+      const root = (this.layout as unknown as { rootItem?: ContentItem }).rootItem;
       // Find the stack by its known id 'editor-stack'.
       const editorStackById = this.findStackById(root, 'editor-stack');
       if (editorStackById) {
@@ -568,7 +624,7 @@ export class LayoutManagerService {
     }
   }
 
-  private findStackById(node: ContentItem | null, id: string): Stack | null {
+  private findStackById(node: ContentItem | null | undefined, id: string): Stack | null {
     if (!node) return null;
     if (node.type === 'stack' && node.id === id) return node as Stack;
     const children: ContentItem[] = (node as { contentItems?: ContentItem[] }).contentItems ?? [];
@@ -579,7 +635,7 @@ export class LayoutManagerService {
     return null;
   }
 
-  private findClosestStack(node: ContentItem | null): Stack | null {
+  private findClosestStack(node: ContentItem | null | undefined): Stack | null {
     if (!node) return null;
     let current: ContentItem | null = node;
     while (current) {
@@ -589,7 +645,7 @@ export class LayoutManagerService {
     return null;
   }
 
-  private findMainEditorStack(node: ContentItem | null): Stack | null {
+  private findMainEditorStack(node: ContentItem | null | undefined): Stack | null {
     if (!node) return null;
 
     if (
@@ -597,7 +653,9 @@ export class LayoutManagerService {
       ((node as ComponentItem).componentType === PANEL_COMPONENT_TYPES.viewport ||
         (node as ComponentItem).componentType === PANEL_COMPONENT_TYPES.background)
     ) {
-      return this.findClosestStack(node.parent ?? (node as { _parent?: ContentItem })._parent ?? null);
+      return this.findClosestStack(
+        node.parent ?? (node as { _parent?: ContentItem })._parent ?? null
+      );
     }
 
     const children: ContentItem[] = (node as { contentItems?: ContentItem[] }).contentItems ?? [];
@@ -609,7 +667,7 @@ export class LayoutManagerService {
     return null;
   }
 
-  private findFirstStack(node: ContentItem | null): Stack | null {
+  private findFirstStack(node: ContentItem | null | undefined): Stack | null {
     if (!node) return null;
     if (node.type === 'stack') return node as Stack;
     const children: ContentItem[] = (node as { contentItems?: ContentItem[] }).contentItems ?? [];

@@ -125,14 +125,14 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
       node.scale.set(state.scale.x, state.scale.y, 1);
     }
 
-    const canSize =
-      typeof (node as any).width === 'number' && typeof (node as any).height === 'number';
+    const dimsNode = node as Node2D & { width?: number; height?: number };
+    const canSize = typeof dimsNode.width === 'number' && typeof dimsNode.height === 'number';
     if (canSize) {
       if (typeof state.width === 'number') {
-        (node as any).width = state.width;
+        dimsNode.width = state.width;
       }
       if (typeof state.height === 'number') {
-        (node as any).height = state.height;
+        dimsNode.height = state.height;
       }
     }
   }

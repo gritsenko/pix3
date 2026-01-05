@@ -3,7 +3,6 @@ import './pix3-script-creator.ts.css';
 
 export interface ScriptCreationOptions {
   defaultName: string;
-  scriptType: 'behavior' | 'controller';
 }
 
 @customElement('pix3-script-creator')
@@ -13,9 +12,6 @@ export class ScriptCreator extends ComponentBase {
 
   @property({ type: String })
   public defaultName: string = '';
-
-  @property({ type: String })
-  public scriptType: 'behavior' | 'controller' = 'controller';
 
   @state()
   private scriptName: string = '';
@@ -39,9 +35,7 @@ export class ScriptCreator extends ComponentBase {
           @click=${(e: Event) => e.stopPropagation()}
         >
           <div class="dialog-header">
-            <h2 class="dialog-title">
-              Create New ${this.scriptType === 'controller' ? 'Controller' : 'Behavior'}
-            </h2>
+            <h2 class="dialog-title">Create New Component</h2>
           </div>
 
           <div class="dialog-body">
@@ -98,8 +92,7 @@ export class ScriptCreator extends ComponentBase {
 
   private getFullClassName(): string {
     const fileName = this.getFileName();
-    const suffix = this.scriptType === 'controller' ? 'Controller' : 'Behavior';
-    return `${fileName}${suffix}`;
+    return `${fileName}`;
   }
 
   private isValidScriptName(): boolean {
@@ -125,7 +118,6 @@ export class ScriptCreator extends ComponentBase {
         detail: {
           dialogId: this.dialogId,
           scriptName: this.getFileName(),
-          scriptType: this.scriptType,
         },
         bubbles: true,
         composed: true,

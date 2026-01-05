@@ -86,10 +86,8 @@ export class InspectorPanel extends ComponentBase {
     this.updateSelectedNodes();
 
     // Listen for script creator requested event from editor shell
-    this.scriptCreatorRequestedHandler = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const { type } = customEvent.detail;
-      void this.handleScriptCreatorRequested(type);
+    this.scriptCreatorRequestedHandler = (_e: Event) => {
+      void this.handleScriptCreatorRequested();
     };
     window.addEventListener(
       'script-creator-requested',

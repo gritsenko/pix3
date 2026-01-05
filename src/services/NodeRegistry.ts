@@ -16,7 +16,7 @@ export interface NodeTypeInfo {
   displayName: string;
   description: string;
   category: '2D' | '3D';
-  commandClass: new (...args: unknown[]) => Command;
+  commandClass: new (...args: unknown[]) => Command<unknown, unknown>;
   color: string;
   icon: string;
   keywords: string[];

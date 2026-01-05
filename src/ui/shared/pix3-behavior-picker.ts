@@ -1,13 +1,9 @@
 import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
-import {
-  ScriptRegistry,
-  type BehaviorTypeInfo,
-  type ControllerTypeInfo,
-} from '@/services/ScriptRegistry';
+import { ScriptRegistry, type ComponentTypeInfo } from '@/services/ScriptRegistry';
 import { IconService } from '@/services/IconService';
 import './pix3-behavior-picker.ts.css';
 
-type ScriptTypeInfo = BehaviorTypeInfo | ControllerTypeInfo;
+type ScriptTypeInfo = ComponentTypeInfo;
 
 @customElement('pix3-behavior-picker')
 export class BehaviorPicker extends ComponentBase {
@@ -20,9 +16,6 @@ export class BehaviorPicker extends ComponentBase {
   @property({ type: String, reflect: true })
   public pickerId: string = '';
 
-  @property({ type: String })
-  public type: 'behavior' | 'controller' = 'behavior';
-
   @state()
   private searchQuery: string = '';
 
@@ -30,10 +23,7 @@ export class BehaviorPicker extends ComponentBase {
   private selectedScriptId: string | null = null;
 
   protected render() {
-    const scripts: ScriptTypeInfo[] =
-      this.type === 'behavior'
-        ? this.scriptRegistry.getAllBehaviorTypes()
-        : this.scriptRegistry.getAllControllerTypes();
+    const scripts: ScriptTypeInfo[] = this.scriptRegistry.getAllComponentTypes();
 
     const filteredScripts = scripts.filter(
       s =>
@@ -60,9 +50,7 @@ export class BehaviorPicker extends ComponentBase {
         >
           <div class="picker-header">
             <div class="picker-header-row">
-              <h2 class="dialog-title">
-                ${this.type === 'behavior' ? 'Add Behavior' : 'Set Controller'}
-              </h2>
+              <h2 class="dialog-title">Add Component</h2>
               <button
                 class="btn-create-new"
                 @click=${this.dispatchCreateNew}
@@ -75,7 +63,7 @@ export class BehaviorPicker extends ComponentBase {
               ${this.iconService.getIcon('search', 16)}
               <input
                 type="text"
-                placeholder="Search ${this.type}s..."
+                placeholder="Search components..."
                 .value=${this.searchQuery}
                 @input=${(e: InputEvent) =>
                   (this.searchQuery = (e.target as HTMLInputElement).value)}
@@ -103,12 +91,7 @@ export class BehaviorPicker extends ComponentBase {
                             @click=${() => (this.selectedScriptId = s.id)}
                             @dblclick=${() => this.dispatchSelect(s)}
                           >
-                            <div class="behavior-icon">
-                              ${this.iconService.getIcon(
-                                this.type === 'behavior' ? 'zap' : 'code',
-                                24
-                              )}
-                            </div>
+                            <div class="behavior-icon">${this.iconService.getIcon('code', 24)}</div>
                             <div class="behavior-info">
                               <div class="behavior-name">${s.displayName}</div>
                               <div class="behavior-desc">${s.description}</div>
@@ -122,9 +105,7 @@ export class BehaviorPicker extends ComponentBase {
               )}
               ${filteredScripts.length === 0
                 ? html`
-                    <div class="no-results">
-                      No ${this.type}s found matching "${this.searchQuery}"
-                    </div>
+                    <div class="no-results">No components found matching "${this.searchQuery}"</div>
                   `
                 : ''}
             </div>
@@ -140,7 +121,7 @@ export class BehaviorPicker extends ComponentBase {
                 if (s) this.dispatchSelect(s);
               }}
             >
-              ${this.type === 'behavior' ? 'Add' : 'Set'}
+              Add
             </button>
           </div>
         </div>
@@ -154,8 +135,8 @@ export class BehaviorPicker extends ComponentBase {
 
   private dispatchSelect(script: ScriptTypeInfo): void {
     this.dispatchEvent(
-      new CustomEvent('behavior-selected', {
-        detail: { pickerId: this.pickerId, behavior: script },
+      new CustomEvent('component-selected', {
+        detail: { pickerId: this.pickerId, component: script },
         bubbles: true,
         composed: true,
       })
@@ -164,7 +145,7 @@ export class BehaviorPicker extends ComponentBase {
 
   private dispatchCancel(): void {
     this.dispatchEvent(
-      new CustomEvent('behavior-picker-cancelled', {
+      new CustomEvent('component-picker-cancelled', {
         detail: { pickerId: this.pickerId },
         bubbles: true,
         composed: true,
@@ -174,8 +155,8 @@ export class BehaviorPicker extends ComponentBase {
 
   private dispatchCreateNew(): void {
     this.dispatchEvent(
-      new CustomEvent('behavior-picker-create-new', {
-        detail: { pickerId: this.pickerId, type: this.type },
+      new CustomEvent('component-picker-create-new', {
+        detail: { pickerId: this.pickerId },
         bubbles: true,
         composed: true,
       })

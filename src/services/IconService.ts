@@ -4,6 +4,10 @@ import type { TemplateResult } from 'lit';
 import { html } from 'lit';
 import feather from 'feather-icons';
 
+// Feather icon typing helper
+type FeatherIcon = { toSvg?: (opts?: Record<string, unknown>) => string };
+type FeatherIconMap = Record<string, FeatherIcon>;
+
 /**
  * Standard icon sizes used throughout the application
  */
@@ -182,7 +186,8 @@ export class IconService {
     } else {
       // Try Feather Icons
       try {
-        const icon = (feather.icons as Record<string, any>)[name];
+        const featherIcons = feather.icons as FeatherIconMap;
+        const icon = featherIcons[name];
         if (icon && typeof icon.toSvg === 'function') {
           svg = icon.toSvg({
             width: size,
@@ -192,11 +197,11 @@ export class IconService {
             'stroke-width': 2,
             'stroke-linecap': 'round',
             'stroke-linejoin': 'round',
-          });
+          } as Record<string, unknown>);
         } else {
           console.warn(`[IconService] Icon not found: ${name}`);
           // Return fallback icon (box)
-          const fallbackIcon = (feather.icons as Record<string, any>)['box'];
+          const fallbackIcon = featherIcons['box'];
           if (fallbackIcon && typeof fallbackIcon.toSvg === 'function') {
             svg = fallbackIcon.toSvg({
               width: size,
@@ -206,7 +211,7 @@ export class IconService {
               'stroke-width': 2,
               'stroke-linecap': 'round',
               'stroke-linejoin': 'round',
-            });
+            } as Record<string, unknown>);
           }
         }
       } catch (error) {

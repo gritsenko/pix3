@@ -86,7 +86,12 @@ export class SaveAsSceneCommand extends CommandBase<void, void> {
     if (!filePath) {
       try {
         // Use showSaveFilePicker API to let user choose destination
-        const handle = await (window as any).showSaveFilePicker?.({
+        type ShowSaveFilePickerFn = (opts?: unknown) => Promise<FileSystemFileHandle>;
+        type WindowWithSave = { showSaveFilePicker?: ShowSaveFilePickerFn };
+        const w = window as unknown as WindowWithSave;
+        const showSaveFilePicker = w.showSaveFilePicker;
+
+        const handle = await showSaveFilePicker?.({
           suggestedName: 'scene.pix3scene',
           types: [
             {
