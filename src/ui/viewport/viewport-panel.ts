@@ -61,6 +61,11 @@ export class ViewportPanel extends ComponentBase {
     });
     this.syncViewportScene();
 
+    // Initialize state from current appState values
+    this.showGrid = appState.ui.showGrid;
+    this.showLayer2D = appState.ui.showLayer2D;
+    this.showLayer3D = appState.ui.showLayer3D;
+
     subscribe(appState.ui, () => {
       this.showGrid = appState.ui.showGrid;
       this.showLayer2D = appState.ui.showLayer2D;

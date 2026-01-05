@@ -55,6 +55,11 @@ export class EditorTabComponent extends ComponentBase {
   connectedCallback(): void {
     super.connectedCallback();
 
+    // Initialize state from current appState values
+    this.showGrid = appState.ui.showGrid;
+    this.showLayer2D = appState.ui.showLayer2D;
+    this.showLayer3D = appState.ui.showLayer3D;
+
     this.disposeUiSubscription = subscribe(appState.ui, () => {
       this.showGrid = appState.ui.showGrid;
       this.showLayer2D = appState.ui.showLayer2D;
