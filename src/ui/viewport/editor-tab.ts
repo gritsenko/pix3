@@ -76,6 +76,15 @@ export class EditorTabComponent extends ComponentBase {
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
     this.addEventListener('pointerup', this.handleCanvasPointerUp);
 
+    // Re-observe canvas host if it exists (handles reconnection/reparenting by Golden Layout)
+    if (this.canvasHost) {
+      try {
+        this.resizeObserver.observe(this.canvasHost);
+      } catch {
+        // ignore
+      }
+    }
+
     this.syncActiveState();
   }
 
@@ -96,7 +105,7 @@ export class EditorTabComponent extends ComponentBase {
     this.canvasHost = this.renderRoot.querySelector<HTMLElement>('.viewport-host') ?? undefined;
     if (this.canvasHost) {
       try {
-        this.resizeObserver.observe(this);
+        this.resizeObserver.observe(this.canvasHost);
       } catch {
         // ignore
       }
