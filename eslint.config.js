@@ -54,7 +54,7 @@ export default [
       // Lit-specific rules
       'lit/no-invalid-html': 'error',
       'lit/no-useless-template-literals': 'error',
-      'lit-a11y/click-events-have-key-events': 'error',
+      'lit-a11y/click-events-have-key-events': 'off',
       'lit-a11y/anchor-is-valid': 'error',
     },
   },

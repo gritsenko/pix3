@@ -8,7 +8,6 @@ import { FileSystemAPIService } from './FileSystemAPIService';
 import { ScriptRegistry } from './ScriptRegistry';
 import { ScriptCompilerService } from './ScriptCompilerService';
 import type { CompilationError } from './ScriptCompilerService';
-import { FileWatchService } from './FileWatchService';
 import { LoggingService } from './LoggingService';
 
 /**
@@ -34,9 +33,6 @@ export class ProjectScriptLoaderService {
 
   @inject(ScriptCompilerService)
   private readonly compiler!: ScriptCompilerService;
-
-  @inject(FileWatchService)
-  private readonly _fileWatch!: FileWatchService; // Injected to ensure service initialization
 
   @inject(LoggingService)
   private readonly logger!: LoggingService;
@@ -176,10 +172,10 @@ export class ProjectScriptLoaderService {
       return;
     }
 
-    const ctor = classValue as any;
+    const ctor = classValue as unknown as { prototype?: object; getPropertySchema?: unknown };
 
     // Check if it has getPropertySchema static method (our marker for script classes)
-    if (typeof ctor.getPropertySchema !== 'function') {
+    if (typeof (ctor as { getPropertySchema?: unknown }).getPropertySchema !== 'function') {
       return;
     }
 
@@ -211,9 +207,20 @@ export class ProjectScriptLoaderService {
   /**
    * Check if a constructor is a subclass of a base class
    */
-  private isSubclassOf(ctor: any, baseClass: any): boolean {
+  private isSubclassOf(ctor: unknown, baseClass: unknown): boolean {
     try {
-      return ctor.prototype instanceof baseClass || ctor === baseClass;
+      // Ensure both values are callable constructors at runtime
+      if (typeof ctor !== 'function' || typeof baseClass !== 'function') return false;
+
+      // Walk the prototype chain to correctly detect subclassing for both
+      // regular and abstract class constructors.
+      let currentProto = (ctor as { prototype?: object }).prototype;
+      const baseProto = (baseClass as { prototype?: object }).prototype;
+      while (currentProto) {
+        if (currentProto === baseProto) return true;
+        currentProto = Object.getPrototypeOf(currentProto);
+      }
+      return ctor === baseClass;
     } catch {
       return false;
     }

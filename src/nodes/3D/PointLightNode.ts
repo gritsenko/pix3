@@ -1,6 +1,7 @@
 import { Color, PointLight } from 'three';
 import { Node3D, type Node3DProps } from '@/nodes/Node3D';
 import type { PropertySchema } from '@/fw/property-schema';
+import { defineProperty, mergeSchemas } from '@/fw/property-schema';
 
 export interface PointLightNodeProps extends Omit<Node3DProps, 'type'> {
   color?: string;
@@ -25,61 +26,49 @@ export class PointLightNode extends Node3D {
   }
 
   static override getPropertySchema(): PropertySchema {
-    return {
-      ...super.getPropertySchema(),
-      color: {
-        name: 'color',
-        label: 'Color',
-        type: 'string',
-        group: 'Light',
-        getValue: (node: PointLightNode) => '#' + node.light.color.getHexString(),
-        setValue: (node: PointLightNode, value: string) => {
-          node.light.color.set(value).convertSRGBToLinear();
-        },
-      },
-      intensity: {
-        name: 'intensity',
-        label: 'Intensity',
-        type: 'number',
-        group: 'Light',
-        uiHints: { step: 0.1, precision: 2 },
-        getValue: (node: PointLightNode) => node.light.intensity,
-        setValue: (node: PointLightNode, value: number) => {
-          node.light.intensity = value;
-        },
-      },
-      distance: {
-        name: 'distance',
-        label: 'Range',
-        type: 'number',
-        group: 'Light',
-        uiHints: { step: 0.1, precision: 2 },
-        getValue: (node: PointLightNode) => node.light.distance,
-        setValue: (node: PointLightNode, value: number) => {
-          node.light.distance = value;
-        },
-      },
-      decay: {
-        name: 'decay',
-        label: 'Decay',
-        type: 'number',
-        group: 'Light',
-        uiHints: { step: 0.1, precision: 2 },
-        getValue: (node: PointLightNode) => node.light.decay,
-        setValue: (node: PointLightNode, value: number) => {
-          node.light.decay = value;
-        },
-      },
-      castShadow: {
-        name: 'castShadow',
-        label: 'Cast Shadow',
-        type: 'boolean',
-        group: 'Light',
-        getValue: (node: PointLightNode) => node.light.castShadow,
-        setValue: (node: PointLightNode, value: boolean) => {
-          node.light.castShadow = value;
-        },
-      },
+    const base = super.getPropertySchema();
+    const props: PropertySchema = {
+      nodeType: 'PointLight',
+      properties: [
+        defineProperty('color', 'color', {
+          ui: { label: 'Color', group: 'Light' },
+          getValue: (n: unknown) => '#' + (n as PointLightNode).light.color.getHexString(),
+          setValue: (n: unknown, v: unknown) => {
+            (n as PointLightNode).light.color.set(String(v)).convertSRGBToLinear();
+          },
+        }),
+        defineProperty('intensity', 'number', {
+          ui: { label: 'Intensity', group: 'Light', step: 0.1, precision: 2 },
+          getValue: (n: unknown) => (n as PointLightNode).light.intensity,
+          setValue: (n: unknown, v: unknown) => {
+            (n as PointLightNode).light.intensity = Number(v);
+          },
+        }),
+        defineProperty('distance', 'number', {
+          ui: { label: 'Range', group: 'Light', step: 0.1, precision: 2 },
+          getValue: (n: unknown) => (n as PointLightNode).light.distance,
+          setValue: (n: unknown, v: unknown) => {
+            (n as PointLightNode).light.distance = Number(v);
+          },
+        }),
+        defineProperty('decay', 'number', {
+          ui: { label: 'Decay', group: 'Light', step: 0.1, precision: 2 },
+          getValue: (n: unknown) => (n as PointLightNode).light.decay,
+          setValue: (n: unknown, v: unknown) => {
+            (n as PointLightNode).light.decay = Number(v);
+          },
+        }),
+        defineProperty('castShadow', 'boolean', {
+          ui: { label: 'Cast Shadow', group: 'Light' },
+          getValue: (n: unknown) => (n as PointLightNode).light.castShadow,
+          setValue: (n: unknown, v: unknown) => {
+            (n as PointLightNode).light.castShadow = Boolean(v);
+          },
+        }),
+      ],
+      groups: { Light: { label: 'Light', expanded: true } },
     };
+
+    return mergeSchemas(base, props);
   }
 }

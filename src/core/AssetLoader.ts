@@ -2,7 +2,7 @@ import { inject, injectable } from '@/fw/di';
 import { ResourceManager } from '@/services/ResourceManager';
 import { MeshInstance } from '@/nodes/3D/MeshInstance';
 import { NodeBase } from '@/nodes/NodeBase';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AnimationClip } from 'three';
 
 export interface AssetLoaderResult {
@@ -78,11 +78,11 @@ export class AssetLoader {
 
       // Use parse() instead of loadAsync() with an empty resource path
       // This prevents GLTFLoader from trying to resolve external resources
-      const gltf = await new Promise<any>((resolve, reject) => {
+      const gltf = await new Promise<GLTF>((resolve, reject) => {
         loader.parse(
           arrayBuffer,
           '', // Empty resource path - all data is embedded in GLB
-          result => resolve(result),
+          result => resolve(result as GLTF),
           error => reject(error)
         );
       });

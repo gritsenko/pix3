@@ -40,6 +40,11 @@ export class AssetTree extends ComponentBase {
   @state()
   private selectedPath: string | null = null;
 
+  /** Public getter for selected path (avoid accessing private internals) */
+  public getSelectedPath(): string | null {
+    return this.selectedPath;
+  }
+
   @state()
   private draggedPath: string | null = null;
 

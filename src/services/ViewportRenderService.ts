@@ -194,7 +194,7 @@ export class ViewportRendererService {
     this.transformControls.size = 0.6; // Make gizmos smaller/thinner (default is 1)
 
     // When dragging with transform controls, disable orbit controls
-    this.transformControls.addEventListener('dragging-changed', (event: any) => {
+    this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
       this.setOrbitEnabled(!event.value);
 
       // Track transform start state when dragging begins
@@ -299,7 +299,7 @@ export class ViewportRendererService {
               : 'translate';
         this.transformControls.setMode(mode);
         this.transformControls.size = 0.6;
-        this.transformControls.addEventListener('dragging-changed', (event: any) => {
+        this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
           this.setOrbitEnabled(!event.value);
           if (event.value && this.transformControls?.object) {
             this.captureTransformStartState(this.transformControls.object);
@@ -571,7 +571,7 @@ export class ViewportRendererService {
       while (current) {
         if (current instanceof NodeBase) {
           // Skip locked nodes - they cannot be selected by pointer
-          const isLocked = Boolean((current as any).properties?.locked);
+          const isLocked = Boolean((current as NodeBase).properties.locked);
           if (!isLocked) {
             return current;
           }
@@ -640,7 +640,7 @@ export class ViewportRendererService {
 
     const node = sceneGraph.nodeMap.get(nodeId);
     if (node instanceof NodeBase) {
-      const isLocked = Boolean((node as any).properties?.locked);
+      const isLocked = Boolean((node as NodeBase).properties.locked);
       if (isLocked) {
         console.debug('[ViewportRenderer] 2D hit on locked node', nodeId);
         return null;
@@ -671,8 +671,9 @@ export class ViewportRendererService {
 
         // Some helpers need explicit update
         gizmo.traverse(child => {
-          if ((child as any).update) {
-            (child as any).update();
+          const updatable = child as unknown as { update?: () => void };
+          if (typeof updatable.update === 'function') {
+            updatable.update();
           }
         });
       }
@@ -773,11 +774,8 @@ export class ViewportRendererService {
     if (this.scene) {
       const toRemove: THREE.Object3D[] = [];
       this.scene.children.forEach(child => {
-        if (
-          (child as any).userData?.isSelectionBox ||
-          (child as any).userData?.isTransformGizmo ||
-          (child as any).userData?.isSelectionGizmo
-        ) {
+        const ud = child.userData as Record<string, unknown> | undefined;
+        if (ud?.isSelectionBox || ud?.isTransformGizmo || ud?.isSelectionGizmo) {
           toRemove.push(child);
         }
       });
@@ -1520,8 +1518,12 @@ export class ViewportRendererService {
         position: { x: node.position.x, y: node.position.y },
         rotation: MathUtils.radToDeg(node.rotation.z),
         scale: { x: node.scale.x, y: node.scale.y },
-        ...(typeof (node as any).width === 'number' ? { width: (node as any).width } : {}),
-        ...(typeof (node as any).height === 'number' ? { height: (node as any).height } : {}),
+        ...(typeof (node as unknown as { width?: number }).width === 'number'
+          ? { width: (node as unknown as { width?: number }).width }
+          : {}),
+        ...(typeof (node as unknown as { height?: number }).height === 'number'
+          ? { height: (node as unknown as { height?: number }).height }
+          : {}),
       };
 
       const op = new Transform2DCompleteOperation({
@@ -1598,8 +1600,9 @@ export class ViewportRendererService {
               }
 
               gizmo.traverse(child => {
-                if ((child as any).update) {
-                  (child as any).update();
+                const updatable = child as unknown as { update?: () => void };
+                if (typeof updatable.update === 'function') {
+                  updatable.update();
                 }
               });
             }

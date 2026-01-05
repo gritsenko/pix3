@@ -83,7 +83,13 @@ export class SelectObjectOperation implements Operation<OperationInvokeResult> {
     if (range && snapshot.selection.primaryNodeId) {
       const sceneHierarchy = this.getActiveSceneHierarchy(snapshot);
       if (sceneHierarchy) {
-        const allNodeIds = this.collectAllNodeIds(sceneHierarchy.rootNodes as any[]);
+        const allNodeIds = this.collectAllNodeIds(
+          sceneHierarchy.rootNodes as readonly {
+            nodeId?: string;
+            id?: string;
+            children?: unknown[];
+          }[]
+        );
         const primaryIndex = allNodeIds.indexOf(snapshot.selection.primaryNodeId);
         const targetIndex = allNodeIds.indexOf(nodeId);
 
@@ -127,12 +133,18 @@ export class SelectObjectOperation implements Operation<OperationInvokeResult> {
     return activeSceneId ? snapshot.scenes.hierarchies[activeSceneId] : null;
   }
 
-  private collectAllNodeIds(nodes: readonly any[]): string[] {
+  private collectAllNodeIds(
+    nodes: readonly { nodeId?: string; id?: string; children?: unknown[] }[]
+  ): string[] {
     const result: string[] = [];
-    const collect = (list: readonly any[]) => {
+    const collect = (list: readonly { nodeId?: string; id?: string; children?: unknown[] }[]) => {
       for (const node of list) {
         result.push(node.nodeId || node.id);
-        if (node.children?.length) collect(node.children);
+        if (Array.isArray(node.children) && node.children.length) {
+          collect(
+            node.children as readonly { nodeId?: string; id?: string; children?: unknown[] }[]
+          );
+        }
       }
     };
     collect(nodes);

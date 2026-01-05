@@ -9,12 +9,9 @@ import { FileWatchService } from '@/services/FileWatchService';
 import { DialogService, type DialogInstance } from '@/services/DialogService';
 import {
   BehaviorPickerService,
-  type BehaviorPickerInstance,
+  type ComponentPickerInstance,
 } from '@/services/BehaviorPickerService';
-import {
-  ScriptCreatorService,
-  type ScriptCreationInstance,
-} from '@/services/ScriptCreatorService';
+import { ScriptCreatorService, type ScriptCreationInstance } from '@/services/ScriptCreatorService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { ScriptCompilerService } from '@/services/ScriptCompilerService';
@@ -91,7 +88,7 @@ export class Pix3EditorShell extends ComponentBase {
   private dialogs: DialogInstance[] = [];
 
   @state()
-  private behaviorPickers: BehaviorPickerInstance[] = [];
+  private componentPickers: ComponentPickerInstance[] = [];
 
   @state()
   private scriptCreators: ScriptCreationInstance[] = [];
@@ -135,9 +132,13 @@ export class Pix3EditorShell extends ComponentBase {
       this.requestUpdate();
     });
 
-    // Subscribe to behavior picker changes
+    // Touch injected services to avoid unused var lint error (they are singletons for side-effects)
+    void this._projectScriptLoader;
+    void this._scriptCompiler;
+
+    // Subscribe to component picker changes
     this.behaviorPickerService.subscribe(pickers => {
-      this.behaviorPickers = pickers;
+      this.componentPickers = pickers;
       this.requestUpdate();
     });
 
@@ -484,41 +485,36 @@ export class Pix3EditorShell extends ComponentBase {
     return html`
       <div
         class="picker-host"
-        @behavior-selected=${(e: CustomEvent) => this.onBehaviorSelected(e)}
-        @behavior-picker-cancelled=${(e: CustomEvent) => this.onBehaviorPickerCancelled(e)}
-        @behavior-picker-create-new=${(e: CustomEvent) => this.onBehaviorPickerCreateNew(e)}
+        @component-selected=${(e: CustomEvent) => this.onComponentSelected(e)}
+        @component-picker-cancelled=${(e: CustomEvent) => this.onComponentPickerCancelled(e)}
+        @component-picker-create-new=${(e: CustomEvent) => this.onComponentPickerCreateNew(e)}
       >
-        ${this.behaviorPickers.map(
-          picker => html`
-            <pix3-behavior-picker
-              .pickerId=${picker.id}
-              .type=${picker.type}
-            ></pix3-behavior-picker>
-          `
+        ${this.componentPickers.map(
+          picker => html` <pix3-behavior-picker .pickerId=${picker.id}></pix3-behavior-picker> `
         )}
       </div>
     `;
   }
 
-  private onBehaviorSelected(e: CustomEvent): void {
-    const { pickerId, behavior } = e.detail;
-    this.behaviorPickerService.select(pickerId, behavior);
+  private onComponentSelected(e: CustomEvent): void {
+    const { pickerId, component } = e.detail;
+    this.behaviorPickerService.select(pickerId, component);
   }
 
-  private onBehaviorPickerCancelled(e: CustomEvent): void {
+  private onComponentPickerCancelled(e: CustomEvent): void {
     const { pickerId } = e.detail;
     this.behaviorPickerService.cancel(pickerId);
   }
 
-  private onBehaviorPickerCreateNew(e: CustomEvent): void {
-    const { pickerId, type } = e.detail;
+  private onComponentPickerCreateNew(e: CustomEvent): void {
+    const { pickerId } = e.detail;
     // First cancel the picker
     this.behaviorPickerService.cancel(pickerId);
     // Then show the script creator - we'll handle the result in the inspector
     // This event will bubble up to the inspector which initiated the picker
     this.dispatchEvent(
       new CustomEvent('script-creator-requested', {
-        detail: { type },
+        detail: { pickerId },
         bubbles: true,
         composed: true,
       })
@@ -537,7 +533,6 @@ export class Pix3EditorShell extends ComponentBase {
             <pix3-script-creator
               .dialogId=${creator.id}
               .defaultName=${creator.params.defaultName || creator.params.scriptName}
-              .scriptType=${creator.params.scriptType}
             ></pix3-script-creator>
           `
         )}

@@ -1,6 +1,7 @@
 import { PerspectiveCamera, OrthographicCamera, Camera } from 'three';
 import { Node3D, type Node3DProps } from '@/nodes/Node3D';
 import type { PropertySchema } from '@/fw/property-schema';
+import { defineProperty, mergeSchemas } from '@/fw/property-schema';
 
 export interface Camera3DProps extends Omit<Node3DProps, 'type'> {
   projection?: 'perspective' | 'orthographic';
@@ -31,46 +32,56 @@ export class Camera3D extends Node3D {
   }
 
   static override getPropertySchema(): PropertySchema {
-    return {
-      ...super.getPropertySchema(),
-      fov: {
-        name: 'fov',
-        label: 'Field of View',
-        type: 'number',
-        group: 'Camera',
-        uiHints: { unit: '°', step: 0.1, precision: 1 },
-        getValue: (node: Camera3D) => (node.camera as PerspectiveCamera).fov ?? 60,
-        setValue: (node: Camera3D, value: number) => {
-          if (node.camera instanceof PerspectiveCamera) {
-            node.camera.fov = value;
-            node.camera.updateProjectionMatrix();
-          }
-        },
+    const base = super.getPropertySchema();
+
+    const cameraProps = {
+      nodeType: 'Camera3D',
+      properties: [
+        defineProperty('fov', 'number', {
+          ui: { label: 'Field of View', group: 'Camera', unit: '°', step: 0.1, precision: 1 },
+          getValue: (node: unknown) => ((node as Camera3D).camera as PerspectiveCamera).fov ?? 60,
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as Camera3D;
+            if (n.camera instanceof PerspectiveCamera) {
+              n.camera.fov = Number(value);
+              (n.camera as PerspectiveCamera).updateProjectionMatrix();
+            }
+          },
+        }),
+        defineProperty('near', 'number', {
+          ui: { label: 'Near Plane', group: 'Camera', step: 0.01, precision: 2 },
+          getValue: (node: unknown) => {
+            const n = node as Camera3D;
+            return (n.camera as PerspectiveCamera | OrthographicCamera).near;
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as Camera3D;
+            if (n.camera instanceof PerspectiveCamera || n.camera instanceof OrthographicCamera) {
+              (n.camera as PerspectiveCamera | OrthographicCamera).near = Number(value);
+              (n.camera as PerspectiveCamera | OrthographicCamera).updateProjectionMatrix?.();
+            }
+          },
+        }),
+        defineProperty('far', 'number', {
+          ui: { label: 'Far Plane', group: 'Camera', step: 1, precision: 0 },
+          getValue: (node: unknown) => {
+            const n = node as Camera3D;
+            return (n.camera as PerspectiveCamera | OrthographicCamera).far;
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as Camera3D;
+            if (n.camera instanceof PerspectiveCamera || n.camera instanceof OrthographicCamera) {
+              (n.camera as PerspectiveCamera | OrthographicCamera).far = Number(value);
+              (n.camera as PerspectiveCamera | OrthographicCamera).updateProjectionMatrix?.();
+            }
+          },
+        }),
+      ],
+      groups: {
+        Camera: { label: 'Camera', expanded: true },
       },
-      near: {
-        name: 'near',
-        label: 'Near Plane',
-        type: 'number',
-        group: 'Camera',
-        uiHints: { step: 0.01, precision: 2 },
-        getValue: (node: Camera3D) => node.camera.near,
-        setValue: (node: Camera3D, value: number) => {
-          node.camera.near = value;
-          node.camera.updateProjectionMatrix();
-        },
-      },
-      far: {
-        name: 'far',
-        label: 'Far Plane',
-        type: 'number',
-        group: 'Camera',
-        uiHints: { step: 1, precision: 0 },
-        getValue: (node: Camera3D) => node.camera.far,
-        setValue: (node: Camera3D, value: number) => {
-          node.camera.far = value;
-          node.camera.updateProjectionMatrix();
-        },
-      },
-    };
+    } as PropertySchema;
+
+    return mergeSchemas(base, cameraProps);
   }
 }

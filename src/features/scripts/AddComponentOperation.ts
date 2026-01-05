@@ -56,13 +56,11 @@ export class AddComponentOperation implements Operation<OperationInvokeResult> {
     }
 
     // Generate component ID if not provided
-    const componentId = this.params.componentId || `${this.params.nodeId}-${this.params.componentType}-${Date.now()}`;
+    const componentId =
+      this.params.componentId || `${this.params.nodeId}-${this.params.componentType}-${Date.now()}`;
 
     // Create component instance
-    const component = scriptRegistry.createComponent(
-      this.params.componentType,
-      componentId
-    );
+    const component = scriptRegistry.createComponent(this.params.componentType, componentId);
     if (!component) {
       console.error(
         `[AddComponentOperation] Failed to create component "${this.params.componentType}"`

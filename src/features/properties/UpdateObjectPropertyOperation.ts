@@ -11,6 +11,7 @@ import { SceneManager } from '@/core/SceneManager';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { getNodePropertySchema } from '@/fw/property-schema-utils';
 import type { PropertyDefinition } from '@/fw';
+import type { ServiceContainer } from '@/fw/di';
 
 export interface UpdateObjectPropertyParams {
   nodeId: string;
@@ -108,7 +109,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     };
   }
 
-  private updateViewport(container: any, propertyPath: string, node: NodeBase) {
+  private updateViewport(container: ServiceContainer, propertyPath: string, node: NodeBase) {
     try {
       const vr = container.getService(
         container.getOrCreateToken(ViewportRendererService)

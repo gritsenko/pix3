@@ -86,10 +86,8 @@ export class InspectorPanel extends ComponentBase {
     this.updateSelectedNodes();
 
     // Listen for script creator requested event from editor shell
-    this.scriptCreatorRequestedHandler = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      const { type } = customEvent.detail;
-      void this.handleScriptCreatorRequested(type);
+    this.scriptCreatorRequestedHandler = (_e: Event) => {
+      void this.handleScriptCreatorRequested();
     };
     window.addEventListener(
       'script-creator-requested',
@@ -135,7 +133,7 @@ export class InspectorPanel extends ComponentBase {
     try {
       const entries = await this.fileSystemAPI.listDirectory('scripts');
       return entries.some(e => e.kind === 'file' && e.name === fileName);
-    } catch (error) {
+    } catch {
       // Directory might not exist yet
       console.log('[InspectorPanel] scripts directory does not exist yet');
       return false;

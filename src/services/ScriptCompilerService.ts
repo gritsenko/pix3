@@ -118,17 +118,12 @@ export class ScriptCompilerService {
         warnings.forEach(warning => this.logger.warn(`Script compilation warning: ${warning}`));
       }
 
-      this.logger.info(
-        `Scripts compiled successfully (${files.size} files, ${code.length} bytes)`
-      );
+      this.logger.info(`Scripts compiled successfully (${files.size} files, ${code.length} bytes)`);
 
       return { code, warnings };
-    } catch (error: any) {
+    } catch (error: unknown) {
       const compilationError = this.parseCompilationError(error);
-      this.logger.error(
-        `Script compilation failed: ${compilationError.message}`,
-        compilationError
-      );
+      this.logger.error(`Script compilation failed: ${compilationError.message}`, compilationError);
       throw compilationError;
     }
   }
@@ -242,8 +237,14 @@ export class ScriptCompilerService {
   /**
    * Parse esbuild error into a user-friendly CompilationError
    */
-  private parseCompilationError(error: any): CompilationError {
-    if (error.errors && Array.isArray(error.errors) && error.errors.length > 0) {
+  private parseCompilationError(error: unknown): CompilationError {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'errors' in error &&
+      Array.isArray(error.errors) &&
+      error.errors.length > 0
+    ) {
       const firstError = error.errors[0];
       return {
         message: firstError.text || 'Compilation failed',
@@ -254,8 +255,17 @@ export class ScriptCompilerService {
       };
     }
 
+    // Safely extract message from unknown error object without using `any`
+    const maybeMessage =
+      error &&
+      typeof error === 'object' &&
+      'message' in error &&
+      typeof (error as { message?: unknown }).message === 'string'
+        ? ((error as { message?: unknown }).message as string)
+        : 'Unknown compilation error';
+
     return {
-      message: error.message || 'Unknown compilation error',
+      message: maybeMessage,
       details: error,
     };
   }

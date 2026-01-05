@@ -6,7 +6,10 @@ import './index.css';
 
 // Expose Engine API for user scripts
 import * as EngineAPI from './fw/engine-api';
-(window as any).__PIX3_ENGINE__ = EngineAPI;
+interface WindowWithEngine extends Window {
+  __PIX3_ENGINE__: typeof EngineAPI;
+}
+(window as unknown as WindowWithEngine).__PIX3_ENGINE__ = EngineAPI;
 
 // Create dynamic import map for @pix3/engine
 // This allows user scripts to import from '@pix3/engine' at runtime

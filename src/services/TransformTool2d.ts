@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { Node2D } from '@/nodes/Node2D';
+import type { SceneGraph } from '@/core/SceneManager';
 
 export type TwoDHandle =
   | 'idle'
@@ -343,7 +344,7 @@ export class TransformTool2d {
     screenY: number,
     handle: TwoDHandle,
     overlay: Selection2DOverlay,
-    sceneGraph: any,
+    sceneGraph: SceneGraph,
     orthographicCamera: THREE.OrthographicCamera,
     viewportSize: { width: number; height: number }
   ): Active2DTransform | null {
@@ -365,8 +366,10 @@ export class TransformTool2d {
         const worldPosition = node.getWorldPosition(new THREE.Vector3());
         const worldQuat = node.getWorldQuaternion(new THREE.Quaternion());
         const worldEuler = new THREE.Euler().setFromQuaternion(worldQuat, 'XYZ');
-        const width = typeof (node as any).width === 'number' ? (node as any).width : undefined;
-        const height = typeof (node as any).height === 'number' ? (node as any).height : undefined;
+        // Some Node2D subclasses (e.g., sprites) may expose width/height; avoid `any` by narrowing
+        const dims = node as Node2D & { width?: number; height?: number };
+        const width = typeof dims.width === 'number' ? dims.width : undefined;
+        const height = typeof dims.height === 'number' ? dims.height : undefined;
         startStates.set(nodeId, {
           position: node.position.clone(),
           rotation: node.rotation.z,
@@ -404,7 +407,7 @@ export class TransformTool2d {
     screenX: number,
     screenY: number,
     transform: Active2DTransform,
-    sceneGraph: any,
+    sceneGraph: SceneGraph,
     orthographicCamera: THREE.OrthographicCamera,
     viewportSize: { width: number; height: number }
   ): void {
@@ -511,15 +514,16 @@ export class TransformTool2d {
 
           const startWidth = typeof startState.width === 'number' ? startState.width : undefined;
           const startHeight = typeof startState.height === 'number' ? startState.height : undefined;
+          const dimsNode = node as Node2D & { width?: number; height?: number };
           const hasSize =
-            typeof (node as any).width === 'number' &&
-            typeof (node as any).height === 'number' &&
+            typeof dimsNode.width === 'number' &&
+            typeof dimsNode.height === 'number' &&
             typeof startWidth === 'number' &&
             typeof startHeight === 'number';
 
           if (hasSize) {
-            (node as any).width = Math.max(minSize, startWidth * scaleFactorX);
-            (node as any).height = Math.max(minSize, startHeight * scaleFactorY);
+            dimsNode.width = Math.max(minSize, startWidth * scaleFactorX);
+            dimsNode.height = Math.max(minSize, startHeight * scaleFactorY);
             // Keep node.scale stable; size changes should primarily use width/height.
             node.scale.set(startState.scale.x, startState.scale.y, 1);
           } else {
