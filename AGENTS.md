@@ -273,6 +273,7 @@ src/
 12. **Avoid bloat documentation** — Only maintain README.md, AGENTS.md, architecture.md, pix3-specification.md in docs/. Keep documentation minimal and focused on active development. **Do NOT create separate .md files for specific features or refactors**—integrate essential information directly into existing documentation files or README.md instead.
 13. **Property schemas define node properties** — Node classes must implement `static getPropertySchema()`. Inspector consumes via `getNodePropertySchema()`. Schema's getValue/setValue handle all property access and transformation (e.g., radian/degree conversion).
 14. **Unified component system** — All scripts are `ScriptComponent` instances. Use `Script` base class for new components. Use `node.addComponent()`, `node.removeComponent()`, `node.getComponent<T>()` for component management. Legacy `behaviors`/`controller` APIs maintained for backward compatibility.
+15. **Never use `any` types** — Always provide explicit types. When dealing with external libraries or dynamic structures, use `unknown` with type guards or cast to specific interfaces/types. This prevents `@typescript-eslint/no-explicit-any` lint errors and improves type safety.
 
 Always verify architectural decisions against the specification before implementing features.
 
