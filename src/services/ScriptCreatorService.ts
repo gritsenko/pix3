@@ -103,7 +103,7 @@ export class ScriptCreatorService {
       // Ensure scripts directory exists
       try {
         await this.fs.createDirectory('scripts');
-      } catch (error) {
+      } catch {
         // Directory might already exist, that's ok
         console.log('[ScriptCreator] Scripts directory already exists or created');
       }

@@ -190,12 +190,13 @@ export class SceneLoader {
     // Load components
     if (definition.components) {
       for (const componentDef of definition.components) {
-        const componentId = componentDef.id || `${definition.id}-${componentDef.type}-${Date.now()}`;
+        const componentId =
+          componentDef.id || `${definition.id}-${componentDef.type}-${Date.now()}`;
         const component = this.scriptRegistry.createComponent(componentDef.type, componentId);
-        
+
         if (component) {
           component.enabled = componentDef.enabled ?? true;
-          
+
           const configData = componentDef.config ?? {};
           component.config = { ...configData };
 

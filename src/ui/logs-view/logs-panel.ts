@@ -210,7 +210,9 @@ export class LogsPanel extends ComponentBase {
                           <span class="log-timestamp">${this.formatTime(log.timestamp)}</span>
                         </div>
                         ${hasDetails && isExpanded
-                          ? html`<pre class="log-details">${this.formatErrorDetails(log.data)}</pre>`
+                          ? html`<pre class="log-details">
+${this.formatErrorDetails(log.data)}</pre
+                            >`
                           : ''}
                       </li>
                     `;

@@ -102,7 +102,6 @@ export class AssetFileActivationService {
     const stripped = fileName.replace(/\.[^./]+$/, '').trim();
     return stripped || 'Sprite2D';
   }
-
 }
 
 injectable()(AssetFileActivationService);

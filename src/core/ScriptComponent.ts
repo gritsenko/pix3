@@ -11,7 +11,7 @@ import type { NodeBase } from '@/nodes/NodeBase';
 /**
  * Type helper for constructors
  */
-export type Constructor<T> = new (...args: any[]) => T;
+export type Constructor<T> = new (...args: unknown[]) => T;
 
 /**
  * ScriptComponent - Unified interface for all script components.

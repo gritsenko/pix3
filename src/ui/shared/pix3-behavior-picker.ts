@@ -63,9 +63,12 @@ export class BehaviorPicker extends ComponentBase {
               <h2 class="dialog-title">
                 ${this.type === 'behavior' ? 'Add Behavior' : 'Set Controller'}
               </h2>
-              <button class="btn-create-new" @click=${this.dispatchCreateNew} title="Create new script file">
-                ${this.iconService.getIcon('plus', 16)}
-                Create New
+              <button
+                class="btn-create-new"
+                @click=${this.dispatchCreateNew}
+                title="Create new script file"
+              >
+                ${this.iconService.getIcon('plus', 16)} Create New
               </button>
             </div>
             <div class="search-box">

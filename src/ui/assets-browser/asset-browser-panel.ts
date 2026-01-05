@@ -2,6 +2,7 @@ import { ComponentBase, customElement, html, inject, state } from '@/fw';
 import { ref } from 'lit/directives/ref.js';
 import { AssetFileActivationService, type AssetActivation } from '@/services';
 import { DialogService } from '@/services/DialogService';
+import type { AssetTree } from './asset-tree';
 
 import '../shared/pix3-panel';
 import '../shared/pix3-toolbar';
@@ -9,6 +10,11 @@ import '../shared/pix3-toolbar-button';
 import '../shared/pix3-dropdown-button';
 import './asset-tree';
 import './asset-browser-panel.ts.css';
+
+// Helper interface to access private members of AssetTree (for internal use only)
+interface AssetTreeInternal extends AssetTree {
+  selectedPath: string | null;
+}
 
 @customElement('pix3-asset-browser-panel')
 export class AssetBrowserPanel extends ComponentBase {
@@ -18,7 +24,7 @@ export class AssetBrowserPanel extends ComponentBase {
   @inject(DialogService)
   private readonly dialogService!: DialogService;
 
-  private assetTreeRef: HTMLElement | null = null;
+  private assetTreeRef: AssetTree | null = null;
 
   @state()
   private selectedItemName: string | null = null;
@@ -38,12 +44,7 @@ export class AssetBrowserPanel extends ComponentBase {
         console.warn('[AssetBrowserPanel] assetTreeRef is null, cannot create folder');
         return;
       }
-      const assetTree = this.assetTreeRef as any;
-      if (!assetTree.createFolder || typeof assetTree.createFolder !== 'function') {
-        console.warn('[AssetBrowserPanel] createFolder method not found on asset tree');
-        return;
-      }
-      await assetTree.createFolder();
+      await this.assetTreeRef.createFolder();
       console.log('[AssetBrowserPanel] Folder creation initiated');
     } catch (error) {
       console.error('[AssetBrowserPanel] Failed to create folder:', error);
@@ -57,12 +58,7 @@ export class AssetBrowserPanel extends ComponentBase {
         console.warn('[AssetBrowserPanel] assetTreeRef is null, cannot create scene');
         return;
       }
-      const assetTree = this.assetTreeRef as any;
-      if (!assetTree.createScene || typeof assetTree.createScene !== 'function') {
-        console.warn('[AssetBrowserPanel] createScene method not found on asset tree');
-        return;
-      }
-      assetTree.createScene();
+      this.assetTreeRef.createScene();
       console.log('[AssetBrowserPanel] Scene creation initiated');
     } catch (error) {
       console.error('[AssetBrowserPanel] Failed to create scene:', error);
@@ -71,7 +67,7 @@ export class AssetBrowserPanel extends ComponentBase {
 
   private onDeleteClick = () => {
     try {
-      const assetTree = this.assetTreeRef as any;
+      const assetTree = this.assetTreeRef as AssetTreeInternal | null;
       const selectedPath = assetTree?.selectedPath;
 
       if (!selectedPath) {
@@ -97,12 +93,7 @@ export class AssetBrowserPanel extends ComponentBase {
         console.warn('[AssetBrowserPanel] assetTreeRef is null, cannot rename');
         return;
       }
-      const assetTree = this.assetTreeRef as any;
-      if (!assetTree.renameSelected || typeof assetTree.renameSelected !== 'function') {
-        console.warn('[AssetBrowserPanel] renameSelected method not found on asset tree');
-        return;
-      }
-      void assetTree.renameSelected();
+      void this.assetTreeRef.renameSelected();
       console.log('[AssetBrowserPanel] Rename initiated');
     } catch (error) {
       console.error('[AssetBrowserPanel] Failed to rename item:', error);
@@ -136,13 +127,7 @@ export class AssetBrowserPanel extends ComponentBase {
         return;
       }
 
-      const assetTree = this.assetTreeRef as any;
-      if (!assetTree.deleteSelected || typeof assetTree.deleteSelected !== 'function') {
-        console.warn('[AssetBrowserPanel] deleteSelected method not found on asset tree');
-        return;
-      }
-
-      await assetTree.deleteSelected();
+      await this.assetTreeRef.deleteSelected();
       console.log('[AssetBrowserPanel] Item deleted successfully');
       this.selectedItemName = null;
     } catch (error) {
@@ -151,7 +136,7 @@ export class AssetBrowserPanel extends ComponentBase {
   }
 
   private setAssetTreeRef = (element: Element | undefined) => {
-    this.assetTreeRef = element as HTMLElement | null;
+    this.assetTreeRef = (element as AssetTree) || null;
   };
 
   connectedCallback(): void {
@@ -184,12 +169,7 @@ export class AssetBrowserPanel extends ComponentBase {
         console.warn('[AssetBrowserPanel] assetTreeRef is null, cannot select file');
         return;
       }
-      const assetTree = this.assetTreeRef as any;
-      if (!assetTree.selectPath || typeof assetTree.selectPath !== 'function') {
-        console.warn('[AssetBrowserPanel] selectPath method not found on asset tree');
-        return;
-      }
-      await assetTree.selectPath(filePath);
+      await this.assetTreeRef.selectPath(filePath);
       console.log('[AssetBrowserPanel] Selected newly created script file:', filePath);
     } catch (error) {
       console.error('[AssetBrowserPanel] Failed to select newly created script file:', error);

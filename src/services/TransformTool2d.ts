@@ -10,6 +10,7 @@
 
 import * as THREE from 'three';
 import { Node2D } from '@/nodes/Node2D';
+import type { SceneGraph } from '@/core/SceneManager';
 
 export type TwoDHandle =
   | 'idle'
@@ -343,7 +344,7 @@ export class TransformTool2d {
     screenY: number,
     handle: TwoDHandle,
     overlay: Selection2DOverlay,
-    sceneGraph: any,
+    sceneGraph: SceneGraph,
     orthographicCamera: THREE.OrthographicCamera,
     viewportSize: { width: number; height: number }
   ): Active2DTransform | null {
@@ -404,7 +405,7 @@ export class TransformTool2d {
     screenX: number,
     screenY: number,
     transform: Active2DTransform,
-    sceneGraph: any,
+    sceneGraph: SceneGraph,
     orthographicCamera: THREE.OrthographicCamera,
     viewportSize: { width: number; height: number }
   ): void {

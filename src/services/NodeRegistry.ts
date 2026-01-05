@@ -6,6 +6,7 @@ import { CreatePointLightCommand } from '@/features/scene/CreatePointLightComman
 import { CreateSpotLightCommand } from '@/features/scene/CreateSpotLightCommand';
 import { CreateCamera3DCommand } from '@/features/scene/CreateCamera3DCommand';
 import { CreateMeshInstanceCommand } from '@/features/scene/CreateMeshInstanceCommand';
+import type { Command } from '@/core/command';
 
 /**
  * Node type definition for the registry
@@ -15,7 +16,7 @@ export interface NodeTypeInfo {
   displayName: string;
   description: string;
   category: '2D' | '3D';
-  commandClass: new (...args: any[]) => any;
+  commandClass: new (...args: unknown[]) => Command;
   color: string;
   icon: string;
   keywords: string[];

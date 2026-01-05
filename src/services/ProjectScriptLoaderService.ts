@@ -211,7 +211,10 @@ export class ProjectScriptLoaderService {
   /**
    * Check if a constructor is a subclass of a base class
    */
-  private isSubclassOf(ctor: any, baseClass: any): boolean {
+  private isSubclassOf(
+    ctor: new (...args: unknown[]) => unknown,
+    baseClass: new (...args: unknown[]) => unknown
+  ): boolean {
     try {
       return ctor.prototype instanceof baseClass || ctor === baseClass;
     } catch {

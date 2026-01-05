@@ -12,7 +12,9 @@ describe('ScriptCreatorService', () => {
     it('should generate controller template with correct class name', () => {
       const template = (service as any).generateScriptTemplate('PlayerMovement', 'controller');
 
-      expect(template).toContain('export class PlayerMovementController extends ScriptControllerBase');
+      expect(template).toContain(
+        'export class PlayerMovementController extends ScriptControllerBase'
+      );
       expect(template).toContain("nodeType: 'PlayerMovementController'");
       expect(template).toContain('import { ScriptControllerBase } from');
     });

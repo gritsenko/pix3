@@ -135,7 +135,7 @@ export class InspectorPanel extends ComponentBase {
     try {
       const entries = await this.fileSystemAPI.listDirectory('scripts');
       return entries.some(e => e.kind === 'file' && e.name === fileName);
-    } catch (error) {
+    } catch {
       // Directory might not exist yet
       console.log('[InspectorPanel] scripts directory does not exist yet');
       return false;

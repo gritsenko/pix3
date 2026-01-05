@@ -1,4 +1,10 @@
-import { GoldenLayout, type LayoutConfig } from 'golden-layout';
+import {
+  GoldenLayout,
+  type LayoutConfig,
+  type ContentItem,
+  type Stack,
+  type ComponentItem,
+} from 'golden-layout';
 import { injectable } from '@/fw/di';
 import { appState, type AppState, type EditorTab, type PanelVisibilityState } from '@/state';
 
@@ -115,9 +121,9 @@ export class LayoutManagerService {
   private layout: GoldenLayout | null = null;
   private readonly state: AppState;
   private container: HTMLElement | null = null;
-  private editorStack: any = null;
-  private editorTabContainers = new Map<string, any>();
-  private editorTabItems = new Map<string, any>();
+  private editorStack: Stack | null = null;
+  private editorTabContainers = new Map<string, ComponentItem>();
+  private editorTabItems = new Map<string, ComponentItem>();
   private editorTabFocusedListeners = new Set<(tabId: string) => void>();
   private editorTabCloseRequestedListeners = new Set<(tabId: string) => void>();
 
@@ -206,7 +212,10 @@ export class LayoutManagerService {
 
     // Create a new component item inside the editor stack.
     try {
-      console.log('[LayoutManager] Adding tab to editor stack:', { tabId: tab.id, title: tab.title });
+      console.log('[LayoutManager] Adding tab to editor stack:', {
+        tabId: tab.id,
+        title: tab.title,
+      });
       const index = this.editorStack.addItem(
         {
           type: 'component',
@@ -227,7 +236,16 @@ export class LayoutManagerService {
       if (this.editorStack && this.editorStack.contentItems) {
         for (let i = 0; i < this.editorStack.contentItems.length; i++) {
           const item = this.editorStack.contentItems[i];
-          console.log('[LayoutManager]   Item', i, '- type:', item.type, 'component:', item.componentType, 'tabId:', (item.container?.state as any)?.tabId);
+          console.log(
+            '[LayoutManager]   Item',
+            i,
+            '- type:',
+            item.type,
+            'component:',
+            item.componentType,
+            'tabId:',
+            (item.container?.state as any)?.tabId
+          );
         }
       }
 
@@ -274,7 +292,7 @@ export class LayoutManagerService {
   focusEditorTab(tabId: string): void {
     if (!this.layout) return;
     this.ensureEditorStack();
-    
+
     let item = this.editorTabItems.get(tabId);
 
     // Fallback: if map is not yet updated, search the tree manually
@@ -311,7 +329,7 @@ export class LayoutManagerService {
     }
 
     console.log('[LayoutManager] Found item, attempting to focus...');
-    
+
     try {
       if (item.parent && typeof item.parent.setActiveComponentItem === 'function') {
         console.log('[LayoutManager] Calling setActiveComponentItem on parent');
@@ -330,16 +348,16 @@ export class LayoutManagerService {
     }
   }
 
-  private findViewportByTabId(node: any, tabId: string): any {
+  private findViewportByTabId(node: ContentItem | null, tabId: string): ContentItem | null {
     if (!node) return null;
     if (
       node.type === 'component' &&
-      node.componentType === PANEL_COMPONENT_TYPES.viewport &&
-      (node.container?.state as any)?.tabId === tabId
+      (node as ComponentItem).componentType === PANEL_COMPONENT_TYPES.viewport &&
+      ((node as ComponentItem).container?.state as { tabId?: string })?.tabId === tabId
     ) {
       return node;
     }
-    const children: any[] = node.contentItems ?? node.content ?? [];
+    const children: ContentItem[] = (node as { contentItems?: ContentItem[] }).contentItems ?? [];
     for (const child of children) {
       const found = this.findViewportByTabId(child, tabId);
       if (found) return found;
@@ -379,7 +397,7 @@ export class LayoutManagerService {
 
     // Track active editor tab focus changes.
     try {
-      this.layout.on('activeContentItemChanged' as any, (item: any) => {
+      this.layout.on('activeContentItemChanged' as 'stateChanged', (item: ComponentItem) => {
         try {
           const componentType = item?.componentType;
           if (
@@ -550,10 +568,10 @@ export class LayoutManagerService {
     }
   }
 
-  private findStackById(node: any, id: string): any {
+  private findStackById(node: ContentItem | null, id: string): Stack | null {
     if (!node) return null;
-    if (node.type === 'stack' && node.id === id) return node;
-    const children: any[] = node.contentItems ?? node.content ?? [];
+    if (node.type === 'stack' && node.id === id) return node as Stack;
+    const children: ContentItem[] = (node as { contentItems?: ContentItem[] }).contentItems ?? [];
     for (const child of children) {
       const found = this.findStackById(child, id);
       if (found) return found;
@@ -561,28 +579,28 @@ export class LayoutManagerService {
     return null;
   }
 
-  private findClosestStack(node: any): any {
+  private findClosestStack(node: ContentItem | null): Stack | null {
     if (!node) return null;
-    let current = node;
+    let current: ContentItem | null = node;
     while (current) {
-      if (current.type === 'stack') return current;
-      current = current.parent ?? current._parent ?? null;
+      if (current.type === 'stack') return current as Stack;
+      current = current.parent ?? (current as { _parent?: ContentItem })._parent ?? null;
     }
     return null;
   }
 
-  private findMainEditorStack(node: any): any {
+  private findMainEditorStack(node: ContentItem | null): Stack | null {
     if (!node) return null;
 
     if (
       node.type === 'component' &&
-      (node.componentType === PANEL_COMPONENT_TYPES.viewport ||
-        node.componentType === PANEL_COMPONENT_TYPES.background)
+      ((node as ComponentItem).componentType === PANEL_COMPONENT_TYPES.viewport ||
+        (node as ComponentItem).componentType === PANEL_COMPONENT_TYPES.background)
     ) {
-      return this.findClosestStack(node.parent ?? node._parent ?? null);
+      return this.findClosestStack(node.parent ?? (node as { _parent?: ContentItem })._parent ?? null);
     }
 
-    const children: any[] = node.contentItems ?? node.content ?? [];
+    const children: ContentItem[] = (node as { contentItems?: ContentItem[] }).contentItems ?? [];
     for (const child of children) {
       const found = this.findMainEditorStack(child);
       if (found) return found;
@@ -591,10 +609,10 @@ export class LayoutManagerService {
     return null;
   }
 
-  private findFirstStack(node: any): any {
+  private findFirstStack(node: ContentItem | null): Stack | null {
     if (!node) return null;
-    if (node.type === 'stack') return node;
-    const children: any[] = node.contentItems ?? node.content ?? [];
+    if (node.type === 'stack') return node as Stack;
+    const children: ContentItem[] = (node as { contentItems?: ContentItem[] }).contentItems ?? [];
     for (const child of children) {
       const found = this.findFirstStack(child);
       if (found) return found;

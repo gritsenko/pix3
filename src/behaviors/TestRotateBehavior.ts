@@ -34,8 +34,7 @@ export class TestRotateBehavior extends Script {
             max: 10,
             step: 0.1,
           },
-          getValue: (component: unknown) =>
-            (component as TestRotateBehavior).config.rotationSpeed,
+          getValue: (component: unknown) => (component as TestRotateBehavior).config.rotationSpeed,
           setValue: (component: unknown, value: unknown) => {
             const c = component as TestRotateBehavior;
             c.config.rotationSpeed = Number(value);

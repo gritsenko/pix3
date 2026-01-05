@@ -16,6 +16,7 @@ import {
   selectObjectRange,
 } from '@/features/selection/SelectObjectCommand';
 import { UpdateObjectPropertyCommand } from '@/features/properties/UpdateObjectPropertyCommand';
+import type { ScriptComponent } from '@/core/ScriptComponent';
 
 import './scene-tree-node.ts.css';
 
@@ -184,7 +185,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
                     const scene = this.sceneManager.getActiveSceneGraph();
                     const nodeObj = scene ? scene.nodeMap.get(this.node.id) : undefined;
                     const controllerName = nodeObj?.controller ? nodeObj.controller.type : null;
-                    const behaviors = (nodeObj?.behaviors || []).map((b: any) => b.type);
+                    const behaviors = (nodeObj?.behaviors || []).map((b: ScriptComponent) => b.type);
                     return html`
                       <span
                         class="tree-node__script-indicator"

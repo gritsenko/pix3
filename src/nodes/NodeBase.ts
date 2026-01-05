@@ -90,7 +90,9 @@ export class NodeBase extends Object3D {
    */
   addComponent(component: ScriptComponent): void {
     if (this.components.includes(component)) {
-      console.warn(`[NodeBase] Component ${component.id} is already attached to node ${this.nodeId}`);
+      console.warn(
+        `[NodeBase] Component ${component.id} is already attached to node ${this.nodeId}`
+      );
       return;
     }
 

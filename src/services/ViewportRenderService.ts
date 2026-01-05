@@ -194,7 +194,7 @@ export class ViewportRendererService {
     this.transformControls.size = 0.6; // Make gizmos smaller/thinner (default is 1)
 
     // When dragging with transform controls, disable orbit controls
-    this.transformControls.addEventListener('dragging-changed', (event: any) => {
+    this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
       this.setOrbitEnabled(!event.value);
 
       // Track transform start state when dragging begins
@@ -299,7 +299,7 @@ export class ViewportRendererService {
               : 'translate';
         this.transformControls.setMode(mode);
         this.transformControls.size = 0.6;
-        this.transformControls.addEventListener('dragging-changed', (event: any) => {
+        this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
           this.setOrbitEnabled(!event.value);
           if (event.value && this.transformControls?.object) {
             this.captureTransformStartState(this.transformControls.object);

@@ -11,10 +11,7 @@ import {
   BehaviorPickerService,
   type BehaviorPickerInstance,
 } from '@/services/BehaviorPickerService';
-import {
-  ScriptCreatorService,
-  type ScriptCreationInstance,
-} from '@/services/ScriptCreatorService';
+import { ScriptCreatorService, type ScriptCreationInstance } from '@/services/ScriptCreatorService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { ScriptCompilerService } from '@/services/ScriptCompilerService';
