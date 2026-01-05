@@ -92,7 +92,9 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
                 componentType: PANEL_COMPONENT_TYPES.background,
                 title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.background],
                 isClosable: false,
-              },
+                // Cast to any to allow reorderEnabled in strict TS environments
+                reorderEnabled: false, 
+              } as any,
             ],
           },
           {
@@ -216,18 +218,24 @@ export class LayoutManagerService {
         tabId: tab.id,
         title: tab.title,
       });
-      const index = this.editorStack.addItem(
-        {
-          type: 'component',
-          componentType: PANEL_COMPONENT_TYPES.viewport,
-          title: tab.title,
-          isClosable: true,
-          componentState: {
-            tabId: tab.id,
-          },
+
+      // Use 'as any' to bypass strict ComponentItemConfig type definition 
+      // which might be missing reorderEnabled / popoutEnabled in some versions.
+      const itemConfig: any = {
+        type: 'component',
+        componentType: PANEL_COMPONENT_TYPES.viewport,
+        title: tab.title,
+        isClosable: true,
+        // PREVENT DRAGGING to enforce Single Document Interface
+        reorderEnabled: false, 
+        // PREVENT POPPING OUT
+        popoutEnabled: false,
+        componentState: {
+          tabId: tab.id,
         },
-        undefined
-      );
+      };
+
+      const index = this.editorStack.addItem(itemConfig, undefined);
 
       console.log('[LayoutManager] addItem returned index:', index);
 
