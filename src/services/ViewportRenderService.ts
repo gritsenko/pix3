@@ -522,21 +522,31 @@ export class ViewportRendererService {
       return null;
     }
 
-    const pixelX = screenX * this.viewportSize.width;
-    const pixelY = screenY * this.viewportSize.height;
-    const hit2D = this.raycast2D(pixelX, pixelY);
-    if (hit2D) {
-      console.debug('[ViewportRenderer] 2D hit', hit2D.nodeId, 'at', { pixelX, pixelY });
-      return hit2D;
+    const layer2DEnabled = appState.ui.showLayer2D && Boolean(this.orthographicCamera);
+    const layer3DEnabled = appState.ui.showLayer3D && Boolean(this.camera);
+
+    if (!layer2DEnabled && !layer3DEnabled) {
+      return null;
     }
 
-    if (!this.camera) {
+    const pixelX = screenX * this.viewportSize.width;
+    const pixelY = screenY * this.viewportSize.height;
+    if (layer2DEnabled) {
+      const hit2D = this.raycast2D(pixelX, pixelY);
+      if (hit2D) {
+        console.debug('[ViewportRenderer] 2D hit', hit2D.nodeId, 'at', { pixelX, pixelY });
+        return hit2D;
+      }
+    }
+
+    if (!layer3DEnabled || !this.camera) {
       return null;
     }
 
     // Create raycaster and convert screen coordinates to normalized device coordinates
     const raycaster = new THREE.Raycaster();
-    console.debug('[ViewportRenderer] 3D raycast fallback at', { pixelX, pixelY });
+    raycaster.layers.set(LAYER_3D);
+    console.debug('[ViewportRenderer] 3D raycast at', { pixelX, pixelY });
     const mouse = new THREE.Vector2();
 
     // Convert from screen coordinates (0-1) to NDC (-1 to 1)
@@ -546,10 +556,10 @@ export class ViewportRendererService {
     // Cast ray from camera through mouse position
     raycaster.setFromCamera(mouse, this.camera);
 
-    // Get all objects in the scene
+    // Get all 3D objects in the scene
     const sceneObjects: THREE.Object3D[] = [];
     this.scene.traverse(obj => {
-      if (obj instanceof NodeBase) {
+      if (obj instanceof Node3D) {
         sceneObjects.push(obj);
       }
     });
@@ -598,10 +608,8 @@ export class ViewportRendererService {
     raycaster.layers.set(1);
     raycaster.setFromCamera(mouse, this.orthographicCamera);
 
-    const candidates: THREE.Object3D[] = [
-      ...this.group2DVisuals.values(),
-      ...this.sprite2DVisuals.values(),
-    ];
+    // Only hit-test rendered 2D visuals; transparent container groups are intentionally skipped
+    const candidates: THREE.Object3D[] = [...this.sprite2DVisuals.values()];
 
     console.debug('[ViewportRenderer] 2D raycast candidates', {
       count: candidates.length,
