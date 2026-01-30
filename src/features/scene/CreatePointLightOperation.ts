@@ -4,8 +4,8 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { PointLightNode } from '@/nodes/3D/PointLightNode';
-import { SceneManager } from '@/core/SceneManager';
+import { PointLightNode } from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { Vector3 } from 'three';
 

@@ -3,13 +3,13 @@ import { repeat } from 'lit/directives/repeat.js';
 
 import { ComponentBase, customElement, html, state, inject } from '@/fw';
 import { appState, type SceneDescriptor } from '@/state';
-import { NodeBase } from '@/nodes/NodeBase';
+import { NodeBase } from '@pix3/runtime';
 import { getNodeVisuals } from './node-visuals.helper';
 import type { SceneTreeNode } from './scene-tree-node';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { NodeRegistry } from '@/services/NodeRegistry';
 import { ReparentNodeCommand } from '@/features/scene/ReparentNodeCommand';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 import { ServiceContainer } from '@/fw/di';
 
 import '../shared/pix3-panel';

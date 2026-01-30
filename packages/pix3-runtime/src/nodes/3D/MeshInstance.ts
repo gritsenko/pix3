@@ -1,4 +1,4 @@
-import { Node3D, type Node3DProps } from '@/nodes/Node3D';
+import { Node3D, type Node3DProps } from '../Node3D';
 import { AnimationClip } from 'three';
 
 export interface MeshInstanceProps extends Omit<Node3DProps, 'type'> {

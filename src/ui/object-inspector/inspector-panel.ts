@@ -3,17 +3,17 @@ import {
   getNodePropertySchema,
   getPropertiesByGroup,
   getPropertyDisplayValue,
-} from '@/fw/property-schema-utils';
-import { SceneManager } from '@/core/SceneManager';
+} from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
 import { appState } from '@/state';
-import type { NodeBase } from '@/nodes/NodeBase';
+import type { NodeBase } from '@pix3/runtime';
 import type { PropertySchema, PropertyDefinition } from '@/fw';
 import { UpdateObjectPropertyOperation } from '@/features/properties/UpdateObjectPropertyOperation';
 import { OperationService } from '@/services/OperationService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { BehaviorPickerService } from '@/services/BehaviorPickerService';
 import { ScriptCreatorService } from '@/services/ScriptCreatorService';
-import { ScriptRegistry } from '@/services/ScriptRegistry';
+import { ScriptRegistry } from '@pix3/runtime';
 import { IconService } from '@/services/IconService';
 import { DialogService } from '@/services/DialogService';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';

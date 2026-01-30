@@ -9,7 +9,7 @@ import {
   UpdateObjectPropertyOperation,
   type UpdateObjectPropertyParams,
 } from '@/features/properties/UpdateObjectPropertyOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export type UpdateObjectPropertyExecutePayload = object;
 

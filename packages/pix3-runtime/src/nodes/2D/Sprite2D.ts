@@ -1,5 +1,5 @@
-import { Node2D, type Node2DProps } from '@/nodes/Node2D';
-import type { PropertySchema } from '@/fw';
+import { Node2D, type Node2DProps } from '../Node2D';
+import type { PropertySchema } from '../../fw/property-schema';
 
 export interface Sprite2DProps extends Omit<Node2DProps, 'type'> {
   texturePath?: string | null;

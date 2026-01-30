@@ -2,7 +2,7 @@ import {
   defineProperty,
   type PropertyDefinition,
   type PropertyUIHints,
-} from '@/fw/property-schema';
+} from '../../fw/property-schema';
 
 export function createLightColorProperty<
   T extends {

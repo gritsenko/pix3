@@ -1,7 +1,7 @@
 import { Euler, Vector3 } from 'three';
 
 import { NodeBase, type NodeBaseProps } from './NodeBase';
-import type { PropertySchema } from '@/fw';
+import type { PropertySchema } from '../fw/property-schema';
 
 export interface Node3DProps extends Omit<NodeBaseProps, 'type'> {
   position?: Vector3;

@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { ViewportRendererService } from './ViewportRenderService';
-import { Sprite2D } from '@/nodes/2D/Sprite2D';
+import { Sprite2D } from '@pix3/runtime';
 
 describe('ViewportRendererService', () => {
   it('should use ResourceManager.readBlob for templ:// sprite textures', async () => {

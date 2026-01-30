@@ -4,9 +4,9 @@
  * Rotates a node continuously based on a configurable speed parameter.
  */
 
-import { Script } from '@/core/ScriptComponent';
-import type { PropertySchema } from '@/fw';
-import { Node3D } from '@/nodes/Node3D';
+import { Script } from '../core/ScriptComponent';
+import type { PropertySchema } from '../fw/property-schema';
+import { Node3D } from '../nodes/Node3D';
 
 export class TestRotateBehavior extends Script {
   private rotationSpeed: number = 1.0; // radians per second

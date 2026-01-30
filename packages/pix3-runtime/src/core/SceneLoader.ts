@@ -1,24 +1,23 @@
 import { parse } from 'yaml';
 import { Euler, MathUtils, Vector2, Vector3 } from 'three';
 
-import { injectable, inject } from '@/fw/di';
-import { NodeBase, type NodeBaseProps } from '@/nodes/NodeBase';
-import { Node3D } from '@/nodes/Node3D';
-import { MeshInstance } from '@/nodes/3D/MeshInstance';
-import { Sprite2D } from '@/nodes/2D/Sprite2D';
-import { Group2D } from '@/nodes/2D/Group2D';
-import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
-import { PointLightNode } from '@/nodes/3D/PointLightNode';
-import { SpotLightNode } from '@/nodes/3D/SpotLightNode';
+import { NodeBase, type NodeBaseProps } from '../nodes/NodeBase';
+import { Node3D } from '../nodes/Node3D';
+import { MeshInstance } from '../nodes/3D/MeshInstance';
+import { Sprite2D } from '../nodes/2D/Sprite2D';
+import { Group2D } from '../nodes/2D/Group2D';
+import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
+import { PointLightNode } from '../nodes/3D/PointLightNode';
+import { SpotLightNode } from '../nodes/3D/SpotLightNode';
 import type { SceneGraph } from './SceneManager';
 
-import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
+import { GeometryMesh } from '../nodes/3D/GeometryMesh';
 
-import { Camera3D } from '@/nodes/3D/Camera3D';
+import { Camera3D } from '../nodes/3D/Camera3D';
 
-import { Node2D } from '@/nodes/Node2D';
+import { Node2D } from '../nodes/Node2D';
 import { AssetLoader } from './AssetLoader';
-import { ScriptRegistry } from '@/services/ScriptRegistry';
+import { ScriptRegistry } from './ScriptRegistry';
 
 const ZERO_VECTOR3 = new Vector3(0, 0, 0);
 const UNIT_VECTOR3 = new Vector3(1, 1, 1);
@@ -109,15 +108,14 @@ export interface ParseSceneOptions {
   filePath?: string;
 }
 
-@injectable()
 export class SceneLoader {
-  @inject(AssetLoader)
-  private readonly assetLoader!: AssetLoader;
+  private readonly assetLoader: AssetLoader;
+  private readonly scriptRegistry: ScriptRegistry;
 
-  @inject(ScriptRegistry)
-  private readonly scriptRegistry!: ScriptRegistry;
-
-  constructor() {}
+  constructor(assetLoader: AssetLoader, scriptRegistry: ScriptRegistry) {
+    this.assetLoader = assetLoader;
+    this.scriptRegistry = scriptRegistry;
+  }
 
   async parseScene(sceneText: string, options: ParseSceneOptions = {}): Promise<SceneGraph> {
     let document: SceneDocument;

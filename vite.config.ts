@@ -9,6 +9,7 @@ export default defineConfig({
       '@/services': resolve(__dirname, 'src/services'),
       '@/state': resolve(__dirname, 'src/state'),
       '@/fw': resolve(__dirname, 'src/fw'),
+      '@pix3/runtime': resolve(__dirname, 'packages/pix3-runtime/src'),
     },
   },
 });

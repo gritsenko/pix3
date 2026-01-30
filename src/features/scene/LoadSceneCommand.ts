@@ -1,9 +1,9 @@
 import { inject } from '@/fw/di';
 import { ResourceManager } from '@/services/ResourceManager';
-import { SceneManager } from '@/core/SceneManager';
-import { SceneValidationError } from '@/core/SceneLoader';
+import { SceneManager } from '@pix3/runtime';
+import { SceneValidationError } from '@pix3/runtime';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
-import type { SceneGraph } from '@/core/SceneManager';
+import type { SceneGraph } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import {
   CommandBase,

@@ -1,7 +1,7 @@
 import { Vector2 } from 'three';
 
-import { Node2D, type Node2DProps } from '@/nodes/Node2D';
-import type { PropertySchema } from '@/fw';
+import { Node2D, type Node2DProps } from '../Node2D';
+import type { PropertySchema } from '../../fw/property-schema';
 
 export interface Group2DProps extends Omit<Node2DProps, 'type'> {
   width?: number;

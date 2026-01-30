@@ -4,9 +4,8 @@
  * Maintains a unified registry of script components.
  */
 
-import { injectable } from '@/fw/di';
-import type { PropertySchema } from '@/fw';
-import type { ScriptComponent } from '@/core/ScriptComponent';
+import type { PropertySchema } from '../fw/property-schema';
+import type { ScriptComponent } from './ScriptComponent';
 
 /**
  * Type for classes that have a static getPropertySchema method
@@ -41,7 +40,6 @@ export interface ComponentTypeInfo {
 /**
  * Registry service for script components
  */
-@injectable()
 export class ScriptRegistry {
   // Unified component registry
   private components = new Map<string, ComponentTypeInfo>();

@@ -4,9 +4,9 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { MeshInstance } from '@/nodes/3D/MeshInstance';
-import { SceneManager } from '@/core/SceneManager';
-import { AssetLoader } from '@/core/AssetLoader';
+import { MeshInstance } from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
+import { AssetLoader } from '@pix3/runtime';
 import { getAppStateSnapshot } from '@/state';
 import { ref } from 'valtio/vanilla';
 

@@ -9,7 +9,7 @@ import {
   AddModelOperation,
   type AddModelOperationParams,
 } from '@/features/scene/AddModelOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export type AddModelCommandPayload = object;
 

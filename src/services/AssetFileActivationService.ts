@@ -2,8 +2,8 @@ import { injectable, inject } from '@/fw/di';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { AddModelCommand } from '@/features/scene/AddModelCommand';
 import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
-import { SceneManager } from '@/core/SceneManager';
-import type { SceneGraph } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
+import type { SceneGraph } from '@pix3/runtime';
 import { EditorTabService } from '@/services/EditorTabService';
 
 export interface AssetActivation {

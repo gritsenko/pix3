@@ -1,5 +1,5 @@
 import { BoxGeometry, Mesh, MeshStandardMaterial, Color, BufferGeometry, Material } from 'three';
-import { Node3D, type Node3DProps } from '@/nodes/Node3D';
+import { Node3D, type Node3DProps } from '../Node3D';
 
 export interface GeometryMeshProps extends Omit<Node3DProps, 'type'> {
   geometry?: string;

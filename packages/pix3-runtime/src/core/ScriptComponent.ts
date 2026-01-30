@@ -5,8 +5,8 @@
  * This system follows the PropertySchema pattern for dynamic parameter configuration.
  */
 
-import type { PropertySchema } from '@/fw';
-import type { NodeBase } from '@/nodes/NodeBase';
+import type { PropertySchema } from '../fw/property-schema';
+import type { NodeBase } from '../nodes/NodeBase';
 
 /**
  * Type helper for constructors

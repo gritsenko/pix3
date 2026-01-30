@@ -1,18 +1,17 @@
 import { stringify } from 'yaml';
 import { MathUtils, PerspectiveCamera, OrthographicCamera } from 'three';
 
-import { injectable } from '@/fw/di';
-import { NodeBase } from '@/nodes/NodeBase';
-import { Node3D } from '@/nodes/Node3D';
-import { Node2D } from '@/nodes/Node2D';
-import { Group2D } from '@/nodes/2D/Group2D';
-import { Sprite2D } from '@/nodes/2D/Sprite2D';
-import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
-import { PointLightNode } from '@/nodes/3D/PointLightNode';
-import { SpotLightNode } from '@/nodes/3D/SpotLightNode';
-import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
-import { Camera3D } from '@/nodes/3D/Camera3D';
-import { MeshInstance } from '@/nodes/3D/MeshInstance';
+import { NodeBase } from '../nodes/NodeBase';
+import { Node3D } from '../nodes/Node3D';
+import { Node2D } from '../nodes/Node2D';
+import { Group2D } from '../nodes/2D/Group2D';
+import { Sprite2D } from '../nodes/2D/Sprite2D';
+import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
+import { PointLightNode } from '../nodes/3D/PointLightNode';
+import { SpotLightNode } from '../nodes/3D/SpotLightNode';
+import { GeometryMesh } from '../nodes/3D/GeometryMesh';
+import { Camera3D } from '../nodes/3D/Camera3D';
+import { MeshInstance } from '../nodes/3D/MeshInstance';
 import type { SceneGraph } from './SceneManager';
 import type { SceneNodeDefinition } from './SceneLoader';
 
@@ -23,7 +22,6 @@ interface SceneDocument {
   root: SceneNodeDefinition[];
 }
 
-@injectable()
 export class SceneSaver {
   constructor() {}
 
@@ -31,11 +29,6 @@ export class SceneSaver {
    * Serialize a scene graph back to YAML format for saving.
    */
   serializeScene(graph: SceneGraph): string {
-    console.debug('[SceneSaver] Starting serialization', {
-      rootNodeCount: graph.rootNodes.length,
-      version: graph.version,
-    });
-
     const rootDefinitions: SceneNodeDefinition[] = graph.rootNodes.map(node =>
       this.serializeNode(node)
     );
@@ -92,11 +85,6 @@ export class SceneSaver {
 
     // Replace expanded pivot arrays with inline format
     yaml = yaml.replace(/pivot:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'pivot: [$1, $2]');
-
-    console.debug('[SceneSaver] Serialization complete', {
-      yamlLength: yaml.length,
-      rootDefinitionCount: rootDefinitions.length,
-    });
 
     return yaml;
   }
@@ -264,9 +252,5 @@ export class SceneSaver {
     }
 
     return props;
-  }
-
-  dispose(): void {
-    // No resources to clean up
   }
 }

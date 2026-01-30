@@ -4,7 +4,7 @@
  * Helper functions for working with property schemas in the inspector.
  */
 
-import type { NodeBase } from '@/nodes/NodeBase';
+import type { NodeBase } from '../nodes/NodeBase';
 import type { PropertySchema, PropertyDefinition } from './property-schema';
 
 /**

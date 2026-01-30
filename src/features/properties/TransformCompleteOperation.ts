@@ -5,8 +5,8 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { Node3D } from '@/nodes/Node3D';
-import { SceneManager } from '@/core/SceneManager';
+import { Node3D } from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 
 export interface TransformState {

@@ -1,7 +1,6 @@
-import { injectable, inject } from '@/fw/di';
+import type { NodeBase } from '../nodes/NodeBase';
 import { SceneLoader, type ParseSceneOptions } from './SceneLoader';
 import { SceneSaver } from './SceneSaver';
-import type { NodeBase } from '../nodes/NodeBase';
 
 export interface SceneGraph {
   version: string;
@@ -11,15 +10,17 @@ export interface SceneGraph {
   metadata: Record<string, unknown>;
 }
 
-@injectable()
 export class SceneManager {
-  @inject(SceneLoader) private readonly sceneLoader!: SceneLoader;
-  @inject(SceneSaver) private readonly sceneSaver!: SceneSaver;
+  private readonly sceneLoader: SceneLoader;
+  private readonly sceneSaver: SceneSaver;
 
   private readonly sceneGraphs = new Map<string, SceneGraph>();
   private activeSceneId: string | null = null;
 
-  constructor() {}
+  constructor(sceneLoader: SceneLoader, sceneSaver: SceneSaver) {
+    this.sceneLoader = sceneLoader;
+    this.sceneSaver = sceneSaver;
+  }
 
   async parseScene(sceneText: string, options: ParseSceneOptions = {}): Promise<SceneGraph> {
     return await this.sceneLoader.parseScene(sceneText, options);
@@ -33,12 +34,10 @@ export class SceneManager {
     this.sceneGraphs.set(sceneId, graph);
     this.activeSceneId = sceneId;
     // Debug logging to help trace when scenes are registered as active
-    if (process.env.NODE_ENV === 'development') {
-      console.debug('[SceneManager] setActiveSceneGraph', {
-        sceneId,
-        rootCount: graph.rootNodes.length,
-      });
-    }
+    console.debug('[SceneManager] setActiveSceneGraph', {
+      sceneId,
+      rootCount: graph.rootNodes.length,
+    });
   }
 
   getSceneGraph(sceneId: string): SceneGraph | null {

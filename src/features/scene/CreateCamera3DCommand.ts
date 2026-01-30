@@ -9,7 +9,7 @@ import {
   CreateCamera3DOperation,
   type CreateCamera3DOperationParams,
 } from '@/features/scene/CreateCamera3DOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export interface CreateCamera3DCommandPayload {
   nodeId: string;

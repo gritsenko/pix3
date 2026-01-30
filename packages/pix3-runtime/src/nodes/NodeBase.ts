@@ -1,6 +1,6 @@
 import { Object3D } from 'three';
-import type { PropertySchema } from '@/fw';
-import type { ScriptComponent, Constructor } from '@/core/ScriptComponent';
+import type { PropertySchema } from '../fw/property-schema';
+import type { ScriptComponent, Constructor } from '../core/ScriptComponent';
 
 export interface NodeMetadata {
   [key: string]: unknown;
@@ -19,7 +19,7 @@ export class NodeBase extends Object3D {
   readonly nodeId: string;
   readonly type: string;
   override name: string;
-  override children!: NodeBase[];
+  declare children: NodeBase[];
   readonly properties: Record<string, unknown>;
   readonly metadata: NodeMetadata;
   readonly instancePath: string | null;

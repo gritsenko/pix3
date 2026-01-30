@@ -5,27 +5,47 @@
     "emitDecoratorMetadata": true,
     "useDefineForClassFields": false,
     "module": "ESNext",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "types": ["vite/client", "vitest"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "types": [
+      "vite/client",
+      "vitest"
+    ],
     "skipLibCheck": true,
-
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
-
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@/core/*": ["src/core/*"],
-      "@/services/*": ["src/services/*"],
-      "@/state/*": ["src/state/*"],
-      "@/fw/*": ["src/fw/*"]
+      "@/*": [
+        "src/*"
+      ],
+      "@/core/*": [
+        "src/core/*"
+      ],
+      "@/services/*": [
+        "src/services/*"
+      ],
+      "@/state/*": [
+        "src/state/*"
+      ],
+      "@/fw/*": [
+        "src/fw/*"
+      ],
+      "@pix3/runtime": [
+        "packages/pix3-runtime/src"
+      ],
+      "@pix3/runtime/*": [
+        "packages/pix3-runtime/src/*"
+      ]
     },
-
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,
@@ -33,5 +53,8 @@
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src"]
+  "include": [
+    "src",
+    "packages/pix3-runtime/src"
+  ]
 }

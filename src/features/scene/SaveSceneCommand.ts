@@ -6,7 +6,7 @@ import {
   type CommandPreconditionResult,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 import {
   SaveSceneOperation,
   type SaveSceneOperationParams,

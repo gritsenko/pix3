@@ -2,7 +2,7 @@ import {
   defineProperty,
   type PropertyDefinition,
   type PropertyUIHints,
-} from '@/fw/property-schema';
+} from '../fw/property-schema';
 import type { Node2D } from './Node2D';
 import type { Node3D } from './Node3D';
 

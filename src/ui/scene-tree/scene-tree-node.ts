@@ -8,7 +8,7 @@ import { appState } from '@/state';
 import { CommandDispatcher } from '@/services';
 import { IconService, IconSize } from '@/services/IconService';
 import { ServiceContainer } from '@/fw/di';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 import { canDropNode } from '@/fw/hierarchy-validation';
 import {
   selectObject,

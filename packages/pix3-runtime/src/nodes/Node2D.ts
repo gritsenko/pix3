@@ -1,7 +1,7 @@
 import { MathUtils, Vector2 } from 'three';
 
 import { NodeBase, type NodeBaseProps } from './NodeBase';
-import type { PropertySchema } from '@/fw';
+import type { PropertySchema } from '../fw/property-schema';
 
 export interface Node2DProps extends Omit<NodeBaseProps, 'type'> {
   position?: Vector2;

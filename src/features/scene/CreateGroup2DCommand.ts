@@ -9,7 +9,7 @@ import {
   CreateGroup2DOperation,
   type CreateGroup2DOperationParams,
 } from '@/features/scene/CreateGroup2DOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export interface CreateGroup2DCommandPayload {
   nodeId: string;

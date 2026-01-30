@@ -1,7 +1,6 @@
-import { inject, injectable } from '@/fw/di';
-import { ResourceManager } from '@/services/ResourceManager';
-import { MeshInstance } from '@/nodes/3D/MeshInstance';
-import { NodeBase } from '@/nodes/NodeBase';
+import { ResourceManager } from './ResourceManager';
+import { MeshInstance } from '../nodes/3D/MeshInstance';
+import { NodeBase } from '../nodes/NodeBase';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AnimationClip } from 'three';
 
@@ -10,7 +9,7 @@ export interface AssetLoaderResult {
 }
 
 /**
- * AssetLoader is responsible for loading asset files from res:// or templ:// URLs
+ * AssetLoader is responsible for loading asset files from various URLs
  * and converting them to concrete NodeBase instances in the scene tree.
  *
  * Supported formats:
@@ -18,14 +17,16 @@ export interface AssetLoaderResult {
  * - (TODO) .png / .jpg → Sprite2D
  * - (TODO) .mp3 / .ogg → AudioNode
  */
-@injectable()
 export class AssetLoader {
-  @inject(ResourceManager)
-  private readonly resources!: ResourceManager;
+  private readonly resources: ResourceManager;
+
+  constructor(resources: ResourceManager) {
+    this.resources = resources;
+  }
 
   /**
    * Load an asset file and return a NodeBase instance.
-   * @param resourcePath res:// or templ:// path to the asset file
+   * @param resourcePath Path to the asset file
    * @param nodeId Optional node ID; generates UUID if not provided
    * @param nodeName Optional node name; defaults to asset filename
    * @returns Loaded asset as a NodeBase instance
@@ -60,7 +61,7 @@ export class AssetLoader {
 
   /**
    * Load a GLB/GLTF file and convert it to a MeshInstance node.
-   * @param resourcePath res:// or templ:// path to the .glb/.gltf file
+   * @param resourcePath Path to the .glb/.gltf file
    * @param nodeId Optional node ID; generates UUID if not provided
    * @param nodeName Optional node name; defaults to 'mesh' if not provided
    * @returns MeshInstance node with loaded geometry and animations
@@ -117,9 +118,5 @@ export class AssetLoader {
   private getExtension(resourcePath: string): string {
     const match = resourcePath.match(/\.([a-z0-9]+)$/i);
     return match ? match[1].toLowerCase() : '';
-  }
-
-  dispose(): void {
-    // No resources to clean up
   }
 }

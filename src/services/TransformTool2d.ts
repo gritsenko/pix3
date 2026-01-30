@@ -9,8 +9,8 @@
  */
 
 import * as THREE from 'three';
-import { Node2D } from '@/nodes/Node2D';
-import type { SceneGraph } from '@/core/SceneManager';
+import { Node2D } from '@pix3/runtime';
+import type { SceneGraph } from '@pix3/runtime';
 
 export type TwoDHandle =
   | 'idle'

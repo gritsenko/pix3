@@ -1,5 +1,5 @@
 import { injectable } from '@/fw/di';
-import type { ComponentTypeInfo } from './ScriptRegistry';
+import type { ComponentTypeInfo } from '@pix3/runtime';
 
 export interface ComponentPickerInstance {
   id: string;

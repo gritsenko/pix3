@@ -1,4 +1,4 @@
-import type { SceneGraph } from './SceneManager';
+import type { SceneGraph } from '@pix3/runtime';
 import type { AppState } from '@/state';
 import { SceneStateUpdater } from './SceneStateUpdater';
 

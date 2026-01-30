@@ -2,22 +2,16 @@
  * Register built-in script components
  *
  * This module registers all built-in script components with the ScriptRegistry.
- * Import this module early in the application lifecycle to ensure components
- * are available when scenes are loaded.
+ * Import this module and pass the registry instance to register components.
  */
 
-import { ServiceContainer } from '@/fw/di';
-import { ScriptRegistry } from '@/services/ScriptRegistry';
+import { ScriptRegistry } from '../core/ScriptRegistry';
 import { TestRotateBehavior } from './TestRotateBehavior';
 
 /**
  * Register all built-in script components
  */
-export function registerBuiltInScripts(): void {
-  const container = ServiceContainer.getInstance();
-  const token = container.getOrCreateToken(ScriptRegistry);
-  const registry = container.getService<ScriptRegistry>(token);
-
+export function registerBuiltInScripts(registry: ScriptRegistry): void {
   // Register test/example components
   registry.registerComponent({
     id: 'test_rotate',

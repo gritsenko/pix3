@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NodeBase } from '@/nodes/NodeBase';
-import { Script } from '@/core/ScriptComponent';
-import type { Constructor } from '@/core/ScriptComponent';
+import { NodeBase } from '@pix3/runtime';
+import { Script } from '@pix3/runtime';
+import type { Constructor } from '@pix3/runtime';
 
 // Test component implementation
 class TestComponent extends Script {

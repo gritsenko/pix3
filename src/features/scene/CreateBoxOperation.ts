@@ -4,8 +4,8 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
-import { SceneManager } from '@/core/SceneManager';
+import { GeometryMesh } from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 
 export interface CreateBoxOperationParams {

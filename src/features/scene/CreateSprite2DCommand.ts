@@ -9,7 +9,7 @@ import {
   CreateSprite2DOperation,
   type CreateSprite2DOperationParams,
 } from '@/features/scene/CreateSprite2DOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export interface CreateSprite2DCommandPayload {
   nodeId: string;

@@ -4,7 +4,7 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 import { getAppStateSnapshot } from '@/state';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
 import { FileWatchService } from '@/services/FileWatchService';

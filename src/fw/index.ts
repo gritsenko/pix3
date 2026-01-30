@@ -9,7 +9,8 @@ import { subscribe } from 'valtio/vanilla';
 export * from './component-base';
 export * from './di';
 export * from './layout-component-base';
-export * from './property-schema';
-export * from './property-schema-utils';
+
+// These now come from the runtime package
+export * from '@pix3/runtime';
 
 export { html, css, unsafeCSS, customElement, property, state, inject, fromQuery, subscribe };

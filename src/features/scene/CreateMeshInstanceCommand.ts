@@ -9,7 +9,7 @@ import {
   CreateMeshInstanceOperation,
   type CreateMeshInstanceOperationParams,
 } from '@/features/scene/CreateMeshInstanceOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export interface CreateMeshInstanceCommandPayload {
   nodeId: string;

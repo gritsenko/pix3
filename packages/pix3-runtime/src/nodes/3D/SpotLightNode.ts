@@ -1,7 +1,7 @@
 import { Color, SpotLight } from 'three';
-import { Node3D, type Node3DProps } from '@/nodes/Node3D';
-import type { PropertySchema } from '@/fw/property-schema';
-import { defineProperty, mergeSchemas } from '@/fw/property-schema';
+import { Node3D, type Node3DProps } from '../Node3D';
+import type { PropertySchema } from '../../fw/property-schema';
+import { defineProperty, mergeSchemas } from '../../fw/property-schema';
 
 export interface SpotLightNodeProps extends Omit<Node3DProps, 'type'> {
   color?: string;

@@ -9,7 +9,7 @@ import {
   CreatePointLightOperation,
   type CreatePointLightOperationParams,
 } from '@/features/scene/CreatePointLightOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export interface CreatePointLightCommandPayload {
   nodeId: string;
