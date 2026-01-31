@@ -33,9 +33,13 @@ export class EditorResourceManager extends RuntimeResourceManager {
     const scheme = this.getScheme(resource);
 
     if (scheme === RES_SCHEME) {
-       // Note: FileSystemAPIService might need a readBlob equivalent or we use the network fallback
-       // For now, let's use the buildPublicUrl fallback which is what the previous implementation did mostly
-       return super.readBlob(this.buildPublicUrl(resource));
+      const path = resource.startsWith('res://') ? resource.substring(6) : resource;
+      try {
+        return await this.fileSystem.readBlob(path);
+      } catch (error) {
+        // Fallback to network
+        return super.readBlob(this.buildPublicUrl(resource));
+      }
     }
 
     return super.readBlob(resource);
@@ -44,7 +48,7 @@ export class EditorResourceManager extends RuntimeResourceManager {
   override normalize(resource: string): string {
     const scheme = this.getScheme(resource);
     if (scheme === RES_SCHEME) {
-        return this.fileSystem.normalizeResourcePath(resource);
+      return this.fileSystem.normalizeResourcePath(resource);
     }
     return super.normalize(resource);
   }

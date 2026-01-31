@@ -159,6 +159,15 @@ export class FileSystemAPIService {
     }
   }
 
+  async readBlob(path: string, options?: { mode?: PermissionMode }): Promise<Blob> {
+    const fileHandle = await this.resolveFileHandle(path, options?.mode ?? 'read');
+    try {
+      return await fileHandle.getFile();
+    } catch (error) {
+      throw this.normalizeError(error, `Failed to read blob at ${path}`);
+    }
+  }
+
   async readScene<TScene = unknown>(
     path: string,
     options?: { mode?: PermissionMode }
@@ -243,9 +252,9 @@ export class FileSystemAPIService {
         typeof window === 'undefined'
           ? undefined
           : (window as Window &
-              typeof globalThis & {
-                showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
-              });
+            typeof globalThis & {
+              showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+            });
 
       const picker = globalWindow?.showDirectoryPicker;
       if (typeof picker !== 'function') {
