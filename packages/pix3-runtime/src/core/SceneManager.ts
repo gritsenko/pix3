@@ -1,6 +1,7 @@
 import type { NodeBase } from '../nodes/NodeBase';
 import { SceneLoader, type ParseSceneOptions } from './SceneLoader';
 import { SceneSaver } from './SceneSaver';
+import { Group2D } from '../nodes/2D/Group2D';
 
 export interface SceneGraph {
   version: string;
@@ -53,6 +54,27 @@ export class SceneManager {
     const graph = this.sceneGraphs.get(this.activeSceneId) ?? null;
 
     return graph;
+  }
+
+  /**
+   * Resize the root layout containers to match viewport dimensions.
+   * Triggers layout recalculation for all Group2D root nodes and their children.
+   *
+   * @param width Viewport width in pixels
+   * @param height Viewport height in pixels
+   */
+  resizeRoot(width: number, height: number): void {
+    const graph = this.getActiveSceneGraph();
+    if (!graph) return;
+
+    for (const node of graph.rootNodes) {
+      if (node instanceof Group2D) {
+        // Set the root container size directly
+        node.setSize(width, height);
+        // Trigger layout calculation for this root and all children
+        node.updateLayout(width, height);
+      }
+    }
   }
 
   removeSceneGraph(sceneId: string): void {

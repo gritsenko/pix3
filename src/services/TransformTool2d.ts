@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three';
-import { Node2D } from '@pix3/runtime';
+import { Node2D, Group2D } from '@pix3/runtime';
 import type { SceneGraph } from '@pix3/runtime';
 
 export type TwoDHandle =
@@ -33,6 +33,11 @@ export interface Transform2DState {
   height?: number;
   worldPosition?: THREE.Vector3;
   worldRotationZ?: number;
+  // Anchor data for Group2D nodes (for real-time offset updates during drag)
+  offsetMin?: THREE.Vector2;
+  offsetMax?: THREE.Vector2;
+  parentWidth?: number;
+  parentHeight?: number;
 }
 
 export interface Selection2DOverlay {
@@ -61,6 +66,19 @@ export class TransformTool2d {
   private readonly min2DSizeCssPx = 4;
   private readonly handleSizeCssPx = 10;
 
+  // Handle colors
+  private readonly scaleHandleColor = 0x4e8df5;
+  private readonly scaleHandleHoverColor = 0xffffff; // White for obvious hover
+  private readonly scaleHandleActiveColor = 0xffcf33; // Accent color for active drag
+  private readonly rotateHandleColor = 0xf5b64e;
+  private readonly rotateHandleHoverColor = 0xffffff; // White for obvious hover
+  private readonly rotateHandleActiveColor = 0xffcf33; // Accent color for active drag
+
+  // Currently hovered handle (for visual feedback)
+  private hoveredHandle: TwoDHandle = 'idle';
+  // Currently active/dragging handle
+  private activeHandle: TwoDHandle = 'idle';
+
   private setNodeWorldPosition(node: Node2D, worldPosition: THREE.Vector3): void {
     const parent = node.parent as THREE.Object3D | null;
     if (parent) {
@@ -86,6 +104,46 @@ export class TransformTool2d {
     node.rotation.set(0, 0, worldRotationZ - parentEuler.z);
   }
 
+  /**
+   * Update Group2D offsets during drag to maintain proper anchor-relative positioning.
+   * This provides real-time preview by directly computing offsets from the delta.
+   */
+  private updateGroup2DOffsetsDuringDrag(
+    node: Group2D,
+    startState: Transform2DState,
+    worldDelta: THREE.Vector3
+  ): void {
+    // Convert world delta to local delta (accounting for parent rotation/scale)
+    const parent = node.parent as THREE.Object3D | null;
+    let localDeltaX = worldDelta.x;
+    let localDeltaY = worldDelta.y;
+
+    if (parent) {
+      // Get parent's inverse world matrix to convert delta to parent-local space
+      parent.updateWorldMatrix(true, false);
+      const parentMatrix = parent.matrixWorld.clone();
+      // We only need rotation and scale (not translation) for delta conversion
+      parentMatrix.setPosition(0, 0, 0);
+      const localDelta = new THREE.Vector3(worldDelta.x, worldDelta.y, 0).applyMatrix4(
+        parentMatrix.clone().invert()
+      );
+      localDeltaX = localDelta.x;
+      localDeltaY = localDelta.y;
+    }
+
+    // Apply delta to start offsets
+    if (startState.offsetMin && startState.offsetMax) {
+      node.offsetMin.set(
+        startState.offsetMin.x + localDeltaX,
+        startState.offsetMin.y + localDeltaY
+      );
+      node.offsetMax.set(
+        startState.offsetMax.x + localDeltaX,
+        startState.offsetMax.y + localDeltaY
+      );
+    }
+  }
+
   private getDpr(): number {
     // Keep 2D overlay sizing stable in CSS pixels; the ortho camera uses physical pixels.
     return typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1;
@@ -97,6 +155,13 @@ export class TransformTool2d {
 
   private getHandleSizeWorldPx(): number {
     return this.handleSizeCssPx * this.getDpr();
+  }
+
+  /**
+   * Get the fixed rotation handle offset (public for consistency in ViewportRenderService)
+   */
+  getRotationHandleOffset(): number {
+    return this.getHandleSizeWorldPx() * 3;
   }
 
   /**
@@ -143,6 +208,9 @@ export class TransformTool2d {
     const midX = (min.x + max.x) / 2;
     const midY = (min.y + max.y) / 2;
 
+    // Fixed rotation handle offset (3x handle size for consistent distance)
+    const rotationOffset = this.getHandleSizeWorldPx() * 3;
+
     const positions: Record<Exclude<TwoDHandle, 'idle' | 'move'>, THREE.Vector3> = {
       'scale-nw': new THREE.Vector3(min.x, max.y, z),
       'scale-n': new THREE.Vector3(midX, max.y, z),
@@ -152,16 +220,15 @@ export class TransformTool2d {
       'scale-s': new THREE.Vector3(midX, min.y, z),
       'scale-sw': new THREE.Vector3(min.x, min.y, z),
       'scale-w': new THREE.Vector3(min.x, midY, z),
-      rotate: new THREE.Vector3(midX, max.y + Math.max(max.y - min.y, max.x - min.x) * 0.12, z),
+      rotate: new THREE.Vector3(midX, max.y + rotationOffset, z),
     };
 
     // Ortho camera uses physical pixels as world units (see ViewportRendererService.resize).
     // Keep handles a stable size in CSS pixels by multiplying by DPR.
     const handleSize = this.getHandleSizeWorldPx();
-    const handleColor = 0x4e8df5;
     const handleGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
     const handleMaterial = new THREE.MeshBasicMaterial({
-      color: handleColor,
+      color: this.scaleHandleColor,
       side: THREE.DoubleSide,
       depthTest: false,
       transparent: true,
@@ -169,7 +236,7 @@ export class TransformTool2d {
     });
 
     const rotationMaterial = new THREE.MeshBasicMaterial({
-      color: 0xf5b64e,
+      color: this.rotateHandleColor,
       side: THREE.DoubleSide,
       depthTest: false,
       transparent: true,
@@ -233,6 +300,9 @@ export class TransformTool2d {
     ];
     overlay.frame.geometry.setFromPoints(framePoints);
 
+    // Fixed rotation handle offset (3x handle size for consistent distance)
+    const rotationOffset = this.getHandleSizeWorldPx() * 3;
+
     const handlePositions: Record<string, THREE.Vector3> = {
       'scale-nw': new THREE.Vector3(min.x, max.y, z),
       'scale-n': new THREE.Vector3(midX, max.y, z),
@@ -242,7 +312,7 @@ export class TransformTool2d {
       'scale-s': new THREE.Vector3(midX, min.y, z),
       'scale-sw': new THREE.Vector3(min.x, min.y, z),
       'scale-w': new THREE.Vector3(min.x, midY, z),
-      rotate: new THREE.Vector3(midX, max.y + Math.max(max.y - min.y, max.x - min.x) * 0.12, z),
+      rotate: new THREE.Vector3(midX, max.y + rotationOffset, z),
     };
 
     for (const handle of overlay.handles) {
@@ -291,28 +361,7 @@ export class TransformTool2d {
     raycaster.params.Line.threshold = 6 * this.getDpr();
     raycaster.setFromCamera(mouse, orthographicCamera);
 
-    // DEBUG: log pointer vs all handle positions (in world space)
-    const pointerWorld = this.screenToWorld2D(screenX, screenY, orthographicCamera, viewportSize);
-    console.debug('[TransformTool2d] pointer vs handles:');
-    console.debug(
-      '  pointer:',
-      pointerWorld ? `(${pointerWorld.x.toFixed(0)}, ${pointerWorld.y.toFixed(0)})` : 'null'
-    );
-    console.debug(
-      '  bounds:',
-      `min(${overlay.combinedBounds.min.x.toFixed(0)}, ${overlay.combinedBounds.min.y.toFixed(0)}) max(${overlay.combinedBounds.max.x.toFixed(0)}, ${overlay.combinedBounds.max.y.toFixed(0)})`
-    );
-    for (const h of overlay.handles) {
-      const wp = h.getWorldPosition(new THREE.Vector3());
-      console.debug(`  ${h.userData?.handleType}: (${wp.x.toFixed(0)}, ${wp.y.toFixed(0)})`);
-    }
-
     const hits = raycaster.intersectObjects(overlay.handles, true);
-    console.debug(
-      '[TransformTool2d] raycast hits',
-      hits.length,
-      hits.map(h => h.object.userData?.handleType)
-    );
     if (hits.length) {
       // Prefer actual handle meshes over the rotation connector line.
       const meshHit = hits.find(h => h.object instanceof THREE.Mesh);
@@ -370,7 +419,8 @@ export class TransformTool2d {
         const dims = node as Node2D & { width?: number; height?: number };
         const width = typeof dims.width === 'number' ? dims.width : undefined;
         const height = typeof dims.height === 'number' ? dims.height : undefined;
-        startStates.set(nodeId, {
+
+        const state: Transform2DState = {
           position: node.position.clone(),
           rotation: node.rotation.z,
           scale: new THREE.Vector2(node.scale.x, node.scale.y),
@@ -378,7 +428,19 @@ export class TransformTool2d {
           height,
           worldPosition,
           worldRotationZ: worldEuler.z,
-        });
+        };
+
+        // Capture anchor data for Group2D nodes (for real-time offset updates)
+        if (node instanceof Group2D) {
+          state.offsetMin = node.offsetMin.clone();
+          state.offsetMax = node.offsetMax.clone();
+          // Get parent dimensions
+          const parentGroup = node.parent instanceof Group2D ? node.parent : null;
+          state.parentWidth = parentGroup?.width ?? 0;
+          state.parentHeight = parentGroup?.height ?? 0;
+        }
+
+        startStates.set(nodeId, state);
       }
     }
 
@@ -398,6 +460,38 @@ export class TransformTool2d {
       anchorLocal,
       startSize,
     };
+  }
+
+  /**
+   * Set the active handle being dragged (for visual feedback).
+   * Call at the start of a drag operation.
+   */
+  setActiveHandle(handle: TwoDHandle, overlay: Selection2DOverlay): void {
+    // Clear previous active handle styling
+    if (this.activeHandle !== 'idle') {
+      this.setHandleActiveState(overlay, this.activeHandle, false);
+    }
+    this.activeHandle = handle;
+    if (handle !== 'idle') {
+      this.setHandleActiveState(overlay, handle, true);
+    }
+  }
+
+  /**
+   * Clear the active handle (call at end of drag).
+   */
+  clearActiveHandle(overlay: Selection2DOverlay | undefined): void {
+    if (overlay && this.activeHandle !== 'idle') {
+      this.setHandleActiveState(overlay, this.activeHandle, false);
+    }
+    this.activeHandle = 'idle';
+  }
+
+  /**
+   * Get the currently active/dragging handle.
+   */
+  getActiveHandle(): TwoDHandle {
+    return this.activeHandle;
   }
 
   /**
@@ -432,6 +526,12 @@ export class TransformTool2d {
           const startWorld = startState.worldPosition ?? node.getWorldPosition(new THREE.Vector3());
           const newWorld = startWorld.clone().add(delta);
           this.setNodeWorldPosition(node, newWorld);
+
+          // For Group2D, update offsets in real-time during drag
+          // This ensures proper anchor-relative positioning
+          if (node instanceof Group2D) {
+            this.updateGroup2DOffsetsDuringDrag(node, startState, delta);
+          }
         }
       }
     } else if (handle === 'rotate') {
@@ -589,5 +689,141 @@ export class TransformTool2d {
     const point = new THREE.Vector3(ndc.x, ndc.y, 0);
     point.unproject(orthographicCamera);
     return point;
+  }
+
+  /**
+   * Update hover state for handles based on cursor position.
+   * Returns true if hover state changed (requires re-render).
+   */
+  updateHover(
+    screenX: number,
+    screenY: number,
+    overlay: Selection2DOverlay | undefined,
+    orthographicCamera: THREE.OrthographicCamera | undefined,
+    viewportSize: { width: number; height: number }
+  ): boolean {
+    if (!overlay || !orthographicCamera) {
+      if (this.hoveredHandle !== 'idle') {
+        this.hoveredHandle = 'idle';
+        return true;
+      }
+      return false;
+    }
+
+    const handle = this.getHandleAt(screenX, screenY, overlay, orthographicCamera, viewportSize);
+    if (handle === this.hoveredHandle) {
+      return false;
+    }
+
+    // Reset previous hovered handle color
+    this.setHandleHoverState(overlay, this.hoveredHandle, false);
+
+    // Set new hovered handle color
+    this.hoveredHandle = handle;
+    this.setHandleHoverState(overlay, handle, true);
+
+    return true;
+  }
+
+  /**
+   * Clear hover state (e.g., when cursor leaves viewport)
+   */
+  clearHover(overlay: Selection2DOverlay | undefined): boolean {
+    if (this.hoveredHandle === 'idle') {
+      return false;
+    }
+    if (overlay) {
+      this.setHandleHoverState(overlay, this.hoveredHandle, false);
+    }
+    this.hoveredHandle = 'idle';
+    return true;
+  }
+
+  /**
+   * Get the currently hovered handle
+   */
+  getHoveredHandle(): TwoDHandle {
+    return this.hoveredHandle;
+  }
+
+  /**
+   * Set hover visual state for a specific handle
+   */
+  private setHandleHoverState(
+    overlay: Selection2DOverlay,
+    handle: TwoDHandle,
+    isHovered: boolean
+  ): void {
+    // Don't change color if this handle is actively being dragged
+    if (handle === this.activeHandle && this.activeHandle !== 'idle') {
+      return;
+    }
+
+    if (handle === 'idle' || handle === 'move') {
+      return;
+    }
+
+    for (const obj of overlay.handles) {
+      const handleType = obj.userData?.handleType as TwoDHandle | undefined;
+      if (handleType !== handle) {
+        continue;
+      }
+
+      if (obj instanceof THREE.Mesh) {
+        const material = obj.material as THREE.MeshBasicMaterial;
+        if (handleType === 'rotate') {
+          material.color.setHex(isHovered ? this.rotateHandleHoverColor : this.rotateHandleColor);
+        } else {
+          material.color.setHex(isHovered ? this.scaleHandleHoverColor : this.scaleHandleColor);
+        }
+        material.needsUpdate = true;
+      } else if (obj instanceof THREE.Line) {
+        // Rotation connector line
+        const material = obj.material as THREE.LineBasicMaterial;
+        material.color.setHex(isHovered ? this.rotateHandleHoverColor : this.rotateHandleColor);
+        material.needsUpdate = true;
+      }
+    }
+  }
+
+  /**
+   * Set active (dragging) visual state for a specific handle.
+   * Active handles show in accent color.
+   */
+  private setHandleActiveState(
+    overlay: Selection2DOverlay,
+    handle: TwoDHandle,
+    isActive: boolean
+  ): void {
+    if (handle === 'idle' || handle === 'move') {
+      return;
+    }
+
+    for (const obj of overlay.handles) {
+      const handleType = obj.userData?.handleType as TwoDHandle | undefined;
+      if (handleType !== handle) {
+        continue;
+      }
+
+      if (obj instanceof THREE.Mesh) {
+        const material = obj.material as THREE.MeshBasicMaterial;
+        if (isActive) {
+          material.color.setHex(
+            handleType === 'rotate' ? this.rotateHandleActiveColor : this.scaleHandleActiveColor
+          );
+        } else {
+          // Restore default color
+          material.color.setHex(
+            handleType === 'rotate' ? this.rotateHandleColor : this.scaleHandleColor
+          );
+        }
+        material.needsUpdate = true;
+      } else if (obj instanceof THREE.Line) {
+        // Rotation connector line
+        const material = obj.material as THREE.LineBasicMaterial;
+        material.color.setHex(isActive ? this.rotateHandleActiveColor : this.rotateHandleColor);
+        material.needsUpdate = true;
+      }
+    }
   }
 }

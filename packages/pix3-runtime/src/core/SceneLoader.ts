@@ -290,6 +290,7 @@ export class SceneLoader {
       case 'Group2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
+        const layout = this.asRecord(props.layout);
 
         return new Group2D({
           ...baseProps,
@@ -301,6 +302,14 @@ export class SceneLoader {
               : 0,
           width: this.asNumber(props.width, 100),
           height: this.asNumber(props.height, 100),
+          anchorMin: layout?.anchorMin
+            ? this.readVector2(layout.anchorMin, new Vector2(0.5, 0.5))
+            : undefined,
+          anchorMax: layout?.anchorMax
+            ? this.readVector2(layout.anchorMax, new Vector2(0.5, 0.5))
+            : undefined,
+          offsetMin: layout?.offsetMin ? this.readVector2(layout.offsetMin, ZERO_VECTOR2) : undefined,
+          offsetMax: layout?.offsetMax ? this.readVector2(layout.offsetMax, ZERO_VECTOR2) : undefined,
         });
       }
       case 'GeometryMesh': {

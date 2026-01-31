@@ -74,6 +74,8 @@ export class ViewportRendererService {
   private sprite2DVisuals = new Map<string, THREE.Group>();
   private selection2DOverlay?: Selection2DOverlay;
   private active2DTransform?: Active2DTransform;
+  // Hover preview frame for 2D nodes (before selection)
+  private hoverPreview2D?: { nodeId: string; frame: THREE.LineSegments };
   private animationId?: number;
   private pollIntervalId?: number;
   private isPaused = true;
@@ -459,6 +461,72 @@ export class ViewportRendererService {
       this.orthographicCamera.top = pixelHeight / 2;
       this.orthographicCamera.bottom = -pixelHeight / 2;
       this.orthographicCamera.updateProjectionMatrix();
+    }
+
+    // Trigger layout recalculation for root Group2D nodes
+    this.sceneManager.resizeRoot(pixelWidth, pixelHeight);
+
+    // Sync all 2D visuals after layout recalculation
+    this.syncAll2DVisuals();
+  }
+
+  /**
+   * Sync all Group2D and Sprite2D visuals to match their node state.
+   * Called after layout recalculation to update visual positions/sizes.
+   */
+  private syncAll2DVisuals(): void {
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) return;
+
+    // Recursively update all 2D nodes in the scene
+    const updateNode2DVisuals = (nodes: NodeBase[]) => {
+      for (const node of nodes) {
+        if (node instanceof Group2D) {
+          const visualRoot = this.group2DVisuals.get(node.nodeId);
+          if (visualRoot) {
+            visualRoot.position.copy(node.position);
+            visualRoot.rotation.copy(node.rotation);
+            visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+            const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
+            if (sizeGroup) {
+              sizeGroup.scale.set(node.width, node.height, 1);
+
+              // Update line color based on viewport container status
+              const isViewportContainer = node.isViewportContainer;
+              if (visualRoot.userData.isViewportContainer !== isViewportContainer) {
+                visualRoot.userData.isViewportContainer = isViewportContainer;
+                const line = sizeGroup.children[0] as THREE.LineSegments | undefined;
+                if (line && line.userData.lineMaterial instanceof THREE.LineBasicMaterial) {
+                  line.userData.lineMaterial.color.setHex(
+                    isViewportContainer ? 0x4ecf4e : 0x96cbf6
+                  );
+                }
+              }
+            }
+            visualRoot.visible = node.visible;
+          }
+        } else if (node instanceof Sprite2D) {
+          const visualRoot = this.sprite2DVisuals.get(node.nodeId);
+          if (visualRoot) {
+            visualRoot.position.copy(node.position);
+            visualRoot.rotation.copy(node.rotation);
+            visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+            const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
+            if (sizeGroup) {
+              sizeGroup.scale.set(node.width ?? 64, node.height ?? 64, 1);
+            }
+            visualRoot.visible = node.visible;
+          }
+        }
+        updateNode2DVisuals(node.children);
+      }
+    };
+
+    updateNode2DVisuals(sceneGraph.rootNodes);
+
+    // Also refresh gizmo positions if there's a 2D selection
+    if (this.selection2DOverlay) {
+      this.refreshGizmoPositions();
     }
   }
 
@@ -989,8 +1057,12 @@ export class ViewportRendererService {
     geometry.computeBoundingBox();
 
     // Create line material with 2D node color
+    // Viewport containers get a special green color to indicate viewport alignment
+    const isViewportContainer = node.isViewportContainer;
+    const lineColor = isViewportContainer ? 0x4ecf4e : 0x96cbf6; // Green for viewport, blue for regular
+
     const material = new THREE.LineBasicMaterial({
-      color: 0x96cbf6, // NODE_2D_COLOR
+      color: lineColor,
       linewidth: 2,
     });
 
@@ -1009,6 +1081,7 @@ export class ViewportRendererService {
     line.layers.set(LAYER_2D);
     line.userData.isGroup2DVisual = true;
     line.userData.nodeId = node.nodeId;
+    line.userData.lineMaterial = material; // Store reference for color updates
 
     sizeGroup.add(line);
     root.add(sizeGroup);
@@ -1017,6 +1090,7 @@ export class ViewportRendererService {
     root.userData.isGroup2DVisualRoot = true;
     root.userData.nodeId = node.nodeId;
     root.userData.sizeGroup = sizeGroup;
+    root.userData.isViewportContainer = isViewportContainer;
 
     return root;
   }
@@ -1252,6 +1326,46 @@ export class ViewportRendererService {
     console.debug('[ViewportRenderer] cleared 2D overlay');
   }
 
+  /**
+   * Get bounds for a single 2D node, NOT including its descendants.
+   * Uses the node's own size/transform rather than recursively computing from children.
+   */
+  private getNodeOnlyBounds(node: Node2D): THREE.Box3 {
+    const bounds = new THREE.Box3();
+
+    // Get world transform
+    node.updateWorldMatrix(true, false);
+    const worldMatrix = node.matrixWorld;
+
+    // Determine node size
+    let halfWidth = 50; // Default
+    let halfHeight = 50;
+
+    if (node instanceof Group2D) {
+      halfWidth = node.width / 2;
+      halfHeight = node.height / 2;
+    } else if (node instanceof Sprite2D) {
+      halfWidth = (node.width ?? 64) / 2;
+      halfHeight = (node.height ?? 64) / 2;
+    }
+
+    // Create local corners (center-origin)
+    const corners = [
+      new THREE.Vector3(-halfWidth, -halfHeight, 0),
+      new THREE.Vector3(halfWidth, -halfHeight, 0),
+      new THREE.Vector3(halfWidth, halfHeight, 0),
+      new THREE.Vector3(-halfWidth, halfHeight, 0),
+    ];
+
+    // Transform corners to world space and expand bounds
+    for (const corner of corners) {
+      corner.applyMatrix4(worldMatrix);
+      bounds.expandByPoint(corner);
+    }
+
+    return bounds;
+  }
+
   private update2DSelectionOverlayForNodes(nodeIds: string[]): void {
     // Don't recreate overlay during an active 2D transform - use refreshGizmoPositions instead
     if (this.active2DTransform) {
@@ -1291,7 +1405,8 @@ export class ViewportRendererService {
         continue;
       }
 
-      const nodeBounds = new THREE.Box3().setFromObject(visual);
+      // Use node-only bounds (not including descendants)
+      const nodeBounds = this.getNodeOnlyBounds(node);
       console.debug('[ViewportRenderer] update2DOverlay: nodeBounds', nodeId, nodeBounds);
       combinedBounds.union(nodeBounds);
       node2DIds.push(nodeId);
@@ -1344,9 +1459,8 @@ export class ViewportRendererService {
     for (const nodeId of this.selection2DOverlay.nodeIds) {
       const node = sceneGraph.nodeMap.get(nodeId);
       if (!node || !(node instanceof Node2D)) continue;
-      const visual = this.get2DVisual(node);
-      if (!visual) continue;
-      const nodeBounds = new THREE.Box3().setFromObject(visual);
+      // Use node-only bounds (not including descendants)
+      const nodeBounds = this.getNodeOnlyBounds(node);
       combinedBounds.union(nodeBounds);
     }
 
@@ -1371,6 +1485,9 @@ export class ViewportRendererService {
     ];
     this.selection2DOverlay.frame.geometry.setFromPoints(framePoints);
 
+    // Use fixed rotation handle offset from TransformTool2d for consistency
+    const rotationOffset = this.transformTool2d.getRotationHandleOffset();
+
     const handlePositions: Record<string, THREE.Vector3> = {
       'scale-nw': new THREE.Vector3(min.x, max.y, z),
       'scale-n': new THREE.Vector3(midX, max.y, z),
@@ -1380,7 +1497,7 @@ export class ViewportRendererService {
       'scale-s': new THREE.Vector3(midX, min.y, z),
       'scale-sw': new THREE.Vector3(min.x, min.y, z),
       'scale-w': new THREE.Vector3(min.x, midY, z),
-      rotate: new THREE.Vector3(midX, max.y + Math.max(max.y - min.y, max.x - min.x) * 0.12, z),
+      rotate: new THREE.Vector3(midX, max.y + rotationOffset, z),
     };
 
     for (const handle of this.selection2DOverlay.handles) {
@@ -1413,13 +1530,7 @@ export class ViewportRendererService {
   }
 
   get2DHandleAt(screenX: number, screenY: number): TwoDHandle {
-    console.debug('[ViewportRenderer] get2DHandleAt called', {
-      screenX,
-      screenY,
-      hasOverlay: !!this.selection2DOverlay,
-    });
     if (!this.selection2DOverlay || !this.orthographicCamera) {
-      console.debug('[ViewportRenderer] get2DHandleAt: no overlay or camera');
       return 'idle';
     }
 
@@ -1434,6 +1545,141 @@ export class ViewportRendererService {
 
   has2DTransform(): boolean {
     return this.active2DTransform !== undefined;
+  }
+
+  /**
+   * Update handle hover state for visual feedback.
+   * Returns true if hover state changed (requires re-render).
+   */
+  updateHandleHover(screenX: number, screenY: number): boolean {
+    return this.transformTool2d.updateHover(
+      screenX,
+      screenY,
+      this.selection2DOverlay,
+      this.orthographicCamera,
+      this.viewportSize
+    );
+  }
+
+  /**
+   * Clear handle hover state (e.g., when cursor leaves viewport)
+   */
+  clearHandleHover(): boolean {
+    return this.transformTool2d.clearHover(this.selection2DOverlay);
+  }
+
+  /**
+   * Update 2D hover preview frame based on pointer position.
+   * Shows a preview frame around the 2D node under the cursor.
+   * Group2D nodes show in a different color.
+   * Returns true if the hover state changed.
+   */
+  update2DHoverPreview(screenX: number, screenY: number): boolean {
+    // Don't show hover preview during active transform or if selection overlay is being interacted with
+    if (this.active2DTransform) {
+      return this.clear2DHoverPreview();
+    }
+
+    // Don't show preview if pointer is over selection handles
+    const handleType = this.get2DHandleAt(screenX, screenY);
+    if (handleType !== 'idle') {
+      return this.clear2DHoverPreview();
+    }
+
+    // Raycast to find 2D node under pointer
+    const hit = this.raycast2D(screenX, screenY);
+
+    // If no hit or same node, check if we should clear
+    if (!hit) {
+      return this.clear2DHoverPreview();
+    }
+
+    // Check if this node is already selected (don't show preview for selected nodes)
+    const selectedNodeIds = appState.selection.nodeIds;
+    if (selectedNodeIds.includes(hit.nodeId)) {
+      return this.clear2DHoverPreview();
+    }
+
+    // If same node, no change needed
+    if (this.hoverPreview2D?.nodeId === hit.nodeId) {
+      return false;
+    }
+
+    // Clear previous preview
+    this.clear2DHoverPreview();
+
+    // Create new preview frame for this node
+    if (hit instanceof Node2D && this.scene) {
+      const bounds = this.getNodeOnlyBounds(hit);
+      const isGroup2D = hit instanceof Group2D;
+
+      // Create preview frame with different color for Group2D
+      const previewColor = isGroup2D ? 0x4ecf4e : 0xffffff; // Green for Group2D, white for others
+      const frame = this.create2DHoverPreviewFrame(bounds, previewColor);
+
+      this.scene.add(frame);
+      this.hoverPreview2D = { nodeId: hit.nodeId, frame };
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * Clear the 2D hover preview frame.
+   * Returns true if there was a preview to clear.
+   */
+  clear2DHoverPreview(): boolean {
+    if (!this.hoverPreview2D) {
+      return false;
+    }
+
+    if (this.scene && this.hoverPreview2D.frame) {
+      this.scene.remove(this.hoverPreview2D.frame);
+      this.hoverPreview2D.frame.geometry.dispose();
+      if (this.hoverPreview2D.frame.material instanceof THREE.Material) {
+        this.hoverPreview2D.frame.material.dispose();
+      }
+    }
+
+    this.hoverPreview2D = undefined;
+    return true;
+  }
+
+  /**
+   * Create a preview frame for hovering over 2D nodes.
+   */
+  private create2DHoverPreviewFrame(bounds: THREE.Box3, color: number): THREE.LineSegments {
+    const min = bounds.min;
+    const max = bounds.max;
+    const z = (min.z + max.z) / 2 + 0.1; // Slightly above to prevent z-fighting
+
+    const points = [
+      new THREE.Vector3(min.x, min.y, z),
+      new THREE.Vector3(max.x, min.y, z),
+      new THREE.Vector3(max.x, min.y, z),
+      new THREE.Vector3(max.x, max.y, z),
+      new THREE.Vector3(max.x, max.y, z),
+      new THREE.Vector3(min.x, max.y, z),
+      new THREE.Vector3(min.x, max.y, z),
+      new THREE.Vector3(min.x, min.y, z),
+    ];
+
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    const material = new THREE.LineBasicMaterial({
+      color,
+      linewidth: 1,
+      depthTest: false,
+      transparent: true,
+      opacity: 0.6,
+    });
+
+    const frame = new THREE.LineSegments(geometry, material);
+    frame.userData.isHoverPreview = true;
+    frame.renderOrder = 999; // Just below selection overlay
+    frame.layers.set(LAYER_2D);
+
+    return frame;
   }
 
   start2DTransform(screenX: number, screenY: number, handle: TwoDHandle): void {
@@ -1458,6 +1704,8 @@ export class ViewportRendererService {
 
     if (transform) {
       this.active2DTransform = transform;
+      // Set active handle for visual feedback (accent color during drag)
+      this.transformTool2d.setActiveHandle(handle, this.selection2DOverlay);
       this.begin2DInteraction();
       console.debug('[ViewportRenderer] start 2D transform', {
         handle,
@@ -1490,6 +1738,19 @@ export class ViewportRendererService {
       const node = sceneGraph.nodeMap.get(nodeId);
       if (node && node instanceof Node2D) {
         this.updateNodeTransform(node);
+        // If resizing a Group2D, update layout for children only (do not recompute node itself)
+        if (
+          node instanceof Group2D &&
+          this.active2DTransform.handle !== 'move' &&
+          this.active2DTransform.handle !== 'rotate'
+        ) {
+          for (const child of node.children) {
+            if (child instanceof Group2D) {
+              child.updateLayout(node.width, node.height);
+            }
+          }
+          this.syncAll2DVisuals();
+        }
       }
     }
   }
@@ -1499,12 +1760,23 @@ export class ViewportRendererService {
       return;
     }
 
-    const { nodeIds, startStates } = this.active2DTransform;
+    const { nodeIds, startStates, handle } = this.active2DTransform;
     const sceneGraph = this.sceneManager.getActiveSceneGraph();
     if (!sceneGraph) {
       this.active2DTransform = undefined;
       this.end2DInteraction();
       return;
+    }
+
+    // If this was a move operation, recalculate offsets for Group2D nodes
+    // so they maintain their new position relative to parent anchors
+    if (handle === 'move') {
+      for (const nodeId of nodeIds) {
+        const node = sceneGraph.nodeMap.get(nodeId);
+        if (node && node instanceof Group2D) {
+          node.recalculateOffsets();
+        }
+      }
     }
 
     for (const nodeId of nodeIds) {
@@ -1534,6 +1806,12 @@ export class ViewportRendererService {
           : {}),
       };
 
+      // Include offsets for Group2D nodes
+      if (node instanceof Group2D) {
+        currentState.offsetMin = { x: node.offsetMin.x, y: node.offsetMin.y };
+        currentState.offsetMax = { x: node.offsetMax.x, y: node.offsetMax.y };
+      }
+
       const op = new Transform2DCompleteOperation({
         nodeId,
         previousState,
@@ -1544,6 +1822,8 @@ export class ViewportRendererService {
     }
 
     const savedNodeIds = [...nodeIds];
+    // Clear active handle visual feedback before clearing the transform
+    this.transformTool2d.clearActiveHandle(this.selection2DOverlay);
     this.active2DTransform = undefined;
     this.end2DInteraction();
     this.update2DSelectionOverlayForNodes(savedNodeIds);

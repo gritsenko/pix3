@@ -86,6 +86,24 @@ export class SceneSaver {
     // Replace expanded pivot arrays with inline format
     yaml = yaml.replace(/pivot:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'pivot: [$1, $2]');
 
+    // Replace expanded layout anchor/offset arrays with inline format
+    yaml = yaml.replace(
+      /anchorMin:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'anchorMin: [$1, $2]'
+    );
+    yaml = yaml.replace(
+      /anchorMax:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'anchorMax: [$1, $2]'
+    );
+    yaml = yaml.replace(
+      /offsetMin:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'offsetMin: [$1, $2]'
+    );
+    yaml = yaml.replace(
+      /offsetMax:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'offsetMax: [$1, $2]'
+    );
+
     return yaml;
   }
 
@@ -184,6 +202,51 @@ export class SceneSaver {
         rotation: MathUtils.radToDeg(node.rotation.z),
       };
       props.transform = transform;
+
+      // Serialize layout properties (only if non-default)
+      const anchorMin = node.anchorMin;
+      const anchorMax = node.anchorMax;
+      const offsetMin = node.offsetMin;
+      const offsetMax = node.offsetMax;
+
+      // Default anchors are (0.5, 0.5) - only save if different
+      const hasCustomAnchors =
+        anchorMin.x !== 0.5 ||
+        anchorMin.y !== 0.5 ||
+        anchorMax.x !== 0.5 ||
+        anchorMax.y !== 0.5;
+
+      // Default offsets depend on size, so save if anchors are custom or offsets are non-zero
+      const hasCustomOffsets =
+        hasCustomAnchors ||
+        offsetMin.x !== -node.width / 2 ||
+        offsetMin.y !== -node.height / 2 ||
+        offsetMax.x !== node.width / 2 ||
+        offsetMax.y !== node.height / 2;
+
+      if (hasCustomAnchors || hasCustomOffsets) {
+        const layout: Record<string, unknown> = {};
+
+        if (hasCustomAnchors) {
+          // Round anchors to 2 decimal places
+          layout.anchorMin = [
+            Math.round(anchorMin.x * 100) / 100,
+            Math.round(anchorMin.y * 100) / 100,
+          ];
+          layout.anchorMax = [
+            Math.round(anchorMax.x * 100) / 100,
+            Math.round(anchorMax.y * 100) / 100,
+          ];
+        }
+
+        if (hasCustomOffsets) {
+          // Round offsets to integers for 2D pixel precision
+          layout.offsetMin = [Math.round(offsetMin.x), Math.round(offsetMin.y)];
+          layout.offsetMax = [Math.round(offsetMax.x), Math.round(offsetMax.y)];
+        }
+
+        props.layout = layout;
+      }
     } else if (node instanceof Node2D) {
       // Generic Node2D transform
       const transform: Record<string, unknown> = {

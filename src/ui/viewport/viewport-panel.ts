@@ -78,6 +78,7 @@ export class ViewportPanel extends ComponentBase {
     this.addEventListener('pointerdown', this.handleCanvasPointerDown);
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
     this.addEventListener('pointerup', this.handleCanvasPointerUp);
+    this.addEventListener('pointerleave', this.handleCanvasPointerLeave);
   }
 
   disconnectedCallback() {
@@ -91,6 +92,7 @@ export class ViewportPanel extends ComponentBase {
     this.removeEventListener('pointerdown', this.handleCanvasPointerDown);
     this.removeEventListener('pointermove', this.handleCanvasPointerMove);
     this.removeEventListener('pointerup', this.handleCanvasPointerUp);
+    this.removeEventListener('pointerleave', this.handleCanvasPointerLeave);
     this.pointerDownPos = undefined;
     this.pointerDownTime = undefined;
     this.isDragging = false;
@@ -327,19 +329,23 @@ export class ViewportPanel extends ComponentBase {
   };
 
   private handleCanvasPointerMove = (event: PointerEvent): void => {
-    // Only process if pointer was pressed down
+    // Get screen coordinates relative to canvas
+    const rect = this.canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
+    const screenX = event.clientX - rect.left;
+    const screenY = event.clientY - rect.top;
+
+    // Always update hover states for visual feedback (even without pointer down)
     if (!this.pointerDownPos || !this.pointerDownTime) {
+      // Update handle hover for selection overlay
+      this.viewportRenderer.updateHandleHover?.(screenX, screenY);
+      // Update 2D hover preview (shows frame around hovered node before selection)
+      this.viewportRenderer.update2DHoverPreview?.(screenX, screenY);
       return;
     }
 
     // Handle 2D transform updates when a 2D handle is engaged
     const has2DTransform = this.viewportRenderer.has2DTransform?.();
     if (has2DTransform) {
-      // Use canvas rect, not panel rect, since canvas is offset by toolbar
-      const rect = this.canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
-      const screenX = event.clientX - rect.left;
-      const screenY = event.clientY - rect.top;
-
       this.viewportRenderer.update2DTransform?.(screenX, screenY);
       this.isDragging = true;
       return;
@@ -427,6 +433,13 @@ export class ViewportPanel extends ComponentBase {
     this.pointerDownPos = undefined;
     this.pointerDownTime = undefined;
     this.isDragging = false;
+  };
+
+  private handleCanvasPointerLeave = (): void => {
+    // Clear handle hover state when cursor leaves viewport
+    this.viewportRenderer.clearHandleHover?.();
+    // Clear 2D hover preview
+    this.viewportRenderer.clear2DHoverPreview?.();
   };
 
   static styles = css`
