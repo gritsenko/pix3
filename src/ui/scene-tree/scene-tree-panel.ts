@@ -117,16 +117,16 @@ export class SceneTreePanel extends ComponentBase {
           @node-drag-end=${this.onNodeDragEnd.bind(this)}
         >
           ${hasHierarchy
-            ? html`<ul
+        ? html`<ul
                 class="tree-root"
                 role="tree"
                 aria-label=${this.getTreeAriaLabel(activeSceneName)}
               >
                 ${repeat(
-                  this.hierarchy,
-                  node => node.id,
-                  (node, index) =>
-                    html`<pix3-scene-tree-node
+          this.hierarchy,
+          node => node.id,
+          (node, index) =>
+            html`<pix3-scene-tree-node
                       .node=${node}
                       .level=${1}
                       .selectedNodeIds=${this.selectedNodeIds}
@@ -136,9 +136,9 @@ export class SceneTreePanel extends ComponentBase {
                       .draggedNodeType=${this.draggedNodeType}
                       ?focusable=${index === 0}
                     ></pix3-scene-tree-node>`
-                )}
+        )}
               </ul>`
-            : html`<p class="panel-placeholder">${this.getPlaceholderMessage()}</p>`}
+        : html`<p class="panel-placeholder">${this.getPlaceholderMessage()}</p>`}
         </div>
       </pix3-panel>
     `;
@@ -235,6 +235,7 @@ export class SceneTreePanel extends ComponentBase {
         instancePath: node.instancePath,
         properties: node.properties,
         isContainer: node.isContainer,
+        scripts: node.components.map(c => c.type),
         // Only include NodeBase children, filter out Three.js objects like Mesh, Light, etc.
         children: this.buildTreeNodes(node.children.filter(child => child instanceof NodeBase)),
       };

@@ -50,15 +50,21 @@ root:
             position: [0, 0.5, 0]
             rotationEuler: [0, 45, 0]
             scale: [1, 1, 1]
+        components:
+          - id: test_rotate-1769874090897-mtdj91e
+            type: test_rotate
+            enabled: true
+            config:
+              rotationSpeed: 1
         children: []
   - id: ui-layer
     type: Group2D
     name: UI Layer
     properties:
-      width: 256
-      height: 256
+      width: 677.8046875000001
+      height: 528.5546875
       transform:
-        position: [0, 0]
+        position: [32.21484375000003, 18.54296875000005]
         scale: [1, 1]
         rotation: 0
     children:
@@ -70,6 +76,6 @@ root:
           width: 86.6015625
           height: 78.2265625
           transform:
-            position: [71.15234375000004, 73.93359374999996]
+            position: [262.0039062500001, 192.76171874999994]
             scale: [1, 1]
             rotation: 0
