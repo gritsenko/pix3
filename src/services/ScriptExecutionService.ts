@@ -6,8 +6,8 @@
  */
 
 import { injectable, inject } from '@/fw/di';
-import { SceneManager, type SceneGraph } from '@/core/SceneManager';
-import { NodeBase } from '@/nodes/NodeBase';
+import { SceneManager, type SceneGraph } from '@pix3/runtime';
+import { NodeBase } from '@pix3/runtime';
 
 interface NodeStateSnapshot {
   nodeId: string;

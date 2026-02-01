@@ -23,6 +23,7 @@ export default defineConfig({
       '@/state': resolve(__dirname, 'src/state'),
       '@/styles': resolve(__dirname, 'src/styles'),
       '@/fw': resolve(__dirname, 'src/fw'),
+      '@pix3/runtime': resolve(__dirname, 'packages/pix3-runtime/src'),
     },
   },
 });

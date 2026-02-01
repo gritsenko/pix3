@@ -1,6 +1,6 @@
 import { ResourceManager } from '@/services/ResourceManager';
-import { SceneManager } from '@/core/SceneManager';
-import { SceneValidationError } from '@/core/SceneLoader';
+import { SceneManager } from '@pix3/runtime';
+import { SceneValidationError } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { getAppStateSnapshot } from '@/state';
 import type {

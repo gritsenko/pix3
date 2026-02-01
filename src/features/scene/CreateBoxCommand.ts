@@ -9,7 +9,7 @@ import {
   CreateBoxOperation,
   type CreateBoxOperationParams,
 } from '@/features/scene/CreateBoxOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export interface CreateBoxCommandPayload {
   nodeId: string;

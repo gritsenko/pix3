@@ -50,26 +50,54 @@ root:
             position: [0, 0.5, 0]
             rotationEuler: [0, 45, 0]
             scale: [1, 1, 1]
+        components:
+          - id: test_rotate-1769874090897-mtdj91e
+            type: test_rotate
+            enabled: true
+            config:
+              rotationSpeed: 1
         children: []
   - id: ui-layer
     type: Group2D
     name: UI Layer
     properties:
-      width: 256
-      height: 256
+      width: 659.5022224703685
+      height: 489.16015625
+      layout:
+        anchorMin: [0, 0]
+        anchorMax: [1, 1]
+        offsetMin: [391, 140]
+        offsetMax: [-410, -179]
       transform:
-        position: [0, 0]
+        position: [-9.524548735184226, -19.697265625]
         scale: [1, 1]
         rotation: 0
     children:
-      - id: logo-sprite
-        type: Sprite2D
-        name: Logo Sprite
+      - id: group2d-1769887727222-am28ds0
+        type: Group2D
+        name: Group2D
         properties:
-          texturePath: templ://pix3-logo.png
-          width: 86.6015625
-          height: 78.2265625
+          visible: true
+          width: 100
+          height: 100
+          layout:
+            anchorMin: [1, 1]
+            anchorMax: [1, 1]
+            offsetMin: [-98, -119]
+            offsetMax: [2, -19]
           transform:
-            position: [71.15234375000004, 73.93359374999996]
+            position: [256.63163999630626, 175.814453125]
             scale: [1, 1]
             rotation: 0
+        children:
+          - id: logo-sprite
+            type: Sprite2D
+            name: Logo Sprite
+            properties:
+              texturePath: res://images/64x64.png
+              width: 86.6015625
+              height: 78.2265625
+              transform:
+                position: [0, 0]
+                scale: [1, 1]
+                rotation: 0

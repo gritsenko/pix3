@@ -12,16 +12,16 @@
  */
 
 // Core script system
-export { Script } from '@/core/ScriptComponent';
-export type { ScriptComponent, Constructor } from '@/core/ScriptComponent';
+export { Script } from '@pix3/runtime';
+export type { ScriptComponent, Constructor } from '@pix3/runtime';
 
 // Node system
-export { NodeBase } from '@/nodes/NodeBase';
-export type { NodeBaseProps, NodeMetadata } from '@/nodes/NodeBase';
+export { NodeBase } from '@pix3/runtime';
+export type { NodeBaseProps, NodeMetadata } from '@pix3/runtime';
 
 // Node types that users might reference
-export { Node2D } from '@/nodes/Node2D';
-export { Node3D } from '@/nodes/Node3D';
+export { Node2D } from '@pix3/runtime';
+export { Node3D } from '@pix3/runtime';
 
 // Property schema system for defining script parameters
 export type {
@@ -29,7 +29,7 @@ export type {
   PropertyDefinition,
   PropertyType,
   PropertyUIHints,
-} from '@/fw/property-schema';
+} from '@pix3/runtime';
 
 // State management (if users need to read app state)
 export { appState } from '@/state';

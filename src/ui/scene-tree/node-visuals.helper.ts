@@ -1,12 +1,12 @@
-import { NodeBase } from '@/nodes/NodeBase';
-import { Node2D } from '@/nodes/Node2D';
-import { Node3D } from '@/nodes/Node3D';
-import { Sprite2D } from '@/nodes/2D/Sprite2D';
-import { Group2D } from '@/nodes/2D/Group2D';
-import { Camera3D } from '@/nodes/3D/Camera3D';
-import { DirectionalLightNode } from '@/nodes/3D/DirectionalLightNode';
-import { MeshInstance } from '@/nodes/3D/MeshInstance';
-import { GeometryMesh } from '@/nodes/3D/GeometryMesh';
+import { NodeBase } from '@pix3/runtime';
+import { Node2D } from '@pix3/runtime';
+import { Node3D } from '@pix3/runtime';
+import { Sprite2D } from '@pix3/runtime';
+import { Group2D } from '@pix3/runtime';
+import { Camera3D } from '@pix3/runtime';
+import { DirectionalLightNode } from '@pix3/runtime';
+import { MeshInstance } from '@pix3/runtime';
+import { GeometryMesh } from '@pix3/runtime';
 
 // Color constants for node types
 const NODE_2D_COLOR = '#96cbf6ff';

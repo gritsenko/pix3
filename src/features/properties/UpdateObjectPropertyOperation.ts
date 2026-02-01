@@ -4,12 +4,12 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { NodeBase } from '@/nodes/NodeBase';
-import { Group2D } from '@/nodes/2D/Group2D';
-import { Sprite2D } from '@/nodes/2D/Sprite2D';
-import { SceneManager } from '@/core/SceneManager';
+import { NodeBase } from '@pix3/runtime';
+import { Group2D } from '@pix3/runtime';
+import { Sprite2D } from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
-import { getNodePropertySchema } from '@/fw/property-schema-utils';
+import { getNodePropertySchema } from '@pix3/runtime';
 import type { PropertyDefinition } from '@/fw';
 import type { ServiceContainer } from '@/fw/di';
 

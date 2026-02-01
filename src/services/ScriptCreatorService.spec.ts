@@ -58,7 +58,7 @@ describe('ScriptCreatorService', () => {
       const gen = service as unknown as { generateScriptTemplate(name: string): string };
       const template = gen.generateScriptTemplate('Test');
 
-      expect(template).toContain("import { Script } from '@/core/ScriptComponent'");
+      expect(template).toContain("import { Script } from '@pix3/runtime'");
       expect(template).toContain("import type { PropertySchema } from '@/fw'");
     });
   });

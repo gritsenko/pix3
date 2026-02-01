@@ -1,14 +1,15 @@
 import 'reflect-metadata';
 import 'golden-layout/dist/css/goldenlayout-base.css';
 import 'golden-layout/dist/css/themes/goldenlayout-dark-theme.css';
-
 import './index.css';
 
 // Expose Engine API for user scripts
 import * as EngineAPI from './fw/engine-api';
+
 interface WindowWithEngine extends Window {
   __PIX3_ENGINE__: typeof EngineAPI;
 }
+
 (window as unknown as WindowWithEngine).__PIX3_ENGINE__ = EngineAPI;
 
 // Create dynamic import map for @pix3/engine
@@ -30,8 +31,6 @@ const createImportMapShim = () => {
   // Create blob URL for the module
   const blob = new Blob([moduleCode], { type: 'application/javascript' });
   const blobUrl = URL.createObjectURL(blob);
-  // Note: This blob URL is intentionally not revoked as it needs to remain
-  // available for the lifetime of the application for dynamic imports to work
 
   // Inject import map into document
   const importMap = document.createElement('script');
@@ -42,15 +41,22 @@ const createImportMapShim = () => {
     },
   });
   document.head.appendChild(importMap);
-
   console.log('[Pix3] Engine API exposed and import map created for user scripts');
 };
 
 createImportMapShim();
 
-// Register built-in script components before loading any scenes
-import { registerBuiltInScripts } from './behaviors/register-behaviors';
-registerBuiltInScripts();
+// Register runtime services
+import { registerRuntimeServices } from './core/register-runtime-services';
+registerRuntimeServices();
+
+// Register built-in script components
+import { ScriptRegistry, registerBuiltInScripts } from '@pix3/runtime';
+import { ServiceContainer } from './fw/di';
+
+const container = ServiceContainer.getInstance();
+const registry = container.getService<ScriptRegistry>(container.getOrCreateToken(ScriptRegistry));
+registerBuiltInScripts(registry);
 
 import './ui/scene-tree/scene-tree-panel';
 import './ui/viewport/editor-tab';

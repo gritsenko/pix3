@@ -4,9 +4,9 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import type { NodeBase } from '@/nodes/NodeBase';
-import { Sprite2D } from '@/nodes/2D/Sprite2D';
-import { SceneManager } from '@/core/SceneManager';
+import type { NodeBase } from '@pix3/runtime';
+import { Sprite2D } from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { Vector2 } from 'three';
 

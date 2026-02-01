@@ -2,11 +2,11 @@ import { injectable, inject } from '@/fw/di';
 import { subscribe } from 'valtio/vanilla';
 
 import { appState } from '@/state';
-import { Script } from '@/core/ScriptComponent';
-import type { ScriptComponent } from '@/core/ScriptComponent';
+import { Script } from '@pix3/runtime';
+import type { ScriptComponent } from '@pix3/runtime';
 import { FileSystemAPIService } from './FileSystemAPIService';
-import { ScriptRegistry } from './ScriptRegistry';
-import type { PropertySchemaProvider } from './ScriptRegistry';
+import { ScriptRegistry } from '@pix3/runtime';
+import type { PropertySchemaProvider } from '@pix3/runtime';
 import { ScriptCompilerService } from './ScriptCompilerService';
 import type { CompilationError } from './ScriptCompilerService';
 import { LoggingService } from './LoggingService';

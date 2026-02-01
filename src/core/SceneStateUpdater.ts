@@ -1,5 +1,5 @@
 import type { AppState } from '@/state';
-import type { SceneGraph } from './SceneManager';
+import type { SceneGraph } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 
 export class SceneStateUpdater {

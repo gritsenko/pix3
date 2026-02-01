@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ScriptRegistry } from './ScriptRegistry';
-import { Script } from '@/core/ScriptComponent';
+import { ScriptRegistry } from '@pix3/runtime';
+import { Script } from '@pix3/runtime';
 import type { PropertySchema } from '@/fw';
 
 class TestComponent extends Script {

@@ -4,9 +4,9 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
-import { NodeBase } from '@/nodes/NodeBase';
+import { NodeBase } from '@pix3/runtime';
 
 export interface DeletedNodeInfo {
   node: NodeBase;

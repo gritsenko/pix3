@@ -4,10 +4,10 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 import { canDropNode } from '@/fw/hierarchy-validation';
 import { ref } from 'valtio/vanilla';
-import type { NodeBase } from '@/nodes/NodeBase';
+import type { NodeBase } from '@pix3/runtime';
 
 export interface ReparentNodeOperationParams {
   /** ID of the node to move */

@@ -5,8 +5,8 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { SceneManager } from '@/core/SceneManager';
-import { Node2D } from '@/nodes/Node2D';
+import { SceneManager, Group2D } from '@pix3/runtime';
+import { Node2D } from '@pix3/runtime';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 
 export interface Transform2DState {
@@ -15,6 +15,8 @@ export interface Transform2DState {
   scale?: { x: number; y: number };
   width?: number;
   height?: number;
+  offsetMin?: { x: number; y: number };
+  offsetMax?: { x: number; y: number };
 }
 
 export interface Transform2DCompleteParams {
@@ -135,6 +137,16 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
         dimsNode.height = state.height;
       }
     }
+
+    // Apply offsets for Group2D nodes
+    if (node instanceof Group2D) {
+      if (state.offsetMin) {
+        node.offsetMin.set(state.offsetMin.x, state.offsetMin.y);
+      }
+      if (state.offsetMax) {
+        node.offsetMax.set(state.offsetMax.x, state.offsetMax.y);
+      }
+    }
   }
 
   private isStateEqual(a: Transform2DState, b: Transform2DState): boolean {
@@ -148,6 +160,28 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
         return false;
       }
     } else if (a.position || b.position) {
+      return false;
+    }
+
+    if (a.offsetMin && b.offsetMin) {
+      if (
+        Math.abs(a.offsetMin.x - b.offsetMin.x) > eps ||
+        Math.abs(a.offsetMin.y - b.offsetMin.y) > eps
+      ) {
+        return false;
+      }
+    } else if (a.offsetMin || b.offsetMin) {
+      return false;
+    }
+
+    if (a.offsetMax && b.offsetMax) {
+      if (
+        Math.abs(a.offsetMax.x - b.offsetMax.x) > eps ||
+        Math.abs(a.offsetMax.y - b.offsetMax.y) > eps
+      ) {
+        return false;
+      }
+    } else if (a.offsetMax || b.offsetMax) {
       return false;
     }
 

@@ -3,17 +3,20 @@ import {
   getNodePropertySchema,
   getPropertiesByGroup,
   getPropertyDisplayValue,
-} from '@/fw/property-schema-utils';
-import { SceneManager } from '@/core/SceneManager';
+  Group2D,
+  LAYOUT_PRESETS,
+  type LayoutPreset,
+} from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
 import { appState } from '@/state';
-import type { NodeBase } from '@/nodes/NodeBase';
+import type { NodeBase } from '@pix3/runtime';
 import type { PropertySchema, PropertyDefinition } from '@/fw';
 import { UpdateObjectPropertyOperation } from '@/features/properties/UpdateObjectPropertyOperation';
 import { OperationService } from '@/services/OperationService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { BehaviorPickerService } from '@/services/BehaviorPickerService';
 import { ScriptCreatorService } from '@/services/ScriptCreatorService';
-import { ScriptRegistry } from '@/services/ScriptRegistry';
+import { ScriptRegistry } from '@pix3/runtime';
 import { IconService } from '@/services/IconService';
 import { DialogService } from '@/services/DialogService';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
@@ -471,12 +474,93 @@ export class InspectorPanel extends ComponentBase {
       return this.renderTransformGroup(label, visibleProps);
     }
 
+    // Special handling for Layout group - render with presets
+    if (groupName === 'Layout' && this.primaryNode instanceof Group2D) {
+      return this.renderLayoutGroup(label, visibleProps);
+    }
+
     return html`
       <div class="property-group-section">
         <h4 class="group-title">${label}</h4>
         ${visibleProps.map(prop => this.renderPropertyInput(prop))}
       </div>
     `;
+  }
+
+  private renderLayoutGroup(label: string, props: PropertyDefinition[]) {
+    if (!this.primaryNode || !(this.primaryNode instanceof Group2D)) {
+      return '';
+    }
+
+    // Layout preset buttons - organized in rows
+    const presetRows: LayoutPreset[][] = [
+      ['top-left', 'top-center', 'top-right'],
+      ['middle-left', 'center', 'middle-right'],
+      ['bottom-left', 'bottom-center', 'bottom-right'],
+      ['stretch-horizontal', 'stretch', 'stretch-vertical'],
+    ];
+
+    return html`
+      <div class="property-group-section layout-section">
+        <h4 class="group-title">${label}</h4>
+
+        <div class="layout-presets">
+          <div class="preset-label">Anchor Presets</div>
+          <div class="preset-grid">
+            ${presetRows.map(
+              row => html`
+                <div class="preset-row">
+                  ${row.map(presetId => {
+                    const preset = LAYOUT_PRESETS[presetId];
+                    return html`
+                      <button
+                        class="preset-btn"
+                        title=${preset.label}
+                        @click=${() => this.applyLayoutPreset(presetId)}
+                      >
+                        ${this.renderPresetIcon(presetId)}
+                      </button>
+                    `;
+                  })}
+                </div>
+              `
+            )}
+          </div>
+        </div>
+
+        ${props.map(prop => this.renderPropertyInput(prop))}
+      </div>
+    `;
+  }
+
+  private renderPresetIcon(preset: LayoutPreset) {
+    // SVG icons representing each layout preset
+    const iconMap: Record<LayoutPreset, string> = {
+      center: '●',
+      stretch: '⬛',
+      'top-left': '◤',
+      'top-center': '▲',
+      'top-right': '◥',
+      'middle-left': '◀',
+      'middle-right': '▶',
+      'bottom-left': '◣',
+      'bottom-center': '▼',
+      'bottom-right': '◢',
+      'stretch-horizontal': '⬌',
+      'stretch-vertical': '⬍',
+    };
+    return iconMap[preset] || '?';
+  }
+
+  private applyLayoutPreset(preset: LayoutPreset) {
+    if (!this.primaryNode || !(this.primaryNode instanceof Group2D)) return;
+
+    const group = this.primaryNode as Group2D;
+    group.applyLayoutPreset(preset);
+
+    // Sync UI values after applying preset
+    this.syncValuesFromNode();
+    this.requestUpdate();
   }
 
   private renderTransformGroup(label: string, props: PropertyDefinition[]) {

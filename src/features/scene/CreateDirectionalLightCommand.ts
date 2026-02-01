@@ -9,7 +9,7 @@ import {
   CreateDirectionalLightOperation,
   type CreateDirectionalLightOperationParams,
 } from '@/features/scene/CreateDirectionalLightOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export interface CreateDirectionalLightCommandPayload {
   nodeId: string;

@@ -8,7 +8,7 @@ import { appState } from '@/state';
 import { CommandDispatcher } from '@/services';
 import { IconService, IconSize } from '@/services/IconService';
 import { ServiceContainer } from '@/fw/di';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 import { canDropNode } from '@/fw/hierarchy-validation';
 import {
   selectObject,
@@ -32,6 +32,7 @@ export interface SceneTreeNode {
   properties: Record<string, unknown>;
   children: SceneTreeNode[];
   isContainer: boolean;
+  scripts: string[];
 }
 
 @customElement('pix3-scene-tree-node')
@@ -144,18 +145,18 @@ export class SceneTreeNodeComponent extends ComponentBase {
           aria-level=${this.level}
           aria-selected=${isSelected ? 'true' : 'false'}
           aria-expanded=${ifDefined(
-            hasChildren ? (this.isCollapsed ? 'false' : 'true') : undefined
-          )}
+      hasChildren ? (this.isCollapsed ? 'false' : 'true') : undefined
+    )}
           tabindex=${this.focusable ? '0' : '-1'}
           data-node-id=${this.node.id}
           title=${this.getNodeTooltip(this.node)}
           @click=${(event: Event) => this.onSelectNode(event)}
           @keydown=${(event: KeyboardEvent) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              this.onSelectNode(event);
-              event.preventDefault();
-            }
-          }}
+        if (event.key === 'Enter' || event.key === ' ') {
+          this.onSelectNode(event);
+          event.preventDefault();
+        }
+      }}
           @dragstart=${(event: DragEvent) => this.onDragStart(event)}
           @dragend=${(event: DragEvent) => this.onDragEnd(event)}
           @dragover=${(event: DragEvent) => this.onDragOver(event)}
@@ -175,17 +176,32 @@ export class SceneTreeNodeComponent extends ComponentBase {
           <span class="tree-node__label">
             <span class="tree-node__header">
               <span class="tree-node__name"> ${this.node.name} </span>
+              ${this.node.scripts.length > 0
+        ? html`
+                    <span class="tree-node__script-indicator">
+                      ${this.renderToggleIcon('code')}
+                      <div class="script-popover">
+                        <div class="script-popover__title">Attached Scripts</div>
+                        <ul class="script-popover__list">
+                          ${this.node.scripts.map(
+          script => html`<li class="script-popover__item">${script}</li>`
+        )}
+                        </ul>
+                      </div>
+                    </span>
+                  `
+        : null}
             </span>
             ${this.node.instancePath
-              ? html`<span class="tree-node__instance">${this.node.instancePath}</span>`
-              : null}
+        ? html`<span class="tree-node__instance">${this.node.instancePath}</span>`
+        : null}
           </span>
           <div class="tree-node__buttons">
             <button
               type="button"
               class="tree-node__button tree-node__button--visible ${this.isVisible
-                ? 'tree-node__button--active'
-                : ''}"
+        ? 'tree-node__button--active'
+        : ''}"
               aria-label=${this.isVisible ? `Hide ${this.node.name}` : `Show ${this.node.name}`}
               @click=${(event: Event) => this.onToggleVisibility(event)}
             >
@@ -194,8 +210,8 @@ export class SceneTreeNodeComponent extends ComponentBase {
             <button
               type="button"
               class="tree-node__button tree-node__button--lock ${this.isLocked
-                ? 'tree-node__button--active'
-                : ''}"
+        ? 'tree-node__button--active'
+        : ''}"
               aria-label=${this.isLocked ? `Unlock ${this.node.name}` : `Lock ${this.node.name}`}
               @click=${(event: Event) => this.onToggleLock(event)}
             >
@@ -204,12 +220,12 @@ export class SceneTreeNodeComponent extends ComponentBase {
           </div>
         </div>
         ${hasChildren && !this.isCollapsed
-          ? html`<ul class="tree-children" role="group">
+        ? html`<ul class="tree-children" role="group">
               ${repeat(
-                this.node.children,
-                child => child.id,
-                (child, index) =>
-                  html`<li>
+          this.node.children,
+          child => child.id,
+          (child, index) =>
+            html`<li>
                     <pix3-scene-tree-node
                       .node=${child}
                       .level=${this.level + 1}
@@ -221,9 +237,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
                       ?focusable=${index === 0}
                     ></pix3-scene-tree-node>
                   </li>`
-              )}
+        )}
             </ul>`
-          : null}
+        : null}
       </li>
     `;
   }

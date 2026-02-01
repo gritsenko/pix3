@@ -1,0 +1,23 @@
+{
+  "name": "@pix3/runtime",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc"
+  },
+  "dependencies": {
+    "three": "^0.160.0",
+    "yaml": "^2.3.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2"
+  }
+}

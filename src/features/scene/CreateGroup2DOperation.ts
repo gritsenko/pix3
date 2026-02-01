@@ -4,8 +4,8 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { Group2D } from '@/nodes/2D/Group2D';
-import { SceneManager } from '@/core/SceneManager';
+import { Group2D } from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { Vector2 } from 'three';
 

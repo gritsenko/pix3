@@ -348,3 +348,63 @@ pix3-panel {
   color: var(--color-text-subtle, #888);
   margin-left: 0.25rem;
 }
+
+/* Layout Section with Presets */
+.layout-section {
+  border-top: 1px solid var(--color-border-subtle, #2a2a2a);
+  padding-top: 0.75rem;
+}
+
+.layout-presets {
+  margin-bottom: 0.75rem;
+}
+
+.preset-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--color-text-secondary, #aaa);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 0.5rem;
+}
+
+.preset-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--color-bg-item, #1a1a1a);
+  border-radius: 4px;
+  border: 1px solid var(--color-border, #333);
+}
+
+.preset-row {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+
+.preset-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-hover, #2a2a2a);
+  border: 1px solid transparent;
+  border-radius: 3px;
+  color: var(--color-text-secondary, #888);
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.15s ease;
+}
+
+.preset-btn:hover {
+  background: var(--color-bg-active, #333);
+  border-color: var(--pix3-accent-color, #ffcf33);
+  color: var(--color-text-primary, #eee);
+}
+
+.preset-btn:active {
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.2);
+}

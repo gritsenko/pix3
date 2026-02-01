@@ -8,8 +8,8 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { SceneManager } from '@/core/SceneManager';
-import { ScriptRegistry } from '@/services/ScriptRegistry';
+import { SceneManager } from '@pix3/runtime';
+import { ScriptRegistry } from '@pix3/runtime';
 
 export interface AddComponentParams {
   nodeId: string;

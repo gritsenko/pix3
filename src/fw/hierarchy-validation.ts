@@ -1,5 +1,5 @@
-import type { NodeBase } from '@/nodes/NodeBase';
-import type { SceneGraph } from '@/core/SceneManager';
+import type { NodeBase } from '@pix3/runtime';
+import type { SceneGraph } from '@pix3/runtime';
 
 /**
  * Determines if a node is a 2D node (Node2D or its subclasses)

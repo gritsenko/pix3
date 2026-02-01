@@ -11,7 +11,7 @@ import {
   SaveAsSceneOperation,
   type SaveAsSceneOperationParams,
 } from '@/features/scene/SaveAsSceneOperation';
-import { SceneManager } from '@/core/SceneManager';
+import { SceneManager } from '@pix3/runtime';
 
 export class SaveAsSceneCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
