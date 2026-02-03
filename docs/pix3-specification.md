@@ -1,8 +1,8 @@
 # Pix3 — Technical Specification
 
-Version: 1.12
+Version: 1.13
 
-Date: 2026-01-01
+Date: 2026-02-03
 
 ## 1. Introduction
 
@@ -393,6 +393,58 @@ export class TestRotateBehavior extends BehaviorBase {
 }
 ```
 
+## 6.5 Layout2D Node
+
+### 6.5.1 Overview
+
+Layout2D is a special 2D root node that represents the game viewport, separating it from the editor's WebGL viewport. This enables independent game layout testing across different screen sizes.
+
+### 6.5.2 Layout2D Properties
+
+Layout2D extends `Node2D` and provides the following properties:
+
+- `width: number` - Game viewport width in pixels (default: 1920)
+- `height: number` - Game viewport height in pixels (default: 1080)
+- `resolutionPreset: ResolutionPreset` - Quick preset selection for common resolutions
+- `showViewportOutline: boolean` - Toggle visual border visibility (default: true)
+
+### 6.5.3 Resolution Presets
+
+```typescript
+enum ResolutionPreset {
+  Custom = 'custom',
+  FullHD = '1920x1080', // 1920x1080
+  HD = '1280x720', // 1280x720
+  MobilePortrait = '1080x1920', // 1080x1920
+  MobileLandscape = '1920x1080', // 1920x1080
+  Tablet = '1024x768', // 1024x768
+}
+```
+
+### 6.5.4 Layout Recalculation
+
+Layout2D triggers layout recalculation for all Group2D children when its size changes:
+
+1. User changes Layout2D size/preset via inspector
+2. `UpdateLayout2DSizeOperation` executes
+3. `layout2d.width` and `layout2d.height` updated
+4. `layout2d.recalculateChildLayouts()` called
+5. For each Group2D child: `child.updateLayout(layout2d.width, layout2d.height)`
+6. Recursive: children update their own children with inherited dimensions
+
+### 6.5.5 Key Constraints
+
+- Layout2D size is **independent** of editor viewport size
+- Editor viewport resize does NOT change Layout2D dimensions
+- Layout2D can only be resized via inspector properties (width/height or preset)
+- Layout2D visibility state cascades to all children
+
+### 6.5.6 Visual Representation
+
+- Purple dashed border (0x9b59b6) when `showViewportOutline` is true
+- Border visibility can be toggled via checkbox in inspector
+- Children (Group2D, Sprite2D) render normally within Layout2D bounds
+
 ## 7. Scene File Format (\*.pix3scene)
 
 The scene file uses the YAML format to ensure readability for both humans and machines (including AI agents).
@@ -499,22 +551,24 @@ root:
 │   │   │   ├── TransformCompleteOperation.ts
 │   │   │   ├── UpdateObjectPropertyCommand.ts
 │   │   │   └── UpdateObjectPropertyOperation.ts
-│   │   ├── scene/
-│   │   │   ├── AddModelCommand.ts
-│   │   │   ├── CreateBoxCommand.ts
-│   │   │   ├── CreateCamera3DCommand.ts
-│   │   │   ├── CreateDirectionalLightCommand.ts
-│   │   │   ├── CreateGroup2DCommand.ts
-│   │   │   ├── CreateMeshInstanceCommand.ts
-│   │   │   ├── CreatePointLightCommand.ts
-│   │   │   ├── CreateSpotLightCommand.ts
-│   │   │   ├── CreateSprite2DCommand.ts
-│   │   │   ├── DeleteObjectCommand.ts
-│   │   │   ├── LoadSceneCommand.ts
-│   │   │   ├── ReloadSceneCommand.ts
-│   │   │   ├── ReparentNodeCommand.ts
-│   │   │   ├── SaveAsSceneCommand.ts
-│   │   │   └── SaveSceneCommand.ts
+      │   │   ├── scene/
+      │   │   │   ├── AddModelCommand.ts
+      │   │   │   ├── CreateBoxCommand.ts
+      │   │   │   ├── CreateCamera3DCommand.ts
+      │   │   │   ├── CreateDirectionalLightCommand.ts
+      │   │   │   ├── CreateGroup2DCommand.ts
+      │   │   │   ├── CreateLayout2DCommand.ts
+      │   │   │   ├── CreateMeshInstanceCommand.ts
+      │   │   │   ├── CreatePointLightCommand.ts
+      │   │   │   ├── CreateSpotLightCommand.ts
+      │   │   │   ├── CreateSprite2DCommand.ts
+      │   │   │   ├── DeleteObjectCommand.ts
+      │   │   │   ├── LoadSceneCommand.ts
+      │   │   │   ├── ReloadSceneCommand.ts
+      │   │   │   ├── ReparentNodeCommand.ts
+      │   │   │   ├── SaveAsSceneCommand.ts
+      │   │   │   ├── SaveSceneCommand.ts
+      │   │   │   └── UpdateLayout2DSizeCommand.ts
 │   │   └── selection/
 │   │       ├── SelectObjectCommand.ts
 │   │       └── SelectObjectOperation.ts
@@ -531,9 +585,10 @@ root:
 │   │   ├── Node2D.ts
 │   │   ├── Node3D.ts
 │   │   ├── NodeBase.ts       # Extends Three.js Object3D; purely data/logic
-│   │   ├── 2D/
-│   │   │   ├── Group2D.ts
-│   │   │   └── Sprite2D.ts
+      │   │   ├── 2D/
+      │   │   │   ├── Group2D.ts
+      │   │   │   ├── Layout2D.ts
+      │   │   │   └── Sprite2D.ts
 │   │   └── 3D/
 │   │       ├── Camera3D.ts
 │   │       ├── DirectionalLightNode.ts
@@ -619,3 +674,4 @@ root:
 - **1.10 (2025-12-30):** Added comprehensive Property Schema System section (5.0-5.5). Updated technology stack to include Pixi.js v8 for 2D rendering alongside Three.js. Added LoggingService and FileWatchService to architecture. Updated feature list to reflect all implemented commands/operations. Added vector4 property type. Updated MVP plan and roadmap to reflect completed milestones. Added format:check script to project scripts.
 - **1.11 (2025-12-30):** Removed Pixi.js from technology stack. Updated to Three.js-only rendering pipeline. Removed Pixi.js references from architecture notes and rendering architecture sections. Updated MVP plan to remove 2D rendering requirements via Pixi.js. Added details about the Icon Service under the Services section.
 - **1.12 (2026-01-01):** Added Script Component System section (6.0-6.11). Implemented behaviors and controller scripts attachments in inspector. Nodes now support `behaviors` array and optional `controller`. Added ScriptRegistry service for registering script types. Added BehaviorPickerService for modal dialog. Added ScriptExecutionService for game loop and script lifecycle management. Added commands for Attach/DetachBehavior, Set/ClearController, ToggleScriptEnabled, PlayScene, StopScene. Updated inspector panel to display "Scripts & Behaviors" section. Updated scene tree to show script indicators. Updated project structure to include `behaviors/` directory and `features/scripts/`. Added example TestRotateBehavior implementation. Updated node lifecycle with `tick(dt)` method for script updates.
+- **1.13 (2026-02-03):** Added Layout2D Node System section (6.5). Implemented Layout2D node class in `packages/pix3-runtime/src/nodes/2D/Layout2D.ts` with properties for width, height, resolutionPreset, and showViewportOutline. Added Layout2D YAML parsing support in SceneLoader with Layout2DProperties interface. Modified SceneManager to add `skipLayout2D` parameter to `resizeRoot()` and `findLayout2D()` helper method. Created CreateLayout2DCommand/Operation and UpdateLayout2DSizeCommand/Operation for mutation support. Updated ViewportRenderService with `layout2dVisuals` map, `createLayout2DVisual()` method (purple dashed border), and Layout2D handling in processNodeForRendering, syncAll2DVisuals, updateNodeTransform, and updateNodeVisibility. Removed isViewportContainer property from Group2D and all related logic. Updated startup scene template to use Layout2D root instead of Group2D. Layout2D size is now independent of editor viewport and only changeable via inspector properties.
