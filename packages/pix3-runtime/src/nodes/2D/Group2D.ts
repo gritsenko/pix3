@@ -117,31 +117,6 @@ export class Group2D extends Node2D {
   /** Flag to prevent recursive layout updates */
   private _isUpdatingLayout = false;
 
-  /**
-   * Check if this Group2D is acting as a viewport-aligned root container.
-   * A viewport container is a root node that stretches to fill the entire viewport.
-   */
-  get isViewportContainer(): boolean {
-    // Must be a root node (no parent that is a Group2D)
-    const hasGroup2DParent = this.parent instanceof Group2D;
-    if (hasGroup2DParent) return false;
-
-    // Must have stretch anchors (0,0) to (1,1) with zero offsets
-    const hasStretchAnchors =
-      this._anchorMin.x === 0 &&
-      this._anchorMin.y === 0 &&
-      this._anchorMax.x === 1 &&
-      this._anchorMax.y === 1;
-
-    const hasZeroOffsets =
-      Math.abs(this._offsetMin.x) < 1 &&
-      Math.abs(this._offsetMin.y) < 1 &&
-      Math.abs(this._offsetMax.x) < 1 &&
-      Math.abs(this._offsetMax.y) < 1;
-
-    return hasStretchAnchors && hasZeroOffsets;
-  }
-
   constructor(props: Group2DProps) {
     super(props, 'Group2D');
 
@@ -157,7 +132,8 @@ export class Group2D extends Node2D {
 
     // Default offsets: position node at center with initial size
     // For center anchor, offsetMin/Max define half-size extents
-    this._offsetMin = props.offsetMin?.clone() ?? new Vector2(-initialWidth / 2, -initialHeight / 2);
+    this._offsetMin =
+      props.offsetMin?.clone() ?? new Vector2(-initialWidth / 2, -initialHeight / 2);
     this._offsetMax = props.offsetMax?.clone() ?? new Vector2(initialWidth / 2, initialHeight / 2);
   }
 
@@ -306,7 +282,7 @@ export class Group2D extends Node2D {
    * Recalculate offsets from current position and size.
    * Call this after manually changing position (e.g., via move transform)
    * to update offsets so the node stays at the new position.
-   * 
+   *
    * @param parentWidth Optional parent width override (use when parent dimensions aren't cached yet)
    * @param parentHeight Optional parent height override
    */

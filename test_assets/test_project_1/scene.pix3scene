@@ -57,36 +57,31 @@ root:
             config:
               rotationSpeed: 1
         children: []
-  - id: ui-layer
-    type: Group2D
-    name: UI Layer
+  - id: layout2d-root
+    type: Layout2D
+    name: 2D Layout
     properties:
-      width: 659.5022224703685
-      height: 489.16015625
-      layout:
-        anchorMin: [0, 0]
-        anchorMax: [1, 1]
-        offsetMin: [391, 140]
-        offsetMax: [-410, -179]
+      width: 600
+      height: 800
+      resolutionPreset: FullHD
+      showViewportOutline: true
+      visible: true
       transform:
-        position: [-9.524548735184226, -19.697265625]
+        position: [0, 0]
         scale: [1, 1]
         rotation: 0
     children:
-      - id: group2d-1769887727222-am28ds0
+      - id: ui-group
         type: Group2D
-        name: Group2D
+        name: UI Group
         properties:
-          visible: true
-          width: 100
-          height: 100
+          width: 256
+          height: 256
           layout:
-            anchorMin: [1, 1]
-            anchorMax: [1, 1]
-            offsetMin: [-98, -119]
-            offsetMax: [2, -19]
+            offsetMin: [39, 12]
+            offsetMax: [295, 268]
           transform:
-            position: [256.63163999630626, 175.814453125]
+            position: [166.56250000000023, 139.87499999999994]
             scale: [1, 1]
             rotation: 0
         children:
@@ -95,9 +90,9 @@ root:
             name: Logo Sprite
             properties:
               texturePath: res://images/64x64.png
-              width: 86.6015625
-              height: 78.2265625
+              width: 64
+              height: 64
               transform:
-                position: [0, 0]
+                position: [79.33593750000009, 77.6953125]
                 scale: [1, 1]
                 rotation: 0

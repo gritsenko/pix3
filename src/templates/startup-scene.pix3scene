@@ -55,24 +55,35 @@ root:
             scale: [1, 1, 1]
         children: []
 
-  - id: ui-layer
-    type: Group2D
-    name: UI Layer
+  - id: layout2d-root
+    type: Layout2D
+    name: 2D Layout
     properties:
-      width: 256
-      height: 256
-      position: [0, 0]
-      scale: [1, 1]
-      rotation: 0
+      width: 1920
+      height: 1080
+      resolutionPreset: FullHD
+      showViewportOutline: true
     children:
-      - id: logo-sprite
-        type: Sprite2D
-        name: Logo Sprite
+      - id: ui-group
+        type: Group2D
+        name: UI Group
         properties:
-          texturePath: templ://pix3-logo.png
-          width: 64
-          height: 64
-          transform:
-            position: [0, 0]
-            scale: [1, 1]
-            rotation: 0
+          width: 256
+          height: 256
+          layout:
+            anchorMin: [0.5, 0.5]
+            anchorMax: [0.5, 0.5]
+            offsetMin: [-128, -128]
+            offsetMax: [128, 128]
+        children:
+          - id: logo-sprite
+            type: Sprite2D
+            name: Logo Sprite
+            properties:
+              texturePath: templ://pix3-logo.png
+              width: 64
+              height: 64
+              transform:
+                position: [0, 0]
+                scale: [1, 1]
+                rotation: 0

@@ -17,6 +17,7 @@ export * from './nodes/Node3D';
 // 2D Nodes
 export * from './nodes/2D/Sprite2D';
 export * from './nodes/2D/Group2D';
+export * from './nodes/2D/Layout2D';
 
 // 3D Nodes
 export * from './nodes/3D/Camera3D';

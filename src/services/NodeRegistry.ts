@@ -6,6 +6,7 @@ import { CreatePointLightCommand } from '@/features/scene/CreatePointLightComman
 import { CreateSpotLightCommand } from '@/features/scene/CreateSpotLightCommand';
 import { CreateCamera3DCommand } from '@/features/scene/CreateCamera3DCommand';
 import { CreateMeshInstanceCommand } from '@/features/scene/CreateMeshInstanceCommand';
+import { CreateLayout2DCommand } from '@/features/scene/CreateLayout2DCommand';
 import type { Command } from '@/core/command';
 
 /**
@@ -44,6 +45,18 @@ export class NodeRegistry {
 
   private registerNodeTypes(): void {
     // 2D Node Types
+    this.registerNodeType({
+      id: 'layout2d',
+      displayName: 'Layout2D',
+      description: '2D game viewport container',
+      category: '2D',
+      commandClass: CreateLayout2DCommand,
+      color: '#9b59b6ff',
+      icon: 'viewport',
+      keywords: ['create', 'layout2d', 'viewport', 'container', 'root'],
+      order: 0,
+    });
+
     this.registerNodeType({
       id: 'group2d',
       displayName: 'Group2D',

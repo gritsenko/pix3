@@ -6,6 +6,7 @@ import { Node3D } from '../nodes/Node3D';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { Sprite2D } from '../nodes/2D/Sprite2D';
 import { Group2D } from '../nodes/2D/Group2D';
+import { Layout2D } from '../nodes/2D/Layout2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
@@ -97,6 +98,13 @@ export interface Node2DProperties {
   position?: Vector2 | [number, number];
   scale?: Vector2 | [number, number];
   rotation?: number;
+}
+
+export interface Layout2DProperties {
+  width?: number;
+  height?: number;
+  resolutionPreset?: string;
+  showViewportOutline?: boolean;
 }
 
 export interface Group2DProperties extends Node2DProperties {
@@ -287,6 +295,27 @@ export class SceneLoader {
           rotation: props.rotation ?? 0,
         });
       }
+      case 'Layout2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        return new Layout2D({
+          ...baseProps,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
+          width: this.asNumber(props.width, 1920),
+          height: this.asNumber(props.height, 1080),
+          resolutionPreset:
+            typeof props.resolutionPreset === 'string'
+              ? (props.resolutionPreset as any)
+              : undefined,
+          showViewportOutline:
+            typeof props.showViewportOutline === 'boolean' ? props.showViewportOutline : true,
+        });
+      }
       case 'Group2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
@@ -308,8 +337,12 @@ export class SceneLoader {
           anchorMax: layout?.anchorMax
             ? this.readVector2(layout.anchorMax, new Vector2(0.5, 0.5))
             : undefined,
-          offsetMin: layout?.offsetMin ? this.readVector2(layout.offsetMin, ZERO_VECTOR2) : undefined,
-          offsetMax: layout?.offsetMax ? this.readVector2(layout.offsetMax, ZERO_VECTOR2) : undefined,
+          offsetMin: layout?.offsetMin
+            ? this.readVector2(layout.offsetMin, ZERO_VECTOR2)
+            : undefined,
+          offsetMax: layout?.offsetMax
+            ? this.readVector2(layout.offsetMax, ZERO_VECTOR2)
+            : undefined,
         });
       }
       case 'GeometryMesh': {

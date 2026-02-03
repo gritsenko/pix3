@@ -14,6 +14,7 @@ import { Node2D } from '@pix3/runtime';
 import { Node3D } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
 import { Sprite2D } from '@pix3/runtime';
+import { Layout2D } from '@pix3/runtime';
 import { DirectionalLightNode } from '@pix3/runtime';
 import { PointLightNode } from '@pix3/runtime';
 import { SpotLightNode } from '@pix3/runtime';
@@ -72,6 +73,7 @@ export class ViewportRendererService {
   private previewCamera: THREE.Camera | null = null;
   private group2DVisuals = new Map<string, THREE.Group>();
   private sprite2DVisuals = new Map<string, THREE.Group>();
+  private layout2dVisuals = new Map<string, THREE.Group>();
   private selection2DOverlay?: Selection2DOverlay;
   private active2DTransform?: Active2DTransform;
   // Hover preview frame for 2D nodes (before selection)
@@ -464,7 +466,7 @@ export class ViewportRendererService {
     }
 
     // Trigger layout recalculation for root Group2D nodes
-    this.sceneManager.resizeRoot(pixelWidth, pixelHeight);
+    this.sceneManager.resizeRoot(pixelWidth, pixelHeight, true);
 
     // Sync all 2D visuals after layout recalculation
     this.syncAll2DVisuals();
@@ -481,7 +483,20 @@ export class ViewportRendererService {
     // Recursively update all 2D nodes in the scene
     const updateNode2DVisuals = (nodes: NodeBase[]) => {
       for (const node of nodes) {
-        if (node instanceof Group2D) {
+        if (node instanceof Layout2D) {
+          const visualRoot = this.layout2dVisuals.get(node.nodeId);
+          if (visualRoot) {
+            visualRoot.position.copy(node.position);
+            visualRoot.rotation.copy(node.rotation);
+            visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+            visualRoot.visible = node.visible;
+            const borderGroup = visualRoot.userData.borderGroup as THREE.Group | undefined;
+            if (borderGroup) {
+              borderGroup.visible = node.showViewportOutline;
+              borderGroup.scale.set(node.width, node.height, 1);
+            }
+          }
+        } else if (node instanceof Group2D) {
           const visualRoot = this.group2DVisuals.get(node.nodeId);
           if (visualRoot) {
             visualRoot.position.copy(node.position);
@@ -490,18 +505,6 @@ export class ViewportRendererService {
             const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
             if (sizeGroup) {
               sizeGroup.scale.set(node.width, node.height, 1);
-
-              // Update line color based on viewport container status
-              const isViewportContainer = node.isViewportContainer;
-              if (visualRoot.userData.isViewportContainer !== isViewportContainer) {
-                visualRoot.userData.isViewportContainer = isViewportContainer;
-                const line = sizeGroup.children[0] as THREE.LineSegments | undefined;
-                if (line && line.userData.lineMaterial instanceof THREE.LineBasicMaterial) {
-                  line.userData.lineMaterial.color.setHex(
-                    isViewportContainer ? 0x4ecf4e : 0x96cbf6
-                  );
-                }
-              }
             }
             visualRoot.visible = node.visible;
           }
@@ -753,6 +756,19 @@ export class ViewportRendererService {
           }
         });
       }
+    } else if (node instanceof Layout2D) {
+      const visualRoot = this.layout2dVisuals.get(node.nodeId);
+      if (visualRoot) {
+        visualRoot.position.copy(node.position);
+        visualRoot.rotation.copy(node.rotation);
+        visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+        visualRoot.visible = node.visible;
+        const borderGroup = visualRoot.userData.borderGroup as THREE.Group | undefined;
+        if (borderGroup) {
+          borderGroup.visible = node.showViewportOutline;
+          borderGroup.scale.set(node.width, node.height, 1);
+        }
+      }
     } else if (node instanceof Group2D) {
       const visualRoot = this.group2DVisuals.get(node.nodeId);
       if (visualRoot) {
@@ -785,8 +801,13 @@ export class ViewportRendererService {
   }
 
   updateNodeVisibility(node: NodeBase): void {
-    // Handle visibility changes for 2D nodes (Group2D and Sprite2D)
-    if (node instanceof Group2D) {
+    // Handle visibility changes for 2D nodes (Layout2D, Group2D and Sprite2D)
+    if (node instanceof Layout2D) {
+      const visualRoot = this.layout2dVisuals.get(node.nodeId);
+      if (visualRoot) {
+        visualRoot.visible = node.visible;
+      }
+    } else if (node instanceof Group2D) {
       const visualRoot = this.group2DVisuals.get(node.nodeId);
       if (visualRoot) {
         visualRoot.visible = node.visible;
@@ -976,6 +997,14 @@ export class ViewportRendererService {
       }
       this.sprite2DVisuals.clear();
 
+      for (const visual of this.layout2dVisuals.values()) {
+        if (visual.parent) {
+          visual.parent.remove(visual);
+        }
+        this.disposeObject3D(visual);
+      }
+      this.layout2dVisuals.clear();
+
       // Remove all root nodes from scene (except lights and helpers)
       const objectsToRemove: THREE.Object3D[] = [];
       this.scene.children.forEach(child => {
@@ -1013,7 +1042,13 @@ export class ViewportRendererService {
 
     let current2DVisualRoot = parent2DVisualRoot;
 
-    if (node instanceof Group2D) {
+    if (node instanceof Layout2D) {
+      const visualRoot = this.createLayout2DVisual(node);
+      this.layout2dVisuals.set(node.nodeId, visualRoot);
+      const parent = parent2DVisualRoot ?? this.scene;
+      parent.add(visualRoot);
+      current2DVisualRoot = visualRoot;
+    } else if (node instanceof Group2D) {
       const visualRoot = this.createGroup2DVisual(node);
       this.group2DVisuals.set(node.nodeId, visualRoot);
 
@@ -1057,12 +1092,8 @@ export class ViewportRendererService {
     geometry.computeBoundingBox();
 
     // Create line material with 2D node color
-    // Viewport containers get a special green color to indicate viewport alignment
-    const isViewportContainer = node.isViewportContainer;
-    const lineColor = isViewportContainer ? 0x4ecf4e : 0x96cbf6; // Green for viewport, blue for regular
-
     const material = new THREE.LineBasicMaterial({
-      color: lineColor,
+      color: 0x96cbf6,
       linewidth: 2,
     });
 
@@ -1090,7 +1121,53 @@ export class ViewportRendererService {
     root.userData.isGroup2DVisualRoot = true;
     root.userData.nodeId = node.nodeId;
     root.userData.sizeGroup = sizeGroup;
-    root.userData.isViewportContainer = isViewportContainer;
+
+    return root;
+  }
+
+  private createLayout2DVisual(node: Layout2D): THREE.Group {
+    const points: THREE.Vector3[] = [
+      new THREE.Vector3(-0.5, -0.5, 0),
+      new THREE.Vector3(0.5, -0.5, 0),
+      new THREE.Vector3(0.5, -0.5, 0),
+      new THREE.Vector3(0.5, 0.5, 0),
+      new THREE.Vector3(0.5, 0.5, 0),
+      new THREE.Vector3(-0.5, 0.5, 0),
+      new THREE.Vector3(-0.5, 0.5, 0),
+      new THREE.Vector3(-0.5, -0.5, 0),
+    ];
+
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    geometry.computeBoundingBox();
+
+    const material = new THREE.LineBasicMaterial({
+      color: 0x9b59b6,
+      linewidth: 2,
+    });
+
+    const root = new THREE.Group();
+    root.position.copy(node.position);
+    root.rotation.copy(node.rotation);
+    root.scale.set(node.scale.x, node.scale.y, 1);
+    root.visible = node.visible;
+    root.layers.set(LAYER_2D);
+
+    const borderGroup = new THREE.Group();
+    borderGroup.scale.set(node.width, node.height, 1);
+    borderGroup.visible = node.showViewportOutline;
+    borderGroup.layers.set(LAYER_2D);
+
+    const line = new THREE.LineSegments(geometry, material);
+    line.layers.set(LAYER_2D);
+    line.userData.isLayout2DVisual = true;
+    line.userData.nodeId = node.nodeId;
+
+    borderGroup.add(line);
+    root.add(borderGroup);
+
+    root.userData.isLayout2DVisualRoot = true;
+    root.userData.nodeId = node.nodeId;
+    root.userData.borderGroup = borderGroup;
 
     return root;
   }
@@ -1837,6 +1914,9 @@ export class ViewportRendererService {
   }
 
   private get2DVisual(node: Node2D): THREE.Object3D | undefined {
+    if (node instanceof Layout2D) {
+      return this.layout2dVisuals.get(node.nodeId);
+    }
     if (node instanceof Group2D) {
       return this.group2DVisuals.get(node.nodeId);
     }

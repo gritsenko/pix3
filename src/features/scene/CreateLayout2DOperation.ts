@@ -1,0 +1,165 @@
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/Operation';
+import { Layout2D } from '@pix3/runtime';
+import { NodeBase } from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
+
+export interface CreateLayout2DOperationParams {
+  width?: number;
+  height?: number;
+}
+
+export class CreateLayout2DOperation implements Operation<OperationInvokeResult> {
+  readonly metadata: OperationMetadata = {
+    id: 'scene.create-layout2d',
+    title: 'Create Layout2D',
+    description: 'Create a new Layout2D root node',
+    tags: ['scene', 'layout2d', 'viewport', 'node', 'container'],
+  };
+
+  private readonly params: CreateLayout2DOperationParams;
+
+  constructor(params: CreateLayout2DOperationParams = {}) {
+    this.params = params;
+  }
+
+  async perform(context: OperationContext): Promise<OperationInvokeResult> {
+    const { state, container } = context;
+    const activeSceneId = state.scenes.activeSceneId;
+
+    if (!activeSceneId) {
+      return { didMutate: false };
+    }
+
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
+    );
+    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
+    if (!sceneGraph) {
+      return { didMutate: false };
+    }
+
+    // Check if Layout2D already exists
+    for (const node of sceneGraph.rootNodes) {
+      if (node instanceof Layout2D) {
+        console.warn('[CreateLayout2DOperation] Layout2D already exists');
+        return { didMutate: false };
+      }
+    }
+
+    // Generate a unique node ID
+    const nodeId = `layout2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+    const width = this.params.width ?? 1920;
+    const height = this.params.height ?? 1080;
+
+    const node = new Layout2D({
+      id: nodeId,
+      name: '2D Layout',
+      width,
+      height,
+    });
+
+    // Add to scene graph
+    sceneGraph.rootNodes.push(node);
+    sceneGraph.nodeMap.set(nodeId, node);
+
+    // Update state hierarchy
+    const hierarchy = state.scenes.hierarchies[activeSceneId];
+    if (hierarchy) {
+      state.scenes.hierarchies[activeSceneId] = {
+        version: hierarchy.version,
+        description: hierarchy.description,
+        rootNodes: [...sceneGraph.rootNodes],
+        metadata: hierarchy.metadata,
+      };
+    }
+
+    // Mark scene as dirty
+    const descriptor = state.scenes.descriptors[activeSceneId];
+    if (descriptor) {
+      descriptor.isDirty = true;
+    }
+
+    // Move existing Group2D root nodes as children of Layout2D
+    const nodesToMove: NodeBase[] = [];
+    for (let i = 0; i < sceneGraph.rootNodes.length - 1; i++) {
+      const n = sceneGraph.rootNodes[i];
+      if (n && n.type === 'Group2D') {
+        nodesToMove.push(n);
+      }
+    }
+
+    for (const childNode of nodesToMove) {
+      sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n !== childNode);
+      node.adoptChild(childNode);
+    }
+
+    // Select newly created Layout2D node
+    state.selection.nodeIds = [nodeId];
+    state.selection.primaryNodeId = nodeId;
+
+    return {
+      didMutate: true,
+      commit: {
+        label: 'Create Layout2D',
+        undo: () => {
+          // Remove from scene graph
+          sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n !== node);
+          sceneGraph.nodeMap.delete(nodeId);
+
+          // Update state hierarchy
+          const hierarchy = state.scenes.hierarchies[activeSceneId];
+          if (hierarchy) {
+            state.scenes.hierarchies[activeSceneId] = {
+              version: hierarchy.version,
+              description: hierarchy.description,
+              rootNodes: [...sceneGraph.rootNodes],
+              metadata: hierarchy.metadata,
+            };
+          }
+
+          // Mark scene as dirty
+          const descriptor = state.scenes.descriptors[activeSceneId];
+          if (descriptor) {
+            descriptor.isDirty = true;
+          }
+
+          // Clear selection
+          state.selection.nodeIds = [];
+          state.selection.primaryNodeId = null;
+        },
+        redo: () => {
+          // Re-add to scene graph
+          sceneGraph.rootNodes.push(node);
+          sceneGraph.nodeMap.set(nodeId, node);
+
+          // Update state hierarchy
+          const hierarchy = state.scenes.hierarchies[activeSceneId];
+          if (hierarchy) {
+            state.scenes.hierarchies[activeSceneId] = {
+              version: hierarchy.version,
+              description: hierarchy.description,
+              rootNodes: [...sceneGraph.rootNodes],
+              metadata: hierarchy.metadata,
+            };
+          }
+
+          // Mark scene as dirty
+          const descriptor = state.scenes.descriptors[activeSceneId];
+          if (descriptor) {
+            descriptor.isDirty = true;
+          }
+
+          // Select node
+          state.selection.nodeIds = [nodeId];
+          state.selection.primaryNodeId = nodeId;
+        },
+      },
+    };
+  }
+}

@@ -2,6 +2,7 @@ import type { NodeBase } from '../nodes/NodeBase';
 import { SceneLoader, type ParseSceneOptions } from './SceneLoader';
 import { SceneSaver } from './SceneSaver';
 import { Group2D } from '../nodes/2D/Group2D';
+import { Layout2D } from '../nodes/2D/Layout2D';
 
 export interface SceneGraph {
   version: string;
@@ -62,19 +63,33 @@ export class SceneManager {
    *
    * @param width Viewport width in pixels
    * @param height Viewport height in pixels
+   * @param skipLayout2D If true, skip Layout2D size updates (viewport resize only affects Group2D children)
    */
-  resizeRoot(width: number, height: number): void {
+  resizeRoot(width: number, height: number, skipLayout2D: boolean = false): void {
     const graph = this.getActiveSceneGraph();
     if (!graph) return;
 
+    const layout2dNode = this.findLayout2D(graph);
+    if (layout2dNode && !skipLayout2D) {
+      layout2dNode.updateLayout(width, height);
+    }
+
     for (const node of graph.rootNodes) {
       if (node instanceof Group2D) {
-        // Set the root container size directly
-        node.setSize(width, height);
-        // Trigger layout calculation for this root and all children
-        node.updateLayout(width, height);
+        const layout2dWidth = layout2dNode?.width ?? width;
+        const layout2dHeight = layout2dNode?.height ?? height;
+        node.updateLayout(layout2dWidth, layout2dHeight);
       }
     }
+  }
+
+  private findLayout2D(graph: SceneGraph): Layout2D | null {
+    for (const node of graph.rootNodes) {
+      if (node instanceof Layout2D) {
+        return node;
+      }
+    }
+    return null;
   }
 
   removeSceneGraph(sceneId: string): void {
