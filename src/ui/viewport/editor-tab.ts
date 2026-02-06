@@ -1,11 +1,12 @@
 import { ComponentBase, customElement, html, inject, property, state, css, unsafeCSS } from '@/fw';
 import { subscribe } from 'valtio/vanilla';
-import { appState } from '@/state';
+import { appState, type NavigationMode } from '@/state';
 import styles from './editor-tab.ts.css?raw';
 import { ViewportRendererService, type TransformMode } from '@/services/ViewportRenderService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { IconService } from '@/services/IconService';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
+import { toggleNavigationMode } from '@/features/viewport/ToggleNavigationModeCommand';
 import renderTransformToolbar from './transform-toolbar';
 
 @customElement('pix3-editor-tab')
@@ -36,6 +37,9 @@ export class EditorTabComponent extends ComponentBase {
   @state()
   private showLayer3D = false;
 
+  @state()
+  private navigationMode: NavigationMode = '3d';
+
   private canvasHost?: HTMLElement;
   private disposeUiSubscription?: () => void;
   private disposeTabsSubscription?: () => void;
@@ -43,6 +47,7 @@ export class EditorTabComponent extends ComponentBase {
   private pointerDownTime?: number;
   private isDragging = false;
   private readonly dragThreshold = 5;
+  private wheelCanvas?: HTMLCanvasElement;
 
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
@@ -59,11 +64,13 @@ export class EditorTabComponent extends ComponentBase {
     this.showGrid = appState.ui.showGrid;
     this.showLayer2D = appState.ui.showLayer2D;
     this.showLayer3D = appState.ui.showLayer3D;
+    this.navigationMode = appState.ui.navigationMode;
 
     this.disposeUiSubscription = subscribe(appState.ui, () => {
       this.showGrid = appState.ui.showGrid;
       this.showLayer2D = appState.ui.showLayer2D;
       this.showLayer3D = appState.ui.showLayer3D;
+      this.navigationMode = appState.ui.navigationMode;
       this.requestUpdate();
     });
 
@@ -72,6 +79,7 @@ export class EditorTabComponent extends ComponentBase {
     });
 
     this.addEventListener('keydown', this.handleKeyDown);
+    this.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
     this.addEventListener('pointerdown', this.handleCanvasPointerDown);
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
     this.addEventListener('pointerup', this.handleCanvasPointerUp);
@@ -95,6 +103,10 @@ export class EditorTabComponent extends ComponentBase {
     this.disposeTabsSubscription?.();
     this.disposeTabsSubscription = undefined;
     this.removeEventListener('keydown', this.handleKeyDown);
+    this.removeEventListener('wheel', this.handleWheel as EventListener, true);
+    this.renderRoot.removeEventListener('wheel', this.handleWheel as EventListener, true);
+    this.wheelCanvas?.removeEventListener('wheel', this.handleWheel as EventListener, true);
+    this.wheelCanvas = undefined;
     this.removeEventListener('pointerdown', this.handleCanvasPointerDown);
     this.removeEventListener('pointermove', this.handleCanvasPointerMove);
     this.removeEventListener('pointerup', this.handleCanvasPointerUp);
@@ -110,6 +122,8 @@ export class EditorTabComponent extends ComponentBase {
         // ignore
       }
     }
+    // Ensure wheel events are captured inside the shadow root.
+    this.renderRoot.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
     this.syncActiveState();
   }
 
@@ -118,7 +132,13 @@ export class EditorTabComponent extends ComponentBase {
     const isSceneTab = tab?.type === 'scene';
 
     return html`
-      <section class="panel" role="region" aria-label="Editor tab" tabindex="0">
+      <section
+        class="panel"
+        role="region"
+        aria-label="Editor tab"
+        tabindex="0"
+        data-nav-mode="${this.navigationMode}"
+      >
         <div
           class="top-toolbar"
           @click=${(e: Event) => e.stopPropagation()}
@@ -146,6 +166,19 @@ export class EditorTabComponent extends ComponentBase {
             title="Toggle Grid (G)"
           >
             <span class="toolbar-icon">${this.iconService.getIcon('grid')}</span>
+          </button>
+          <button
+            class="toolbar-button layer-toggle-button"
+            aria-label="Toggle navigation mode"
+            aria-pressed="${this.navigationMode === '2d'}"
+            @click="${(e: Event) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              this.toggleNavigationMode();
+            }}"
+            title="Toggle Navigation Mode (N)"
+          >
+            <span class="layer-label">${this.navigationMode === '3d' ? '3D' : '2D'}</span>
           </button>
           <button
             class="toolbar-button layer-toggle-button"
@@ -216,6 +249,14 @@ export class EditorTabComponent extends ComponentBase {
 
     this.viewportRenderer.attachToHost(this.canvasHost);
 
+    // Bind wheel listener to the actual renderer canvas (it is moved between hosts).
+    const canvas = this.viewportRenderer.getCanvasElement();
+    if (canvas && canvas !== this.wheelCanvas) {
+      this.wheelCanvas?.removeEventListener('wheel', this.handleWheel as EventListener, true);
+      this.wheelCanvas = canvas;
+      this.wheelCanvas.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+    }
+
     const rect = this.getBoundingClientRect();
     if (rect.width > 0 && rect.height > 0) {
       // Account for toolbar height by measuring host.
@@ -243,6 +284,11 @@ export class EditorTabComponent extends ComponentBase {
 
   private toggleLayer3D(): void {
     appState.ui.showLayer3D = !appState.ui.showLayer3D;
+  }
+
+  private toggleNavigationMode(): void {
+    const command = toggleNavigationMode();
+    this.commandDispatcher.execute(command);
   }
 
   private zoomDefault(): void {
@@ -288,6 +334,10 @@ export class EditorTabComponent extends ComponentBase {
         event.preventDefault();
         this.toggleLayer3D();
         break;
+      case 'n':
+        event.preventDefault();
+        this.toggleNavigationMode();
+        break;
       case 'home':
         event.preventDefault();
         this.zoomDefault();
@@ -296,6 +346,39 @@ export class EditorTabComponent extends ComponentBase {
         event.preventDefault();
         this.zoomAll();
         break;
+    }
+  };
+
+  private handleWheel = (event: WheelEvent): void => {
+    if (appState.tabs.activeTabId !== this.tabId) return;
+
+    // Only handle gestures in 2D mode
+    if (appState.ui.navigationMode !== '2d') {
+      return;
+    }
+
+    // Prevent default scrolling (do not stop propagation)
+    event.preventDefault();
+
+    const target = event.target as HTMLElement;
+    if (target.closest('.top-toolbar')) {
+      return;
+    }
+
+    // Detect pinch zoom: non-zero deltaZ (macOS pinch gesture)
+    // Some browsers emit wheel with ctrlKey=true for pinch.
+    if (event.deltaZ !== 0 || event.ctrlKey) {
+      const zoomDelta = event.deltaZ !== 0 ? event.deltaZ : event.deltaY;
+      const zoomFactor = 1 - zoomDelta * 0.01;
+      this.viewportRenderer.zoom2D(zoomFactor);
+      return;
+    }
+
+    // Trackpad pan (pixel deltas)
+    if (event.deltaMode === 0) {
+      if (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) > 0) {
+        this.viewportRenderer.pan2D(event.deltaX, event.deltaY);
+      }
     }
   };
 

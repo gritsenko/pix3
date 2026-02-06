@@ -116,12 +116,15 @@ export interface PanelVisibilityState {
   logs: boolean;
 }
 
+export type NavigationMode = '2d' | '3d';
+
 export interface UIState {
   theme: ThemeName;
   isLayoutReady: boolean;
   focusedPanelId: string | null;
   commandPaletteOpen: boolean;
   panelVisibility: PanelVisibilityState;
+  navigationMode: NavigationMode;
   /** Toggle for showing the 2D orthographic layer overlay */
   showLayer2D: boolean;
   /** Toggle for showing the 3D perspective layer */
@@ -203,6 +206,7 @@ export const createInitialAppState = (): AppState => ({
       assetBrowser: true,
       logs: true,
     },
+    navigationMode: '3d',
     showLayer2D: true,
     showLayer3D: true,
     showGrid: true,

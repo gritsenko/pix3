@@ -64,6 +64,7 @@ export class ViewportRendererService {
   private camera?: THREE.PerspectiveCamera;
   private orthographicCamera?: THREE.OrthographicCamera;
   private orbitControls?: OrbitControls;
+  private orthographicControls?: OrbitControls;
   private transformControls?: TransformControls;
   private transformGizmo?: THREE.Object3D;
   private currentTransformMode: TransformMode = 'select';
@@ -90,6 +91,10 @@ export class ViewportRendererService {
   private lastActiveSceneId: string | null = null;
   private viewportSize = { width: 0, height: 0 };
   private transformTool2d: TransformTool2d;
+
+  // Gesture handling for 2D navigation
+  private panVelocity = { x: 0, y: 0 };
+  private momentumAnimationId?: number;
 
   constructor() {
     this.transformTool2d = new TransformTool2d();
@@ -192,6 +197,20 @@ export class ViewportRendererService {
     this.orbitControls.enableZoom = true;
     this.orbitControls.enablePan = true;
 
+    // Initialize 2D controls for the orthographic camera
+    if (this.orthographicCamera) {
+      this.orthographicControls = new OrbitControls(
+        this.orthographicCamera,
+        this.renderer.domElement
+      );
+      this.orthographicControls.enableRotate = false;
+      this.orthographicControls.enableZoom = true;
+      this.orthographicControls.enablePan = true;
+      this.orthographicControls.enableDamping = true;
+      this.orthographicControls.dampingFactor = 0.2;
+      this.orthographicControls.screenSpacePanning = true;
+    }
+
     // Initialize TransformControls for object manipulation
     this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
     this.transformControls.setMode('translate'); // Default to translate mode
@@ -249,11 +268,14 @@ export class ViewportRendererService {
     });
     this.disposers.push(unsubscribeHierarchies);
 
-    // Subscribe to grid visibility changes
-    const unsubscribeGrid = subscribe(appState.ui, () => {
+    // Subscribe to UI changes
+    const unsubscribeUi = subscribe(appState.ui, () => {
       this.toggleGrid();
+      this.syncNavigationMode();
     });
-    this.disposers.push(unsubscribeGrid);
+    this.disposers.push(unsubscribeUi);
+
+    this.syncNavigationMode();
 
     // Initial sync
     checkSceneChanges();
@@ -378,17 +400,40 @@ export class ViewportRendererService {
   }
 
   private setOrbitEnabled(enabled: boolean): void {
-    if (this.orbitControls) {
-      this.orbitControls.enabled = enabled;
+    if (!this.orbitControls) return;
+    if (enabled && appState.ui.navigationMode === '2d') {
+      this.orbitControls.enabled = false;
+      return;
+    }
+    this.orbitControls.enabled = enabled;
+  }
+
+  private syncNavigationMode(): void {
+    const is2DMode = appState.ui.navigationMode === '2d';
+    this.setOrbitEnabled(!is2DMode);
+    if (this.orthographicControls) {
+      // Disable orthographic controls entirely in 2D mode.
+      // We handle pan/zoom gestures manually in ViewportPanel and call pan2D/zoom2D.
+      // Keeping it enabled would cause it to intercept and swallow wheel/pointer events
+      // via internal event.stopPropagation(), preventing the UI components from
+      // receiving them for our custom gesture handling.
+      this.orthographicControls.enabled = false;
+
+      // Ensure damping is off if we were using it, though it shouldn't matter if disabled
+      this.orthographicControls.enableZoom = false;
+      this.orthographicControls.enablePan = false;
     }
   }
 
   begin2DInteraction(): void {
     this.setOrbitEnabled(false);
+    if (this.orthographicControls) {
+      this.orthographicControls.enabled = false;
+    }
   }
 
   end2DInteraction(): void {
-    this.setOrbitEnabled(true);
+    this.syncNavigationMode();
   }
 
   toggleGrid(): void {
@@ -533,6 +578,157 @@ export class ViewportRendererService {
     }
   }
 
+  /**
+   * Pan the 2D camera by the given delta in screen space.
+   * Only active in 2D mode.
+   */
+  pan2D(deltaX: number, deltaY: number): void {
+    if (!this.orthographicControls || !this.orthographicCamera || appState.ui.navigationMode !== '2d') {
+      return;
+    }
+
+    // Scale delta by current zoom level so pan feels consistent at any zoom
+    // We also account for devicePixelRatio because the orthographic camera is sized
+    // to physical pixels (World Units), while WheelEvent deltas are in CSS pixels.
+    const zoomFactor = this.orthographicCamera.zoom;
+    const dpr = window.devicePixelRatio || 1;
+    const scaledDeltaX = (deltaX * dpr) / zoomFactor;
+    const scaledDeltaY = (deltaY * dpr) / zoomFactor;
+    const panScale = 0.5;
+
+    // Translate both camera position and target so it pans instead of rotating.
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.orthographicCamera.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.orthographicCamera.quaternion);
+    const panOffset = right
+      .multiplyScalar(scaledDeltaX * panScale)
+      .add(up.multiplyScalar(-scaledDeltaY * panScale));
+
+    this.orthographicCamera.position.add(panOffset);
+    this.orthographicControls.target.add(panOffset);
+
+    // Track velocity for momentum animation (unused if handled via OS inertia events)
+    this.panVelocity.x = scaledDeltaX * 0.5;
+    this.panVelocity.y = -scaledDeltaY * 0.5;
+  }
+
+  /**
+   * Zoom the 2D camera by the given factor (multiplied into current zoom).
+   * Only active in 2D mode.
+   */
+  zoom2D(factor: number): void {
+    if (!this.orthographicCamera || appState.ui.navigationMode !== '2d') {
+      return;
+    }
+
+    const newZoom = Math.max(0.1, this.orthographicCamera.zoom * factor);
+    this.orthographicCamera.zoom = newZoom;
+    this.orthographicCamera.updateProjectionMatrix();
+  }
+
+  /**
+   * Get current 2D zoom level.
+   */
+  getZoom2D(): number {
+    return this.orthographicCamera?.zoom ?? 1;
+  }
+
+  /**
+   * Set 2D zoom level directly.
+   */
+  setZoom2D(zoom: number): void {
+    if (!this.orthographicCamera) {
+      return;
+    }
+    const clampedZoom = Math.max(0.1, zoom);
+    this.orthographicCamera.zoom = clampedZoom;
+    this.orthographicCamera.updateProjectionMatrix();
+  }
+
+  /**
+   * Save current 2D zoom to app state for persistence.
+   */
+  saveZoomToState(): void {
+    const sceneId = appState.scenes.activeSceneId;
+    if (!sceneId) return;
+
+    const currentZoom = this.getZoom2D();
+    const cameraState = appState.scenes.cameraStates[sceneId] ?? {
+      position: { x: 0, y: 0, z: 0 },
+      target: { x: 0, y: 0, z: 0 },
+    };
+
+    appState.scenes.cameraStates[sceneId] = {
+      ...cameraState,
+      zoom: currentZoom,
+    };
+  }
+
+  /**
+   * Restore 2D zoom from app state.
+   */
+  restoreZoomFromState(): void {
+    const sceneId = appState.scenes.activeSceneId;
+    if (!sceneId) return;
+
+    const cameraState = appState.scenes.cameraStates[sceneId];
+    if (cameraState?.zoom) {
+      this.setZoom2D(cameraState.zoom);
+    }
+  }
+
+  /**
+   * Start pan momentum animation. Called after gesture ends.
+   * Applies exponential damping to pan velocity over ~500ms.
+   */
+  startPanMomentum(): void {
+    if (this.momentumAnimationId) {
+      cancelAnimationFrame(this.momentumAnimationId);
+    }
+
+    const frictionFactor = 0.95; // Per frame decay (5% loss per frame at 60fps ≈ 500ms total)
+    const minVelocity = 0.001; // Below this, stop animating
+
+    const animate = () => {
+      // Check if velocity is negligible
+      const speed = Math.sqrt(
+        this.panVelocity.x * this.panVelocity.x + this.panVelocity.y * this.panVelocity.y
+      );
+
+      if (speed < minVelocity) {
+        // Save zoom when momentum animation ends
+        this.saveZoomToState();
+        this.momentumAnimationId = undefined;
+        return;
+      }
+
+      // Apply pan with current velocity (no new delta)
+      if (this.orthographicControls && appState.ui.navigationMode === '2d') {
+        this.orthographicControls.target.x += this.panVelocity.x;
+        this.orthographicControls.target.y += this.panVelocity.y;
+      }
+
+      // Decay velocity
+      this.panVelocity.x *= frictionFactor;
+      this.panVelocity.y *= frictionFactor;
+
+      // Queue next frame
+      this.momentumAnimationId = requestAnimationFrame(animate);
+    };
+
+    // Start animation
+    this.momentumAnimationId = requestAnimationFrame(animate);
+  }
+
+  /**
+   * Cancel any ongoing pan momentum animation.
+   */
+  cancelPanMomentum(): void {
+    if (this.momentumAnimationId) {
+      cancelAnimationFrame(this.momentumAnimationId);
+      this.momentumAnimationId = undefined;
+    }
+  }
+
   setTransformMode(mode: TransformMode): void {
     // Set the transform mode for the gizmo
     this.currentTransformMode = mode;
@@ -593,8 +789,10 @@ export class ViewportRendererService {
       return null;
     }
 
+    const is2DMode = appState.ui.navigationMode === '2d';
+
     const layer2DEnabled = appState.ui.showLayer2D && Boolean(this.orthographicCamera);
-    const layer3DEnabled = appState.ui.showLayer3D && Boolean(this.camera);
+    const layer3DEnabled = appState.ui.showLayer3D && Boolean(this.camera) && !is2DMode;
 
     if (!layer2DEnabled && !layer3DEnabled) {
       return null;
@@ -1022,6 +1220,11 @@ export class ViewportRendererService {
       });
 
       this.updateSelection();
+
+      // Restore zoom for 2D mode
+      if (appState.ui.navigationMode === '2d') {
+        this.restoreZoomFromState();
+      }
     } catch (err) {
       console.error('[ViewportRenderer] Error syncing scene content:', err);
     }
@@ -1936,8 +2139,12 @@ export class ViewportRendererService {
       this.animationId = requestAnimationFrame(render);
 
       if (this.renderer && this.scene && this.camera) {
-        // Update orbit controls
-        this.orbitControls?.update();
+        const is2DMode = appState.ui.navigationMode === '2d';
+        if (is2DMode) {
+          this.orthographicControls?.update();
+        } else {
+          this.orbitControls?.update();
+        }
 
         // Only update selection boxes and gizmos every few frames to avoid performance issues
         if ((this.animationId || 0) % 10 === 0) {
@@ -2140,6 +2347,9 @@ export class ViewportRendererService {
     if (this.animationId !== undefined) {
       cancelAnimationFrame(this.animationId);
     }
+
+    // Cancel pan momentum animation
+    this.cancelPanMomentum();
 
     // Dispose orbit controls
     this.orbitControls?.dispose();

@@ -1,0 +1,64 @@
+import { CommandBase, type CommandContext, type CommandExecutionResult } from '@/core/command';
+import { OperationService } from '@/services/OperationService';
+import { SceneManager, Node3D } from '@pix3/runtime';
+import { SelectObjectOperation } from '@/features/selection/SelectObjectOperation';
+import type { NavigationMode } from '@/state';
+
+export interface ToggleNavigationModeParams {
+  mode?: NavigationMode;
+}
+
+export class ToggleNavigationModeCommand extends CommandBase<object, void> {
+  readonly metadata = {
+    id: 'viewport.toggle-navigation-mode',
+    title: 'Toggle Navigation Mode',
+    description: 'Switch between 3D orbit navigation and 2D orthographic navigation',
+    keywords: ['viewport', 'navigation', '2d', '3d', 'camera'],
+  } as const;
+
+  private readonly params: ToggleNavigationModeParams;
+
+  constructor(params: ToggleNavigationModeParams = {}) {
+    super();
+    this.params = params;
+  }
+
+  async execute(context: CommandContext): Promise<CommandExecutionResult<object>> {
+    const { snapshot, state, container } = context;
+    const currentMode: NavigationMode = snapshot.ui.navigationMode ?? '3d';
+    const nextMode: NavigationMode =
+      this.params.mode ?? (currentMode === '3d' ? '2d' : '3d');
+
+    if (currentMode === nextMode) {
+      return { didMutate: false, payload: {} };
+    }
+
+    state.ui.navigationMode = nextMode;
+
+    if (nextMode === '2d' && snapshot.selection.nodeIds.length > 0) {
+      const sceneManager = container.getService<SceneManager>(
+        container.getOrCreateToken(SceneManager)
+      );
+      const sceneGraph = sceneManager.getActiveSceneGraph();
+      if (sceneGraph) {
+        const has3DSelection = snapshot.selection.nodeIds.some(nodeId => {
+          const node = sceneGraph.nodeMap.get(nodeId);
+          return node instanceof Node3D;
+        });
+
+        if (has3DSelection) {
+          const operations = container.getService<OperationService>(
+            container.getOrCreateToken(OperationService)
+          );
+          await operations.invokeAndPush(new SelectObjectOperation({ nodeId: null }));
+        }
+      }
+    }
+
+    return { didMutate: true, payload: {} };
+  }
+}
+
+export const toggleNavigationMode = () => new ToggleNavigationModeCommand();
+export const setNavigationMode = (mode: NavigationMode) =>
+  new ToggleNavigationModeCommand({ mode });

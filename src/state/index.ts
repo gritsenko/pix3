@@ -32,6 +32,7 @@ export type {
   CameraState,
   EditorTab,
   EditorTabType,
+  NavigationMode,
   OperationState,
   PanelVisibilityState,
   ProjectState,

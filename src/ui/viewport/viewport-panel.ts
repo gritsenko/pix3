@@ -53,6 +53,10 @@ export class ViewportPanel extends ComponentBase {
   private isDragging = false;
   private readonly dragThreshold = 5; // pixels
 
+  // Gesture tracking for 2D navigation
+  // Note: We handle wheel events directly without accumulation to ensure responsive
+  // 1:1 panning with trackpad gestures which provide their own inertia.
+
   connectedCallback() {
     super.connectedCallback();
     // ResizeObserver will be set up in firstUpdated when host element is available
@@ -74,6 +78,10 @@ export class ViewportPanel extends ComponentBase {
 
     // Add keyboard shortcuts for transform modes
     this.addEventListener('keydown', this.handleKeyDown);
+    // Add wheel listener for gesture control - use capture to ensure we get it before children
+    this.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+    // Temporary: capture wheel at window level to confirm event delivery in Golden Layout
+    window.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
     // Add pointer handlers for object selection (only on tap/click, not drag)
     this.addEventListener('pointerdown', this.handleCanvasPointerDown);
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
@@ -82,13 +90,16 @@ export class ViewportPanel extends ComponentBase {
   }
 
   disconnectedCallback() {
-    this.viewportRenderer.dispose();
-    this.canvas = undefined;
+    this.viewportRenderer.pause(); // Pause instead of full dispose to handle moves
     super.disconnectedCallback();
     this.resizeObserver.disconnect();
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
     this.removeEventListener('keydown', this.handleKeyDown);
+    this.removeEventListener('wheel', this.handleWheel as EventListener, true);
+    window.removeEventListener('wheel', this.handleWheel as EventListener, true);
+    this.renderRoot.removeEventListener('wheel', this.handleWheel as EventListener, true);
+    this.canvas?.removeEventListener('wheel', this.handleWheel as EventListener, true);
     this.removeEventListener('pointerdown', this.handleCanvasPointerDown);
     this.removeEventListener('pointermove', this.handleCanvasPointerMove);
     this.removeEventListener('pointerup', this.handleCanvasPointerUp);
@@ -105,11 +116,14 @@ export class ViewportPanel extends ComponentBase {
       return;
     }
 
+    // Ensure wheel events are captured inside the shadow root and on the canvas.
+    // Some browsers may not compose wheel events across shadow boundaries.
+    this.renderRoot.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+    this.canvas.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+
     // Observe the component host (the element itself) instead of the canvas. When the
     // surrounding layout (Golden Layout splitters or window resizes) changes the host
     // bounding rect, we want to update the renderer to match the visible area.
-    // Using the host avoids cases where the canvas CSS size remains unchanged while
-    // the host shrinks/grows due to layout adjustments.
     try {
       this.resizeObserver.observe(this);
     } catch {
@@ -440,6 +454,43 @@ export class ViewportPanel extends ComponentBase {
     this.viewportRenderer.clearHandleHover?.();
     // Clear 2D hover preview
     this.viewportRenderer.clear2DHoverPreview?.();
+  };
+
+  private handleWheel = (event: WheelEvent): void => {
+    // Only handle gestures in 2D mode
+    if (appState.ui.navigationMode !== '2d') {
+      return;
+    }
+
+    // Prevent default scrolling
+    event.preventDefault();
+
+    // Ignore events on toolbar to allow toolbar interactions
+    const target = event.target as HTMLElement;
+    if (target.closest('.top-toolbar')) {
+      return;
+    }
+
+    // Detect pinch zoom: non-zero deltaZ (macOS pinch gesture)
+    // On macOS trackpads, pinch zoom sends deltaZ directly
+    if (event.deltaZ !== 0 || event.ctrlKey) {
+      // deltaZ is positive for pinch-in (zoom in), negative for pinch-out (zoom out)
+      const zoomDelta = event.deltaZ !== 0 ? event.deltaZ : event.deltaY;
+      const zoomFactor = 1 - zoomDelta * 0.01; // Scale deltaZ to reasonable zoom factor (inverted)
+      this.viewportRenderer.zoom2D(zoomFactor);
+      return;
+    }
+
+    // Detect two-finger pan: smooth deltaX/deltaY (trackpad) vs discrete (mouse wheel)
+    // Trackpad events have deltaMode=0 (pixels) with smooth continuous deltas
+    // Mouse wheel events have deltaMode=1 (lines) with discrete steps
+    
+    // For trackpad gestures (pixels), apply pan immediately
+    if (event.deltaMode === 0) {
+      if (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) > 0) {
+        this.viewportRenderer.pan2D(event.deltaX, event.deltaY);
+      }
+    }
   };
 
   static styles = css`

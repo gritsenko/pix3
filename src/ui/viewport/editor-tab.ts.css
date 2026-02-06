@@ -13,9 +13,26 @@
   outline: none;
   display: flex;
   flex-direction: column;
+  --pix3-nav-border: #fe9ebe;
 }
 
-.panel:focus-visible {
+.panel::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid var(--pix3-nav-border);
+  pointer-events: none;
+  z-index: 1000;
+}
+
+.panel[data-nav-mode='2d'] {
+  --pix3-nav-border: #96cbf6;
+}
+
+.panel:focus-visible::after {
   box-shadow: inset 0 0 0 2px rgba(var(--pix3-accent-rgb), 0.5);
 }
 
