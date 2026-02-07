@@ -92,6 +92,7 @@ export class ProjectService {
         ? (crypto as unknown as { randomUUID: () => string }).randomUUID()
         : `handle-${Date.now()}`;
 
+      appState.project.id = id;
       appState.project.directoryHandle = handle;
       appState.project.projectName = handle.name ?? 'Untitled Project';
       appState.project.status = 'ready';
@@ -128,6 +129,7 @@ export class ProjectService {
           try {
             await this.fs.ensurePermission(handle, 'readwrite');
             this.fs.setProjectDirectory(handle);
+            appState.project.id = entry.id || null;
             appState.project.directoryHandle = handle;
             appState.project.projectName = handle.name ?? entry.name;
             appState.project.status = 'ready';

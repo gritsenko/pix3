@@ -307,8 +307,7 @@ Always verify architectural decisions against the specification before implement
 
 ### Browser Interaction
 
-- Agents can use the `#browsermcp` MCP server to navigate pages, read logs and make screenshots.
-- Avoid use of clicking, pressing keys, and other input simulations. Ask developer instead to make changes on the page before taking screenshots or gathering logs. The only exception is opening recent projects on app startup.
+- Agents can use the `#mcp_chrome` MCP server to navigate pages, read logs and make screenshots. User already opened tab on current debug session.
 - Prefer adding console logs over using screenshots.
 - Never launch URLs directly; use MCP to navigate to necessary pages. Never open simple browser.
 - Logs and snapshots can be read using the MCP browser tools.

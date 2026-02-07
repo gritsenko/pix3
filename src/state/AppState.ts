@@ -84,6 +84,8 @@ export interface ScenesState {
 export type ProjectStatus = 'idle' | 'selecting' | 'ready' | 'error';
 
 export interface ProjectState {
+  /** Unique ID for the project (used for persistence). */
+  id: string | null;
   /** Active project directory handle retrieved via the File System Access API. */
   directoryHandle: FileSystemDirectoryHandle | null;
   projectName: string | null;
@@ -161,10 +163,10 @@ export interface AppState {
   telemetry: TelemetryState;
 }
 
-const STARTUP_SCENE_URI = 'templ://startup-scene';
 
 export const createInitialAppState = (): AppState => ({
   project: {
+    id: null,
     directoryHandle: null,
     projectName: null,
     status: 'idle',
@@ -181,7 +183,7 @@ export const createInitialAppState = (): AppState => ({
     loadState: 'idle',
     loadError: null,
     lastLoadedAt: null,
-    pendingScenePaths: [STARTUP_SCENE_URI],
+    pendingScenePaths: [],
     nodeDataChangeSignal: 0,
     cameraStates: {},
   },

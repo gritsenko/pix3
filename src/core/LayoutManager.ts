@@ -128,6 +128,7 @@ export class LayoutManagerService {
   private editorTabItems = new Map<string, ContentItem>();
   private editorTabFocusedListeners = new Set<(tabId: string) => void>();
   private editorTabCloseRequestedListeners = new Set<(tabId: string) => void>();
+  private handleTabCloseClick?: (e: MouseEvent) => void;
 
   constructor(state: AppState = appState) {
     this.state = state;
@@ -145,6 +146,54 @@ export class LayoutManagerService {
     this.container = container;
     this.layout = new GoldenLayout(container);
     this.layout.resizeWithContainerAutomatically = true;
+
+    // Intercept GL tab close button clicks before they reach GL's internal handler.
+    // GL's .lm_close_tab element uses mousedown to trigger close, bypassing click events.
+    this.handleTabCloseClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.classList.contains('lm_close_tab')) return;
+
+      // Walk up to find the .lm_tab and then the tab title to match our tabId.
+      const tabEl = target.closest('.lm_tab') as HTMLElement | null;
+      if (!tabEl) return;
+
+      // Find the ComponentItem that owns this tab by matching against our tracked items.
+      const tabTitle = tabEl.querySelector('.lm_title')?.textContent ?? '';
+      let matchedTabId: string | null = null;
+
+      for (const [tabId] of this.editorTabContainers) {
+        // Match by checking the item's title against the tab title.
+        const item = this.editorTabItems.get(tabId);
+        if (item && (item as ComponentItem).title === tabTitle) {
+          matchedTabId = tabId;
+          break;
+        }
+      }
+
+      // Fallback: search by component state tabId in the GL tree.
+      if (!matchedTabId && this.layout) {
+        const root = (this.layout as unknown as { rootItem?: ContentItem }).rootItem;
+        if (root) {
+          matchedTabId = this.findTabIdByTitle(root, tabTitle);
+        }
+      }
+
+      if (!matchedTabId) return; // Not one of our editor tabs, let GL handle it.
+
+      // Prevent GL's default close behavior.
+      e.stopPropagation();
+      e.preventDefault();
+
+      // Route through our close flow (which shows dirty confirmation).
+      for (const listener of this.editorTabCloseRequestedListeners) {
+        try {
+          listener(matchedTabId);
+        } catch {
+          // ignore
+        }
+      }
+    };
+    container.addEventListener('mousedown', this.handleTabCloseClick, true);
 
     this.registerComponents(this.layout);
     await this.loadDefaultLayout();
@@ -289,7 +338,6 @@ export class LayoutManagerService {
       return;
     }
     try {
-      console.log('[LayoutManager] Removing editor tab:', tabId);
       const closableItem = item as ContentItem & { close?: () => void };
       closableItem.close?.();
     } catch {
@@ -518,6 +566,10 @@ export class LayoutManagerService {
   }
 
   dispose(): void {
+    if (this.container && this.handleTabCloseClick) {
+      this.container.removeEventListener('mousedown', this.handleTabCloseClick, true);
+      this.handleTabCloseClick = undefined;
+    }
     if (this.layout) {
       try {
         this.layout.destroy();
@@ -538,38 +590,6 @@ export class LayoutManagerService {
           const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
           if (typeof tabId === 'string' && tabId) {
             this.editorTabContainers.set(tabId, container as unknown as ContentItem);
-
-            // Override GoldenLayout close so we can show Save/Don't Save/Cancel for dirty tabs.
-            // GoldenLayout's default close is synchronous; we keep the tab open and only remove
-            // it after EditorTabService confirms.
-            try {
-              const containerAny = container as unknown as {
-                close?: () => void;
-                __pix3OriginalClose?: unknown;
-                _parent?: ContentItem;
-                state?: { tabId?: string };
-              };
-              const originalClose = containerAny.close?.bind(container);
-              containerAny.close = () => {
-                // If no one is listening yet (early init), fall back to default close.
-                if (this.editorTabCloseRequestedListeners.size === 0) {
-                  originalClose?.();
-                  return;
-                }
-
-                for (const listener of this.editorTabCloseRequestedListeners) {
-                  try {
-                    listener(tabId);
-                  } catch {
-                    // ignore
-                  }
-                }
-              };
-              // Keep a reference in case we need to fall back to original behavior.
-              containerAny.__pix3OriginalClose = originalClose;
-            } catch {
-              // ignore
-            }
 
             try {
               const parent = (container as unknown as { _parent?: ContentItem })._parent;
@@ -681,6 +701,31 @@ export class LayoutManagerService {
     const children: ContentItem[] = (node as { contentItems?: ContentItem[] }).contentItems ?? [];
     for (const child of children) {
       const found = this.findFirstStack(child);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  /**
+   * Walk the GL tree to find a viewport component whose title matches and return its tabId.
+   */
+  private findTabIdByTitle(node: ContentItem | null | undefined, title: string): string | null {
+    if (!node) return null;
+    const nodeInfo = node as ContentItem & {
+      type?: string;
+      componentType?: string;
+      container?: { state?: { tabId?: string } };
+    };
+    if (
+      nodeInfo.type === 'component' &&
+      nodeInfo.componentType === PANEL_COMPONENT_TYPES.viewport &&
+      (node as ComponentItem).title === title
+    ) {
+      return nodeInfo.container?.state?.tabId ?? null;
+    }
+    const children: ContentItem[] = (nodeInfo as { contentItems?: ContentItem[] }).contentItems ?? [];
+    for (const child of children) {
+      const found = this.findTabIdByTitle(child, title);
       if (found) return found;
     }
     return null;

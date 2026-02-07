@@ -151,6 +151,10 @@ export class Pix3EditorShell extends ComponentBase {
     // Setup keyboard shortcuts
     this.keyboardHandler = this.handleKeyboardShortcuts.bind(this);
     window.addEventListener('keydown', this.keyboardHandler);
+
+    // Initialize tab service early to catch session persistence
+    this.editorTabService.initialize();
+
     this.disposeSubscription = subscribe(appState.ui, () => {
       this.isLayoutReady = appState.ui.isLayoutReady;
       this.shellReady = this.isLayoutReady;
@@ -175,17 +179,12 @@ export class Pix3EditorShell extends ComponentBase {
             this.shellReady = true;
             this.requestUpdate();
 
-            // Open startup scene when no tabs exist.
+            // Restore previously open tabs from session storage.
             if (!this.tabsInitialized) {
               this.tabsInitialized = true;
-              if (appState.tabs.tabs.length === 0) {
-                const pending = appState.scenes.pendingScenePaths[0];
-                if (pending) {
-                  if (process.env.NODE_ENV === 'development') {
-                    console.debug('[Pix3Editor] Opening startup scene tab', { pending });
-                  }
-                  await this.editorTabService.openResourceTab('scene', pending);
-                }
+              
+              if (appState.project.id) {
+                await this.editorTabService.restoreProjectSession(appState.project.id);
               }
             }
           });

@@ -6,6 +6,7 @@ import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
+import { SceneManager } from '@pix3/runtime';
 import { subscribe } from 'valtio/vanilla';
 
 export type DirtyCloseDecision = 'save' | 'dont-save' | 'cancel';
@@ -24,8 +25,13 @@ export class EditorTabService {
   @inject(ViewportRendererService)
   private readonly viewportRenderer!: ViewportRendererService;
 
+  @inject(SceneManager)
+  private readonly sceneManager!: SceneManager;
+
   private disposeSceneSubscription?: () => void;
   private disposeLayoutSubscription?: () => void;
+  private disposeTabsSubscription?: () => void;
+  private handleBeforeUnload?: (e: BeforeUnloadEvent) => void;
 
   initialize(): void {
     if (this.disposeSceneSubscription) return;
@@ -43,6 +49,45 @@ export class EditorTabService {
     this.layoutManager.subscribeEditorTabCloseRequested(tabId => {
       void this.closeTab(tabId);
     });
+
+    // Persist open tabs and active tab per project.
+    this.disposeTabsSubscription = subscribe(
+      appState.tabs,
+      () => {
+        const projectId = appState.project.id;
+        if (!projectId) return;
+
+        const session = {
+          tabs: appState.tabs.tabs
+            .filter(t => !t.resourceId.startsWith('templ://'))
+            .map(t => ({
+              resourceId: t.resourceId,
+              type: t.type,
+              title: t.title,
+              contextState: t.contextState,
+            })),
+          activeTabId: appState.tabs.activeTabId,
+        };
+
+        try {
+          localStorage.setItem(`pix3.projectTabs:${projectId}`, JSON.stringify(session));
+        } catch (e) {
+          console.error('[EditorTabService] Failed to persist tabs session', e);
+        }
+      },
+      true // deep subscription to catch contextState changes
+    );
+
+    this.handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      this.captureActiveContextState();
+
+      // Prompt the user if any scene tab has unsaved changes.
+      const hasDirty = appState.tabs.tabs.some(t => t.isDirty);
+      if (hasDirty) {
+        e.preventDefault();
+      }
+    };
+    window.addEventListener('beforeunload', this.handleBeforeUnload);
   }
 
   dispose(): void {
@@ -50,18 +95,32 @@ export class EditorTabService {
     this.disposeSceneSubscription = undefined;
     this.disposeLayoutSubscription?.();
     this.disposeLayoutSubscription = undefined;
+    this.disposeTabsSubscription?.();
+    this.disposeTabsSubscription = undefined;
+    if (this.handleBeforeUnload) {
+      window.removeEventListener('beforeunload', this.handleBeforeUnload);
+      this.handleBeforeUnload = undefined;
+    }
   }
 
-  async openResourceTab(type: EditorTabType, resourceId: string): Promise<EditorTab> {
+  async openResourceTab(
+    type: EditorTabType,
+    resourceId: string,
+    contextState?: EditorTab['contextState'],
+    activate = true
+  ): Promise<EditorTab> {
     this.initialize();
 
     const tabId = this.deriveTabId(type, resourceId);
     const existing = appState.tabs.tabs.find(t => t.id === tabId);
     if (existing) {
-      // The tab may still exist in appState even if its Golden Layout item was closed/destroyed.
-      // Ensure the visual tab exists before focusing/activating.
-      this.layoutManager.ensureEditorTab(existing);
-      await this.focusTab(existing.id);
+      if (activate) {
+        this.layoutManager.ensureEditorTab(existing);
+        await this.focusTab(existing.id);
+      } else {
+        // Even if not activating, ensure GL component exists if it's already in state
+        this.layoutManager.ensureEditorTab(existing);
+      }
       return existing;
     }
 
@@ -71,16 +130,21 @@ export class EditorTabService {
       resourceId,
       title: this.deriveTitle(resourceId),
       isDirty: false,
-      contextState: {},
+      contextState: contextState ?? {},
     };
 
     appState.tabs.tabs = [...appState.tabs.tabs, tab];
-    appState.tabs.activeTabId = tab.id;
+
+    if (activate) {
+      appState.tabs.activeTabId = tab.id;
+    }
 
     this.layoutManager.ensureEditorTab(tab);
     // focusEditorTab is now called asynchronously inside ensureEditorTab after the component factory runs
 
-    await this.activateTab(tab.id);
+    if (activate) {
+      await this.activateTab(tab.id);
+    }
 
     return tab;
   }
@@ -89,9 +153,46 @@ export class EditorTabService {
     await this.openResourceTab('scene', resourcePath);
   }
 
+  async restoreProjectSession(projectId: string): Promise<boolean> {
+    const raw = localStorage.getItem(`pix3.projectTabs:${projectId}`);
+    if (!raw) return false;
+
+    try {
+      const session = JSON.parse(raw);
+      if (!session || !Array.isArray(session.tabs)) return false;
+
+      // Skip template tabs (templ://) — they should not be restored.
+      const tabsToRestore = (session.tabs as Array<{ type: string; resourceId: string; contextState?: EditorTab['contextState'] }>).filter(
+        (t: { resourceId: string }) => !t.resourceId.startsWith('templ://')
+      );
+      for (const tabData of tabsToRestore) {
+        await this.openResourceTab(
+          tabData.type,
+          tabData.resourceId,
+          tabData.contextState,
+          false // don't activate yet
+        );
+      }
+
+      if (session.activeTabId) {
+        await this.focusTab(session.activeTabId);
+      } else if (tabsToRestore.length > 0) {
+        const firstTabId = this.deriveTabId(tabsToRestore[0].type, tabsToRestore[0].resourceId);
+        await this.focusTab(firstTabId);
+      }
+
+      return tabsToRestore.length > 0;
+    } catch (e) {
+      console.error('[EditorTabService] Failed to restore project session', e);
+      return false;
+    }
+  }
+
   async closeTab(tabId: string): Promise<void> {
     const tab = appState.tabs.tabs.find(t => t.id === tabId);
-    if (!tab) return;
+    if (!tab) {
+      return;
+    }
 
     if (tab.isDirty) {
       const decision = await this.promptDirtyClose(tab);
@@ -107,6 +208,30 @@ export class EditorTabService {
     // If closing active tab, save camera/selection before removal.
     if (appState.tabs.activeTabId === tabId) {
       this.captureActiveContextState();
+    }
+
+    // Clean up scene data if it's a scene tab.
+    if (tab.type === 'scene') {
+      const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
+
+      // Remove from state.
+      delete appState.scenes.descriptors[sceneId];
+      delete appState.scenes.hierarchies[sceneId];
+      if (appState.scenes.cameraStates[sceneId]) {
+        delete appState.scenes.cameraStates[sceneId];
+      }
+
+      if (appState.scenes.activeSceneId === sceneId) {
+        appState.scenes.activeSceneId = null;
+
+        // Clear selection when active scene is removed.
+        appState.selection.nodeIds = [];
+        appState.selection.primaryNodeId = null;
+        appState.selection.hoveredNodeId = null;
+      }
+
+      // Remove from runtime.
+      this.sceneManager.removeSceneGraph(sceneId);
     }
 
     appState.tabs.tabs = appState.tabs.tabs.filter(t => t.id !== tabId);
