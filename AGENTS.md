@@ -7,7 +7,7 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - **Pix3** is a browser-based editor for HTML5 scenes blending 2D and 3D layers
 - **Target stack**: TypeScript + Vite, Lit web components, Valtio state, Three.js, Golden Layout
 - **Architecture model**: Operations-first with OperationService as single mutation gateway
-- **Source of truth**: `docs/pix3-specification.md` (v1.12, 2026-01-01)
+- **Source of truth**: `docs/pix3-specification.md` (v1.13, 2026-02-03)
 
 ## Essential Architecture Patterns
 
@@ -94,6 +94,14 @@ Examples:
 - Inspector uses `getNodePropertySchema()` and `getPropertiesByGroup()` to render UI dynamically
 - All property mutations via `UpdateObjectPropertyOperation` which uses schema's `getValue/setValue` methods
 
+### 2D/3D Navigation Mode
+
+- **Modes**: `appState.ui.navigationMode` toggles between `'2d'` and `'3d'`.
+- **3D Mode**: Uses `OrbitControls` with perspective camera.
+- **2D Mode**: Uses custom pan/zoom implementation with orthographic camera. OrbitControls are disabled to prevent event interception.
+- **Layout2D Integration**: 2D mode is optimized for interacting with `Layout2D` root nodes and 2D elements.
+- **Command**: Use `ToggleNavigationModeCommand` to switch modes.
+
 ## File Structure Conventions
 
 ```
@@ -149,6 +157,7 @@ src/
     Node3D.ts              # Has getPropertySchema() with position (vector3), rotation (euler), scale (vector3)
     NodeBase.ts            # Extends Three.js Object3D; has getPropertySchema() with id, name, type
     2D/
+      Layout2D.ts          # Root container for 2D scenes
       Sprite2D.ts
     3D/
       Camera3D.ts
@@ -161,6 +170,7 @@ src/
     AssetLoaderService.ts
     BehaviorPickerService.ts
     CommandDispatcher.ts   # Primary entry point for all actions
+    EditorTabService.ts    # Manages editor tabs (scenes, scripts, etc.)
     FileSystemAPIService.ts
     FocusRingService.ts
     IconService.ts         # Injectable service for managing scalable vector icons. Use `getIcon(name: string)` to retrieve icons. Ensure consistent usage across components for theming and scaling.
@@ -169,6 +179,8 @@ src/
     ProjectScriptLoaderService.ts
     ProjectService.ts
     ResourceManager.ts
+    ScriptCompilerService.ts  # Compiles project scripts
+    ScriptCreatorService.ts   # Creates new script components
     ScriptExecutionService.ts
     ScriptRegistry.ts       # Registry for behaviors and controllers
     TemplateService.ts
@@ -206,6 +218,7 @@ src/
       pix3-toolbar.ts
       pix3-toolbar.ts.css
     viewport/
+      editor-tab.ts               # Container for viewport and toolbar within a tab
       viewport-panel.ts
       viewport-panel.ts.css
     welcome/

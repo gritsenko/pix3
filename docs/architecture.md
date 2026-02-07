@@ -4,14 +4,15 @@ This document contains a high-level architecture diagram for Pix3 and notes abou
 
 ## Mermaid diagram
 
-Below is a Mermaid system diagram that represents the architecture described in `pix3-specification.md` (v1.12, operations-first).
+Below is a Mermaid system diagram that represents the architecture described in `pix3-specification.md` (v1.13, operations-first).
 
 ```mermaid
 flowchart LR
   subgraph UI
     A["ComponentBase (fw)"] --> B["Panels (Golden Layout)"]
     B --> C["Scene Tree"]
-    B --> D["Viewport Component"]
+    B --> D["Editor Tab"]
+    D --> D2["Viewport Component"]
     B --> E["Inspector"]
     B --> F["Asset Browser"]
     B --> G["Logs Panel"]
@@ -45,16 +46,20 @@ flowchart LR
     Y["ProjectService"]
     Z["ResourceManager"]
     AA["ViewportRenderService"]
+    AB1["EditorTabService"]
+    AB2["IconService"]
+    AB3["ScriptRegistry"]
+    AB4["ScriptExecutionService"]
   end
 
   subgraph Rendering
-    AB["Three.js Pipeline (Perspective + Ortho Pass)"]
+    AC["Three.js Pipeline (Perspective + Ortho Pass)"]
   end
 
   A ---|renders| D
-  D ---|uses unified pipeline| AB
-  D ---|observes resize| AA
-  AA ---|triggers resize| AB
+  D2 ---|uses unified pipeline| AC
+  D2 ---|observes resize| AA
+  AA ---|triggers resize| AC
 
   C -->|reads| K
   E -->|reads| K
@@ -79,10 +84,11 @@ flowchart LR
   A -->|uses| P
   C -->|dispatches| P
   D -->|dispatches| P
+  D2 -->|dispatches| P
   E -->|creates operation| P
   F -->|dispatches| P
 
-  AB -->|reads scene nodes| N
+  AC -->|reads scene nodes| N
 ```
 
 ## Property Schema System
@@ -279,11 +285,15 @@ Pix3 currently implements the following node types, each with property schema su
   - Properties: position (vector2), rotation (number°), scale (vector2)
   - All rotation values stored internally as radians, displayed as degrees
 
+- **Layout2D**: Root container for 2D scenes
+  - Properties: width, height, resolutionPreset, showViewportOutline
+  - Replaces Group2D as the primary root for 2D content; size is independent of editor viewport
+
 - **Sprite2D**: 2D sprite image
   - Properties: texture, tint, blend mode
   - Renders via Three.js texture/material system
 
-- **Group2D**: 2D container with defined dimensions
+- **Group2D**: 2D general container
   - Properties: width, height (for size group)
   - Allows positioning nested elements aligned to edges
 
@@ -339,6 +349,7 @@ Pix3 implements a comprehensive set of commands and operations organized by feat
 - **CreateCamera3DCommand**: Adds perspective camera to scene
 - **CreateDirectionalLightCommand**: Adds directional light to scene
 - **CreateGroup2DCommand**: Creates 2D group container
+- **CreateLayout2DCommand**: Creates a Layout2D root node
 - **CreateMeshInstanceCommand**: Adds mesh instance from GLB/GLTF file
 - **CreatePointLightCommand**: Adds point light to scene
 - **CreateSpotLightCommand**: Adds spot light to scene
@@ -350,12 +361,20 @@ Pix3 implements a comprehensive set of commands and operations organized by feat
 - **DeleteObjectCommand**: Removes selected nodes from scene
 - **ReparentNodeCommand**: Moves nodes to new parent (drag-and-drop in scene tree)
 - **UpdateGroup2DSizeCommand**: Updates Group2D width/height
+- **UpdateLayout2DSizeCommand**: Updates Layout2D width/height
 
 ### Property Commands
 
 - **UpdateObjectPropertyCommand**: Updates any node property via schema
 - **Transform2DCompleteOperation**: Completes 2D transform tool operation
 - **TransformCompleteOperation**: Completes 3D transform tool operation
+
+### Viewport Commands
+
+- **ToggleNavigationModeCommand**: Switches between 2D and 3D navigation modes
+- **ToggleLayer2DCommand**: Toggles visibility of the 2D layer
+- **ToggleLayer3DCommand**: Toggles visibility of the 3D layer
+- **ToggleGridCommand**: Toggles the 3D grid visibility
 
 ### Selection Commands
 
@@ -507,6 +526,21 @@ Pix3 includes example behaviors for testing:
 
 Additional behaviors can be registered via `ScriptRegistry.registerBehavior()`.
 
+## 2D/3D Navigation Mode
+
+Pix3 supports specialized navigation modes for 2D and 3D authoring, controlled via `appState.ui.navigationMode`.
+
+### 3D Navigation (Default)
+- **Controls**: `OrbitControls` for rotation, panning, and zooming around a target.
+- **Camera**: Perspective camera.
+- **Visuals**: Full 3D grid and perspective depth.
+
+### 2D Navigation
+- **Controls**: Custom orthographic pan and zoom. Standard OrbitControls are disabled.
+- **Camera**: Orthographic camera.
+- **Behavior**: Handled via `pan2D` and `zoom2D` in `ViewportRendererService`. Trackpad gestures and wheel events are mapped to 2D transformations.
+- **Integration**: Viewport interaction changes to flat, axis-aligned movement, ideal for working with `Layout2D` and 2D elements.
+
 ## Service Layer
 
 Pix3 implements a comprehensive service layer providing core functionality:
@@ -518,6 +552,7 @@ Pix3 implements a comprehensive service layer providing core functionality:
 - **OperationService**: Executes operations, manages undo/redo history, emits lifecycle events
 - **ScriptRegistry**: Registers behaviors and controllers, creates instances, provides property schemas
 - **BehaviorPickerService**: Shows modal dialog for selecting behaviors/controllers
+- **EditorTabService**: Manages the lifecycle of editor tabs and synchronizes with Golden Layout
 
 ### Scene Services
 
@@ -525,6 +560,8 @@ Pix3 implements a comprehensive service layer providing core functionality:
 - **NodeRegistry**: Maps node type strings to node classes for instantiation
 - **ScriptExecutionService**: Runs game loop, calls tick on nodes, manages script lifecycle
 - **AssetLoader**: Loads 3D models, textures, and other assets
+- **ScriptCompilerService**: Handles on-the-fly compilation of scene scripts
+- **ScriptCreatorService**: Provides UI and logic for creating new script components
 
 ### File System Services
 
@@ -536,9 +573,10 @@ Pix3 implements a comprehensive service layer providing core functionality:
 ### UI Services
 
 - **LayoutManager**: Manages Golden Layout panel configuration
-- **ViewportRenderService**: Handles Three.js rendering loop, resize, DPR
+- **ViewportRenderService**: Handles Three.js rendering loop, resize, DPR, and navigation modes
 - **TransformTool2d**: 2D transform gizmo and interaction
 - **FocusRingService**: Manages keyboard focus within editor UI
+- **IconService**: Centralized management of SVG icons used across the UI
 
 ### Utility Services
 
@@ -546,6 +584,7 @@ Pix3 implements a comprehensive service layer providing core functionality:
 - **LoggingService**: Centralized logging with level filtering (debug/info/warn/error)
 - **TemplateService**: Provides scene templates and project templates
 - **AssetFileActivationService**: Activates assets from browser into scene
+- **ProjectScriptLoaderService**: Dynamically loads and registers scripts from the project directory
 
 ## Rendering Pipeline
 
@@ -577,8 +616,9 @@ ComponentBase (from src/fw)
 │       ├── Pix3Panel (base panel)
 │       ├── SceneTreePanel
 │       │   └── SceneTreeNode (recursive)
-│       ├── ViewportPanel
-│       │   └── TransformToolbar
+│       ├── EditorTab (tab container)
+│       │   └── ViewportPanel
+│       │       └── TransformToolbar
 │       ├── InspectorPanel
 │       │   ├── Vector2Editor
 │       │   ├── Vector3Editor
