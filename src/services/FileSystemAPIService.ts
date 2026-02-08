@@ -44,6 +44,7 @@ export interface ReadSceneResult<TScene = unknown> {
 const DEFAULT_RESOURCE_PREFIX = 'res://';
 
 type PermissionMode = 'read' | 'readwrite';
+export type { PermissionMode };
 type PermissionState = 'prompt' | 'granted' | 'denied';
 
 // IDB Helper for Service Worker sharing

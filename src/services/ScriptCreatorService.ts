@@ -152,8 +152,7 @@ export class ScriptCreatorService {
  * Custom script component for node logic
  */
 
-import { Script } from '@pix3/runtime';
-import type { PropertySchema } from '@/fw';
+import { Script, type PropertySchema } from '@pix3/engine';
 
 export class ${scriptName} extends Script {
   constructor(id: string, type: string) {

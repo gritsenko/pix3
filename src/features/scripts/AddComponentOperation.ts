@@ -91,6 +91,15 @@ export class AddComponentOperation implements Operation<OperationInvokeResult> {
     // Add component to node using the new API
     node.addComponent(component);
 
+    // Mark scene as dirty
+    const activeSceneId = context.state.scenes.activeSceneId;
+    if (activeSceneId) {
+      const descriptor = context.state.scenes.descriptors[activeSceneId];
+      if (descriptor) {
+        descriptor.isDirty = true;
+      }
+    }
+
     return {
       didMutate: true,
       commit: {
@@ -98,10 +107,20 @@ export class AddComponentOperation implements Operation<OperationInvokeResult> {
         undo: async () => {
           // Remove component from node
           node.removeComponent(component);
+          // Mark scene as dirty on undo
+          if (activeSceneId) {
+            const descriptor = context.state.scenes.descriptors[activeSceneId];
+            if (descriptor) descriptor.isDirty = true;
+          }
         },
         redo: async () => {
           // Re-add component to node
           node.addComponent(component);
+          // Mark scene as dirty on redo
+          if (activeSceneId) {
+            const descriptor = context.state.scenes.descriptors[activeSceneId];
+            if (descriptor) descriptor.isDirty = true;
+          }
         },
       },
     };

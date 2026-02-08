@@ -184,6 +184,9 @@ export class Pix3EditorShell extends ComponentBase {
               this.tabsInitialized = true;
               
               if (appState.project.id) {
+                // Wait for project scripts to be compiled before restoring the session 
+                // to ensure custom components are available in the ScriptRegistry.
+                await this.waitForScripts();
                 await this.editorTabService.restoreProjectSession(appState.project.id);
               }
             }
@@ -573,6 +576,30 @@ export class Pix3EditorShell extends ComponentBase {
         )}
       </div>
     `;
+  }
+
+  /**
+   * Waits for project scripts to reach 'ready' or 'error' state.
+   */
+  private async waitForScripts(): Promise<void> {
+    if (
+      appState.project.scriptsStatus === 'ready' ||
+      appState.project.scriptsStatus === 'error'
+    ) {
+      return;
+    }
+
+    return new Promise(resolve => {
+      const unsub = subscribe(appState.project, () => {
+        if (
+          appState.project.scriptsStatus === 'ready' ||
+          appState.project.scriptsStatus === 'error'
+        ) {
+          unsub();
+          resolve();
+        }
+      });
+    });
   }
 
   private onDialogSecondary(e: CustomEvent): void {

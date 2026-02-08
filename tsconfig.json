@@ -44,6 +44,9 @@
       ],
       "@pix3/runtime/*": [
         "packages/pix3-runtime/src/*"
+      ],
+      "@pix3/engine": [
+        "src/fw/engine-api.ts"
       ]
     },
     /* Linting */
@@ -55,6 +58,7 @@
   },
   "include": [
     "src",
-    "packages/pix3-runtime/src"
+    "packages/pix3-runtime/src",
+    "test_assets"
   ]
 }

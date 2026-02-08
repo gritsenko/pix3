@@ -10,6 +10,7 @@ import type { PropertySchemaProvider } from '@pix3/runtime';
 import { ScriptCompilerService } from './ScriptCompilerService';
 import type { CompilationError } from './ScriptCompilerService';
 import { LoggingService } from './LoggingService';
+import { FileWatchService } from './FileWatchService';
 
 /**
  * ProjectScriptLoaderService
@@ -38,6 +39,9 @@ export class ProjectScriptLoaderService {
   @inject(LoggingService)
   private readonly logger!: LoggingService;
 
+  @inject(FileWatchService)
+  private readonly fileWatchService!: FileWatchService;
+
   private disposeSubscription?: () => void;
   private debounceTimer: number | null = null;
   private readonly debounceMs = 300;
@@ -45,15 +49,22 @@ export class ProjectScriptLoaderService {
   // Track scripts from this project for cleanup
   private registeredScriptIds = new Set<string>();
 
-  // Disable auto-compilation for MVP - handled by external compiler
-  enableAutoCompilation = false;
+  // Track watched files to avoid redundant watchers
+  private watchedFilePaths = new Set<string>();
+
+  // Enable auto-compilation
+  enableAutoCompilation = true;
 
   constructor() {
+    let lastStatus = appState.project.status;
+
     // Watch for project status changes to trigger initial compilation
     this.disposeSubscription = subscribe(appState.project, () => {
-      if (appState.project.status === 'ready' && this.enableAutoCompilation) {
+      const currentStatus = appState.project.status;
+      if (currentStatus === 'ready' && lastStatus !== 'ready' && this.enableAutoCompilation) {
         void this.syncAndBuild();
       }
+      lastStatus = currentStatus;
     });
   }
 
@@ -62,6 +73,8 @@ export class ProjectScriptLoaderService {
    * This method is debounced to avoid excessive rebuilds.
    */
   async syncAndBuild(): Promise<void> {
+    appState.project.scriptsStatus = 'loading';
+
     // Clear existing debounce timer
     if (this.debounceTimer !== null) {
       window.clearTimeout(this.debounceTimer);
@@ -78,6 +91,7 @@ export class ProjectScriptLoaderService {
    */
   private async performSyncAndBuild(): Promise<void> {
     try {
+      appState.project.scriptsStatus = 'loading';
       this.logger.info('Compiling project scripts...');
 
       // Step 1: List all .ts files in scripts/ directory
@@ -87,14 +101,38 @@ export class ProjectScriptLoaderService {
       if (tsFiles.length === 0) {
         this.logger.info('No TypeScript files found in scripts/ directory');
         this.clearRegisteredScripts();
+        appState.project.scriptsStatus = 'ready';
         return;
       }
 
       this.logger.info(`Found ${tsFiles.length} script file(s), compiling...`);
 
-      // Step 2: Read file contents into a Map
+      // Step 2: Read file contents into a Map and register watchers
       const filesMap = new Map<string, string>();
+      const currentFiles = new Set(tsFiles.map(f => f.path));
+
+      // Remove watchers for files that are no longer present
+      for (const watchedPath of this.watchedFilePaths) {
+        if (!currentFiles.has(watchedPath)) {
+          this.fileWatchService.unwatch(watchedPath);
+          this.watchedFilePaths.delete(watchedPath);
+        }
+      }
+
       for (const file of tsFiles) {
+        // Register watcher if not already watching
+        if (!this.watchedFilePaths.has(file.path)) {
+          try {
+            const handle = await this.fs.getFileHandle(file.path);
+            this.fileWatchService.watch(file.path, handle, undefined, () => {
+              void this.syncAndBuild();
+            });
+            this.watchedFilePaths.add(file.path);
+          } catch (error) {
+            this.logger.error(`Failed to register watcher for ${file.path}`, error);
+          }
+        }
+
         try {
           const content = await this.fs.readTextFile(file.path);
           filesMap.set(file.path, content);
@@ -105,6 +143,7 @@ export class ProjectScriptLoaderService {
 
       if (filesMap.size === 0) {
         this.logger.warn('No script files could be read');
+        appState.project.scriptsStatus = 'ready'; // Treat as ready but empty
         return;
       }
 
@@ -114,14 +153,20 @@ export class ProjectScriptLoaderService {
         compilationResult = await this.compiler.bundle(filesMap);
       } catch (error) {
         this.handleCompilationError(error as CompilationError);
+        appState.project.scriptsStatus = 'error';
         return;
       }
 
       // Step 4: Load the compiled bundle
       await this.loadBundle(compilationResult.code);
 
+      // Notify UI that scripts have been updated
+      appState.project.scriptRefreshSignal++;
+      appState.project.scriptsStatus = 'ready';
+
       this.logger.info(`✓ Scripts compiled and loaded successfully`);
     } catch (error) {
+      appState.project.scriptsStatus = 'error';
       this.logger.error('Failed to compile scripts', error);
     }
   }
@@ -243,6 +288,19 @@ export class ProjectScriptLoaderService {
   }
 
   /**
+   * Clear all scripts and stop watching files
+   */
+  private clearAll(): void {
+    this.clearRegisteredScripts();
+
+    // Clear watchers
+    for (const filePath of this.watchedFilePaths) {
+      this.fileWatchService.unwatch(filePath);
+    }
+    this.watchedFilePaths.clear();
+  }
+
+  /**
    * Handle compilation errors by logging and displaying to user
    */
   private handleCompilationError(error: CompilationError): void {
@@ -262,6 +320,6 @@ export class ProjectScriptLoaderService {
       this.debounceTimer = null;
     }
 
-    this.clearRegisteredScripts();
+    this.clearAll();
   }
 }

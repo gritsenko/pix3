@@ -83,6 +83,8 @@ export interface ScenesState {
 
 export type ProjectStatus = 'idle' | 'selecting' | 'ready' | 'error';
 
+export type ScriptLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
+
 export interface ProjectState {
   /** Unique ID for the project (used for persistence). */
   id: string | null;
@@ -95,8 +97,12 @@ export interface ProjectState {
   recentProjects: string[];
   /** Last opened scene file relative to the project root. */
   lastOpenedScenePath: string | null;
+  /** Current status of script compilation and loading. */
+  scriptsStatus: ScriptLoadStatus;
   /** Signal counter incremented when project files change (triggers asset explorer refresh). */
   fileRefreshSignal: number;
+  /** Signal counter incremented when scripts are recompiled. */
+  scriptRefreshSignal: number;
   /** Directory path that was modified (e.g., 'Scenes' or 'Assets'). Used to refresh only affected folders. */
   lastModifiedDirectoryPath: string | null;
 }
@@ -173,7 +179,9 @@ export const createInitialAppState = (): AppState => ({
     errorMessage: null,
     recentProjects: [],
     lastOpenedScenePath: null,
+    scriptsStatus: 'idle',
     fileRefreshSignal: 0,
+    scriptRefreshSignal: 0,
     lastModifiedDirectoryPath: null,
   },
   scenes: {

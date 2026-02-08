@@ -1,6 +1,8 @@
 import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
 import { ScriptRegistry, type ComponentTypeInfo } from '@pix3/runtime';
 import { IconService } from '@/services/IconService';
+import { appState } from '@/state';
+import { subscribe } from 'valtio/vanilla';
 import './pix3-behavior-picker.ts.css';
 
 type ScriptTypeInfo = ComponentTypeInfo;
@@ -21,6 +23,20 @@ export class BehaviorPicker extends ComponentBase {
 
   @state()
   private selectedScriptId: string | null = null;
+
+  private disposeSubscription?: () => void;
+
+  connectedCallback() {
+    super.connectedCallback();
+    this.disposeSubscription = subscribe(appState.project, () => {
+      this.requestUpdate();
+    });
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    this.disposeSubscription?.();
+  }
 
   protected render() {
     const scripts: ScriptTypeInfo[] = this.scriptRegistry.getAllComponentTypes();

@@ -96,3 +96,20 @@ root:
                 position: [79.33593750000009, 77.6953125]
                 scale: [1, 1]
                 rotation: 0
+  - id: box-1770498038485-qjs32ot
+    type: GeometryMesh
+    name: Box
+    properties:
+      transform:
+        position: [0, 0, 1.618293032008267]
+        rotationEuler: [0, 0, 0]
+        scale: [1, 1, 1]
+    components:
+      - id: project:SineOscillator:SineOscillator-1770577871035-7ic1dw4
+        type: project:SineOscillator:SineOscillator
+        enabled: true
+        config:
+          amplitude: 1
+          frequency: 1
+          axis: y
+    children: []

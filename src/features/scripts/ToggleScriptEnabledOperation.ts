@@ -60,15 +60,34 @@ export class ToggleScriptEnabledOperation implements Operation<OperationInvokeRe
     const previousEnabled = component.enabled;
     component.enabled = this.params.enabled;
 
+    // Mark scene as dirty
+    const activeSceneId = context.state.scenes.activeSceneId;
+    if (activeSceneId) {
+      const descriptor = context.state.scenes.descriptors[activeSceneId];
+      if (descriptor) {
+        descriptor.isDirty = true;
+      }
+    }
+
     return {
       didMutate: true,
       commit: {
         label: `Toggle ${component.type} ${this.params.enabled ? 'On' : 'Off'}`,
         undo: async () => {
           component.enabled = previousEnabled;
+          // Mark scene as dirty on undo
+          if (activeSceneId) {
+            const descriptor = context.state.scenes.descriptors[activeSceneId];
+            if (descriptor) descriptor.isDirty = true;
+          }
         },
         redo: async () => {
           component.enabled = this.params.enabled;
+          // Mark scene as dirty on redo
+          if (activeSceneId) {
+            const descriptor = context.state.scenes.descriptors[activeSceneId];
+            if (descriptor) descriptor.isDirty = true;
+          }
         },
       },
     };
