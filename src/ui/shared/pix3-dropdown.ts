@@ -1,5 +1,6 @@
 import { ComponentBase, customElement, html, property, state, inject } from '@/fw';
 import { IconService } from '@/services/IconService';
+import { DropdownPortal } from './dropdown-portal';
 import './pix3-dropdown.ts.css';
 
 export interface DropdownItem {
@@ -30,6 +31,8 @@ export class Pix3Dropdown extends ComponentBase {
   @state()
   private isOpen = false;
 
+  private portal: DropdownPortal = new DropdownPortal({ minWidth: '12rem' });
+
   connectedCallback(): void {
     super.connectedCallback();
     this.setAttribute('role', 'menubutton');
@@ -44,6 +47,7 @@ export class Pix3Dropdown extends ComponentBase {
   disconnectedCallback(): void {
     super.disconnectedCallback();
     this.removeEventListeners();
+    this.portal.close();
   }
 
   protected updated(changed: Map<string, unknown>): void {
@@ -53,6 +57,7 @@ export class Pix3Dropdown extends ComponentBase {
 
     if (changed.has('isOpen')) {
       this.setAttribute('aria-expanded', String(this.isOpen));
+      this.updatePortal();
     }
 
     if (changed.has('ariaLabel')) {
@@ -141,32 +146,42 @@ export class Pix3Dropdown extends ComponentBase {
     this.isOpen = false;
   };
 
+  private updatePortal(): void {
+    if (this.isOpen) {
+      // Get the hidden menu element and open the portal
+      const menuElement = this.querySelector('.dropdown__menu') as HTMLElement;
+      if (menuElement) {
+        this.portal.open(this, menuElement);
+      }
+    } else {
+      this.portal.close();
+    }
+  }
+
   protected render() {
     return html`
       <div class="dropdown__trigger">
         <span class="dropdown__icon">${this.icon}</span>
         <span class="dropdown__caret">${this.iconService.getIcon('chevron-down-caret', 12)}</span>
       </div>
-      ${this.isOpen
-        ? html`<div class="dropdown__menu" role="menu">
-            ${this.items.map(
-              item =>
-                html`${item.divider
-                  ? html`<div class="dropdown__divider" role="separator"></div>`
-                  : html`<button
-                      role="menuitem"
-                      class="dropdown__item ${item.disabled ? 'dropdown__item--disabled' : ''}"
-                      ?disabled=${item.disabled}
-                      @click=${() => this.selectItem(item)}
-                    >
-                      ${item.icon
-                        ? html`<span class="dropdown__item-icon">${item.icon}</span>`
-                        : null}
-                      <span class="dropdown__item-label">${item.label}</span>
-                    </button>`}`
-            )}
-          </div>`
-        : null}
+      <div class="dropdown__menu dropdown__menu--hidden" role="menu">
+        ${this.items.map(
+          item =>
+            html`${item.divider
+              ? html`<div class="dropdown__divider" role="separator"></div>`
+              : html`<button
+                  role="menuitem"
+                  class="dropdown__item ${item.disabled ? 'dropdown__item--disabled' : ''}"
+                  ?disabled=${item.disabled}
+                  @click=${() => this.selectItem(item)}
+                >
+                  ${item.icon
+                    ? html`<span class="dropdown__item-icon">${item.icon}</span>`
+                    : null}
+                  <span class="dropdown__item-label">${item.label}</span>
+                </button>`}`
+        )}
+      </div>
     `;
   }
 }

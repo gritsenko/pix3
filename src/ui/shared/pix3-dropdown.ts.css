@@ -13,7 +13,6 @@ pix3-dropdown {
     background 120ms ease,
     box-shadow 120ms ease,
     transform 120ms ease;
-  position: relative;
 }
 
 pix3-dropdown:focus-visible {
@@ -60,17 +59,17 @@ pix3-dropdown[icon-only] .dropdown__caret {
 }
 
 .dropdown__menu {
-  position: absolute;
-  top: 100%;
-  left: 0;
+  display: none;
   min-width: 12rem;
-  margin-top: 0.5rem;
   padding: 0.5rem 0;
   background: var(--pix3-dropdown-background, rgba(26, 29, 35, 0.96));
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 0.4rem;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  z-index: 10000;
+}
+
+.dropdown__menu--hidden {
+  display: none !important;
 }
 
 .dropdown__item {
@@ -122,4 +121,14 @@ pix3-dropdown[icon-only] .dropdown__caret {
   height: 1px;
   margin: 0.25rem 0;
   background: rgba(255, 255, 255, 0.08);
+}
+
+/* Portal styles - rendered at document.body level */
+.pix3-dropdown-portal {
+  all: unset;
+}
+
+.pix3-dropdown-portal .dropdown__menu {
+  display: block !important;
+  position: fixed;
 }
