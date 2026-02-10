@@ -71,6 +71,7 @@ export class ViewportRendererService {
   private selectedObjects = new Set<THREE.Object3D>();
   private selectionBoxes = new Map<string, THREE.Box3Helper>();
   private selectionGizmos = new Map<string, THREE.Object3D>();
+  private targetGizmos = new Map<string, THREE.Object3D>();
   private previewCamera: THREE.Camera | null = null;
   private group2DVisuals = new Map<string, THREE.Group>();
   private sprite2DVisuals = new Map<string, THREE.Group>();
@@ -583,7 +584,11 @@ export class ViewportRendererService {
    * Only active in 2D mode.
    */
   pan2D(deltaX: number, deltaY: number): void {
-    if (!this.orthographicControls || !this.orthographicCamera || appState.ui.navigationMode !== '2d') {
+    if (
+      !this.orthographicControls ||
+      !this.orthographicCamera ||
+      appState.ui.navigationMode !== '2d'
+    ) {
       return;
     }
 
@@ -1064,6 +1069,22 @@ export class ViewportRendererService {
     }
     this.selectionGizmos.clear();
 
+    // Clear previous target gizmos
+    for (const gizmo of this.targetGizmos.values()) {
+      if (this.scene) {
+        this.scene.remove(gizmo);
+      }
+      gizmo.traverse(child => {
+        if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
+          child.geometry.dispose();
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose();
+          }
+        }
+      });
+    }
+    this.targetGizmos.clear();
+
     // Extra safety: remove any lingering selection boxes from the scene
     // (in case of reference mismatches)
     if (this.scene) {
@@ -1133,6 +1154,17 @@ export class ViewportRendererService {
           });
           this.selectionGizmos.set(nodeId, gizmo);
           this.scene?.add(gizmo);
+        }
+
+        // Create target gizmos for cameras and directional lights
+        const targetGizmo = this.createTargetGizmo(node);
+        if (targetGizmo) {
+          targetGizmo.userData.isTargetGizmo = true;
+          targetGizmo.traverse(child => {
+            child.layers.set(LAYER_GIZMOS);
+          });
+          this.targetGizmos.set(nodeId, targetGizmo);
+          this.scene?.add(targetGizmo);
         }
       } else if (node && node instanceof Node2D) {
         selected2DNodeIds.push(nodeId);
@@ -1412,6 +1444,130 @@ export class ViewportRendererService {
     const helper = new THREE.SpotLightHelper(node.light);
     helper.update();
     return helper;
+  }
+
+  private createTargetGizmo(node: Node3D): THREE.Object3D | null {
+    if (node instanceof Camera3D) {
+      return this.createCameraTargetGizmo(node);
+    } else if (node instanceof DirectionalLightNode) {
+      return this.createDirectionalLightTargetGizmo(node);
+    }
+    return null;
+  }
+
+  private createCameraTargetGizmo(node: Camera3D): THREE.Object3D {
+    const targetPos = node.getTargetPosition();
+    const gizmo = new THREE.Group();
+    gizmo.userData.isTargetGizmo = true;
+    gizmo.userData.parentNodeId = node.nodeId;
+
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xffff00,
+        transparent: true,
+        opacity: 0.8,
+      })
+    );
+    sphere.position.copy(targetPos);
+    sphere.userData.isTargetSphere = true;
+    gizmo.add(sphere);
+
+    const outline = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        visible: false,
+      })
+    );
+    outline.position.copy(targetPos);
+    outline.userData.isTargetOutline = true;
+    gizmo.add(outline);
+
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([node.position, targetPos]),
+      new THREE.LineBasicMaterial({
+        color: 0xffff00,
+        transparent: true,
+        opacity: 0.5,
+      })
+    );
+    line.userData.isTargetLine = true;
+    gizmo.add(line);
+
+    return gizmo;
+  }
+
+  private createDirectionalLightTargetGizmo(node: DirectionalLightNode): THREE.Object3D {
+    const targetPos = node.getTargetPosition();
+    const gizmo = new THREE.Group();
+    gizmo.userData.isTargetGizmo = true;
+    gizmo.userData.parentNodeId = node.nodeId;
+
+    const sphere = new THREE.Mesh(
+      new THREE.SphereGeometry(0.2, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xffff00,
+        transparent: true,
+        opacity: 0.8,
+      })
+    );
+    sphere.position.copy(targetPos);
+    sphere.userData.isTargetSphere = true;
+    gizmo.add(sphere);
+
+    const outline = new THREE.Mesh(
+      new THREE.SphereGeometry(0.24, 16, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        wireframe: true,
+        visible: false,
+      })
+    );
+    outline.position.copy(targetPos);
+    outline.userData.isTargetOutline = true;
+    gizmo.add(outline);
+
+    const grid = new THREE.GridHelper(0.5, 4, 0xffff00, 0xffff00);
+    grid.position.copy(targetPos);
+    grid.lookAt(node.position);
+    grid.userData.isTargetGrid = true;
+    gizmo.add(grid);
+
+    return gizmo;
+  }
+
+  private updateTargetGizmo(node: Node3D, gizmo: THREE.Object3D): void {
+    let cameraNode: Camera3D | DirectionalLightNode | null = null;
+    if (node instanceof Camera3D) {
+      cameraNode = node;
+    } else if (node instanceof DirectionalLightNode) {
+      cameraNode = node;
+    }
+    if (!cameraNode) return;
+
+    const targetPos = cameraNode.getTargetPosition();
+
+    gizmo.traverse(child => {
+      if (child.userData.isTargetSphere || child.userData.isTargetOutline) {
+        child.position.copy(targetPos);
+      } else if (child.userData.isTargetLine) {
+        const positions = new Float32Array([
+          node.position.x,
+          node.position.y,
+          node.position.z,
+          targetPos.x,
+          targetPos.y,
+          targetPos.z,
+        ]);
+        const geo = (child as THREE.Mesh).geometry as THREE.BufferGeometry;
+        geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      } else if (child.userData.isTargetGrid) {
+        child.position.copy(targetPos);
+        child.lookAt(node.position);
+      }
+    });
   }
 
   /**
@@ -2181,6 +2337,17 @@ export class ViewportRendererService {
                 }
               });
             }
+
+            // Update target gizmos
+            for (const [nodeId, gizmo] of this.targetGizmos.entries()) {
+              const sceneGraph = this.sceneManager.getActiveSceneGraph();
+              if (sceneGraph) {
+                const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
+                if (node && node instanceof Node3D) {
+                  this.updateTargetGizmo(node, gizmo);
+                }
+              }
+            }
           } catch (error) {
             console.error('[ViewportRenderer] Error updating selection:', error);
           }
@@ -2377,6 +2544,18 @@ export class ViewportRendererService {
     this.sprite2DVisuals.clear();
 
     this.clear2DSelectionOverlay();
+
+    for (const gizmo of this.targetGizmos.values()) {
+      gizmo.traverse(child => {
+        if (child instanceof THREE.Mesh || child instanceof THREE.Line) {
+          child.geometry.dispose();
+          if (child.material instanceof THREE.Material) {
+            child.material.dispose();
+          }
+        }
+      });
+    }
+    this.targetGizmos.clear();
 
     if (this.scene) {
       this.scene.traverse(obj => {

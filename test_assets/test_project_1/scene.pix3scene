@@ -20,9 +20,9 @@ root:
           projection: perspective
           fov: 60
           near: 0.1
-          far: 1000
+          far: 10
           transform:
-            position: [0, 2, 6]
+            position: [0, 1.9715861718891237, 5.732287150574468]
             rotationEuler: [-10, 0, 0]
             scale: [1, 1, 1]
         children: []
