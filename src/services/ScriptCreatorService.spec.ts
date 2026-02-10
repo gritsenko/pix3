@@ -15,7 +15,7 @@ describe('ScriptCreatorService', () => {
 
       expect(template).toContain('export class PlayerMovement extends Script');
       expect(template).toContain("nodeType: 'PlayerMovement'");
-      expect(template).toContain('import { Script } from');
+      expect(template).toContain("import { Script, type PropertySchema } from '@pix3/engine'");
     });
 
     it('should include lifecycle methods', () => {
@@ -58,8 +58,8 @@ describe('ScriptCreatorService', () => {
       const gen = service as unknown as { generateScriptTemplate(name: string): string };
       const template = gen.generateScriptTemplate('Test');
 
-      expect(template).toContain("import { Script } from '@pix3/runtime'");
-      expect(template).toContain("import type { PropertySchema } from '@/fw'");
+      expect(template).toContain("import { Script, type PropertySchema } from '@pix3/engine'");
+      expect(template).toContain('static getPropertySchema(): PropertySchema');
     });
   });
 
