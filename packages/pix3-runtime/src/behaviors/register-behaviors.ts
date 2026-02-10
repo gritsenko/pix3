@@ -14,7 +14,7 @@ import { TestRotateBehavior } from './TestRotateBehavior';
 export function registerBuiltInScripts(registry: ScriptRegistry): void {
   // Register test/example components
   registry.registerComponent({
-    id: 'test_rotate',
+    id: 'core:TestRotate',
     displayName: 'Test Rotate',
     description: 'Rotates a 3D node continuously (for testing)',
     category: 'Test',

@@ -252,18 +252,20 @@ Transform group renders with 6-column CSS Grid (1rem 1fr 1rem 1fr 1rem 1fr) with
 
 ### 6.1 Overview
 
-Pix3 includes a script component system for attaching runtime behaviors and controllers to nodes. This system enables game-like interactivity and logic within the scene editor, similar to behavior systems in Unity or Godot.
+Pix3 includes a unified script component system for attaching runtime logic to nodes. This system enables game-like interactivity and logic within the scene editor, similar to Unity's MonoBehaviour or Godot's nodes. All scripts are components attached to nodes via the `components` array.
 
 ### 6.2 Script Component Types
 
-The script system supports two component types:
+Components use a namespace prefix system to distinguish between built-in and user-defined scripts:
 
-- **Behaviors**: Reusable components that can be attached to multiple nodes. Multiple behaviors can be attached to a single node. Behaviors are ideal for modular functionality (e.g., rotation, physics, animation).
-- **Script Controllers**: Primary logic scripts for a node. Only one controller can be attached per node. Controllers typically represent the main behavior or state machine for a node.
+- **Built-in Components**: Use `core:` prefix (e.g., `core:TestRotate`)
+- **User Components**: Use `user:` prefix (e.g., `user:MyScript`)
+
+Multiple components can be attached to a single node, and all components follow the same lifecycle and interface.
 
 ### 6.3 Script Lifecycle
 
-All script components (behaviors and controllers) implement the `ScriptLifecycle` interface with the following methods:
+All script components implement the `ScriptComponent` interface with the following methods:
 
 - `onAttach(node: NodeBase)`: Called when the script component is attached to a node. Use this to initialize references and set up state.
 - `onStart()`: Called on the first frame after attachment, before `onUpdate`. Use this for initialization that depends on the scene being fully loaded.
@@ -271,19 +273,18 @@ All script components (behaviors and controllers) implement the `ScriptLifecycle
 - `onDetach()`: Called when the script component is detached from a node or scene is unloaded. Use this to clean up resources and remove event listeners.
 - `resetStartedState()`: Called when detaching to allow re-initialization on next attach.
 
-### 6.4 Base Classes
+### 6.4 Base Class
 
-- **BehaviorBase**: Abstract base class for behaviors. Extend this class to create custom behaviors. Behaviors expose parameters via `static getPropertySchema()` for dynamic property editing.
-- **ScriptControllerBase**: Abstract base class for controllers. Extend this class to create custom controllers. Controllers expose parameters via `static getPropertySchema()` for dynamic property editing.
+- **Script**: Abstract base class for all components. Extend this class to create custom scripts. Components expose parameters via `static getPropertySchema()` for dynamic property editing.
 
 ### 6.5 Script Registry
 
-The `ScriptRegistry` service maintains a mapping of script component type names to their implementation classes. Each class must have a static `getPropertySchema()` method for parameter definitions.
+The `ScriptRegistry` service maintains a unified registry of script component types:
 
-- Register behaviors: `registry.registerBehavior(info: BehaviorTypeInfo)`
-- Register controllers: `registry.registerController(info: ControllerTypeInfo)`
-- Create instances: `registry.createBehavior(typeId, instanceId)` or `registry.createController(typeId, instanceId)`
-- Get property schemas: `registry.getBehaviorPropertySchema(typeId)` or `registry.getControllerPropertySchema(typeId)`
+- Register components: `registry.registerComponent(info: ComponentTypeInfo)`
+- Create instances: `registry.createComponent(typeId, instanceId)`
+- Get property schemas: `registry.getComponentPropertySchema(typeId)`
+- List all components: `registry.getAllComponentTypes()`
 
 ### 6.6 Script Execution Service
 
@@ -295,41 +296,37 @@ The `ScriptExecutionService` manages the game loop and script lifecycle:
 - **Start/Stop**: Control script execution via `start()` and `stop()` methods
 - **Scene Change Handling**: Detaches old scripts and attaches new ones when scenes change
 
-### 6.7 Behavior Picker
+### 6.7 Component Picker
 
-The `BehaviorPickerService` provides a modal dialog for selecting behaviors and controllers:
+The `BehaviorPickerService` provides a modal dialog for selecting components:
 
-- Promise-based API: `showPicker('behavior' | 'controller')`
+- Promise-based API: `showPicker()`
 - Search and filtering by name, description, and keywords
-- Category grouping for organized display
-- Integration with inspector panel for adding scripts
+- Category grouping (Built-in, Project) for organized display
+- Integration with inspector panel for adding components
 
 ### 6.8 Inspector Integration
 
-The Object Inspector displays a "Scripts & Behaviors" section for each node:
+The Object Inspector displays a "Components" section for each node:
 
-- Lists attached controller (if any) and behaviors
-- Provides buttons to add new behaviors or set a controller
-- Enable/disable scripts via toggle buttons
-- Remove scripts via delete buttons
-- Behaviors and controllers expose their parameter schemas for inline editing
+- Lists all attached components
+- Provides button to add new components
+- Enable/disable components via toggle buttons
+- Remove components via delete buttons
+- Components expose their parameter schemas for inline editing
 
 ### 6.9 Node Integration
 
-Nodes store scripts in two properties:
-
-- `behaviors: Behavior[]` - Array of attached behaviors
-- `controller: ScriptController | null` - Single attached controller or null
+Nodes store components in the `components: ScriptComponent[]` property.
 
 Nodes implement a `tick(dt)` method that:
 
-1. Updates enabled controller (calls `onUpdate`)
-2. Updates enabled behaviors (calls `onUpdate`)
-3. Recursively ticks children
+1. Updates all enabled components (calls `onUpdate`)
+2. Recursively ticks children
 
 ### 6.10 Scene Serialization
 
-Scripts are serialized in scene files as part of node definitions:
+Components are serialized in scene files as part of node definitions using the namespace prefix format:
 
 ```yaml
 root:
@@ -338,51 +335,46 @@ root:
     name: 'RotatingCube'
     properties:
       position: { x: 0, y: 0, z: 0 }
-    behaviors:
-      - id: 'behavior_001'
-        type: 'test_rotate'
+    components:
+      - id: 'component_001'
+        type: 'core:TestRotate'
         enabled: true
-        parameters:
+        config:
           rotationSpeed: 2.5
-    controller:
-      id: 'controller_001'
-        type: 'my_controller'
-        enabled: true
-        parameters: {}
 ```
 
-### 6.11 Example Behavior
+### 6.11 Example Component
 
 ```typescript
-export class TestRotateBehavior extends BehaviorBase {
+export class TestRotate extends Script {
   private rotationSpeed: number = 1.0;
 
   constructor(id: string, type: string) {
     super(id, type);
-    this.parameters = { rotationSpeed: this.rotationSpeed };
+    this.config = { rotationSpeed: this.rotationSpeed };
   }
 
   static getPropertySchema(): PropertySchema {
     return {
-      nodeType: 'TestRotateBehavior',
+      nodeType: 'TestRotate',
       properties: [
         {
           name: 'rotationSpeed',
           type: 'number',
           ui: {
             label: 'Rotation Speed',
-            group: 'Behavior',
+            group: 'Component',
             min: 0,
             max: 10,
             step: 0.1,
           },
-          getValue: b => (b as TestRotateBehavior).parameters.rotationSpeed,
-          setValue: (b, value) => {
-            (b as TestRotateBehavior).parameters.rotationSpeed = Number(value);
+          getValue: c => (c as TestRotate).config.rotationSpeed,
+          setValue: (c, value) => {
+            (c as TestRotate).config.rotationSpeed = Number(value);
           },
         },
       ],
-      groups: { Behavior: { label: 'Behavior Parameters' } },
+      groups: { Component: { label: 'Component Parameters' } },
     };
   }
 

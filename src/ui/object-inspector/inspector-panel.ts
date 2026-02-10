@@ -173,7 +173,7 @@ export class InspectorPanel extends ComponentBase {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Find the newly created script in the registry
-      const scriptId = `project:${scriptName}.ts:${scriptName}`;
+      const scriptId = `user:${scriptName}`;
 
       const componentType = this.scriptRegistry.getComponentType(scriptId);
       if (componentType) {

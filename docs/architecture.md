@@ -392,35 +392,29 @@ Pix3 implements a comprehensive set of commands and operations organized by feat
 
 ## Script Component System
 
-Pix3 includes a script component system for attaching runtime behaviors and controllers to nodes:
+Pix3 includes a unified script component system for attaching runtime logic to nodes:
 
 ```mermaid
 graph TD
   A["Node"]
-  B["Behavior"]
-  C["Controller"]
+  B["ScriptComponent"]
+  C["Script"]
   D["ScriptRegistry"]
-  E["BehaviorBase/ControllerBase"]
   F["ScriptExecutionService"]
   G["Inspector"]
   H["BehaviorPickerService"]
 
-  A -->|"behaviors[]"| B
-  A -->|"controller"| C
-  B -->|"extends"| E
-  C -->|"extends"| E
+  A -->|"components[]"| B
+  B -->|"extends"| C
   D -->|"creates instances"| B
-  D -->|"creates instances"| C
   F -->|"tick dt"| A
   G -->|"displays"| B
-  G -->|"displays"| C
   H -->|"picker modal"| D
 
   style A fill:#e1f5ff
   style B fill:#fff4e6
-  style C fill:#ffe6e6
+  style C fill:#f5f5f5
   style D fill:#f0f9ff
-  style E fill:#f5f5f5
   style F fill:#fff7ed
   style G fill:#fefce8
   style H fill:#fdf4ff
@@ -428,13 +422,19 @@ graph TD
 
 ### Key Components
 
-- **ScriptRegistry**: Registers behavior and controller types, creates instances, provides property schemas
-- **Behavior**: Reusable script component, multiple per node
-- **Controller**: Primary script component, one per node
-- **BehaviorBase/ScriptControllerBase**: Abstract base classes with `getPropertySchema()` for parameter definitions
+- **ScriptRegistry**: Unified registry for all component types (`core:*` and `user:*`), creates instances, provides property schemas
+- **Script**: Abstract base class for all components with `getPropertySchema()` for parameter definitions
+- **ScriptComponent**: Interface implemented by all script components
 - **ScriptExecutionService**: Game loop, calls `tick(dt)` on nodes, manages script lifecycle
-- **BehaviorPickerService**: Modal dialog for selecting behaviors/controllers
-- **Inspector**: Displays attached scripts, allows adding/removing/toggling
+- **BehaviorPickerService**: Modal dialog for selecting components
+- **Inspector**: Displays attached components, allows adding/removing/toggling
+
+### Component Type IDs
+
+Components use namespace prefixes for type identification:
+
+- **Built-in**: `core:TestRotate`, `core:CameraFollow`
+- **User-defined**: `user:MyScript`, `user:NPCController`
 
 ### Script Lifecycle
 
@@ -442,39 +442,33 @@ graph TD
 sequenceDiagram
   participant S as ScriptExecutionService
   participant N as Node
-  participant C as Controller
-  participant B as Behavior
+  participant C as ScriptComponent
 
   S->>N: tick(dt)
-  N->>C: if enabled: onUpdate(dt)
-  N->>B: for each behavior: if enabled: onUpdate(dt)
+  N->>C: for each component: if enabled: onUpdate(dt)
   Note over B: Update state, animate properties
 
   alt Scene Load
     S->>N: onAttach(node)
     N->>C: onAttach(node)
-    N->>B: onAttach(behavior, node)
     S->>N: first tick: onStart()
     N->>C: onStart()
-    N->>B: onStart()
   end
 
   alt Scene Unload
     S->>N: onDetach()
     N->>C: onDetach()
-    N->>B: onDetach()
   end
 ```
 
 ### Inspector Integration
 
-The Inspector panel includes a "Scripts & Behaviors" section for each node:
+The Inspector panel includes a "Components" section for each node:
 
-- **Controller Display**: Shows controller type with enable/disable and remove buttons
-- **Behaviors List**: Shows all attached behaviors with enable/disable and remove buttons
-- **Add Buttons**: "Add Behavior" and "Set Controller" buttons open behavior picker modal
-- **No Scripts State**: Displays "No scripts attached" when empty
-- **Parameter Editing**: Behaviors/controllers expose parameters via property schemas for inline editing
+- **Components List**: Shows all attached components with enable/disable and remove buttons
+- **Add Button**: "Add Component" button opens component picker modal
+- **No Components State**: Displays "No components attached" when empty
+- **Parameter Editing**: Components expose parameters via property schemas for inline editing
 
 ### Script Parameter Schema
 
@@ -483,25 +477,25 @@ Like node properties, script parameters use the property schema system:
 ```typescript
 static getPropertySchema(): PropertySchema {
   return {
-    nodeType: 'TestRotateBehavior',
+    nodeType: 'TestRotate',
     properties: [
       {
         name: 'rotationSpeed',
         type: 'number',
         ui: {
           label: 'Rotation Speed',
-          group: 'Behavior',
+          group: 'Component',
           min: 0,
           max: 10,
           step: 0.1,
         },
-        getValue: (b) => b.parameters.rotationSpeed,
-        setValue: (b, value) => {
-          b.parameters.rotationSpeed = Number(value);
+        getValue: (c) => c.config.rotationSpeed,
+        setValue: (c, value) => {
+          c.config.rotationSpeed = Number(value);
         },
       },
     ],
-    groups: { Behavior: { label: 'Behavior Parameters' } },
+    groups: { Component: { label: 'Component Parameters' } },
   };
 }
 ```
@@ -510,32 +504,32 @@ static getPropertySchema(): PropertySchema {
 
 All script mutations use commands through CommandDispatcher:
 
-- **AttachBehaviorCommand/Operation**: Add a behavior to a node
-- **DetachBehaviorCommand/Operation**: Remove a behavior from a node
-- **SetControllerCommand/Operation**: Set controller on a node
-- **ClearControllerCommand/Operation**: Remove controller from a node
-- **ToggleScriptEnabledCommand/Operation**: Enable/disable a script
+- **AddComponentCommand/Operation**: Add a component to a node
+- **RemoveComponentCommand/Operation**: Remove a component from a node
+- **ToggleScriptEnabledCommand/Operation**: Enable/disable a component
 - **PlaySceneCommand**: Start script execution loop
 - **StopSceneCommand**: Stop script execution loop
 
-### Built-in Behaviors
+### Built-in Components
 
-Pix3 includes example behaviors for testing:
+Pix3 includes example components for testing:
 
-- **TestRotateBehavior**: Rotates a 3D node continuously with configurable speed
+- **core:TestRotate**: Rotates a 3D node continuously with configurable speed
 
-Additional behaviors can be registered via `ScriptRegistry.registerBehavior()`.
+Additional components can be registered via `ScriptRegistry.registerComponent()`. Use `core:` prefix for built-in components and `user:` prefix for user-defined components.
 
 ## 2D/3D Navigation Mode
 
 Pix3 supports specialized navigation modes for 2D and 3D authoring, controlled via `appState.ui.navigationMode`.
 
 ### 3D Navigation (Default)
+
 - **Controls**: `OrbitControls` for rotation, panning, and zooming around a target.
 - **Camera**: Perspective camera.
 - **Visuals**: Full 3D grid and perspective depth.
 
 ### 2D Navigation
+
 - **Controls**: Custom orthographic pan and zoom. Standard OrbitControls are disabled.
 - **Camera**: Orthographic camera.
 - **Behavior**: Handled via `pan2D` and `zoom2D` in `ViewportRendererService`. Trackpad gestures and wheel events are mapped to 2D transformations.

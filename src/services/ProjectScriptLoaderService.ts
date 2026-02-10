@@ -236,7 +236,7 @@ export class ProjectScriptLoaderService {
     }
 
     // Create unique ID for this script
-    const scriptId = `project:${sourceFile}:${className}`;
+    const scriptId = `user:${className}`;
 
     // Cast the dynamic constructor to the expected registry type
     const typedCtor = ctor as unknown as (new (id: string, type: string) => ScriptComponent) &

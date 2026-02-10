@@ -52,7 +52,7 @@ root:
             scale: [1, 1, 1]
         components:
           - id: test_rotate-1769874090897-mtdj91e
-            type: test_rotate
+            type: core:TestRotate
             enabled: true
             config:
               rotationSpeed: 1
@@ -105,8 +105,8 @@ root:
         rotationEuler: [0, 0, 0]
         scale: [1, 1, 1]
     components:
-      - id: project:SineOscillator:SineOscillator-1770577871035-7ic1dw4
-        type: project:SineOscillator:SineOscillator
+      - id: user:SineOscillator-1770577871035-7ic1dw4
+        type: user:SineOscillator
         enabled: true
         config:
           amplitude: 1
