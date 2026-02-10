@@ -7,6 +7,7 @@ const RECENTS_KEY = 'pix3.recentProjects:v1';
 export interface RecentProjectEntry {
   readonly id?: string;
   readonly name: string;
+  readonly localAbsolutePath?: string;
   readonly lastOpenedAt: number;
 }
 
@@ -27,6 +28,7 @@ export class ProjectService {
         .map(p => ({
           id: p.id,
           name: p.name,
+          localAbsolutePath: p.localAbsolutePath,
           lastOpenedAt: typeof p.lastOpenedAt === 'number' ? p.lastOpenedAt : 0,
         }))
         .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
@@ -68,6 +70,7 @@ export class ProjectService {
     const toAdd: RecentProjectEntry = {
       id: entry.id,
       name: entry.name,
+      localAbsolutePath: entry.localAbsolutePath,
       lastOpenedAt: entry.lastOpenedAt ?? Date.now(),
     };
     filtered.unshift(toAdd);
@@ -78,6 +81,20 @@ export class ProjectService {
     } catch {
       // ignore
     }
+  }
+
+  /**
+   * Syncs current project metadata (name, local path) back to recent projects storage.
+   */
+  syncProjectMetadata(): void {
+    if (appState.project.status !== 'ready' || !appState.project.id) return;
+
+    this.addRecentProject({
+      id: appState.project.id,
+      name: appState.project.projectName ?? 'Untitled Project',
+      localAbsolutePath: appState.project.localAbsolutePath ?? undefined,
+      lastOpenedAt: Date.now(),
+    });
   }
 
   async openProjectViaPicker(): Promise<void> {
@@ -132,12 +149,14 @@ export class ProjectService {
             appState.project.id = entry.id || null;
             appState.project.directoryHandle = handle;
             appState.project.projectName = handle.name ?? entry.name;
+            appState.project.localAbsolutePath = entry.localAbsolutePath ?? null;
             appState.project.status = 'ready';
             appState.project.errorMessage = null;
             // update timestamp in recents
             this.addRecentProject({
               id: entry.id,
               name: appState.project.projectName ?? entry.name,
+              localAbsolutePath: appState.project.localAbsolutePath ?? undefined,
               lastOpenedAt: Date.now(),
             });
             return;

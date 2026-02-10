@@ -5,6 +5,10 @@ import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
 import { SceneManager } from '@pix3/runtime';
 import type { SceneGraph } from '@pix3/runtime';
 import { EditorTabService } from '@/services/EditorTabService';
+import { DialogService } from '@/services/DialogService';
+import { FileSystemAPIService } from '@/services/FileSystemAPIService';
+import { appState } from '@/state';
+import { OpenProjectSettingsCommand } from '@/features/project/OpenProjectSettingsCommand';
 
 export interface AssetActivation {
   name: string;
@@ -37,6 +41,12 @@ export class AssetFileActivationService {
   @inject(EditorTabService)
   private readonly editorTabService!: EditorTabService;
 
+  @inject(DialogService)
+  private readonly dialogService!: DialogService;
+
+  @inject(FileSystemAPIService)
+  private readonly fileSystem!: FileSystemAPIService;
+
   /**
    * Handle activation of an asset file from the project tree.
    * @param payload File activation details including extension and resource path
@@ -58,6 +68,11 @@ export class AssetFileActivationService {
     if (extension === 'glb' || extension === 'gltf') {
       const command = new AddModelCommand({ modelPath: resourcePath, modelName: name });
       await this.commandDispatcher.execute(command);
+      return;
+    }
+
+    if (extension === 'ts') {
+      await this.handleScriptActivation(payload);
       return;
     }
 
@@ -90,6 +105,35 @@ export class AssetFileActivationService {
     });
 
     await this.commandDispatcher.execute(command);
+  }
+
+  private async handleScriptActivation(payload: AssetActivation): Promise<void> {
+    const { resourcePath } = payload;
+    const localPath = appState.project.localAbsolutePath;
+
+    if (!localPath) {
+      const confirm = await this.dialogService.showConfirmation({
+        title: 'Configure Local Project Path',
+        message: 'To open script files in VS Code, you must configure the absolute local path to this project.\n\nWould you like to configure it now?',
+        confirmLabel: 'Configure',
+        cancelLabel: 'Later'
+      });
+
+      if (confirm) {
+        await this.commandDispatcher.execute(new OpenProjectSettingsCommand());
+      }
+      return;
+    }
+
+    // Strip res:// and join with local path
+    const relativePath = resourcePath ? this.fileSystem.normalizeResourcePath(resourcePath) : '';
+    
+    // Normalize slashes for the OS (VS Code handle cross-platform paths well usually, but let's be safe)
+    const fullPath = `${localPath.replace(/\/$/, '')}/${relativePath.replace(/^\//, '')}`;
+    
+    // Open in VS Code using vscode:// protocol
+    const vscodeUrl = `vscode://file/${fullPath}`;
+    window.open(vscodeUrl, '_blank');
   }
 
   private findUiLayer(sceneGraph: SceneGraph) {

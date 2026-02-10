@@ -12,6 +12,7 @@ import {
   type ComponentPickerInstance,
 } from '@/services/BehaviorPickerService';
 import { ScriptCreatorService, type ScriptCreationInstance } from '@/services/ScriptCreatorService';
+import { ProjectSettingsService, type ProjectSettingsDialogInstance } from '@/services/ProjectSettingsService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { ScriptCompilerService } from '@/services/ScriptCompilerService';
@@ -23,6 +24,7 @@ import { UndoCommand } from '@/features/history/UndoCommand';
 import { RedoCommand } from '@/features/history/RedoCommand';
 import { PlaySceneCommand } from '@/features/scripts/PlaySceneCommand';
 import { StopSceneCommand } from '@/features/scripts/StopSceneCommand';
+import { OpenProjectSettingsCommand } from '@/features/project/OpenProjectSettingsCommand';
 import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import { EditorTabService } from '@/services/EditorTabService';
@@ -32,6 +34,7 @@ import './shared/pix3-main-menu';
 import './shared/pix3-confirm-dialog';
 import './shared/pix3-behavior-picker';
 import './shared/pix3-script-creator';
+import './shared/pix3-project-settings-dialog';
 import './shared/pix3-status-bar';
 import './shared/pix3-background';
 import './welcome/pix3-welcome';
@@ -70,6 +73,9 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(ScriptCreatorService)
   private readonly scriptCreatorService!: ScriptCreatorService;
 
+  @inject(ProjectSettingsService)
+  private readonly projectSettingsService!: ProjectSettingsService;
+
   @inject(ScriptExecutionService)
   private readonly scriptExecutionService!: ScriptExecutionService;
 
@@ -92,6 +98,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @state()
   private scriptCreators: ScriptCreationInstance[] = [];
+
+  @state()
+  private activeProjectSettingsDialog: ProjectSettingsDialogInstance | null = null;
 
   @property({ type: Boolean, reflect: true, attribute: 'shell-ready' })
   protected shellReady = false;
@@ -116,6 +125,7 @@ export class Pix3EditorShell extends ComponentBase {
     const redoCommand = new RedoCommand(this.operationService);
     const playCommand = new PlaySceneCommand(this.scriptExecutionService);
     const stopCommand = new StopSceneCommand(this.scriptExecutionService);
+    const projectSettingsCommand = new OpenProjectSettingsCommand();
     this.commandRegistry.registerMany(
       undoCommand,
       redoCommand,
@@ -123,12 +133,19 @@ export class Pix3EditorShell extends ComponentBase {
       saveAsCommand,
       deleteCommand,
       playCommand,
-      stopCommand
+      stopCommand,
+      projectSettingsCommand
     );
 
     // Subscribe to dialog changes
     this.disposeDialogsSubscription = this.dialogService.subscribe(dialogs => {
       this.dialogs = dialogs;
+      this.requestUpdate();
+    });
+
+    // Subscribe to project settings dialog changes
+    this.projectSettingsService.subscribe(dialog => {
+      this.activeProjectSettingsDialog = dialog;
       this.requestUpdate();
     });
 
@@ -451,6 +468,7 @@ export class Pix3EditorShell extends ComponentBase {
         </div>
         <pix3-status-bar></pix3-status-bar>
         ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
+        ${this.renderProjectSettingsHost()}
       </div>
     `;
   }
@@ -574,6 +592,18 @@ export class Pix3EditorShell extends ComponentBase {
             ></pix3-confirm-dialog>
           `
         )}
+      </div>
+    `;
+  }
+
+  private renderProjectSettingsHost() {
+    if (!this.activeProjectSettingsDialog) {
+      return null;
+    }
+
+    return html`
+      <div class="project-settings-host">
+        <pix3-project-settings-dialog></pix3-project-settings-dialog>
       </div>
     `;
   }

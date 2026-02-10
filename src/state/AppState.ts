@@ -91,6 +91,8 @@ export interface ProjectState {
   /** Active project directory handle retrieved via the File System Access API. */
   directoryHandle: FileSystemDirectoryHandle | null;
   projectName: string | null;
+  /** Absolute path on the local file system (e.g. /home/user/project). Used for VS Code integration. */
+  localAbsolutePath: string | null;
   status: ProjectStatus;
   errorMessage: string | null;
   /** Recently opened project identifiers (storage implementation TBD). */
@@ -175,6 +177,7 @@ export const createInitialAppState = (): AppState => ({
     id: null,
     directoryHandle: null,
     projectName: null,
+    localAbsolutePath: null,
     status: 'idle',
     errorMessage: null,
     recentProjects: [],
