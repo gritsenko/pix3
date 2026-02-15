@@ -5,6 +5,7 @@ import {
   type CommandContext,
   type CommandPreconditionResult,
   type CommandMetadata,
+  type CommandExecutionResult,
 } from '@/core/command';
 
 export class OpenProjectSettingsCommand extends CommandBase<void, void> {
@@ -32,7 +33,11 @@ export class OpenProjectSettingsCommand extends CommandBase<void, void> {
     return { canExecute: true };
   }
 
-  async execute(): Promise<void> {
+  async execute(): Promise<CommandExecutionResult<void>> {
     await this.projectSettingsService.showSettings();
+    return {
+      didMutate: false,
+      payload: undefined,
+    };
   }
 }

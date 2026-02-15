@@ -167,7 +167,7 @@ export class EditorTabService {
       );
       for (const tabData of tabsToRestore) {
         await this.openResourceTab(
-          tabData.type,
+          tabData.type as EditorTabType,
           tabData.resourceId,
           tabData.contextState,
           false // don't activate yet
@@ -177,7 +177,7 @@ export class EditorTabService {
       if (session.activeTabId) {
         await this.focusTab(session.activeTabId);
       } else if (tabsToRestore.length > 0) {
-        const firstTabId = this.deriveTabId(tabsToRestore[0].type, tabsToRestore[0].resourceId);
+        const firstTabId = this.deriveTabId(tabsToRestore[0].type as EditorTabType, tabsToRestore[0].resourceId);
         await this.focusTab(firstTabId);
       }
 
@@ -398,6 +398,9 @@ export class EditorTabService {
   }
 
   private deriveTitle(resourceId: string): string {
+    if (resourceId === 'game-view-instance') {
+      return 'Game';
+    }
     const normalized = resourceId.replace(/\\/g, '/');
     const segments = normalized.split('/').filter(Boolean);
     return segments.length ? segments[segments.length - 1] : resourceId;

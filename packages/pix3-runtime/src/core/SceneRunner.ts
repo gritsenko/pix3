@@ -33,9 +33,15 @@ export class SceneRunner {
    * Start running a specific scene.
    * Clears the current scene, loads the new one, and starts the loop.
    */
-  startScene(sceneId: string): void {
-    const graph = this.sceneManager.getSceneGraph(sceneId);
-    if (!graph) {
+  private runtimeGraph: import('./SceneManager').SceneGraph | null = null;
+
+  /**
+   * Start running a specific scene.
+   * Clears the current scene, loads the new one, and starts the loop.
+   */
+  async startScene(sceneId: string): Promise<void> {
+    const sourceGraph = this.sceneManager.getSceneGraph(sceneId);
+    if (!sourceGraph) {
       console.warn(`[SceneRunner] Scene "${sceneId}" not found.`);
       return;
     }
@@ -46,16 +52,22 @@ export class SceneRunner {
     this.scene.clear();
     this.activeCamera = null;
 
+    // CLONE: Serialize and parse to create an isolated runtime graph
+    try {
+      const serialized = this.sceneManager.serializeScene(sourceGraph);
+      this.runtimeGraph = await this.sceneManager.parseScene(serialized);
+    } catch (err) {
+      console.error('[SceneRunner] Failed to clone scene for runtime:', err);
+      return;
+    }
+
     // Add root nodes to the THREE.Scene
-    for (const node of graph.rootNodes) {
+    for (const node of this.runtimeGraph.rootNodes) {
       this.scene.add(node);
     }
 
     // Find the first camera to use
-    this.activeCamera = this.findActiveCamera(graph.rootNodes);
-    
-    // Set active scene in manager
-    this.sceneManager.setActiveSceneGraph(sceneId, graph);
+    this.activeCamera = this.findActiveCamera(this.runtimeGraph.rootNodes);
 
     // Initial tick to update transforms before render
     this.updateNodes(0);
@@ -72,6 +84,14 @@ export class SceneRunner {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+
+    // Clear the runtime scene to release resources
+    if (this.runtimeGraph) {
+      // Remove nodes from the THREE scene (optional, as scene.clear() might be called next start)
+      // But good for cleanup
+      this.scene.clear();
+      this.runtimeGraph = null;
+    }
   }
 
   private tick = (): void => {
@@ -86,7 +106,7 @@ export class SceneRunner {
   };
 
   private updateNodes(dt: number): void {
-    const graph = this.sceneManager.getActiveSceneGraph();
+    const graph = this.runtimeGraph;
     if (graph) {
       for (const node of graph.rootNodes) {
         node.tick(dt);
@@ -97,16 +117,19 @@ export class SceneRunner {
   private render(): void {
     if (!this.activeCamera) {
       // Try to find a camera if we lost it (e.g. strict strict mode)
-      const graph = this.sceneManager.getActiveSceneGraph();
+      const graph = this.runtimeGraph;
       if (graph) {
         this.activeCamera = this.findActiveCamera(graph.rootNodes);
+        if (!this.activeCamera) {
+          console.warn('[SceneRunner] No active camera found in scene.');
+        }
       }
     }
 
     if (this.activeCamera) {
       // Update camera aspect ratio based on renderer size
       this.updateCameraAspect(this.activeCamera);
-      
+
       this.renderer.render(this.scene, this.activeCamera.camera);
     }
   }
@@ -142,3 +165,4 @@ export class SceneRunner {
     }
   }
 }
+

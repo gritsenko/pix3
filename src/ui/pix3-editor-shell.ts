@@ -24,6 +24,8 @@ import { UndoCommand } from '@/features/history/UndoCommand';
 import { RedoCommand } from '@/features/history/RedoCommand';
 import { PlaySceneCommand } from '@/features/scripts/PlaySceneCommand';
 import { StopSceneCommand } from '@/features/scripts/StopSceneCommand';
+import { StartGameCommand } from '@/features/scripts/StartGameCommand';
+import { StopGameCommand } from '@/features/scripts/StopGameCommand';
 import { OpenProjectSettingsCommand } from '@/features/project/OpenProjectSettingsCommand';
 import { appState } from '@/state';
 import { ProjectService } from '@/services';
@@ -39,6 +41,7 @@ import './shared/pix3-status-bar';
 import './shared/pix3-background';
 import './welcome/pix3-welcome';
 import './logs-view/logs-panel';
+import './viewport/game-tab';
 import './pix3-editor-shell.ts.css';
 
 @customElement('pix3-editor')
@@ -125,6 +128,8 @@ export class Pix3EditorShell extends ComponentBase {
     const redoCommand = new RedoCommand(this.operationService);
     const playCommand = new PlaySceneCommand(this.scriptExecutionService);
     const stopCommand = new StopSceneCommand(this.scriptExecutionService);
+    const startGameCommand = new StartGameCommand(this.editorTabService);
+    const stopGameCommand = new StopGameCommand(this.editorTabService);
     const projectSettingsCommand = new OpenProjectSettingsCommand();
     this.commandRegistry.registerMany(
       undoCommand,
@@ -134,6 +139,8 @@ export class Pix3EditorShell extends ComponentBase {
       deleteCommand,
       playCommand,
       stopCommand,
+      startGameCommand,
+      stopGameCommand,
       projectSettingsCommand
     );
 
@@ -199,7 +206,7 @@ export class Pix3EditorShell extends ComponentBase {
             // Restore previously open tabs from session storage.
             if (!this.tabsInitialized) {
               this.tabsInitialized = true;
-              
+
               if (appState.project.id) {
                 // Wait for project scripts to be compiled before restoring the session 
                 // to ensure custom components are available in the ScriptRegistry.
@@ -497,7 +504,7 @@ export class Pix3EditorShell extends ComponentBase {
   }
 
   private togglePlayMode() {
-    const commandId = appState.ui.isPlaying ? 'scene.stop' : 'scene.play';
+    const commandId = appState.ui.isPlaying ? 'game.stop' : 'game.start';
     void this.commandDispatcher.executeById(commandId);
   }
 
@@ -510,8 +517,8 @@ export class Pix3EditorShell extends ComponentBase {
         @component-picker-create-new=${(e: CustomEvent) => this.onComponentPickerCreateNew(e)}
       >
         ${this.componentPickers.map(
-          picker => html` <pix3-behavior-picker .pickerId=${picker.id}></pix3-behavior-picker> `
-        )}
+      picker => html` <pix3-behavior-picker .pickerId=${picker.id}></pix3-behavior-picker> `
+    )}
       </div>
     `;
   }
@@ -549,13 +556,13 @@ export class Pix3EditorShell extends ComponentBase {
         @script-create-cancelled=${(e: CustomEvent) => this.onScriptCreateCancelled(e)}
       >
         ${this.scriptCreators.map(
-          creator => html`
+      creator => html`
             <pix3-script-creator
               .dialogId=${creator.id}
               .defaultName=${creator.params.defaultName || creator.params.scriptName}
             ></pix3-script-creator>
           `
-        )}
+    )}
       </div>
     `;
   }
@@ -579,7 +586,7 @@ export class Pix3EditorShell extends ComponentBase {
         @dialog-secondary=${(e: CustomEvent) => this.onDialogSecondary(e)}
       >
         ${this.dialogs.map(
-          dialog => html`
+      dialog => html`
             <pix3-confirm-dialog
               .dialogId=${dialog.id}
               .title=${dialog.options.title}
@@ -591,7 +598,7 @@ export class Pix3EditorShell extends ComponentBase {
               .secondaryIsDangerous=${dialog.options.secondaryIsDangerous || false}
             ></pix3-confirm-dialog>
           `
-        )}
+    )}
       </div>
     `;
   }

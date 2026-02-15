@@ -6,7 +6,7 @@ export const DEFAULT_THEME: ThemeName = 'dark';
 
 export type SceneLoadState = 'idle' | 'loading' | 'ready' | 'error';
 
-export type EditorTabType = 'scene' | 'prefab' | 'script' | 'texture';
+export type EditorTabType = 'scene' | 'prefab' | 'script' | 'texture' | 'game';
 
 export interface CameraState {
   position: { x: number; y: number; z: number };
@@ -143,6 +143,7 @@ export interface UIState {
   showGrid: boolean;
   /** True when the scene is in play mode (scripts running) */
   isPlaying: boolean;
+  playModeStatus: 'stopped' | 'playing' | 'paused';
 }
 
 export interface OperationState {
@@ -224,6 +225,7 @@ export const createInitialAppState = (): AppState => ({
     showLayer3D: true,
     showGrid: true,
     isPlaying: false,
+    playModeStatus: 'stopped',
   },
   operations: {
     isExecuting: false,

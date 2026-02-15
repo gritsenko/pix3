@@ -15,6 +15,7 @@ const PANEL_COMPONENT_TYPES = {
   assetBrowser: 'asset-browser',
   logs: 'logs',
   background: 'background',
+  game: 'game',
 } as const;
 
 export type PanelComponentType = (typeof PANEL_COMPONENT_TYPES)[keyof typeof PANEL_COMPONENT_TYPES];
@@ -26,6 +27,7 @@ const PANEL_TAG_NAMES = {
   [PANEL_COMPONENT_TYPES.assetBrowser]: 'pix3-asset-browser-panel',
   [PANEL_COMPONENT_TYPES.logs]: 'pix3-logs-panel',
   [PANEL_COMPONENT_TYPES.background]: 'pix3-background',
+  [PANEL_COMPONENT_TYPES.game]: 'pix3-game-tab',
 } as const;
 
 const PANEL_DISPLAY_TITLES: Record<PanelComponentType, string> = {
@@ -35,6 +37,7 @@ const PANEL_DISPLAY_TITLES: Record<PanelComponentType, string> = {
   [PANEL_COMPONENT_TYPES.assetBrowser]: 'Asset Browser',
   [PANEL_COMPONENT_TYPES.logs]: 'Logs',
   [PANEL_COMPONENT_TYPES.background]: 'Pix3',
+  [PANEL_COMPONENT_TYPES.game]: 'Game',
 };
 
 const DEFAULT_PANEL_VISIBILITY: PanelVisibilityState = {
@@ -93,7 +96,7 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
                 title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.background],
                 isClosable: false,
                 // Cast to any to allow reorderEnabled in strict TS environments
-                reorderEnabled: false, 
+                reorderEnabled: false,
               } as any,
             ],
           },
@@ -272,11 +275,12 @@ export class LayoutManagerService {
       // which might be missing reorderEnabled / popoutEnabled in some versions.
       const itemConfig: any = {
         type: 'component',
-        componentType: PANEL_COMPONENT_TYPES.viewport,
+        componentType:
+          tab.type === 'game' ? PANEL_COMPONENT_TYPES.game : PANEL_COMPONENT_TYPES.viewport,
         title: tab.title,
         isClosable: true,
         // PREVENT DRAGGING to enforce Single Document Interface
-        reorderEnabled: false, 
+        reorderEnabled: false,
         // PREVENT POPPING OUT
         popoutEnabled: false,
         componentState: {
@@ -402,8 +406,8 @@ export class LayoutManagerService {
     try {
       const parent = (item as ContentItem & { parent?: unknown }).parent as
         | {
-            setActiveComponentItem?: (it: ComponentItem, focus?: boolean) => void;
-          }
+          setActiveComponentItem?: (it: ComponentItem, focus?: boolean) => void;
+        }
         | undefined;
       if (parent && typeof parent.setActiveComponentItem === 'function') {
         console.log('[LayoutManager] Calling setActiveComponentItem on parent');
@@ -500,9 +504,9 @@ export class LayoutManagerService {
           const item = args[0] as ContentItem | undefined;
           const itemInfo = item as
             | (ContentItem & {
-                componentType?: string;
-                container?: { state?: { tabId?: string } };
-              })
+              componentType?: string;
+              container?: { state?: { tabId?: string } };
+            })
             | undefined;
 
           const componentType = itemInfo?.componentType;
@@ -586,7 +590,10 @@ export class LayoutManagerService {
       layout.registerComponentFactoryFunction(componentType, container => {
         container.setTitle(PANEL_DISPLAY_TITLES[componentType as PanelComponentType]);
 
-        if (componentType === PANEL_COMPONENT_TYPES.viewport) {
+        if (
+          componentType === PANEL_COMPONENT_TYPES.viewport ||
+          componentType === PANEL_COMPONENT_TYPES.game
+        ) {
           const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
           if (typeof tabId === 'string' && tabId) {
             this.editorTabContainers.set(tabId, container as unknown as ContentItem);
@@ -606,7 +613,10 @@ export class LayoutManagerService {
         element.setAttribute('data-panel-id', componentType);
 
         // Forward tab id into the element for the editor-tab component.
-        if (componentType === PANEL_COMPONENT_TYPES.viewport) {
+        if (
+          componentType === PANEL_COMPONENT_TYPES.viewport ||
+          componentType === PANEL_COMPONENT_TYPES.game
+        ) {
           const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
           if (typeof tabId === 'string' && tabId) {
             element.setAttribute('tab-id', tabId);
@@ -616,7 +626,10 @@ export class LayoutManagerService {
         container.element.append(element);
         container.on('destroy', () => {
           try {
-            if (componentType === PANEL_COMPONENT_TYPES.viewport) {
+            if (
+              componentType === PANEL_COMPONENT_TYPES.viewport ||
+              componentType === PANEL_COMPONENT_TYPES.game
+            ) {
               const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
               if (typeof tabId === 'string' && tabId) {
                 this.editorTabContainers.delete(tabId);
