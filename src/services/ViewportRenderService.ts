@@ -219,11 +219,21 @@ export class ViewportRendererService {
 
     // When dragging with transform controls, disable orbit controls
     this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
-      this.setOrbitEnabled(!event.value);
-
-      // Track transform start state when dragging begins
-      if (event.value && this.transformControls?.object) {
-        this.captureTransformStartState(this.transformControls.object);
+      if (event.value) {
+        this.setOrbitEnabled(false);
+        // Track transform start state when dragging begins
+        if (this.transformControls?.object) {
+          this.captureTransformStartState(this.transformControls.object);
+        }
+      } else {
+        // Reset OrbitControls' stuck internal state before re-enabling.
+        // OrbitControls processes the same pointerdown as TransformControls
+        // (both listen on the canvas), entering ROTATE state and tracking
+        // the pointer before we disable it. Its pointerup cleanup doesn't
+        // fire properly when TransformControls captures the pointer,
+        // leaving state/pointers stuck.
+        this.resetOrbitInternalState();
+        this.setOrbitEnabled(true);
       }
     });
 
@@ -327,9 +337,14 @@ export class ViewportRendererService {
         this.transformControls.setMode(mode);
         this.transformControls.size = 0.6;
         this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
-          this.setOrbitEnabled(!event.value);
-          if (event.value && this.transformControls?.object) {
-            this.captureTransformStartState(this.transformControls.object);
+          if (event.value) {
+            this.setOrbitEnabled(false);
+            if (this.transformControls?.object) {
+              this.captureTransformStartState(this.transformControls.object);
+            }
+          } else {
+            this.resetOrbitInternalState();
+            this.setOrbitEnabled(true);
           }
         });
         this.transformControls.addEventListener('objectChange', () => {
@@ -407,6 +422,34 @@ export class ViewportRendererService {
       return;
     }
     this.orbitControls.enabled = enabled;
+  }
+
+  /**
+   * Force-reset OrbitControls' internal state machine.
+   *
+   * Both OrbitControls and TransformControls listen for pointerdown on the
+   * same canvas element.  OrbitControls processes the event first (it's
+   * enabled at that point), enters ROTATE/PAN/DOLLY state and tracks the
+   * pointer.  TransformControls then captures the pointer for gizmo dragging
+   * and we disable orbit in the dragging-changed callback.  On pointerup,
+   * OrbitControls' cleanup handler doesn't run properly (pointer capture
+   * conflict), leaving its internal `state` stuck in a non-NONE value and a
+   * phantom pointer in `_pointers`.  This blocks all subsequent interactions
+   * (rotate, zoom, pan) even though `enabled` is true.
+   *
+   * Calling this method clears those stuck internals so OrbitControls can
+   * accept new pointer interactions again.
+   */
+  private resetOrbitInternalState(): void {
+    if (!this.orbitControls) return;
+    const oc = this.orbitControls as any; // eslint-disable-line @typescript-eslint/no-explicit-any
+    oc.state = -1; // _STATE.NONE
+    if (oc._pointers) oc._pointers.length = 0;
+    if (oc._pointerPositions) {
+      for (const key of Object.keys(oc._pointerPositions)) {
+        delete oc._pointerPositions[key];
+      }
+    }
   }
 
   private syncNavigationMode(): void {
