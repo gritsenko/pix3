@@ -57,6 +57,19 @@ root:
             config:
               rotationSpeed: 1
         children: []
+      - id: box-1770498038485-qjs32ot
+        type: GeometryMesh
+        name: Box
+        properties:
+          transform:
+            position: [0, 0, 1.618293032008267]
+            rotationEuler: [0, 0, 0]
+            scale: [1, 1, 1]
+        components:
+          - id: user:BoxController-1771188904257-g8ns4hw
+            type: user:BoxController
+            enabled: true
+        children: []
   - id: layout2d-root
     type: Layout2D
     name: 2D Layout
@@ -71,6 +84,15 @@ root:
         scale: [1, 1]
         rotation: 0
     children:
+      - id: joystick2d-1771188272990-l47luhu
+        type: Joystick2D
+        name: Joystick2D
+        properties:
+          transform:
+            position: [100, 100]
+            scale: [1, 1]
+            rotation: 0
+        children: []
       - id: ui-group
         type: Group2D
         name: UI Group
@@ -78,10 +100,10 @@ root:
           width: 256
           height: 256
           layout:
-            offsetMin: [39, 12]
-            offsetMax: [295, 268]
+            offsetMin: [-152, -117]
+            offsetMax: [104, 139]
           transform:
-            position: [166.56250000000023, 139.87499999999994]
+            position: [-24.210937499999687, 10.593749999999972]
             scale: [1, 1]
             rotation: 0
         children:
@@ -93,23 +115,6 @@ root:
               width: 64
               height: 64
               transform:
-                position: [79.33593750000009, 77.6953125]
+                position: [19.62499999999997, 5.171875000000028]
                 scale: [1, 1]
                 rotation: 0
-  - id: box-1770498038485-qjs32ot
-    type: GeometryMesh
-    name: Box
-    properties:
-      transform:
-        position: [0, 0, 1.618293032008267]
-        rotationEuler: [0, 0, 0]
-        scale: [1, 1, 1]
-    components:
-      - id: user:SineOscillator-1770577871035-7ic1dw4
-        type: user:SineOscillator
-        enabled: true
-        config:
-          amplitude: 1
-          frequency: 1
-          axis: y
-    children: []

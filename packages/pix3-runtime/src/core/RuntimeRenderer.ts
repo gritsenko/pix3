@@ -26,7 +26,7 @@ export class RuntimeRenderer {
 
     this.renderer.setPixelRatio(options.pixelRatio ?? window.devicePixelRatio);
     this.renderer.setClearColor(options.clearColor ?? '#000000');
-    
+
     if (options.shadows) {
       this.renderer.shadowMap.enabled = true;
       this.renderer.shadowMap.type = PCFSoftShadowMap;
@@ -40,7 +40,7 @@ export class RuntimeRenderer {
   attach(container: HTMLElement): void {
     container.appendChild(this.canvas);
     this.resize();
-    
+
     // Auto-resize observer
     const resizeObserver = new ResizeObserver(() => {
       this.resize();
@@ -53,15 +53,27 @@ export class RuntimeRenderer {
     if (parent) {
       const width = parent.clientWidth;
       const height = parent.clientHeight;
-      
+
       this.renderer.setSize(width, height, false);
-      
+
       // Note: Camera aspect ratio update is responsibility of the SceneRunner or Camera system
     }
   }
 
   render(scene: Scene, camera: Camera): void {
     this.renderer.render(scene, camera);
+  }
+
+  setAutoClear(autoClear: boolean): void {
+    this.renderer.autoClear = autoClear;
+  }
+
+  clear(): void {
+    this.renderer.clear();
+  }
+
+  clearDepth(): void {
+    this.renderer.clearDepth();
   }
 
   dispose(): void {

@@ -10,6 +10,7 @@ import { Layout2D } from '../nodes/2D/Layout2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
+import { Joystick2D } from '../nodes/2D/Joystick2D';
 import type { SceneGraph } from './SceneManager';
 
 import { GeometryMesh } from '../nodes/3D/GeometryMesh';
@@ -257,8 +258,9 @@ export class SceneLoader {
       case 'Sprite2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
+        const texturePath = typeof props.texturePath === 'string' ? props.texturePath : null;
 
-        return new Sprite2D({
+        const sprite = new Sprite2D({
           ...baseProps,
           properties: props,
           position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
@@ -267,10 +269,22 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
-          texturePath: typeof props.texturePath === 'string' ? props.texturePath : null,
+          texturePath,
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
+          color: typeof props.color === 'string' ? props.color : undefined,
         });
+
+        if (texturePath) {
+          try {
+            const texture = await this.assetLoader.loadTexture(texturePath);
+            sprite.setTexture(texture);
+          } catch (error) {
+            console.warn(`[SceneLoader] Error loading texture for Sprite2D "${sprite.nodeId}":`, error);
+          }
+        }
+
+        return sprite;
       }
       case 'Group':
         return new NodeBase({ ...baseProps, type: 'Group' });
@@ -343,6 +357,25 @@ export class SceneLoader {
           offsetMax: layout?.offsetMax
             ? this.readVector2(layout.offsetMax, ZERO_VECTOR2)
             : undefined,
+        });
+      }
+      case 'Joystick2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        return new Joystick2D({
+          ...baseProps,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
+          radius: this.asNumber(props.radius, undefined),
+          handleRadius: this.asNumber(props.handleRadius, undefined),
+          axisHorizontal: this.asString(props.axisHorizontal),
+          axisVertical: this.asString(props.axisVertical),
+          baseColor: this.asString(props.baseColor),
+          handleColor: this.asString(props.handleColor),
         });
       }
       case 'GeometryMesh': {

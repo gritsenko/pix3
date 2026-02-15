@@ -66,6 +66,12 @@ export interface ScriptComponent {
    * Called when detaching to allow re-initialization on next attach.
    */
   resetStartedState?(): void;
+
+  /**
+   * Access to the Input System.
+   * Injected by the SceneRunner or runtime environment.
+   */
+  input?: import('./InputService').InputService;
 }
 
 /**
@@ -79,6 +85,7 @@ export abstract class Script implements ScriptComponent {
   enabled: boolean = true;
   config: Record<string, unknown> = {};
   _started: boolean = false;
+  input?: import('./InputService').InputService;
 
   constructor(id: string, type: string) {
     this.id = id;

@@ -8,6 +8,7 @@ export * from './core/SceneSaver';
 export * from './core/SceneManager';
 export * from './core/SceneRunner';
 export * from './core/RuntimeRenderer';
+export * from './core/InputService';
 
 // Nodes
 export * from './nodes/NodeBase';
@@ -18,6 +19,7 @@ export * from './nodes/Node3D';
 export * from './nodes/2D/Sprite2D';
 export * from './nodes/2D/Group2D';
 export * from './nodes/2D/Layout2D';
+export * from './nodes/2D/Joystick2D';
 
 // 3D Nodes
 export * from './nodes/3D/Camera3D';

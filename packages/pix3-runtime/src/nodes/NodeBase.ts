@@ -28,6 +28,9 @@ export class NodeBase extends Object3D {
   /** Script components attached to this node */
   readonly components: ScriptComponent[] = [];
 
+  /** Reference to InputSystem (injected by runtime) */
+  _input?: import('../core/InputService').InputService;
+
   constructor(props: NodeBaseProps) {
     super();
 
@@ -55,6 +58,26 @@ export class NodeBase extends Object3D {
     };
   }
 
+  get input(): import('../core/InputService').InputService | undefined {
+    return this._input;
+  }
+
+  set input(service: import('../core/InputService').InputService | undefined) {
+    this._input = service;
+
+    // Propagate to children
+    for (const child of this.children) {
+      if (child instanceof NodeBase) {
+        child.input = service;
+      }
+    }
+
+    // Propagate to components
+    for (const component of this.components) {
+      component.input = service;
+    }
+  }
+
   get parentNode(): NodeBase | null {
     return this.parent instanceof NodeBase ? this.parent : null;
   }
@@ -64,6 +87,9 @@ export class NodeBase extends Object3D {
       throw new Error('Cannot adopt node as its own child.');
     }
     this.add(child);
+    if (this._input) {
+      child.input = this._input;
+    }
   }
 
   disownChild(child: NodeBase): void {
@@ -98,6 +124,9 @@ export class NodeBase extends Object3D {
 
     // Attach to node
     component.node = this;
+    if (this._input) {
+      component.input = this._input;
+    }
     this.components.push(component);
 
     // Call onAttach if defined

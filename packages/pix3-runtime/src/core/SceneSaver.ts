@@ -6,6 +6,7 @@ import { Node3D } from '../nodes/Node3D';
 import { Node2D } from '../nodes/Node2D';
 import { Group2D } from '../nodes/2D/Group2D';
 import { Sprite2D } from '../nodes/2D/Sprite2D';
+import { Joystick2D } from '../nodes/2D/Joystick2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
@@ -23,7 +24,7 @@ interface SceneDocument {
 }
 
 export class SceneSaver {
-  constructor() {}
+  constructor() { }
 
   /**
    * Serialize a scene graph back to YAML format for saving.
@@ -266,6 +267,13 @@ export class SceneSaver {
       // Save width/height in pixels
       props.width = node.width;
       props.height = node.height;
+    } else if (node instanceof Joystick2D) {
+      if (node.radius !== 50) props.radius = node.radius;
+      if (node.handleRadius !== 20) props.handleRadius = node.handleRadius;
+      if (node.axisHorizontal !== 'Horizontal') props.axisHorizontal = node.axisHorizontal;
+      if (node.axisVertical !== 'Vertical') props.axisVertical = node.axisVertical;
+      if (node.baseColor !== '#ffffff') props.baseColor = node.baseColor;
+      if (node.handleColor !== '#cccccc') props.handleColor = node.handleColor;
     } else if (node instanceof GeometryMesh) {
       const mesh = node as GeometryMesh & {
         geometry?: unknown;

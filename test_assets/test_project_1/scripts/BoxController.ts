@@ -59,8 +59,18 @@ export class BoxController extends Script {
   }
 
   onUpdate(dt: number): void {
-    // Called every frame with delta time in seconds
-    // Implement your update logic here
+    if (!this.input || !this.node) return;
+
+    const horizontal = this.input.getAxis('Horizontal');
+    const vertical = this.input.getAxis('Vertical');
+
+    if (horizontal !== 0 || vertical !== 0) {
+      console.log(`[BoxController] Joystick input: ${horizontal.toFixed(2)}, ${vertical.toFixed(2)}`);
+
+      const speed = 5;
+      this.node.position.x += horizontal * speed * dt;
+      this.node.position.z -= vertical * speed * dt; // Move in Z plane for 3D box
+    }
   }
 
   onDetach(): void {

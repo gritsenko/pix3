@@ -2,7 +2,7 @@ import { ResourceManager } from './ResourceManager';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { NodeBase } from '../nodes/NodeBase';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { AnimationClip } from 'three';
+import { AnimationClip, Texture, TextureLoader } from 'three';
 
 export interface AssetLoaderResult {
   node: NodeBase;
@@ -14,14 +14,16 @@ export interface AssetLoaderResult {
  *
  * Supported formats:
  * - .glb / .gltf → MeshInstance
- * - (TODO) .png / .jpg → Sprite2D
+ * - .png / .jpg / .jpeg / .webp → used by Sprite2D
  * - (TODO) .mp3 / .ogg → AudioNode
  */
 export class AssetLoader {
   private readonly resources: ResourceManager;
+  private textureLoader: TextureLoader;
 
   constructor(resources: ResourceManager) {
     this.resources = resources;
+    this.textureLoader = new TextureLoader();
   }
 
   /**
@@ -47,7 +49,9 @@ export class AssetLoader {
       case 'jpg':
       case 'jpeg':
       case 'webp':
-        throw new Error(`[AssetLoader] Image loading not yet implemented: ${resourcePath}`);
+        // For images, we usually want the texture, but if loadAsset is called,
+        // we could potentially return a Sprite2D. However, let's just implement loadTexture for now.
+        throw new Error(`[AssetLoader] Generic image node creation not yet implemented. Use loadTexture. Path: ${resourcePath}`);
 
       case 'mp3':
       case 'ogg':
@@ -57,6 +61,54 @@ export class AssetLoader {
       default:
         throw new Error(`[AssetLoader] Unsupported asset type: ${extension}`);
     }
+  }
+
+  /**
+   * Load an image as a THREE.Texture.
+   */
+  /**
+   * Load an image as a THREE.Texture.
+   */
+  async loadTexture(resourcePath: string): Promise<Texture> {
+    console.log(`[AssetLoader] Loading texture: ${resourcePath}`);
+
+    let url: string;
+    let isObjectURL = false;
+
+    if (resourcePath.startsWith('res://')) {
+      try {
+        const blob = await this.resources.readBlob(resourcePath);
+        url = URL.createObjectURL(blob);
+        isObjectURL = true;
+        console.log(`[AssetLoader] Created ObjectURL for ${resourcePath}`);
+      } catch (err) {
+        console.error(`[AssetLoader] Failed to read blob for ${resourcePath}:`, err);
+        throw err;
+      }
+    } else {
+      url = this.resources.normalize(resourcePath);
+    }
+
+    return new Promise((resolve, reject) => {
+      this.textureLoader.load(
+        url,
+        texture => {
+          console.log(`[AssetLoader] Successfully loaded texture: ${resourcePath}`);
+          if (isObjectURL) {
+            URL.revokeObjectURL(url);
+          }
+          resolve(texture);
+        },
+        undefined,
+        error => {
+          console.error(`[AssetLoader] Failed to load texture: ${url}`, error);
+          if (isObjectURL) {
+            URL.revokeObjectURL(url);
+          }
+          reject(error);
+        }
+      );
+    });
   }
 
   /**

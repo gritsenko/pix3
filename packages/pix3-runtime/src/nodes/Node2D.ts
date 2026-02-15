@@ -2,6 +2,7 @@ import { MathUtils, Vector2 } from 'three';
 
 import { NodeBase, type NodeBaseProps } from './NodeBase';
 import type { PropertySchema } from '../fw/property-schema';
+import { LAYER_2D } from '../constants';
 
 export interface Node2DProps extends Omit<NodeBaseProps, 'type'> {
   position?: Vector2;
@@ -13,6 +14,8 @@ export class Node2D extends NodeBase {
   constructor(props: Node2DProps, nodeType: string = 'Node2D') {
     super({ ...props, type: nodeType });
 
+    this.layers.set(LAYER_2D);
+
     const position = props.position ?? new Vector2(0, 0);
     this.position.set(position.x, position.y, 0);
 
@@ -22,6 +25,22 @@ export class Node2D extends NodeBase {
     const rotationDegrees = props.rotation ?? 0;
     const rotationRadians = MathUtils.degToRad(rotationDegrees);
     this.rotation.set(0, 0, rotationRadians);
+  }
+
+  /**
+   * Override add to ensure all children of a Node2D inherit the 2D layer.
+   */
+  add(...object: import('three').Object3D[]): this {
+    super.add(...object);
+
+    // Enforce layer on all added objects and their descendants
+    for (const obj of object) {
+      obj.traverse((child) => {
+        child.layers.set(LAYER_2D);
+      });
+    }
+
+    return this;
   }
 
   /**

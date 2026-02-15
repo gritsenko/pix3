@@ -7,6 +7,7 @@ import { CreateSpotLightCommand } from '@/features/scene/CreateSpotLightCommand'
 import { CreateCamera3DCommand } from '@/features/scene/CreateCamera3DCommand';
 import { CreateMeshInstanceCommand } from '@/features/scene/CreateMeshInstanceCommand';
 import { CreateLayout2DCommand } from '@/features/scene/CreateLayout2DCommand';
+import { CreateJoystick2DCommand } from '@/features/scene/CreateJoystick2DCommand';
 import type { Command } from '@/core/command';
 
 /**
@@ -79,6 +80,17 @@ export class NodeRegistry {
       icon: 'image',
       keywords: ['create', 'sprite', '2d', 'image', 'texture'],
       order: 2,
+    });
+    this.registerNodeType({
+      id: 'joystick2d',
+      displayName: 'Joystick2D',
+      description: '2D virtual joystick for input',
+      category: '2D',
+      commandClass: CreateJoystick2DCommand,
+      color: '#96cbf6ff',
+      icon: 'gamepad',
+      keywords: ['create', 'joystick', '2d', 'input', 'control'],
+      order: 3,
     });
 
     // 3D Node Types
