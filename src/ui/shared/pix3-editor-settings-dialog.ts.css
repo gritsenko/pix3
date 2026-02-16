@@ -1,0 +1,100 @@
+pix3-editor-settings-dialog {
+  display: contents;
+}
+
+.dialog-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dialog-content {
+  background: var(--pix3-bg-secondary, #2a2a2a);
+  border: 1px solid var(--pix3-border, #444);
+  border-radius: 8px;
+  padding: 1.5rem;
+  width: 520px;
+  max-width: 90vw;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.dialog-title {
+  margin: 0 0 1.5rem 0;
+  font-size: 1.4rem;
+  font-weight: 500;
+  color: var(--pix3-text-primary, #fff);
+}
+
+.settings-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  font-size: 0.95rem;
+  color: var(--pix3-text-primary, #fff);
+}
+
+.toggle-row input {
+  accent-color: var(--pix3-accent-color, #ffcf33);
+}
+
+.settings-field .hint {
+  font-size: 0.8rem;
+  color: var(--pix3-text-muted, #777);
+  line-height: 1.4;
+}
+
+.dialog-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  margin-top: 2rem;
+}
+
+.dialog-actions button {
+  padding: 0.6rem 1.2rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  border: 1px solid transparent;
+  transition: all 0.2s;
+}
+
+.btn-cancel {
+  background: transparent;
+  color: var(--pix3-text-secondary, #ccc);
+  border-color: var(--pix3-border, #444);
+}
+
+.btn-cancel:hover {
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.btn-save {
+  background: var(--pix3-accent-color, #ffcf33);
+  color: #000;
+  font-weight: 600;
+}
+
+.btn-save:hover {
+  filter: brightness(1.1);
+}

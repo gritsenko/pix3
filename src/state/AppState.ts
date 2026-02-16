@@ -141,6 +141,8 @@ export interface UIState {
   showLayer3D: boolean;
   /** Toggle for showing the 3D grid helper */
   showGrid: boolean;
+  /** Warn before leaving the page with unsaved changes */
+  warnOnUnsavedUnload: boolean;
   /** True when the scene is in play mode (scripts running) */
   isPlaying: boolean;
   playModeStatus: 'stopped' | 'playing' | 'paused';
@@ -224,6 +226,7 @@ export const createInitialAppState = (): AppState => ({
     showLayer2D: true,
     showLayer3D: true,
     showGrid: true,
+    warnOnUnsavedUnload: true,
     isPlaying: false,
     playModeStatus: 'stopped',
   },

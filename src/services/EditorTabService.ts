@@ -59,7 +59,7 @@ export class EditorTabService {
 
         const session = {
           tabs: appState.tabs.tabs
-            .filter(t => !t.resourceId.startsWith('templ://'))
+            .filter(t => !t.resourceId.startsWith('templ://') && t.type !== 'game')
             .map(t => ({
               resourceId: t.resourceId,
               type: t.type,
@@ -82,6 +82,10 @@ export class EditorTabService {
       this.captureActiveContextState();
 
       // Prompt the user if any scene tab has unsaved changes.
+      if (!appState.ui.warnOnUnsavedUnload) {
+        return;
+      }
+
       const hasDirty = appState.tabs.tabs.some(t => t.isDirty);
       if (hasDirty) {
         e.preventDefault();
@@ -162,9 +166,13 @@ export class EditorTabService {
       if (!session || !Array.isArray(session.tabs)) return false;
 
       // Skip template tabs (templ://) — they should not be restored.
-      const tabsToRestore = (session.tabs as Array<{ type: string; resourceId: string; contextState?: EditorTab['contextState'] }>).filter(
-        (t: { resourceId: string }) => !t.resourceId.startsWith('templ://')
-      );
+      const tabsToRestore = (
+        session.tabs as Array<{ type: string; resourceId: string; contextState?: EditorTab['contextState'] }>
+      ).filter((t: { resourceId: string; type: string }) => {
+        if (t.resourceId.startsWith('templ://')) return false;
+        if (t.type === 'game') return false;
+        return true;
+      });
       for (const tabData of tabsToRestore) {
         await this.openResourceTab(
           tabData.type as EditorTabType,
@@ -203,6 +211,11 @@ export class EditorTabService {
       if (decision === 'save') {
         await this.saveTabResource(tab);
       }
+    }
+
+    if (tab.type === 'game') {
+      appState.ui.isPlaying = false;
+      appState.ui.playModeStatus = 'stopped';
     }
 
     // If closing active tab, save camera/selection before removal.

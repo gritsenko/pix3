@@ -13,6 +13,7 @@ import {
 } from '@/services/BehaviorPickerService';
 import { ScriptCreatorService, type ScriptCreationInstance } from '@/services/ScriptCreatorService';
 import { ProjectSettingsService, type ProjectSettingsDialogInstance } from '@/services/ProjectSettingsService';
+import { EditorSettingsService, type EditorSettingsDialogInstance } from '@/services/EditorSettingsService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { ScriptCompilerService } from '@/services/ScriptCompilerService';
@@ -28,6 +29,7 @@ import { StartGameCommand } from '@/features/scripts/StartGameCommand';
 import { StopGameCommand } from '@/features/scripts/StopGameCommand';
 import { OpenProjectSettingsCommand } from '@/features/project/OpenProjectSettingsCommand';
 import { OpenProjectInIdeCommand } from '@/features/project/OpenProjectInIdeCommand';
+import { OpenEditorSettingsCommand } from '@/features/editor/OpenEditorSettingsCommand';
 import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import { EditorTabService } from '@/services/EditorTabService';
@@ -38,6 +40,7 @@ import './shared/pix3-confirm-dialog';
 import './shared/pix3-behavior-picker';
 import './shared/pix3-script-creator';
 import './shared/pix3-project-settings-dialog';
+import './shared/pix3-editor-settings-dialog';
 import './shared/pix3-status-bar';
 import './shared/pix3-background';
 import './welcome/pix3-welcome';
@@ -80,6 +83,9 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(ProjectSettingsService)
   private readonly projectSettingsService!: ProjectSettingsService;
 
+  @inject(EditorSettingsService)
+  private readonly editorSettingsService!: EditorSettingsService;
+
   @inject(ScriptExecutionService)
   private readonly scriptExecutionService!: ScriptExecutionService;
 
@@ -105,6 +111,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @state()
   private activeProjectSettingsDialog: ProjectSettingsDialogInstance | null = null;
+
+  @state()
+  private activeEditorSettingsDialog: EditorSettingsDialogInstance | null = null;
 
   @property({ type: Boolean, reflect: true, attribute: 'shell-ready' })
   protected shellReady = false;
@@ -133,6 +142,7 @@ export class Pix3EditorShell extends ComponentBase {
     const stopGameCommand = new StopGameCommand(this.editorTabService);
     const projectSettingsCommand = new OpenProjectSettingsCommand();
     const openProjectInIdeCommand = new OpenProjectInIdeCommand();
+    const editorSettingsCommand = new OpenEditorSettingsCommand();
     this.commandRegistry.registerMany(
       undoCommand,
       redoCommand,
@@ -143,6 +153,7 @@ export class Pix3EditorShell extends ComponentBase {
       stopCommand,
       startGameCommand,
       stopGameCommand,
+      editorSettingsCommand,
       projectSettingsCommand,
       openProjectInIdeCommand
     );
@@ -156,6 +167,11 @@ export class Pix3EditorShell extends ComponentBase {
     // Subscribe to project settings dialog changes
     this.projectSettingsService.subscribe(dialog => {
       this.activeProjectSettingsDialog = dialog;
+      this.requestUpdate();
+    });
+
+    this.editorSettingsService.subscribe(dialog => {
+      this.activeEditorSettingsDialog = dialog;
       this.requestUpdate();
     });
 
@@ -181,6 +197,8 @@ export class Pix3EditorShell extends ComponentBase {
 
     // Initialize tab service early to catch session persistence
     this.editorTabService.initialize();
+
+    this.editorSettingsService.initialize();
 
     this.disposeSubscription = subscribe(appState.ui, () => {
       this.isLayoutReady = appState.ui.isLayoutReady;
@@ -478,7 +496,7 @@ export class Pix3EditorShell extends ComponentBase {
         </div>
         <pix3-status-bar></pix3-status-bar>
         ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
-        ${this.renderProjectSettingsHost()}
+        ${this.renderProjectSettingsHost()} ${this.renderEditorSettingsHost()}
       </div>
     `;
   }
@@ -614,6 +632,18 @@ export class Pix3EditorShell extends ComponentBase {
     return html`
       <div class="project-settings-host">
         <pix3-project-settings-dialog></pix3-project-settings-dialog>
+      </div>
+    `;
+  }
+
+  private renderEditorSettingsHost() {
+    if (!this.activeEditorSettingsDialog) {
+      return null;
+    }
+
+    return html`
+      <div class="editor-settings-host">
+        <pix3-editor-settings-dialog></pix3-editor-settings-dialog>
       </div>
     `;
   }
