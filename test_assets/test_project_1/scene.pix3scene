@@ -92,6 +92,7 @@ root:
             position: [0, 0]
             scale: [1, 1]
             rotation: 0
+          floating: true
         children: []
       - id: ui-group
         type: Group2D

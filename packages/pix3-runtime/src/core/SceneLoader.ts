@@ -376,6 +376,7 @@ export class SceneLoader {
           axisVertical: this.asString(props.axisVertical),
           baseColor: this.asString(props.baseColor),
           handleColor: this.asString(props.handleColor),
+          floating: typeof props.floating === 'boolean' ? props.floating : undefined,
         });
       }
       case 'GeometryMesh': {

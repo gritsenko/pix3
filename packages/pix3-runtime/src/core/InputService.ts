@@ -12,6 +12,7 @@ export class InputService {
     // Raw pointer state
     public readonly pointerPosition = new Vector2();
     public isPointerDown = false;
+    public activePointerId: number | null = null;
 
     public width = 0;
     public height = 0;
@@ -64,9 +65,9 @@ export class InputService {
         this.element = element;
 
         // Initialize dimensions
-        const rect = element.getBoundingClientRect();
-        this.width = rect.width;
-        this.height = rect.height;
+        const dimensions = this.getInputDimensions();
+        this.width = dimensions.width;
+        this.height = dimensions.height;
         console.log(`[InputService] Attached to element. Dimensions: ${this.width}x${this.height}`);
 
         element.addEventListener('pointerdown', this.onPointerDown);
@@ -93,9 +94,17 @@ export class InputService {
         this.element.removeEventListener('contextmenu', this.onContextMenu);
 
         this.element = null;
+        this.isPointerDown = false;
+        this.activePointerId = null;
+        this.setButton('Action_Primary', false);
     }
 
     private onPointerDown = (event: PointerEvent): void => {
+        if (this.activePointerId !== null) {
+            return;
+        }
+
+        this.activePointerId = event.pointerId;
         this.isPointerDown = true;
         this.updatePointerPosition(event);
 
@@ -104,11 +113,19 @@ export class InputService {
     };
 
     private onPointerMove = (event: PointerEvent): void => {
+        if (this.activePointerId !== event.pointerId) {
+            return;
+        }
         this.updatePointerPosition(event);
     };
 
     private onPointerUp = (event: PointerEvent): void => {
+        if (this.activePointerId !== event.pointerId) {
+            return;
+        }
+
         this.isPointerDown = false;
+        this.activePointerId = null;
         this.updatePointerPosition(event);
 
         // Release "Action_Primary"
@@ -124,11 +141,35 @@ export class InputService {
 
         // Calculate position relative to the element
         const rect = this.element.getBoundingClientRect();
-        this.width = rect.width;
-        this.height = rect.height;
+        const dimensions = this.getInputDimensions();
+        this.width = dimensions.width;
+        this.height = dimensions.height;
+
+        const safeRectWidth = rect.width > 0 ? rect.width : 1;
+        const safeRectHeight = rect.height > 0 ? rect.height : 1;
+        const scaleX = this.width / safeRectWidth;
+        const scaleY = this.height / safeRectHeight;
+
         this.pointerPosition.set(
-            event.clientX - rect.left,
-            event.clientY - rect.top
+            (event.clientX - rect.left) * scaleX,
+            (event.clientY - rect.top) * scaleY
         );
+    }
+
+    private getInputDimensions(): { width: number; height: number } {
+        if (!this.element) {
+            return { width: 0, height: 0 };
+        }
+
+        if (this.element instanceof HTMLCanvasElement) {
+            const canvasWidth = this.element.width;
+            const canvasHeight = this.element.height;
+            if (canvasWidth > 0 && canvasHeight > 0) {
+                return { width: canvasWidth, height: canvasHeight };
+            }
+        }
+
+        const rect = this.element.getBoundingClientRect();
+        return { width: rect.width, height: rect.height };
     }
 }

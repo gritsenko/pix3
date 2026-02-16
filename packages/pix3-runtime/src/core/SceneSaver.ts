@@ -289,6 +289,7 @@ export class SceneSaver {
       if (node.axisVertical !== 'Vertical') props.axisVertical = node.axisVertical;
       if (node.baseColor !== '#ffffff') props.baseColor = node.baseColor;
       if (node.handleColor !== '#cccccc') props.handleColor = node.handleColor;
+      if (node.floating !== false) props.floating = node.floating;
     } else if (node instanceof GeometryMesh) {
       const mesh = node as GeometryMesh & {
         geometry?: unknown;
