@@ -20,6 +20,7 @@ export class GameViewTab extends ComponentBase {
     private runner?: SceneRunner;
     private renderer?: RuntimeRenderer;
     private gameContainer?: HTMLElement;
+    private viewportContainer?: HTMLElement;
     private resizeObserver?: ResizeObserver;
 
     connectedCallback(): void {
@@ -34,12 +35,15 @@ export class GameViewTab extends ComponentBase {
     }
 
     protected firstUpdated(): void {
+        this.viewportContainer = this.shadowRoot?.querySelector('.viewport-container') as HTMLElement;
         this.gameContainer = this.shadowRoot?.querySelector('.game-host') as HTMLElement;
 
         if (this.gameContainer) {
             void this.initGame();
-            // Observe the container for resizing
-            this.resizeObserver?.observe(this.gameContainer);
+        }
+
+        if (this.viewportContainer) {
+            this.resizeObserver?.observe(this.viewportContainer);
         }
     }
 
@@ -50,13 +54,57 @@ export class GameViewTab extends ComponentBase {
     }
 
     private handleResize() {
+        this.applyViewportFit();
+
         if (this.renderer && this.gameContainer) {
-            // The RuntimeRenderer.resize() method automatically checks parent dimensions if using its default behavior,
-            // but here we might need to be explicit if we are using aspect-ratio CSS.
-            // Actually, RuntimeRenderer.resize() uses this.canvas.parentElement.clientWidth/Height.
-            // So calling it should be enough.
             this.renderer.resize();
         }
+    }
+
+    private applyViewportFit() {
+        if (!this.gameContainer || !this.viewportContainer) {
+            return;
+        }
+
+        if (this.aspectRatio === 'free') {
+            this.gameContainer.style.width = '100%';
+            this.gameContainer.style.height = '100%';
+            return;
+        }
+
+        const targetAspect = this.getAspectValue(this.aspectRatio);
+        const availableWidth = this.viewportContainer.clientWidth;
+        const availableHeight = this.viewportContainer.clientHeight;
+
+        if (availableWidth <= 0 || availableHeight <= 0) {
+            return;
+        }
+
+        let fittedWidth = availableWidth;
+        let fittedHeight = fittedWidth / targetAspect;
+
+        if (fittedHeight > availableHeight) {
+            fittedHeight = availableHeight;
+            fittedWidth = fittedHeight * targetAspect;
+        }
+
+        this.gameContainer.style.width = `${Math.floor(fittedWidth)}px`;
+        this.gameContainer.style.height = `${Math.floor(fittedHeight)}px`;
+    }
+
+    private getAspectValue(aspectRatio: '16:9-landscape' | '16:9-portrait' | '4:3'): number {
+        switch (aspectRatio) {
+            case '16:9-landscape':
+                return 16 / 9;
+            case '16:9-portrait':
+                return 9 / 16;
+            case '4:3':
+                return 4 / 3;
+        }
+    }
+
+    private isAspectRatio(value: string): value is 'free' | '16:9-landscape' | '16:9-portrait' | '4:3' {
+        return value === 'free' || value === '16:9-landscape' || value === '16:9-portrait' || value === '4:3';
     }
 
     private async initGame() {
@@ -104,7 +152,11 @@ export class GameViewTab extends ComponentBase {
 
     private handleAspectChange(e: Event) {
         const target = e.target as HTMLSelectElement;
-        this.aspectRatio = target.value as any;
+        if (!this.isAspectRatio(target.value)) {
+            return;
+        }
+
+        this.aspectRatio = target.value;
         // Defer resize to allow CSS to apply
         requestAnimationFrame(() => this.handleResize());
     }

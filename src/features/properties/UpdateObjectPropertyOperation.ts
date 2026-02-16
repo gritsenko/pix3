@@ -7,6 +7,7 @@ import type {
 import { NodeBase } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
 import { Sprite2D } from '@pix3/runtime';
+import { Layout2D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { getNodePropertySchema } from '@pix3/runtime';
@@ -115,11 +116,12 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
         container.getOrCreateToken(ViewportRendererService)
       ) as ViewportRendererService;
       const isTransform = this.isTransformProperty(propertyPath);
+      const is2DVisualProperty = this.is2DVisualProperty(propertyPath);
       if (isTransform) {
         vr.updateNodeTransform(node);
       } else if (
-        (propertyPath === 'width' || propertyPath === 'height') &&
-        (node instanceof Group2D || node instanceof Sprite2D)
+        is2DVisualProperty &&
+        (node instanceof Layout2D || node instanceof Group2D || node instanceof Sprite2D)
       ) {
         vr.updateNodeTransform(node);
       } else if (propertyPath === 'visible') {
@@ -134,6 +136,10 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
 
   private isTransformProperty(propertyPath: string): boolean {
     return ['position', 'rotation', 'scale'].includes(propertyPath);
+  }
+
+  private is2DVisualProperty(propertyPath: string): boolean {
+    return ['width', 'height', 'showViewportOutline', 'resolutionPreset'].includes(propertyPath);
   }
 
   private validatePropertyUpdate(

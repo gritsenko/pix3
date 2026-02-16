@@ -159,6 +159,27 @@ export class IconService {
   <path d="M12 10V14" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>`
     );
+
+    // Viewport icon for Layout2D nodes
+    this.customIcons.set(
+      'viewport',
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="3" y="4" width="18" height="12" rx="2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M8 20H16" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M12 16V20" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`
+    );
+
+    // Gamepad icon for Joystick2D nodes
+    this.customIcons.set(
+      'gamepad',
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M6 7H18C20.2091 7 22 8.79086 22 11V15C22 17.2091 20.2091 19 18 19H6C3.79086 19 2 17.2091 2 15V11C2 8.79086 3.79086 7 6 7Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M6 13H10M8 11V15" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="15" cy="12" r="1" fill="currentColor"/>
+  <circle cx="18" cy="14" r="1" fill="currentColor"/>
+</svg>`
+    );
   }
 
   /**

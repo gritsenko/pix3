@@ -97,13 +97,15 @@ root:
         type: Group2D
         name: UI Group
         properties:
-          width: 256
-          height: 256
+          width: 106.1875
+          height: 106.2265625
           layout:
-            offsetMin: [17, 74]
-            offsetMax: [273, 330]
+            anchorMin: [1, 1]
+            anchorMax: [1, 1]
+            offsetMin: [-108, -108]
+            offsetMax: [-2, -2]
           transform:
-            position: [144.87580163893995, 201.69413310705957]
+            position: [244.609375, 244.89453125]
             scale: [1, 1]
             rotation: 0
         children:
@@ -115,7 +117,7 @@ root:
               width: 64
               height: 64
               transform:
-                position: [19.62499999999997, 5.171875000000028]
+                position: [0, 0]
                 scale: [1, 1]
                 rotation: 0
             children: []
