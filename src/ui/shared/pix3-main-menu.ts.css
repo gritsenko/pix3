@@ -61,6 +61,21 @@
   padding: 4px 0;
 }
 
+.menu-group + .menu-group {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 4px;
+  padding-top: 6px;
+}
+
+.menu-group-label {
+  padding: 6px 12px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: rgba(245, 247, 250, 0.55);
+  text-transform: uppercase;
+}
+
 .section-items {
   display: flex;
   flex-direction: column;
@@ -69,7 +84,6 @@
 .menu-item {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   width: 100%;
   padding: 8px 12px;
   background: none;
@@ -93,6 +107,16 @@
   color: rgba(245, 247, 250, 0.4);
   cursor: not-allowed;
   opacity: 0.6;
+}
+
+.menu-item-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  margin-right: 10px;
+  opacity: 0.85;
 }
 
 .menu-item-label {

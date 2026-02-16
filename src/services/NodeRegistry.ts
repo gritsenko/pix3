@@ -9,6 +9,9 @@ import { CreateMeshInstanceCommand } from '@/features/scene/CreateMeshInstanceCo
 import { CreateLayout2DCommand } from '@/features/scene/CreateLayout2DCommand';
 import { CreateJoystick2DCommand } from '@/features/scene/CreateJoystick2DCommand';
 import type { Command } from '@/core/command';
+import { injectable } from '@/fw';
+
+type NodeTypeCommandConstructor = new () => Command<unknown, unknown>;
 
 /**
  * Node type definition for the registry
@@ -18,8 +21,7 @@ export interface NodeTypeInfo {
   displayName: string;
   description: string;
   category: '2D' | '3D';
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  commandClass: new (...args: any[]) => Command<unknown, unknown>;
+  commandClass: NodeTypeCommandConstructor;
   color: string;
   icon: string;
   keywords: string[];
@@ -29,19 +31,12 @@ export interface NodeTypeInfo {
 /**
  * Registry of all available node types organized by category
  */
+@injectable()
 export class NodeRegistry {
-  private static instance: NodeRegistry;
   private nodeTypes: Map<string, NodeTypeInfo> = new Map();
 
-  private constructor() {
+  constructor() {
     this.registerNodeTypes();
-  }
-
-  public static getInstance(): NodeRegistry {
-    if (!NodeRegistry.instance) {
-      NodeRegistry.instance = new NodeRegistry();
-    }
-    return NodeRegistry.instance;
   }
 
   private registerNodeTypes(): void {
@@ -209,6 +204,17 @@ export class NodeRegistry {
    */
   public getNodeType(id: string): NodeTypeInfo | undefined {
     return this.nodeTypes.get(id);
+  }
+
+  /**
+   * Create a command instance for node creation by registry ID.
+   */
+  public createCommand(id: string): Command<unknown, unknown> | null {
+    const nodeType = this.nodeTypes.get(id);
+    if (!nodeType) {
+      return null;
+    }
+    return new nodeType.commandClass();
   }
 
   /**

@@ -23,6 +23,9 @@ export class SceneTreePanel extends ComponentBase {
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
 
+  @inject(NodeRegistry)
+  private readonly nodeRegistry!: NodeRegistry;
+
   @state()
   private activeScene: SceneDescriptor | null = this.resolveActiveSceneDescriptor();
 
@@ -117,16 +120,16 @@ export class SceneTreePanel extends ComponentBase {
           @node-drag-end=${this.onNodeDragEnd.bind(this)}
         >
           ${hasHierarchy
-        ? html`<ul
+            ? html`<ul
                 class="tree-root"
                 role="tree"
                 aria-label=${this.getTreeAriaLabel(activeSceneName)}
               >
                 ${repeat(
-          this.hierarchy,
-          node => node.id,
-          (node, index) =>
-            html`<pix3-scene-tree-node
+                  this.hierarchy,
+                  node => node.id,
+                  (node, index) =>
+                    html`<pix3-scene-tree-node
                       .node=${node}
                       .level=${1}
                       .selectedNodeIds=${this.selectedNodeIds}
@@ -136,9 +139,9 @@ export class SceneTreePanel extends ComponentBase {
                       .draggedNodeType=${this.draggedNodeType}
                       ?focusable=${index === 0}
                     ></pix3-scene-tree-node>`
-        )}
+                )}
               </ul>`
-        : html`<p class="panel-placeholder">${this.getPlaceholderMessage()}</p>`}
+            : html`<p class="panel-placeholder">${this.getPlaceholderMessage()}</p>`}
         </div>
       </pix3-panel>
     `;
@@ -191,8 +194,7 @@ export class SceneTreePanel extends ComponentBase {
   }
 
   private syncCreateNodeItems(): void {
-    const nodeRegistry = NodeRegistry.getInstance();
-    this.createNodeItems = nodeRegistry.getGroupedDropdownItems();
+    this.createNodeItems = this.nodeRegistry.getGroupedDropdownItems();
   }
 
   private syncSelectionState(): void {
@@ -284,18 +286,13 @@ export class SceneTreePanel extends ComponentBase {
 
   private async onCreateNode(event: CustomEvent): Promise<void> {
     const { id } = event.detail;
-
-    const nodeRegistry = NodeRegistry.getInstance();
-    const nodeType = nodeRegistry.getNodeType(id);
-
-    if (!nodeType) {
+    const command = this.nodeRegistry.createCommand(id);
+    if (!command) {
       console.error('[SceneTreePanel] Unknown node type:', id);
       return;
     }
 
     try {
-      // Create the command instance and execute it
-      const command = new nodeType.commandClass();
       await this.commandDispatcher.execute(command);
     } catch (error) {
       console.error('[SceneTreePanel] Failed to create node:', error);

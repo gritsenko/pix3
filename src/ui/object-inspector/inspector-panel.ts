@@ -391,7 +391,7 @@ export class InspectorPanel extends ComponentBase {
           ${components.map(
             c => html`
               <div class="script-item component-item">
-                <div class="script-icon">${this.iconService.getIcon('zap', 16)}</div>
+                <div class="script-icon">${this.iconService.getIcon(this.getComponentIconName(c.type), 16)}</div>
                 <div class="script-info">
                   <div class="script-name">${c.type}</div>
                 </div>
@@ -420,6 +420,13 @@ export class InspectorPanel extends ComponentBase {
         </div>
       </div>
     `;
+  }
+
+  private getComponentIconName(componentType: string): string {
+    if (componentType.startsWith('user:')) {
+      return 'code';
+    }
+    return 'zap';
   }
 
   private async onAddBehavior() {

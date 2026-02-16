@@ -115,6 +115,12 @@ pix3-scene-tree-node {
 }
 
 .tree-node__script-indicator {
+  appearance: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -122,7 +128,17 @@ pix3-scene-tree-node {
   height: 0.75rem;
   color: var(--pix3-accent-color);
   opacity: 0.8;
-  position: relative;
+}
+
+.tree-node__script-indicator:hover,
+.tree-node__script-indicator:focus-visible {
+  opacity: 1;
+}
+
+.tree-node__script-indicator:focus-visible {
+  outline: 2px solid rgba(var(--pix3-accent-rgb), 0.75);
+  outline-offset: 2px;
+  border-radius: 2px;
 }
 
 .tree-node__script-indicator svg {
@@ -132,30 +148,22 @@ pix3-scene-tree-node {
 }
 
 .script-popover {
-  position: absolute;
-  left: 100%;
-  top: 50%;
-  transform: translate(8px, -50%);
+  position: fixed;
+  transform: translateY(-50%);
   min-width: 10rem;
-  background: var(--pix3-bg-panel);
+  max-width: min(22rem, calc(100vw - 16px));
+  background: rgba(12, 16, 24, 0.98);
   color: var(--pix3-fg-primary);
   border: 1px solid var(--pix3-border-color);
-  box-shadow: 0 6px 18px rgba(2,6,23,0.6);
+  box-shadow: 0 10px 24px rgba(2, 6, 23, 0.65);
   padding: 8px 10px;
   border-radius: 6px;
-  visibility: hidden;
-  opacity: 0;
-  transition: opacity 120ms ease, transform 120ms ease;
-  z-index: 30;
+  z-index: 9999;
   pointer-events: none;
 }
 
-.tree-node__script-indicator:hover .script-popover,
-.tree-node__script-indicator:focus .script-popover {
-  visibility: visible;
-  opacity: 1;
-  transform: translate(10px, -50%);
-  pointer-events: auto;
+.script-popover--portal {
+  white-space: normal;
 }
 
 .script-popover__title {
@@ -173,8 +181,23 @@ pix3-scene-tree-node {
 }
 
 .script-popover__item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   font-size: 0.85rem;
   padding: 2px 0;
+}
+
+.script-popover__item-icon {
+  color: var(--pix3-accent-color);
+  font-weight: 600;
+  font-size: 0.8rem;
+  min-width: 1rem;
+  text-align: center;
+}
+
+.script-popover__item-label {
+  min-width: 0;
 }
 
 .script-popover__empty {

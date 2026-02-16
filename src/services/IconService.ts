@@ -189,63 +189,14 @@ export class IconService {
    * @returns TemplateResult with SVG content
    */
   getIcon(name: string, size: number = IconSize.MEDIUM): TemplateResult {
-    const cacheKey = `${name}-${size}`;
+    return html`${unsafeHTML(this.resolveIconSvg(name, size))}`;
+  }
 
-    let svg = '';
-
-    // Check cache first (cache stores raw SVG strings)
-    if (this.iconCache.has(cacheKey)) {
-      svg = this.iconCache.get(cacheKey)!;
-      return html`${unsafeHTML(svg)}`;
-    }
-
-    // Check custom icons first
-    if (this.customIcons.has(name)) {
-      svg = this.customIcons.get(name)!;
-      // Apply size to custom icons
-      svg = this.applySizeToSvg(svg, size);
-    } else {
-      // Try Feather Icons
-      try {
-        const featherIcons = feather.icons as FeatherIconMap;
-        const icon = featherIcons[name];
-        if (icon && typeof icon.toSvg === 'function') {
-          svg = icon.toSvg({
-            width: size,
-            height: size,
-            stroke: 'currentColor',
-            fill: 'none',
-            'stroke-width': 2,
-            'stroke-linecap': 'round',
-            'stroke-linejoin': 'round',
-          } as Record<string, unknown>);
-        } else {
-          console.warn(`[IconService] Icon not found: ${name}`);
-          // Return fallback icon (box)
-          const fallbackIcon = featherIcons['box'];
-          if (fallbackIcon && typeof fallbackIcon.toSvg === 'function') {
-            svg = fallbackIcon.toSvg({
-              width: size,
-              height: size,
-              stroke: 'currentColor',
-              fill: 'none',
-              'stroke-width': 2,
-              'stroke-linecap': 'round',
-              'stroke-linejoin': 'round',
-            } as Record<string, unknown>);
-          }
-        }
-      } catch (error) {
-        console.warn(`[IconService] Failed to load icon: ${name}`, error);
-      }
-    }
-
-    // Cache the raw SVG string for future use
-    if (svg) {
-      this.iconCache.set(cacheKey, svg);
-    }
-
-    return html`${unsafeHTML(svg)}`;
+  /**
+   * Get icon as raw SVG markup string (useful for HTML-string renderers).
+   */
+  getIconSvg(name: string, size: number = IconSize.MEDIUM): string {
+    return this.resolveIconSvg(name, size);
   }
 
   /**
@@ -298,6 +249,58 @@ export class IconService {
     });
 
     return updated;
+  }
+
+  private resolveIconSvg(name: string, size: number): string {
+    const cacheKey = `${name}-${size}`;
+    const cached = this.iconCache.get(cacheKey);
+    if (cached) {
+      return cached;
+    }
+
+    let svg = '';
+
+    if (this.customIcons.has(name)) {
+      svg = this.applySizeToSvg(this.customIcons.get(name)!, size);
+    } else {
+      try {
+        const featherIcons = feather.icons as FeatherIconMap;
+        const icon = featherIcons[name];
+        if (icon && typeof icon.toSvg === 'function') {
+          svg = icon.toSvg({
+            width: size,
+            height: size,
+            stroke: 'currentColor',
+            fill: 'none',
+            'stroke-width': 2,
+            'stroke-linecap': 'round',
+            'stroke-linejoin': 'round',
+          } as Record<string, unknown>);
+        } else {
+          console.warn(`[IconService] Icon not found: ${name}`);
+          const fallbackIcon = featherIcons['box'];
+          if (fallbackIcon && typeof fallbackIcon.toSvg === 'function') {
+            svg = fallbackIcon.toSvg({
+              width: size,
+              height: size,
+              stroke: 'currentColor',
+              fill: 'none',
+              'stroke-width': 2,
+              'stroke-linecap': 'round',
+              'stroke-linejoin': 'round',
+            } as Record<string, unknown>);
+          }
+        }
+      } catch (error) {
+        console.warn(`[IconService] Failed to load icon: ${name}`, error);
+      }
+    }
+
+    if (svg) {
+      this.iconCache.set(cacheKey, svg);
+    }
+
+    return svg;
   }
 
   /**

@@ -12,6 +12,11 @@ import './asset-tree';
 import './asset-browser-panel.ts.css';
 
 // Use public API on AssetTree to query selected path (do not access internals)
+interface ScriptRevealRequestDetail {
+  scriptType: string;
+  scriptName: string;
+  candidatePaths: string[];
+}
 
 @customElement('pix3-asset-browser-panel')
 export class AssetBrowserPanel extends ComponentBase {
@@ -30,6 +35,7 @@ export class AssetBrowserPanel extends ComponentBase {
   private selectedItemName: string | null = null;
 
   private scriptFileCreatedHandler?: (e: Event) => void;
+  private scriptFileRevealRequestHandler?: (e: Event) => void;
 
   private onAssetActivate = async (e: Event) => {
     const detail = (e as CustomEvent<AssetActivation>).detail;
@@ -152,6 +158,15 @@ export class AssetBrowserPanel extends ComponentBase {
     };
 
     window.addEventListener('script-file-created', this.scriptFileCreatedHandler as EventListener);
+
+    this.scriptFileRevealRequestHandler = (e: Event) => {
+      const customEvent = e as CustomEvent<ScriptRevealRequestDetail>;
+      void this.onScriptFileRevealRequested(customEvent.detail);
+    };
+    window.addEventListener(
+      'script-file-reveal-request',
+      this.scriptFileRevealRequestHandler as EventListener
+    );
   }
 
   disconnectedCallback(): void {
@@ -163,6 +178,14 @@ export class AssetBrowserPanel extends ComponentBase {
         this.scriptFileCreatedHandler as EventListener
       );
       this.scriptFileCreatedHandler = undefined;
+    }
+
+    if (this.scriptFileRevealRequestHandler) {
+      window.removeEventListener(
+        'script-file-reveal-request',
+        this.scriptFileRevealRequestHandler as EventListener
+      );
+      this.scriptFileRevealRequestHandler = undefined;
     }
   }
 
@@ -177,6 +200,31 @@ export class AssetBrowserPanel extends ComponentBase {
     } catch (error) {
       console.error('[AssetBrowserPanel] Failed to select newly created script file:', error);
     }
+  }
+
+  private async onScriptFileRevealRequested(detail: ScriptRevealRequestDetail): Promise<void> {
+    if (!detail || detail.scriptType.length === 0 || detail.scriptName.length === 0) {
+      return;
+    }
+
+    if (!detail.scriptType.startsWith('user:')) {
+      return;
+    }
+
+    if (!this.assetTreeRef) {
+      console.warn('[AssetBrowserPanel] assetTreeRef is null, cannot reveal script');
+      return;
+    }
+
+    for (const candidatePath of detail.candidatePaths) {
+      const selected = await this.assetTreeRef.selectPath(candidatePath);
+      if (selected) {
+        console.log('[AssetBrowserPanel] Revealed user script:', candidatePath);
+        return;
+      }
+    }
+
+    console.warn('[AssetBrowserPanel] Failed to reveal user script in Asset Browser:', detail);
   }
 
   protected render() {

@@ -35,6 +35,12 @@ export interface SceneTreeNode {
   scripts: string[];
 }
 
+interface ScriptRevealRequestDetail {
+  scriptType: string;
+  scriptName: string;
+  candidatePaths: string[];
+}
+
 @customElement('pix3-scene-tree-node')
 export class SceneTreeNodeComponent extends ComponentBase {
   static useShadowDom = false; // Use light DOM for proper nesting
@@ -86,6 +92,14 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
   @state()
   private isValidDropTarget: boolean = true;
+
+  private scriptPopoverAnchor: HTMLElement | null = null;
+  private scriptPopoverElement: HTMLElement | null = null;
+
+  disconnectedCallback(): void {
+    this.closeScriptPopover();
+    super.disconnectedCallback();
+  }
 
   updated(changedProperties: Map<string, unknown>): void {
     super.updated(changedProperties as Map<string, unknown>);
@@ -178,17 +192,19 @@ export class SceneTreeNodeComponent extends ComponentBase {
               <span class="tree-node__name"> ${this.node.name} </span>
               ${this.node.scripts.length > 0
         ? html`
-                    <span class="tree-node__script-indicator">
-                      ${this.renderToggleIcon('code')}
-                      <div class="script-popover">
-                        <div class="script-popover__title">Attached Scripts</div>
-                        <ul class="script-popover__list">
-                          ${this.node.scripts.map(
-          script => html`<li class="script-popover__item">${script}</li>`
-        )}
-                        </ul>
-                      </div>
-                    </span>
+                    <button
+                      type="button"
+                      class="tree-node__script-indicator"
+                      title=${this.getScriptIndicatorTitle()}
+                      aria-label=${this.getScriptIndicatorTitle()}
+                      @mouseenter=${(event: MouseEvent) => this.onScriptIndicatorMouseEnter(event)}
+                      @mouseleave=${() => this.closeScriptPopover()}
+                      @focus=${(event: FocusEvent) => this.onScriptIndicatorFocus(event)}
+                      @blur=${() => this.closeScriptPopover()}
+                      @click=${(event: Event) => this.onScriptIndicatorClick(event)}
+                    >
+                      ${this.renderToggleIcon(this.getScriptIndicatorIconName())}
+                    </button>
                   `
         : null}
             </span>
@@ -261,6 +277,172 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
   private renderToggleIcon(iconName: string): TemplateResult {
     return this.iconService.getIcon(iconName, IconSize.SMALL);
+  }
+
+  private onScriptIndicatorMouseEnter(event: MouseEvent): void {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    this.openScriptPopover(target);
+  }
+
+  private onScriptIndicatorFocus(event: FocusEvent): void {
+    const target = event.currentTarget;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+    this.openScriptPopover(target);
+  }
+
+  private openScriptPopover(anchor: HTMLElement): void {
+    this.scriptPopoverAnchor = anchor;
+    if (!this.scriptPopoverElement) {
+      this.scriptPopoverElement = this.createScriptPopoverElement();
+      document.body.appendChild(this.scriptPopoverElement);
+    }
+    this.updateScriptPopoverPosition();
+    window.addEventListener('scroll', this.handleViewportChange, true);
+    window.addEventListener('resize', this.handleViewportChange);
+  }
+
+  private closeScriptPopover(): void {
+    this.scriptPopoverAnchor = null;
+    if (this.scriptPopoverElement) {
+      this.scriptPopoverElement.remove();
+      this.scriptPopoverElement = null;
+    }
+    window.removeEventListener('scroll', this.handleViewportChange, true);
+    window.removeEventListener('resize', this.handleViewportChange);
+  }
+
+  private readonly handleViewportChange = (): void => {
+    if (!this.scriptPopoverAnchor || !this.scriptPopoverElement) {
+      return;
+    }
+    this.updateScriptPopoverPosition();
+  };
+
+  private createScriptPopoverElement(): HTMLElement {
+    const popover = document.createElement('div');
+    popover.className = 'script-popover script-popover--portal';
+    popover.setAttribute('role', 'tooltip');
+
+    const title = document.createElement('div');
+    title.className = 'script-popover__title';
+    title.textContent = 'Attached Scripts';
+    popover.appendChild(title);
+
+    const list = document.createElement('ul');
+    list.className = 'script-popover__list';
+    for (const script of this.node.scripts) {
+      const item = document.createElement('li');
+      item.className = 'script-popover__item';
+      const icon = document.createElement('span');
+      icon.className = 'script-popover__item-icon';
+      icon.textContent = this.isUserScriptType(script) ? '<>' : '⚡';
+      icon.setAttribute('aria-hidden', 'true');
+
+      const label = document.createElement('span');
+      label.className = 'script-popover__item-label';
+      label.textContent = script;
+
+      item.appendChild(icon);
+      item.appendChild(label);
+      list.appendChild(item);
+    }
+    popover.appendChild(list);
+
+    return popover;
+  }
+
+  private updateScriptPopoverPosition(): void {
+    if (!this.scriptPopoverAnchor || !this.scriptPopoverElement) {
+      return;
+    }
+
+    const rect = this.scriptPopoverAnchor.getBoundingClientRect();
+    const popover = this.scriptPopoverElement;
+    const margin = 8;
+    let left = rect.right + 10;
+    let top = rect.top + rect.height / 2;
+
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+
+    const popoverRect = popover.getBoundingClientRect();
+
+    if (left + popoverRect.width > window.innerWidth - margin) {
+      left = Math.max(margin, window.innerWidth - popoverRect.width - margin);
+    }
+    if (left < margin) {
+      left = margin;
+    }
+
+    if (top + popoverRect.height / 2 > window.innerHeight - margin) {
+      top = Math.max(
+        margin + popoverRect.height / 2,
+        window.innerHeight - margin - popoverRect.height / 2
+      );
+    }
+    if (top - popoverRect.height / 2 < margin) {
+      top = margin + popoverRect.height / 2;
+    }
+
+    popover.style.left = `${left}px`;
+    popover.style.top = `${top}px`;
+  }
+
+  private getScriptIndicatorIconName(): string {
+    const hasCoreScript = this.node.scripts.some(script => this.isCoreScriptType(script));
+    const hasUserScript = this.node.scripts.some(script => this.isUserScriptType(script));
+
+    if (hasCoreScript && !hasUserScript) {
+      return 'zap';
+    }
+
+    return 'code';
+  }
+
+  private getScriptIndicatorTitle(): string {
+    const hasUserScript = this.node.scripts.some(script => this.isUserScriptType(script));
+    if (hasUserScript) {
+      return 'Reveal user script in Asset Browser';
+    }
+    return 'Attached scripts';
+  }
+
+  private isCoreScriptType(scriptType: string): boolean {
+    return scriptType.startsWith('core:');
+  }
+
+  private isUserScriptType(scriptType: string): boolean {
+    return scriptType.startsWith('user:');
+  }
+
+  private onScriptIndicatorClick(event: Event): void {
+    event.stopPropagation();
+
+    const userScriptType = this.node.scripts.find(scriptType => scriptType.startsWith('user:'));
+    if (!userScriptType) {
+      return;
+    }
+
+    const scriptName = userScriptType.slice('user:'.length).trim();
+    if (!scriptName) {
+      return;
+    }
+
+    const fileName = `${scriptName}.ts`;
+    const detail: ScriptRevealRequestDetail = {
+      scriptType: userScriptType,
+      scriptName,
+      candidatePaths: [`scripts/${fileName}`, `src/scripts/${fileName}`],
+    };
+
+    window.dispatchEvent(
+      new CustomEvent<ScriptRevealRequestDetail>('script-file-reveal-request', { detail })
+    );
   }
 
   private onToggleNode(event: Event): void {

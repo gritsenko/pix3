@@ -138,7 +138,7 @@ export class AssetTree extends ComponentBase {
    * Programmatically select a file/folder by its path
    * Expands parent directories if needed and ensures the path is visible
    */
-  public async selectPath(targetPath: string): Promise<void> {
+  public async selectPath(targetPath: string): Promise<boolean> {
     const normalizedPath = targetPath.startsWith('.') ? targetPath.slice(1) : targetPath;
     const searchPath = normalizedPath.startsWith('/') ? normalizedPath.slice(1) : normalizedPath;
 
@@ -184,8 +184,10 @@ export class AssetTree extends ComponentBase {
       console.warn('[AssetTree] Path not found in tree:', targetPath);
       // Force refresh and try again
       await this.loadRoot();
-      await findAndSelectNode(this.tree, pathSegments);
+      return findAndSelectNode(this.tree, pathSegments);
     }
+
+    return true;
   }
 
   private splitPath(path: string): string[] {

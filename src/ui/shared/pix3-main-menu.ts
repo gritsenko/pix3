@@ -1,7 +1,25 @@
 import { ComponentBase, customElement, html, inject, state, unsafeCSS } from '@/fw';
-import { CommandRegistry, type MenuSection } from '@/services/CommandRegistry';
+import { CommandRegistry } from '@/services/CommandRegistry';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { NodeRegistry } from '@/services/NodeRegistry';
+import { IconService, IconSize } from '@/services/IconService';
 import styles from './pix3-main-menu.ts.css?raw';
+
+interface MainMenuItem {
+  id: string;
+  label: string;
+  shortcut?: string;
+  icon?: string;
+  commandId?: string;
+  nodeTypeId?: string;
+}
+
+interface MainMenuSection {
+  id: string;
+  label: string;
+  items: MainMenuItem[];
+  groupedItems?: Array<{ label: string; items: MainMenuItem[] }>;
+}
 
 @customElement('pix3-main-menu')
 export class Pix3MainMenu extends ComponentBase {
@@ -11,6 +29,12 @@ export class Pix3MainMenu extends ComponentBase {
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
 
+  @inject(NodeRegistry)
+  private readonly nodeRegistry!: NodeRegistry;
+
+  @inject(IconService)
+  private readonly iconService!: IconService;
+
   // Use light DOM (default) to avoid clipping issues with absolutely positioned dropdowns
   @state()
   private activeSection: string | null = null;
@@ -19,14 +43,13 @@ export class Pix3MainMenu extends ComponentBase {
   private menuOpenedByClick = false;
 
   @state()
-  private menuSections: MenuSection[] = [];
+  private menuSections: MainMenuSection[] = [];
 
   private portalElement: HTMLElement | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
-    // Load menu sections from registry
-    this.menuSections = this.commandRegistry.buildMenuSections();
+    this.menuSections = this.buildMenuSections();
     document.addEventListener('click', this.handleDocumentClick);
   }
 
@@ -72,8 +95,10 @@ export class Pix3MainMenu extends ComponentBase {
       return;
     }
 
-    const menuItems = this.querySelectorAll<HTMLElement>('.menu-item:not([disabled])');
-    if (menuItems.length === 0) {
+    const menuItems = this.portalElement?.querySelectorAll<HTMLElement>(
+      '.menu-item:not([disabled])'
+    );
+    if (!menuItems || menuItems.length === 0) {
       return;
     }
 
@@ -118,25 +143,43 @@ export class Pix3MainMenu extends ComponentBase {
     const section = this.menuSections.find(s => s.id === this.activeSection);
     if (!section) return '';
 
+    const renderItem = (item: MainMenuItem): string => `
+      <button
+        role="menuitem"
+        class="menu-item"
+        data-menu-item="${item.id}"
+        ${item.commandId ? `data-command-id="${item.commandId}"` : ''}
+        ${item.nodeTypeId ? `data-node-type-id="${item.nodeTypeId}"` : ''}
+      >
+        ${
+          item.icon
+            ? `<span class="menu-item-icon">${this.iconService.getIconSvg(item.icon, IconSize.MEDIUM)}</span>`
+            : ''
+        }
+        <span class="menu-item-label">${item.label}</span>
+        ${item.shortcut ? `<span class="menu-item-shortcut">${item.shortcut}</span>` : ''}
+      </button>
+    `;
+
+    const content = section.groupedItems?.length
+      ? section.groupedItems
+          .map(
+            group => `
+              <div class="menu-group">
+                <div class="menu-group-label">${group.label}</div>
+                <div class="section-items">
+                  ${group.items.map(item => renderItem(item)).join('')}
+                </div>
+              </div>
+            `
+          )
+          .join('')
+      : `<div class="section-items">${section.items.map(item => renderItem(item)).join('')}</div>`;
+
     return `
       <div class="menu-dropdown" role="menu" onmouseleave="this.dispatchEvent(new CustomEvent('menu-mouseleave', {bubbles: true}))">
         <div class="menu-section" role="group" aria-label="${section.label}">
-          <div class="section-items">
-            ${section.items
-              .map(
-                item =>
-                  `<button
-                      role="menuitem"
-                      class="menu-item"
-                      data-menu-item="${item.id}"
-                      data-command-id="${item.commandId}"
-                    >
-                      <span class="menu-item-label">${item.label}</span>
-                      ${item.shortcut ? `<span class="menu-item-shortcut">${item.shortcut}</span>` : ''}
-                    </button>`
-              )
-              .join('')}
-          </div>
+          ${content}
         </div>
       </div>
     `;
@@ -150,10 +193,16 @@ export class Pix3MainMenu extends ComponentBase {
       item.addEventListener('click', e => {
         e.preventDefault();
         e.stopPropagation();
-        const menuItemId = item.getAttribute('data-menu-item');
         const commandId = item.getAttribute('data-command-id');
-        if (menuItemId && commandId) {
+        const nodeTypeId = item.getAttribute('data-node-type-id');
+
+        if (commandId) {
           void this.executeMenuItem(commandId);
+          return;
+        }
+
+        if (nodeTypeId) {
+          void this.executeCreateMenuItem(nodeTypeId);
         }
       });
     });
@@ -174,6 +223,18 @@ export class Pix3MainMenu extends ComponentBase {
     if (command) {
       await this.commandDispatcher.execute(command);
     }
+    this.activeSection = null;
+    this.menuOpenedByClick = false;
+  }
+
+  private async executeCreateMenuItem(nodeTypeId: string): Promise<void> {
+    const command = this.nodeRegistry.createCommand(nodeTypeId);
+    if (!command) {
+      console.error('[Pix3MainMenu] Unknown node type for create action:', nodeTypeId);
+      return;
+    }
+
+    await this.commandDispatcher.execute(command);
     this.activeSection = null;
     this.menuOpenedByClick = false;
   }
@@ -211,6 +272,45 @@ export class Pix3MainMenu extends ComponentBase {
       this.activeSection = null;
     }
   };
+
+  private buildMenuSections(): MainMenuSection[] {
+    const commandSections: MainMenuSection[] = this.commandRegistry
+      .buildMenuSections()
+      .map(section => ({
+        id: section.id,
+        label: section.label,
+        items: section.items.map(item => ({
+          id: item.id,
+          label: item.label,
+          shortcut: item.shortcut,
+          commandId: item.commandId,
+        })),
+      }));
+
+    const createSection: MainMenuSection = {
+      id: 'create',
+      label: 'Create',
+      items: [],
+      groupedItems: this.nodeRegistry.getGroupedDropdownItems().map(group => ({
+        label: group.label,
+        items: group.items.map(item => ({
+          id: `create-${item.id}`,
+          label: item.label,
+          icon: item.icon,
+          nodeTypeId: item.id,
+        })),
+      })),
+    };
+
+    const sectionsWithoutCreate = commandSections.filter(section => section.id !== 'create');
+    const fileSectionIndex = sectionsWithoutCreate.findIndex(section => section.id === 'file');
+    if (fileSectionIndex >= 0) {
+      sectionsWithoutCreate.splice(fileSectionIndex + 1, 0, createSection);
+      return sectionsWithoutCreate;
+    }
+
+    return [createSection, ...sectionsWithoutCreate];
+  }
 
   protected render() {
     return html`
