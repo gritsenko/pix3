@@ -136,8 +136,11 @@ export class ScriptCompilerService {
 
     for (const [filePath] of files) {
       // Convert file path to a valid import path
-      // Remove 'scripts/' prefix if present and .ts extension
-      const importPath = filePath.replace(/^scripts\//, './').replace(/\.ts$/, '');
+      // Remove supported script-root prefixes and .ts extension
+      const importPath = filePath
+        .replace(/^scripts\//, './')
+        .replace(/^src\/scripts\//, './')
+        .replace(/\.ts$/, '');
       const exportName = this.pathToExportName(filePath);
 
       exports.push(`export * as ${exportName} from '${importPath}';`);
@@ -182,8 +185,8 @@ export class ScriptCompilerService {
             resolvedPath = resolvedPath.replace(/^\.\//, '');
 
             // Check if file exists in our virtual FS
-            // Try with and without scripts/ prefix
-            const paths = [resolvedPath, `scripts/${resolvedPath}`];
+            // Try with and without supported script-root prefixes
+            const paths = [resolvedPath, `scripts/${resolvedPath}`, `src/scripts/${resolvedPath}`];
 
             for (const testPath of paths) {
               if (files.has(testPath)) {
@@ -280,3 +283,6 @@ export class ScriptCompilerService {
     this.initPromise = null;
   }
 }
+
+
+

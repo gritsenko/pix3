@@ -27,6 +27,7 @@ import { StopSceneCommand } from '@/features/scripts/StopSceneCommand';
 import { StartGameCommand } from '@/features/scripts/StartGameCommand';
 import { StopGameCommand } from '@/features/scripts/StopGameCommand';
 import { OpenProjectSettingsCommand } from '@/features/project/OpenProjectSettingsCommand';
+import { OpenProjectInIdeCommand } from '@/features/project/OpenProjectInIdeCommand';
 import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import { EditorTabService } from '@/services/EditorTabService';
@@ -131,6 +132,7 @@ export class Pix3EditorShell extends ComponentBase {
     const startGameCommand = new StartGameCommand(this.editorTabService);
     const stopGameCommand = new StopGameCommand(this.editorTabService);
     const projectSettingsCommand = new OpenProjectSettingsCommand();
+    const openProjectInIdeCommand = new OpenProjectInIdeCommand();
     this.commandRegistry.registerMany(
       undoCommand,
       redoCommand,
@@ -141,7 +143,8 @@ export class Pix3EditorShell extends ComponentBase {
       stopCommand,
       startGameCommand,
       stopGameCommand,
-      projectSettingsCommand
+      projectSettingsCommand,
+      openProjectInIdeCommand
     );
 
     // Subscribe to dialog changes

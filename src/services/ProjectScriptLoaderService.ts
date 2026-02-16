@@ -15,9 +15,9 @@ import { FileWatchService } from './FileWatchService';
 /**
  * ProjectScriptLoaderService
  *
- * Manages the lifecycle of user-authored scripts in the project's scripts/ directory.
+ * Manages the lifecycle of user-authored scripts in the project.
  * This service:
- * 1. Watches for changes to .ts files in the scripts/ directory
+ * 1. Watches for changes to .ts files in supported script directories
  * 2. Compiles scripts using ScriptCompilerService (esbuild-wasm)
  * 3. Dynamically imports the compiled bundle
  * 4. Registers script classes in ScriptRegistry for use in the editor
@@ -45,6 +45,7 @@ export class ProjectScriptLoaderService {
   private disposeSubscription?: () => void;
   private debounceTimer: number | null = null;
   private readonly debounceMs = 300;
+  private readonly scriptDirectories = ['scripts', 'src/scripts'] as const;
 
   // Track scripts from this project for cleanup
   private registeredScriptIds = new Set<string>();
@@ -69,7 +70,7 @@ export class ProjectScriptLoaderService {
   }
 
   /**
-   * Main workflow: Scan scripts directory, compile, and register.
+   * Main workflow: Scan supported script directories, compile, and register.
    * This method is debounced to avoid excessive rebuilds.
    */
   async syncAndBuild(): Promise<void> {
@@ -94,13 +95,15 @@ export class ProjectScriptLoaderService {
       appState.project.scriptsStatus = 'loading';
       this.logger.info('Compiling project scripts...');
 
-      // Step 1: List all .ts files in scripts/ directory
-      const entries = await this.fs.listDirectory('scripts');
-      const tsFiles = entries.filter(e => e.kind === 'file' && e.name.endsWith('.ts'));
+      // Step 1: List all .ts files in supported script directories
+      const { tsFiles, checkedDirectories } = await this.collectScriptFiles();
 
       if (tsFiles.length === 0) {
-        this.logger.info('No TypeScript files found in scripts/ directory');
+        this.logger.info(
+          `No TypeScript files found in any script directory (${checkedDirectories.join(', ')})`
+        );
         this.clearRegisteredScripts();
+        appState.project.errorMessage = null;
         appState.project.scriptsStatus = 'ready';
         return;
       }
@@ -152,7 +155,8 @@ export class ProjectScriptLoaderService {
       try {
         compilationResult = await this.compiler.bundle(filesMap);
       } catch (error) {
-        this.handleCompilationError(error as CompilationError);
+        const userError = this.handleCompilationError(error as CompilationError, checkedDirectories);
+        appState.project.errorMessage = userError;
         appState.project.scriptsStatus = 'error';
         return;
       }
@@ -299,17 +303,51 @@ export class ProjectScriptLoaderService {
     }
     this.watchedFilePaths.clear();
   }
+  private async collectScriptFiles(): Promise<{
+    tsFiles: Array<{ name: string; kind: FileSystemHandleKind; path: string }>;
+    checkedDirectories: readonly string[];
+  }> {
+    const tsFiles: Array<{ name: string; kind: FileSystemHandleKind; path: string }> = [];
+
+    for (const directory of this.scriptDirectories) {
+      try {
+        const entries = await this.fs.listDirectory(directory);
+        tsFiles.push(...entries.filter(e => e.kind === 'file' && e.name.endsWith('.ts')));
+      } catch (error) {
+        if (this.isDirectoryNotFoundError(error)) {
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    return {
+      tsFiles,
+      checkedDirectories: this.scriptDirectories,
+    };
+  }
+
+  private isDirectoryNotFoundError(error: unknown): boolean {
+    return (
+      error instanceof Error &&
+      'code' in error &&
+      (error as { code?: unknown }).code === 'not-found'
+    );
+  }
 
   /**
    * Handle compilation errors by logging and displaying to user
    */
-  private handleCompilationError(error: CompilationError): void {
+  private handleCompilationError(error: CompilationError, checkedDirectories: readonly string[]): string {
     const location = error.file
       ? `${error.file}:${error.line ?? '?'}:${error.column ?? '?'}`
       : 'unknown location';
 
+    const checked = checkedDirectories.join(', ');
     const errorMessage = `Compilation failed at ${location}: ${error.message}`;
-    this.logger.error(errorMessage, error.details);
+    const userMessage = `${errorMessage}. Checked script directories: ${checked}. Keep project scripts in one of these folders.`;
+    this.logger.error(userMessage, error.details);
+    return userMessage;
   }
 
   dispose(): void {
@@ -323,3 +361,4 @@ export class ProjectScriptLoaderService {
     this.clearAll();
   }
 }
+

@@ -1,6 +1,6 @@
 import { ComponentBase, customElement, html, inject, state } from '@/fw';
 import { ref } from 'lit/directives/ref.js';
-import { AssetFileActivationService, type AssetActivation } from '@/services';
+import { AssetFileActivationService, type AssetActivation, CommandDispatcher } from '@/services';
 import { DialogService } from '@/services/DialogService';
 import type { AssetTree } from './asset-tree';
 
@@ -20,6 +20,9 @@ export class AssetBrowserPanel extends ComponentBase {
 
   @inject(DialogService)
   private readonly dialogService!: DialogService;
+
+  @inject(CommandDispatcher)
+  private readonly commandDispatcher!: CommandDispatcher;
 
   private assetTreeRef: AssetTree | null = null;
 
@@ -94,6 +97,10 @@ export class AssetBrowserPanel extends ComponentBase {
     } catch (error) {
       console.error('[AssetBrowserPanel] Failed to rename item:', error);
     }
+  };
+
+  private onOpenInIdeClick = () => {
+    void this.commandDispatcher.executeById('project.open-in-ide');
   };
 
   private async showDeleteConfirmation(itemName: string): Promise<void> {
@@ -206,6 +213,12 @@ export class AssetBrowserPanel extends ComponentBase {
             label="Delete"
             title="Delete selected item"
             @click=${this.onDeleteClick}
+          ></pix3-toolbar-button>
+          <pix3-toolbar-button
+            icon="external-link"
+            label="Open in IDE"
+            title="Open project folder in VS Code"
+            @click=${this.onOpenInIdeClick}
           ></pix3-toolbar-button>
         </pix3-toolbar>
 

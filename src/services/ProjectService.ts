@@ -342,6 +342,7 @@ export class ProjectService {
   private async createProjectStructure(): Promise<void> {
     const directories = [
       'src',
+      'scripts',
       'src/scripts',
       'src/assets',
       'src/assets/scenes',
@@ -362,7 +363,8 @@ This is a new Pix3 project created on ${new Date().toLocaleDateString()}.
 ## Project Structure
 
 - \`src/\` - Source code
-- \`src/scripts/\` - Custom scripts and behaviors
+- \`scripts/\` - Custom scripts and behaviors (primary)
+- \`src/scripts/\` - Custom scripts and behaviors (legacy/supported)
 - \`src/assets/\` - Project assets
 - \`src/assets/scenes/\` - Scene files
 - \`src/assets/models/\` - 3D models
@@ -372,7 +374,7 @@ This is a new Pix3 project created on ${new Date().toLocaleDateString()}.
 
 1. Add your 3D models to \`src/assets/models/\`
 2. Create scenes in \`src/assets/scenes/\`
-3. Write custom scripts in \`src/scripts/\`
+3. Write custom scripts in \`scripts/\` (or \`src/scripts/\`)
 4. Open your project in Pix3 to start editing
 
 Happy creating! 🎨
@@ -387,3 +389,4 @@ export const resolveProjectService = (): ProjectService => {
     ServiceContainer.getInstance().getOrCreateToken(ProjectService)
   ) as ProjectService;
 };
+
