@@ -75,8 +75,8 @@ root:
     name: 2D Layout
     properties:
       width: 600
-      height: 800
-      resolutionPreset: FullHD
+      height: 600
+      resolutionPreset: custom
       showViewportOutline: true
       visible: true
       transform:
@@ -97,15 +97,15 @@ root:
         type: Group2D
         name: UI Group
         properties:
-          width: 106.1875
-          height: 106.2265625
+          width: 142.46093749999997
+          height: 143.89062500000003
           layout:
             anchorMin: [1, 1]
             anchorMax: [1, 1]
-            offsetMin: [-108, -108]
+            offsetMin: [-144, -146]
             offsetMax: [-2, -2]
           transform:
-            position: [244.609375, 244.89453125]
+            position: [226.76953125, 226.0546875]
             scale: [1, 1]
             rotation: 0
         children:

@@ -5,6 +5,7 @@ import { NodeBase } from '../nodes/NodeBase';
 import { Node3D } from '../nodes/Node3D';
 import { Node2D } from '../nodes/Node2D';
 import { Group2D } from '../nodes/2D/Group2D';
+import { Layout2D } from '../nodes/2D/Layout2D';
 import { Sprite2D } from '../nodes/2D/Sprite2D';
 import { Joystick2D } from '../nodes/2D/Joystick2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
@@ -190,6 +191,20 @@ export class SceneSaver {
         transform.rotationOrder = rotation.order;
       }
 
+      props.transform = transform;
+    } else if (node instanceof Layout2D) {
+      // Serialize Layout2D with viewport properties
+      props.width = node.width;
+      props.height = node.height;
+      props.resolutionPreset = node.resolutionPreset;
+      props.showViewportOutline = node.showViewportOutline;
+
+      // Add 2D transform
+      const transform: Record<string, unknown> = {
+        position: [node.position.x, node.position.y],
+        scale: [node.scale.x, node.scale.y],
+        rotation: MathUtils.radToDeg(node.rotation.z),
+      };
       props.transform = transform;
     } else if (node instanceof Group2D) {
       // Serialize Group2D with size properties

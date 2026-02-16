@@ -5,6 +5,7 @@ import type {
   OperationMetadata,
 } from '@/core/Operation';
 import { NodeBase } from '@pix3/runtime';
+import { Node2D } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
 import { Sprite2D } from '@pix3/runtime';
 import { Layout2D } from '@pix3/runtime';
@@ -124,6 +125,9 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
         (node instanceof Layout2D || node instanceof Group2D || node instanceof Sprite2D)
       ) {
         vr.updateNodeTransform(node);
+        if (this.isParentSizeProperty(propertyPath) && this.is2DContainer(node)) {
+          this.updateDescendant2DTransforms(vr, node);
+        }
       } else if (propertyPath === 'visible') {
         vr.updateNodeVisibility(node);
       } else {
@@ -140,6 +144,23 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
 
   private is2DVisualProperty(propertyPath: string): boolean {
     return ['width', 'height', 'showViewportOutline', 'resolutionPreset'].includes(propertyPath);
+  }
+
+  private isParentSizeProperty(propertyPath: string): boolean {
+    return ['width', 'height', 'resolutionPreset'].includes(propertyPath);
+  }
+
+  private is2DContainer(node: NodeBase): node is Layout2D | Group2D {
+    return node instanceof Layout2D || node instanceof Group2D;
+  }
+
+  private updateDescendant2DTransforms(vr: ViewportRendererService, parent: NodeBase): void {
+    for (const child of parent.children) {
+      if (child instanceof Node2D) {
+        vr.updateNodeTransform(child);
+      }
+      this.updateDescendant2DTransforms(vr, child);
+    }
   }
 
   private validatePropertyUpdate(

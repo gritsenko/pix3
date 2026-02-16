@@ -148,6 +148,11 @@ export class Group2D extends Node2D {
       this._width = value;
       // Recalculate offsets to maintain current position with new size
       this._recalcOffsetsFromSize();
+      for (const child of this.children) {
+        if (child instanceof Group2D) {
+          child.updateLayout(this._width, this._height);
+        }
+      }
     }
   }
 
@@ -159,6 +164,11 @@ export class Group2D extends Node2D {
     if (this._height !== value) {
       this._height = value;
       this._recalcOffsetsFromSize();
+      for (const child of this.children) {
+        if (child instanceof Group2D) {
+          child.updateLayout(this._width, this._height);
+        }
+      }
     }
   }
 
