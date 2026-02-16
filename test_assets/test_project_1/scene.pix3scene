@@ -89,7 +89,7 @@ root:
         name: Joystick2D
         properties:
           transform:
-            position: [100, 100]
+            position: [0, 0]
             scale: [1, 1]
             rotation: 0
         children: []
@@ -100,10 +100,10 @@ root:
           width: 256
           height: 256
           layout:
-            offsetMin: [-152, -117]
-            offsetMax: [104, 139]
+            offsetMin: [17, 74]
+            offsetMax: [273, 330]
           transform:
-            position: [-24.210937499999687, 10.593749999999972]
+            position: [144.87580163893995, 201.69413310705957]
             scale: [1, 1]
             rotation: 0
         children:
@@ -118,3 +118,4 @@ root:
                 position: [19.62499999999997, 5.171875000000028]
                 scale: [1, 1]
                 rotation: 0
+            children: []
