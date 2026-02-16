@@ -356,6 +356,13 @@ Pix3 implements a comprehensive set of commands and operations organized by feat
 - **CreateSprite2DCommand**: Creates 2D sprite node
 - **AddModelCommand**: Adds model from asset browser to scene
 
+All scene creation commands share `scene-command-utils.ts` for:
+
+- active-scene preconditions (`requireActiveScene`)
+- created-node payload resolution from selection (`getCreatedNodeIdFromSelection`)
+
+This avoids duplicate precondition code and prevents incorrect node ID payloads when a new node is created under a non-root parent.
+
 ### Node Manipulation Commands
 
 - **DeleteObjectCommand**: Removes selected nodes from scene
@@ -389,6 +396,7 @@ Pix3 implements a comprehensive set of commands and operations organized by feat
 - **ToggleScriptEnabledCommand**: Toggles enabled state of a behavior or controller
 - **PlaySceneCommand**: Starts script execution loop
 - **StopSceneCommand**: Stops script execution loop
+- **SetPlayModeOperation**: Single source of truth for `ui.isPlaying` and `ui.playModeStatus`
 
 ## Script Component System
 
@@ -509,6 +517,7 @@ All script mutations use commands through CommandDispatcher:
 - **ToggleScriptEnabledCommand/Operation**: Enable/disable a component
 - **PlaySceneCommand**: Start script execution loop
 - **StopSceneCommand**: Stop script execution loop
+- **SetPlayModeOperation**: Update play-mode state through OperationService (used by play/stop commands and game tab lifecycle)
 
 ### Built-in Components
 
@@ -517,6 +526,12 @@ Pix3 includes example components for testing:
 - **core:TestRotate**: Rotates a 3D node continuously with configurable speed
 
 Additional components can be registered via `ScriptRegistry.registerComponent()`. Use `core:` prefix for built-in components and `user:` prefix for user-defined components.
+
+## Runtime Stability Notes (2026-02-16)
+
+- **ScriptExecutionService lifecycle fix**: stop/scene-switch now calls `onDetach()` for attached components and resets each component `_started` flag to guarantee `onStart()` runs on next play session.
+- **ViewportRenderService performance fix**: removed the 100ms active-scene polling loop and replaced it with reactive subscription-based scene sync.
+- **Subscription hygiene**: shell and status-bar components now store and dispose all Valtio/service subscriptions in `disconnectedCallback`, preventing listener accumulation across re-mounts/HMR.
 
 ## 2D/3D Navigation Mode
 

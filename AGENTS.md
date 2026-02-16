@@ -58,6 +58,7 @@ Examples:
 - Commands are thin wrappers that invoke operations
 - UI subscribes via `subscribe(appState.section, callback)` for reactive updates
 - Use `snapshot(appState)` for read-only checks
+- Always store and dispose subscription cleanup callbacks in component/service teardown methods (`disconnectedCallback`, `dispose`)
 
 ### Script Component System
 
@@ -81,6 +82,8 @@ Examples:
 - **CommandDispatcher Service** is the primary entry point for all actions. All UI and tools must use Commands via CommandDispatcher to ensure consistent lifecycle management, preconditions checking, and telemetry.
 - **Commands** are thin wrappers: `preconditions()` → `execute()` → OperationService via CommandDispatcher
 - Commands never implement their own undo/redo logic
+- **Play mode UI state** (`ui.isPlaying`, `ui.playModeStatus`) must be changed via `SetPlayModeOperation` (no direct writes in commands/services)
+- **Scene create commands** must use `scene-command-utils.ts` helpers for active-scene preconditions and created-node payload extraction
 
 ### Property Schema System (NEW)
 
@@ -127,6 +130,7 @@ src/
       UpdateObjectPropertyCommand.ts
       UpdateObjectPropertyOperation.ts
     scene/
+      scene-command-utils.ts      # Shared create-scene command helpers
       LoadSceneCommand.ts
     scripts/
       AttachBehaviorCommand.ts
@@ -136,6 +140,7 @@ src/
       DetachBehaviorCommand.ts
       DetachBehaviorOperation.ts
       PlaySceneCommand.ts
+      SetPlayModeOperation.ts
       SetControllerCommand.ts
       SetControllerOperation.ts
       StopSceneCommand.ts
@@ -260,6 +265,7 @@ src/
 - <6s cold start, <80ms command latency
 - WCAG 2.1 AA compliance (keyboard nav, ARIA, high-contrast)
 - Chromium-only for MVP
+- Prefer reactive subscriptions over fixed polling loops for app-state synchronization
 
 ## Key Integration Points
 
@@ -287,6 +293,8 @@ src/
 13. **Property schemas define node properties** — Node classes must implement `static getPropertySchema()`. Inspector consumes via `getNodePropertySchema()`. Schema's getValue/setValue handle all property access and transformation (e.g., radian/degree conversion).
 14. **Unified component system** — All scripts are `ScriptComponent` instances. Use `Script` base class for new components. Use `node.addComponent()`, `node.removeComponent()`, `node.getComponent<T>()` for component management. Legacy `behaviors`/`controller` APIs maintained for backward compatibility.
 15. **Never use `any` types** — Always provide explicit types. When dealing with external libraries or dynamic structures, use `unknown` with type guards or cast to specific interfaces/types. This prevents `@typescript-eslint/no-explicit-any` lint errors and improves type safety.
+16. **Never infer created node IDs from root-node array order** — use selection-based extraction (`getCreatedNodeIdFromSelection`) after successful create operations.
+17. **Script lifecycle teardown must be explicit** — stop/scene-switch paths must call component `onDetach()` and reset started state so `onStart()` runs on the next play session.
 
 Always verify architectural decisions against the specification before implementing features.
 
@@ -304,6 +312,7 @@ Always verify architectural decisions against the specification before implement
 - Menu is generated automatically from registered commands — no hardcoded menu structure
 - To add a command to menu: set metadata properties and register with registry
 - Menu items execute commands through `CommandDispatcher` for consistent lifecycle
+- For UWP target builds, avoid `F5`/`Shift+F5` command shortcuts (reserved for app refresh/debug flows)
 
 ### Browser Interaction
 

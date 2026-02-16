@@ -9,7 +9,7 @@ import {
   AddModelOperation,
   type AddModelOperationParams,
 } from '@/features/scene/AddModelOperation';
-import { SceneManager } from '@pix3/runtime';
+import { requireActiveScene } from '@/features/scene/scene-command-utils';
 
 export type AddModelCommandPayload = object;
 
@@ -29,18 +29,7 @@ export class AddModelCommand extends CommandBase<AddModelCommandPayload, void> {
   }
 
   preconditions(context: CommandContext) {
-    const sceneManager = context.container.getService<SceneManager>(
-      context.container.getOrCreateToken(SceneManager)
-    );
-    const hasActiveScene = Boolean(sceneManager.getActiveSceneGraph());
-    if (!hasActiveScene) {
-      return {
-        canExecute: false,
-        reason: 'An active scene is required to add a model',
-        scope: 'scene' as const,
-      };
-    }
-    return { canExecute: true };
+    return requireActiveScene(context, 'An active scene is required to add a model');
   }
 
   async execute(context: CommandContext): Promise<CommandExecutionResult<AddModelCommandPayload>> {

@@ -12,8 +12,14 @@ import {
   type ComponentPickerInstance,
 } from '@/services/BehaviorPickerService';
 import { ScriptCreatorService, type ScriptCreationInstance } from '@/services/ScriptCreatorService';
-import { ProjectSettingsService, type ProjectSettingsDialogInstance } from '@/services/ProjectSettingsService';
-import { EditorSettingsService, type EditorSettingsDialogInstance } from '@/services/EditorSettingsService';
+import {
+  ProjectSettingsService,
+  type ProjectSettingsDialogInstance,
+} from '@/services/ProjectSettingsService';
+import {
+  EditorSettingsService,
+  type EditorSettingsDialogInstance,
+} from '@/services/EditorSettingsService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { ScriptCompilerService } from '@/services/ScriptCompilerService';
@@ -120,7 +126,12 @@ export class Pix3EditorShell extends ComponentBase {
 
   private disposeSubscription?: () => void;
   private disposeScenesSubscription?: () => void;
+  private disposeProjectSubscription?: () => void;
   private disposeDialogsSubscription?: () => void;
+  private disposeProjectSettingsSubscription?: () => void;
+  private disposeEditorSettingsSubscription?: () => void;
+  private disposeBehaviorPickerSubscription?: () => void;
+  private disposeScriptCreatorSubscription?: () => void;
   private onWelcomeProjectReady?: (e: Event) => void;
   private keyboardHandler?: (e: KeyboardEvent) => void;
   private watchedSceneIds = new Set<string>();
@@ -165,12 +176,12 @@ export class Pix3EditorShell extends ComponentBase {
     });
 
     // Subscribe to project settings dialog changes
-    this.projectSettingsService.subscribe(dialog => {
+    this.disposeProjectSettingsSubscription = this.projectSettingsService.subscribe(dialog => {
       this.activeProjectSettingsDialog = dialog;
       this.requestUpdate();
     });
 
-    this.editorSettingsService.subscribe(dialog => {
+    this.disposeEditorSettingsSubscription = this.editorSettingsService.subscribe(dialog => {
       this.activeEditorSettingsDialog = dialog;
       this.requestUpdate();
     });
@@ -180,13 +191,13 @@ export class Pix3EditorShell extends ComponentBase {
     void this._scriptCompiler;
 
     // Subscribe to component picker changes
-    this.behaviorPickerService.subscribe(pickers => {
+    this.disposeBehaviorPickerSubscription = this.behaviorPickerService.subscribe(pickers => {
       this.componentPickers = pickers;
       this.requestUpdate();
     });
 
     // Subscribe to script creator changes
-    this.scriptCreatorService.subscribe(creators => {
+    this.disposeScriptCreatorSubscription = this.scriptCreatorService.subscribe(creators => {
       this.scriptCreators = creators;
       this.requestUpdate();
     });
@@ -206,7 +217,7 @@ export class Pix3EditorShell extends ComponentBase {
       this.requestUpdate();
     });
     // also subscribe to project state so we can initialize layout once a project is opened
-    subscribe(appState.project, () => {
+    this.disposeProjectSubscription = subscribe(appState.project, () => {
       // if project becomes ready and layout has not been initialized, initialize it
       if (appState.project.status === 'ready') {
         // ensure URL reflects editor state so HMR / page reload keeps us in the editor
@@ -229,7 +240,7 @@ export class Pix3EditorShell extends ComponentBase {
               this.tabsInitialized = true;
 
               if (appState.project.id) {
-                // Wait for project scripts to be compiled before restoring the session 
+                // Wait for project scripts to be compiled before restoring the session
                 // to ensure custom components are available in the ScriptRegistry.
                 await this.waitForScripts();
                 await this.editorTabService.restoreProjectSession(appState.project.id);
@@ -291,8 +302,18 @@ export class Pix3EditorShell extends ComponentBase {
     this.disposeSubscription = undefined;
     this.disposeScenesSubscription?.();
     this.disposeScenesSubscription = undefined;
+    this.disposeProjectSubscription?.();
+    this.disposeProjectSubscription = undefined;
     this.disposeDialogsSubscription?.();
     this.disposeDialogsSubscription = undefined;
+    this.disposeProjectSettingsSubscription?.();
+    this.disposeProjectSettingsSubscription = undefined;
+    this.disposeEditorSettingsSubscription?.();
+    this.disposeEditorSettingsSubscription = undefined;
+    this.disposeBehaviorPickerSubscription?.();
+    this.disposeBehaviorPickerSubscription = undefined;
+    this.disposeScriptCreatorSubscription?.();
+    this.disposeScriptCreatorSubscription = undefined;
     if (this.onWelcomeProjectReady) {
       this.removeEventListener(
         'pix3-welcome:project-ready',
@@ -538,8 +559,8 @@ export class Pix3EditorShell extends ComponentBase {
         @component-picker-create-new=${(e: CustomEvent) => this.onComponentPickerCreateNew(e)}
       >
         ${this.componentPickers.map(
-      picker => html` <pix3-behavior-picker .pickerId=${picker.id}></pix3-behavior-picker> `
-    )}
+          picker => html` <pix3-behavior-picker .pickerId=${picker.id}></pix3-behavior-picker> `
+        )}
       </div>
     `;
   }
@@ -577,13 +598,13 @@ export class Pix3EditorShell extends ComponentBase {
         @script-create-cancelled=${(e: CustomEvent) => this.onScriptCreateCancelled(e)}
       >
         ${this.scriptCreators.map(
-      creator => html`
+          creator => html`
             <pix3-script-creator
               .dialogId=${creator.id}
               .defaultName=${creator.params.defaultName || creator.params.scriptName}
             ></pix3-script-creator>
           `
-    )}
+        )}
       </div>
     `;
   }
@@ -607,7 +628,7 @@ export class Pix3EditorShell extends ComponentBase {
         @dialog-secondary=${(e: CustomEvent) => this.onDialogSecondary(e)}
       >
         ${this.dialogs.map(
-      dialog => html`
+          dialog => html`
             <pix3-confirm-dialog
               .dialogId=${dialog.id}
               .title=${dialog.options.title}
@@ -619,7 +640,7 @@ export class Pix3EditorShell extends ComponentBase {
               .secondaryIsDangerous=${dialog.options.secondaryIsDangerous || false}
             ></pix3-confirm-dialog>
           `
-    )}
+        )}
       </div>
     `;
   }
@@ -652,10 +673,7 @@ export class Pix3EditorShell extends ComponentBase {
    * Waits for project scripts to reach 'ready' or 'error' state.
    */
   private async waitForScripts(): Promise<void> {
-    if (
-      appState.project.scriptsStatus === 'ready' ||
-      appState.project.scriptsStatus === 'error'
-    ) {
+    if (appState.project.scriptsStatus === 'ready' || appState.project.scriptsStatus === 'error') {
       return;
     }
 

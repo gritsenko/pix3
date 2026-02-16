@@ -72,7 +72,7 @@ export class ScriptExecutionService {
       this.restoreNodeState(scene);
     }
 
-    this.nodeStateSnapshots.delete(this.currentSceneId ?? '');
+    this.nodeStateSnapshots.delete(this.getSnapshotKey(this.currentSceneId));
 
     // Detach all scripts from current scene
     this.detachScriptsFromScene();
@@ -179,11 +179,9 @@ export class ScriptExecutionService {
    * Detach scripts from all nodes in the current scene (call onDetach)
    */
   private detachScriptsFromScene(): void {
-    if (!this.currentSceneId) {
-      return;
-    }
-
-    const scene = this.sceneManager.getSceneGraph(this.currentSceneId);
+    const scene = this.currentSceneId
+      ? this.sceneManager.getSceneGraph(this.currentSceneId)
+      : this.sceneManager.getActiveSceneGraph();
     if (!scene) {
       return;
     }
@@ -201,6 +199,20 @@ export class ScriptExecutionService {
    * Recursively detach scripts from a node and its children
    */
   private detachScriptsFromNode(node: NodeBase): void {
+    for (const component of node.components) {
+      if (component.onDetach) {
+        try {
+          component.onDetach();
+        } catch (error) {
+          console.error('[ScriptExecutionService] Component onDetach failed', {
+            componentId: component.id,
+            nodeId: node.nodeId,
+            error,
+          });
+        }
+      }
+    }
+
     // Recursively detach from children
     for (const child of node.children) {
       if (child instanceof NodeBase) {
@@ -213,6 +225,14 @@ export class ScriptExecutionService {
    * Recursively reset started state for all scripts in a node and its children
    */
   private resetScriptStartedState(node: NodeBase): void {
+    for (const component of node.components) {
+      if (component.resetStartedState) {
+        component.resetStartedState();
+      } else {
+        component._started = false;
+      }
+    }
+
     // Recursively reset children
     for (const child of node.children) {
       if (child instanceof NodeBase) {
@@ -238,7 +258,7 @@ export class ScriptExecutionService {
       this.captureNodeStateRecursive(rootNode, snapshots);
     }
 
-    this.nodeStateSnapshots.set(this.currentSceneId ?? '', snapshots);
+    this.nodeStateSnapshots.set(this.getSnapshotKey(this.currentSceneId), snapshots);
     console.debug('[ScriptExecutionService] Captured state for', snapshots.length, 'nodes');
   }
 
@@ -266,7 +286,7 @@ export class ScriptExecutionService {
    * Restore the captured state of all nodes in the scene
    */
   private restoreNodeState(scene: SceneGraph): void {
-    const sceneId = this.currentSceneId ?? '';
+    const sceneId = this.getSnapshotKey(this.currentSceneId);
     const snapshots = this.nodeStateSnapshots.get(sceneId);
 
     if (!snapshots) {
@@ -310,5 +330,9 @@ export class ScriptExecutionService {
     }
 
     return restoredCount;
+  }
+
+  private getSnapshotKey(sceneId: string | null): string {
+    return sceneId ?? '__active_scene__';
   }
 }

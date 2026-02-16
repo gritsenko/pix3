@@ -6,6 +6,8 @@ import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
+import { OperationService } from '@/services/OperationService';
+import { SetPlayModeOperation } from '@/features/scripts/SetPlayModeOperation';
 import { SceneManager } from '@pix3/runtime';
 import { subscribe } from 'valtio/vanilla';
 
@@ -27,6 +29,9 @@ export class EditorTabService {
 
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
+
+  @inject(OperationService)
+  private readonly operationService!: OperationService;
 
   private disposeSceneSubscription?: () => void;
   private disposeLayoutSubscription?: () => void;
@@ -167,7 +172,11 @@ export class EditorTabService {
 
       // Skip template tabs (templ://) — they should not be restored.
       const tabsToRestore = (
-        session.tabs as Array<{ type: string; resourceId: string; contextState?: EditorTab['contextState'] }>
+        session.tabs as Array<{
+          type: string;
+          resourceId: string;
+          contextState?: EditorTab['contextState'];
+        }>
       ).filter((t: { resourceId: string; type: string }) => {
         if (t.resourceId.startsWith('templ://')) return false;
         if (t.type === 'game') return false;
@@ -185,7 +194,10 @@ export class EditorTabService {
       if (session.activeTabId) {
         await this.focusTab(session.activeTabId);
       } else if (tabsToRestore.length > 0) {
-        const firstTabId = this.deriveTabId(tabsToRestore[0].type as EditorTabType, tabsToRestore[0].resourceId);
+        const firstTabId = this.deriveTabId(
+          tabsToRestore[0].type as EditorTabType,
+          tabsToRestore[0].resourceId
+        );
         await this.focusTab(firstTabId);
       }
 
@@ -214,8 +226,12 @@ export class EditorTabService {
     }
 
     if (tab.type === 'game') {
-      appState.ui.isPlaying = false;
-      appState.ui.playModeStatus = 'stopped';
+      await this.operationService.invoke(
+        new SetPlayModeOperation({
+          isPlaying: false,
+          status: 'stopped',
+        })
+      );
     }
 
     // If closing active tab, save camera/selection before removal.

@@ -9,7 +9,10 @@ import {
   CreatePointLightOperation,
   type CreatePointLightOperationParams,
 } from '@/features/scene/CreatePointLightOperation';
-import { SceneManager } from '@pix3/runtime';
+import {
+  getCreatedNodeIdFromSelection,
+  requireActiveScene,
+} from '@/features/scene/scene-command-utils';
 
 export interface CreatePointLightCommandPayload {
   nodeId: string;
@@ -31,18 +34,7 @@ export class CreatePointLightCommand extends CommandBase<CreatePointLightCommand
   }
 
   preconditions(context: CommandContext) {
-    const sceneManager = context.container.getService<SceneManager>(
-      context.container.getOrCreateToken(SceneManager)
-    );
-    const hasActiveScene = Boolean(sceneManager.getActiveSceneGraph());
-    if (!hasActiveScene) {
-      return {
-        canExecute: false,
-        reason: 'An active scene is required to create a point light',
-        scope: 'scene' as const,
-      };
-    }
-    return { canExecute: true };
+    return requireActiveScene(context, 'An active scene is required to create a point light');
   }
 
   async execute(
@@ -51,15 +43,10 @@ export class CreatePointLightCommand extends CommandBase<CreatePointLightCommand
     const operationService = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );
-    const sceneManager = context.container.getService<SceneManager>(
-      context.container.getOrCreateToken(SceneManager)
-    );
 
     const op = new CreatePointLightOperation(this.params);
     const pushed = await operationService.invokeAndPush(op);
-
-    const activeSceneGraph = sceneManager.getActiveSceneGraph();
-    const nodeId = activeSceneGraph?.rootNodes[activeSceneGraph.rootNodes.length - 1]?.nodeId || '';
+    const nodeId = getCreatedNodeIdFromSelection(context, pushed);
 
     return { didMutate: pushed, payload: { nodeId } };
   }

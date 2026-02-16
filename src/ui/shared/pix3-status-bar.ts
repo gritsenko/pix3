@@ -28,14 +28,17 @@ export class Pix3StatusBar extends ComponentBase {
 
   private messageTimeout: number | null = null;
   private disposeLogListener?: () => void;
-  private disposeStateSubscription?: () => void;
+  private disposeProjectSubscription?: () => void;
+  private disposeUiSubscription?: () => void;
 
   connectedCallback() {
     super.connectedCallback();
 
-    // Subscribe to project name changes
-    this.disposeStateSubscription = subscribe(appState.project, () => {
+    this.disposeProjectSubscription = subscribe(appState.project, () => {
       this.projectName = appState.project.projectName;
+    });
+
+    this.disposeUiSubscription = subscribe(appState.ui, () => {
       this.isPlaying = appState.ui.isPlaying;
     });
 
@@ -57,7 +60,8 @@ export class Pix3StatusBar extends ComponentBase {
 
   disconnectedCallback() {
     this.disposeLogListener?.();
-    this.disposeStateSubscription?.();
+    this.disposeProjectSubscription?.();
+    this.disposeUiSubscription?.();
     if (this.messageTimeout !== null) {
       window.clearTimeout(this.messageTimeout);
     }

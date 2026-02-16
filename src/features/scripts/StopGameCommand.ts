@@ -1,49 +1,65 @@
 import {
-    CommandBase,
-    type CommandExecutionResult,
+  CommandBase,
+  type CommandExecutionResult,
+  type CommandContext,
+  type CommandPreconditionResult,
+  type CommandMetadata,
 } from '@/core/command';
-import { appState } from '@/state';
 import { EditorTabService } from '@/services/EditorTabService';
+import { OperationService } from '@/services/OperationService';
+import { SetPlayModeOperation } from '@/features/scripts/SetPlayModeOperation';
 
 export class StopGameCommand extends CommandBase<void, void> {
-    readonly metadata = {
-        id: 'game.stop',
-        title: 'Stop Game',
-        description: 'Stop the game and close the tab',
-        keywords: ['stop', 'game', 'close'],
-        menuPath: 'game',
-        shortcut: 'Shift+F5',
-        addToMenu: true,
-        menuOrder: 101,
+  readonly metadata: CommandMetadata = {
+    id: 'game.stop',
+    title: 'Stop Game',
+    description: 'Stop the game and close the tab',
+    keywords: ['stop', 'game', 'close'],
+    menuPath: 'game',
+    shortcut: 'Ctrl+Shift+Enter',
+    addToMenu: true,
+    menuOrder: 101,
+  };
+
+  private readonly editorTabService: EditorTabService;
+
+  constructor(editorTabService: EditorTabService) {
+    super();
+    this.editorTabService = editorTabService;
+  }
+
+  preconditions(context: CommandContext): CommandPreconditionResult {
+    if (!context.snapshot.ui.isPlaying) {
+      return {
+        canExecute: false,
+        reason: 'Game is not running',
+        scope: 'scene',
+        recoverable: false,
+      };
+    }
+
+    return { canExecute: true };
+  }
+
+  async execute(context: CommandContext): Promise<CommandExecutionResult<void>> {
+    const operationService = context.container.getService<OperationService>(
+      context.container.getOrCreateToken(OperationService)
+    );
+
+    await operationService.invoke(
+      new SetPlayModeOperation({
+        isPlaying: false,
+        status: 'stopped',
+      })
+    );
+
+    const gameTabResourceId = 'game-view-instance';
+    const tabId = `game:${gameTabResourceId}`;
+    await this.editorTabService.closeTab(tabId);
+
+    return {
+      didMutate: true,
+      payload: undefined,
     };
-
-    private readonly editorTabService: EditorTabService;
-
-    constructor(editorTabService: EditorTabService) {
-        super();
-        this.editorTabService = editorTabService;
-    }
-
-    async execute(): Promise<CommandExecutionResult<void>> {
-        console.log('[StopGameCommand] Stopping game mode...');
-
-        // 1. Update global state
-        appState.ui.isPlaying = false;
-        appState.ui.playModeStatus = 'stopped';
-
-        // 2. Close Game Tab
-        // We need to find the tab ID for the game view.
-        // EditorTabService creates IDs as `${type}:${resourceId}`
-        const gameTabResourceId = 'game-view-instance';
-        const tabId = `game:${gameTabResourceId}`;
-
-        await this.editorTabService.closeTab(tabId);
-
-        console.log('[StopGameCommand] Game mode stopped.');
-
-        return {
-            didMutate: false,
-            payload: undefined,
-        };
-    }
+  }
 }

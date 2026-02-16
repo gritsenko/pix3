@@ -6,7 +6,8 @@ import {
   type CommandPreconditionResult,
 } from '@/core/command';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
-import { appState } from '@/state';
+import { OperationService } from '@/services/OperationService';
+import { SetPlayModeOperation } from '@/features/scripts/SetPlayModeOperation';
 
 export class StopSceneCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
@@ -15,7 +16,7 @@ export class StopSceneCommand extends CommandBase<void, void> {
     description: 'Stop script execution for the entire scene',
     keywords: ['stop', 'pause', 'halt', 'scripts'],
     menuPath: 'scene',
-    shortcut: 'Shift+F5',
+    shortcut: 'Ctrl+Shift+Enter',
     addToMenu: true,
     menuOrder: 101,
   };
@@ -27,8 +28,8 @@ export class StopSceneCommand extends CommandBase<void, void> {
     this.scriptExecution = scriptExecution;
   }
 
-  preconditions(_context: CommandContext): CommandPreconditionResult {
-    if (!appState.ui.isPlaying) {
+  preconditions(context: CommandContext): CommandPreconditionResult {
+    if (!context.snapshot.ui.isPlaying) {
       return {
         canExecute: false,
         reason: 'Scene is not playing',
@@ -40,12 +41,21 @@ export class StopSceneCommand extends CommandBase<void, void> {
     return { canExecute: true };
   }
 
-  async execute(_context: CommandContext): Promise<CommandExecutionResult<void>> {
-    appState.ui.isPlaying = false;
+  async execute(context: CommandContext): Promise<CommandExecutionResult<void>> {
+    const operationService = context.container.getService<OperationService>(
+      context.container.getOrCreateToken(OperationService)
+    );
+
+    await operationService.invoke(
+      new SetPlayModeOperation({
+        isPlaying: false,
+        status: 'stopped',
+      })
+    );
     this.scriptExecution.stop();
 
     return {
-      didMutate: false,
+      didMutate: true,
       payload: undefined,
     };
   }

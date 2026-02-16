@@ -81,7 +81,6 @@ export class ViewportRendererService {
   // Hover preview frame for 2D nodes (before selection)
   private hoverPreview2D?: { nodeId: string; frame: THREE.LineSegments };
   private animationId?: number;
-  private pollIntervalId?: number;
   private isPaused = true;
   private disposers: Array<() => void> = [];
   private gridHelper?: THREE.GridHelper;
@@ -249,8 +248,7 @@ export class ViewportRendererService {
 
     // Render loop will start on first attach/resume
 
-    // Poll active scene ID for changes (avoid subscribing to entire scenes object to prevent feedback loops)
-    const checkSceneChanges = () => {
+    const syncIfActiveSceneChanged = () => {
       const currentSceneId = appState.scenes.activeSceneId;
       if (currentSceneId !== this.lastActiveSceneId) {
         this.lastActiveSceneId = currentSceneId;
@@ -258,13 +256,10 @@ export class ViewportRendererService {
       }
     };
 
-    this.pollIntervalId = window.setInterval(checkSceneChanges, 100);
-    this.disposers.push(() => {
-      if (this.pollIntervalId) {
-        clearInterval(this.pollIntervalId);
-        this.pollIntervalId = undefined;
-      }
+    const unsubscribeScenes = subscribe(appState.scenes, () => {
+      syncIfActiveSceneChanged();
     });
+    this.disposers.push(unsubscribeScenes);
 
     // Subscribe to selection changes
     const unsubscribeSelection = subscribe(appState.selection, () => {
@@ -289,7 +284,7 @@ export class ViewportRendererService {
     this.syncNavigationMode();
 
     // Initial sync
-    checkSceneChanges();
+    syncIfActiveSceneChanged();
   }
 
   getCanvasElement(): HTMLCanvasElement | undefined {
