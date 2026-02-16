@@ -9,6 +9,7 @@ import { SceneManager } from '@pix3/runtime';
 import { AssetLoader } from '@pix3/runtime';
 import { getAppStateSnapshot } from '@/state';
 import { ref } from 'valtio/vanilla';
+import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
 
 export interface AddModelOperationParams {
   modelPath: string; // res:// path to .glb/.gltf file
@@ -63,9 +64,8 @@ export class AddModelOperation implements Operation<OperationInvokeResult> {
       return { didMutate: false };
     }
 
-    // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
-    sceneGraph.nodeMap.set(nodeId, node);
+    const targetParent = resolveDefault3DParent(sceneGraph);
+    attachNode(sceneGraph, node, targetParent);
 
     // Update the state hierarchy - REPLACE the entire object to trigger reactivity
     const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -97,12 +97,7 @@ export class AddModelOperation implements Operation<OperationInvokeResult> {
         beforeSnapshot,
         afterSnapshot,
         undo: () => {
-          // Remove node from scene graph
-          const idx = sceneGraph.rootNodes.indexOf(node);
-          if (idx >= 0) {
-            sceneGraph.rootNodes.splice(idx, 1);
-          }
-          sceneGraph.nodeMap.delete(nodeId);
+          detachNode(sceneGraph, node, targetParent);
 
           // Update state hierarchy - replace to trigger reactivity
           if (hierarchy) {
@@ -121,9 +116,7 @@ export class AddModelOperation implements Operation<OperationInvokeResult> {
           }
         },
         redo: () => {
-          // Re-add node to scene graph
-          sceneGraph.rootNodes.push(node);
-          sceneGraph.nodeMap.set(nodeId, node);
+          attachNode(sceneGraph, node, targetParent);
 
           // Update state hierarchy - replace to trigger reactivity
           if (hierarchy) {

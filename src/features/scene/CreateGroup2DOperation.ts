@@ -8,6 +8,13 @@ import { Group2D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { Vector2 } from 'three';
+import {
+  attachNode,
+  detachNode,
+  removeAutoCreatedLayoutIfUnused,
+  resolveDefault2DParent,
+  restoreAutoCreatedLayout,
+} from '@/features/scene/node-placement';
 
 export interface CreateGroup2DOperationParams {
   groupName?: string;
@@ -63,9 +70,8 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
       position: this.params.position,
     });
 
-    // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
-    sceneGraph.nodeMap.set(nodeId, node);
+    const { parent: targetParent, createdLayout } = resolveDefault2DParent(sceneGraph);
+    attachNode(sceneGraph, node, targetParent);
 
     // Update the state hierarchy - REPLACE the entire object to trigger reactivity
     const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -94,9 +100,8 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
       commit: {
         label: `Create ${groupName}`,
         undo: () => {
-          // Remove from scene graph
-          sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
-          sceneGraph.nodeMap.delete(nodeId);
+          detachNode(sceneGraph, node, targetParent);
+          removeAutoCreatedLayoutIfUnused(sceneGraph, createdLayout);
 
           // Update state hierarchy
           const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -122,9 +127,8 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
           }
         },
         redo: () => {
-          // Re-add to scene graph
-          sceneGraph.rootNodes.push(node);
-          sceneGraph.nodeMap.set(nodeId, node);
+          restoreAutoCreatedLayout(sceneGraph, createdLayout);
+          attachNode(sceneGraph, node, targetParent);
 
           // Update state hierarchy
           const hierarchy = state.scenes.hierarchies[activeSceneId];

@@ -8,6 +8,7 @@ import { SpotLightNode } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { Vector3 } from 'three';
+import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
 
 export interface CreateSpotLightOperationParams {
   lightName?: string;
@@ -78,9 +79,8 @@ export class CreateSpotLightOperation implements Operation<OperationInvokeResult
       node.position.copy(this.params.position);
     }
 
-    // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
-    sceneGraph.nodeMap.set(nodeId, node);
+    const targetParent = resolveDefault3DParent(sceneGraph);
+    attachNode(sceneGraph, node, targetParent);
 
     // Update the state hierarchy
     const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -108,8 +108,7 @@ export class CreateSpotLightOperation implements Operation<OperationInvokeResult
       commit: {
         label: `Create ${lightName}`,
         undo: () => {
-          sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
-          sceneGraph.nodeMap.delete(nodeId);
+          detachNode(sceneGraph, node, targetParent);
 
           const currentHierarchy = state.scenes.hierarchies[activeSceneId];
           if (currentHierarchy) {
@@ -125,8 +124,7 @@ export class CreateSpotLightOperation implements Operation<OperationInvokeResult
           state.selection.nodeIds = state.selection.nodeIds.filter(id => id !== nodeId);
         },
         redo: () => {
-          sceneGraph.rootNodes.push(node);
-          sceneGraph.nodeMap.set(nodeId, node);
+          attachNode(sceneGraph, node, targetParent);
 
           const currentHierarchy = state.scenes.hierarchies[activeSceneId];
           if (currentHierarchy) {

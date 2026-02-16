@@ -79,7 +79,10 @@ export class EditorTabComponent extends ComponentBase {
     });
 
     this.addEventListener('keydown', this.handleKeyDown);
-    this.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+    this.addEventListener('wheel', this.handleWheel as EventListener, {
+      passive: false,
+      capture: true,
+    });
     this.addEventListener('pointerdown', this.handleCanvasPointerDown);
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
     this.addEventListener('pointerup', this.handleCanvasPointerUp);
@@ -123,7 +126,10 @@ export class EditorTabComponent extends ComponentBase {
       }
     }
     // Ensure wheel events are captured inside the shadow root.
-    this.renderRoot.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+    this.renderRoot.addEventListener('wheel', this.handleWheel as EventListener, {
+      passive: false,
+      capture: true,
+    });
     this.syncActiveState();
   }
 
@@ -254,7 +260,10 @@ export class EditorTabComponent extends ComponentBase {
     if (canvas && canvas !== this.wheelCanvas) {
       this.wheelCanvas?.removeEventListener('wheel', this.handleWheel as EventListener, true);
       this.wheelCanvas = canvas;
-      this.wheelCanvas.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+      this.wheelCanvas.addEventListener('wheel', this.handleWheel as EventListener, {
+        passive: false,
+        capture: true,
+      });
     }
 
     const rect = this.getBoundingClientRect();

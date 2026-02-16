@@ -8,6 +8,7 @@ import { Camera3D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { Vector3 } from 'three';
+import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
 
 export interface CreateCamera3DOperationParams {
   cameraName?: string;
@@ -62,9 +63,8 @@ export class CreateCamera3DOperation implements Operation<OperationInvokeResult>
       fov,
     });
 
-    // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
-    sceneGraph.nodeMap.set(nodeId, node);
+    const targetParent = resolveDefault3DParent(sceneGraph);
+    attachNode(sceneGraph, node, targetParent);
 
     // Update the state hierarchy - REPLACE the entire object to trigger reactivity
     const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -93,9 +93,7 @@ export class CreateCamera3DOperation implements Operation<OperationInvokeResult>
       commit: {
         label: `Create ${cameraName}`,
         undo: () => {
-          // Remove from scene graph
-          sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
-          sceneGraph.nodeMap.delete(nodeId);
+          detachNode(sceneGraph, node, targetParent);
 
           // Update state hierarchy
           const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -121,9 +119,7 @@ export class CreateCamera3DOperation implements Operation<OperationInvokeResult>
           }
         },
         redo: () => {
-          // Re-add to scene graph
-          sceneGraph.rootNodes.push(node);
-          sceneGraph.nodeMap.set(nodeId, node);
+          attachNode(sceneGraph, node, targetParent);
 
           // Update state hierarchy
           const hierarchy = state.scenes.hierarchies[activeSceneId];

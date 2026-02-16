@@ -4,11 +4,19 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
+import type { Layout2D } from '@pix3/runtime';
 import type { NodeBase } from '@pix3/runtime';
 import { Sprite2D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { Vector2 } from 'three';
+import {
+  attachNode,
+  detachNode,
+  removeAutoCreatedLayoutIfUnused,
+  resolveDefault2DParent,
+  restoreAutoCreatedLayout,
+} from '@/features/scene/node-placement';
 
 export interface CreateSprite2DOperationParams {
   spriteName?: string;
@@ -65,6 +73,14 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
 
     const parentNodeId = this.params.parentNodeId ?? null;
     const parentNode = parentNodeId ? (sceneGraph.nodeMap.get(parentNodeId) ?? null) : null;
+    let autoCreatedLayout: Layout2D | null = null;
+    const targetParent =
+      parentNode ??
+      (() => {
+        const result = resolveDefault2DParent(sceneGraph);
+        autoCreatedLayout = result.createdLayout;
+        return result.parent;
+      })();
 
     const updateHierarchyState = () => {
       const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -97,29 +113,19 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       }
     };
 
-    const attachNode = (targetParent: NodeBase | null) => {
-      if (targetParent) {
-        targetParent.adoptChild(node);
-      } else {
-        sceneGraph.rootNodes.push(node);
-      }
-      sceneGraph.nodeMap.set(nodeId, node);
+    const attachCreatedNode = (targetParentNode: NodeBase | null) => {
+      attachNode(sceneGraph, node, targetParentNode);
       updateHierarchyState();
       markSceneDirty();
     };
 
-    const detachNode = (targetParent: NodeBase | null) => {
-      if (targetParent) {
-        targetParent.disownChild(node);
-      } else {
-        sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
-      }
-      sceneGraph.nodeMap.delete(nodeId);
+    const detachCreatedNode = (targetParentNode: NodeBase | null) => {
+      detachNode(sceneGraph, node, targetParentNode);
       updateHierarchyState();
       markSceneDirty();
     };
 
-    attachNode(parentNode);
+    attachCreatedNode(targetParent);
     selectCreatedNode();
 
     return {
@@ -127,11 +133,15 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       commit: {
         label: `Create ${spriteName}`,
         undo: () => {
-          detachNode(parentNode);
+          detachCreatedNode(targetParent);
+          removeAutoCreatedLayoutIfUnused(sceneGraph, autoCreatedLayout);
+          updateHierarchyState();
+          markSceneDirty();
           clearSelectionIfTargeted();
         },
         redo: () => {
-          attachNode(parentNode);
+          restoreAutoCreatedLayout(sceneGraph, autoCreatedLayout);
+          attachCreatedNode(targetParent);
           selectCreatedNode();
         },
       },

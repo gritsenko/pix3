@@ -7,6 +7,7 @@ import type {
 import { MeshInstance } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
+import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
 
 export interface CreateMeshInstanceOperationParams {
   meshName?: string;
@@ -57,9 +58,8 @@ export class CreateMeshInstanceOperation implements Operation<OperationInvokeRes
       src,
     });
 
-    // Add to the scene graph
-    sceneGraph.rootNodes.push(node);
-    sceneGraph.nodeMap.set(nodeId, node);
+    const targetParent = resolveDefault3DParent(sceneGraph);
+    attachNode(sceneGraph, node, targetParent);
 
     // Update the state hierarchy - REPLACE the entire object to trigger reactivity
     const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -88,9 +88,7 @@ export class CreateMeshInstanceOperation implements Operation<OperationInvokeRes
       commit: {
         label: `Create ${meshName}`,
         undo: () => {
-          // Remove from scene graph
-          sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n.nodeId !== nodeId);
-          sceneGraph.nodeMap.delete(nodeId);
+          detachNode(sceneGraph, node, targetParent);
 
           // Update state hierarchy
           const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -116,9 +114,7 @@ export class CreateMeshInstanceOperation implements Operation<OperationInvokeRes
           }
         },
         redo: () => {
-          // Re-add to scene graph
-          sceneGraph.rootNodes.push(node);
-          sceneGraph.nodeMap.set(nodeId, node);
+          attachNode(sceneGraph, node, targetParent);
 
           // Update state hierarchy
           const hierarchy = state.scenes.hierarchies[activeSceneId];

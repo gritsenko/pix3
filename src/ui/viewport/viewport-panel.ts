@@ -79,9 +79,15 @@ export class ViewportPanel extends ComponentBase {
     // Add keyboard shortcuts for transform modes
     this.addEventListener('keydown', this.handleKeyDown);
     // Add wheel listener for gesture control - use capture to ensure we get it before children
-    this.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+    this.addEventListener('wheel', this.handleWheel as EventListener, {
+      passive: false,
+      capture: true,
+    });
     // Temporary: capture wheel at window level to confirm event delivery in Golden Layout
-    window.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+    window.addEventListener('wheel', this.handleWheel as EventListener, {
+      passive: false,
+      capture: true,
+    });
     // Add pointer handlers for object selection (only on tap/click, not drag)
     this.addEventListener('pointerdown', this.handleCanvasPointerDown);
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
@@ -118,8 +124,14 @@ export class ViewportPanel extends ComponentBase {
 
     // Ensure wheel events are captured inside the shadow root and on the canvas.
     // Some browsers may not compose wheel events across shadow boundaries.
-    this.renderRoot.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
-    this.canvas.addEventListener('wheel', this.handleWheel as EventListener, { passive: false, capture: true });
+    this.renderRoot.addEventListener('wheel', this.handleWheel as EventListener, {
+      passive: false,
+      capture: true,
+    });
+    this.canvas.addEventListener('wheel', this.handleWheel as EventListener, {
+      passive: false,
+      capture: true,
+    });
 
     // Observe the component host (the element itself) instead of the canvas. When the
     // surrounding layout (Golden Layout splitters or window resizes) changes the host
@@ -484,7 +496,7 @@ export class ViewportPanel extends ComponentBase {
     // Detect two-finger pan: smooth deltaX/deltaY (trackpad) vs discrete (mouse wheel)
     // Trackpad events have deltaMode=0 (pixels) with smooth continuous deltas
     // Mouse wheel events have deltaMode=1 (lines) with discrete steps
-    
+
     // For trackpad gestures (pixels), apply pan immediately
     if (event.deltaMode === 0) {
       if (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) > 0) {
