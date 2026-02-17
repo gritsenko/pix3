@@ -62,6 +62,7 @@ export class AssetTree extends ComponentBase {
   private disposeSubscription?: () => void;
 
   private previousRootSignature: string | null = null;
+  private treeRefreshQueue: Promise<void> = Promise.resolve();
 
   private onWindowFocus = async (): Promise<void> => {
     await this.checkForExternalChanges();
@@ -198,6 +199,82 @@ export class AssetTree extends ComponentBase {
       .filter(segment => segment.length > 0 && segment !== '.');
   }
 
+  private normalizePath(path: string): string {
+    const normalized = path
+      .replace(/\\+/g, '/')
+      .replace(/^\.\//, '')
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '');
+    return normalized || '.';
+  }
+
+  private sortNodes(nodes: Node[]): Node[] {
+    return nodes.sort(
+      (a, b) =>
+        Number(b.kind === 'directory') - Number(a.kind === 'directory') ||
+        a.name.localeCompare(b.name)
+    );
+  }
+
+  private collectExpandedPaths(nodes: Node[], expandedPaths: Set<string>): void {
+    for (const node of nodes) {
+      if (node.kind === 'directory') {
+        if (node.expanded) {
+          expandedPaths.add(this.normalizePath(node.path));
+        }
+        if (node.children && node.children.length > 0) {
+          this.collectExpandedPaths(node.children, expandedPaths);
+        }
+      }
+    }
+  }
+
+  private async buildTreeFromExpandedPaths(
+    directoryPath: string,
+    expandedPaths: ReadonlySet<string>
+  ): Promise<Node[]> {
+    const entries = await this.listDirectory(directoryPath);
+    const nextNodes: Node[] = [];
+
+    for (const entry of entries) {
+      if (entry.kind === 'directory') {
+        const isExpanded = expandedPaths.has(this.normalizePath(entry.path));
+        const directoryNode: Node = {
+          name: entry.name,
+          path: entry.path,
+          kind: entry.kind,
+          expanded: isExpanded,
+          children: isExpanded ? [] : null,
+        };
+
+        if (isExpanded) {
+          directoryNode.children = await this.buildTreeFromExpandedPaths(entry.path, expandedPaths);
+        }
+
+        nextNodes.push(directoryNode);
+        continue;
+      }
+
+      nextNodes.push({
+        name: entry.name,
+        path: entry.path,
+        kind: entry.kind,
+        children: [],
+      });
+    }
+
+    return this.sortNodes(nextNodes);
+  }
+
+  private async runSerializedTreeRefresh(task: () => Promise<void>): Promise<void> {
+    const next = this.treeRefreshQueue.then(task, task);
+    this.treeRefreshQueue = next.then(
+      () => undefined,
+      () => undefined
+    );
+    await next;
+  }
+
   protected async firstUpdated(): Promise<void> {
     await this.loadRoot();
     // Subscribe only to lastModifiedDirectoryPath changes (file system changes)
@@ -227,10 +304,6 @@ export class AssetTree extends ComponentBase {
     // Listen for window focus and visibility changes to detect external file changes
     window.addEventListener('focus', this.onWindowFocus);
     document.addEventListener('visibilitychange', this.onVisibilityChange);
-
-    // Listen for window focus and visibility changes to detect external file changes
-    window.addEventListener('focus', this.onWindowFocus);
-    document.addEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   disconnectedCallback(): void {
@@ -246,69 +319,53 @@ export class AssetTree extends ComponentBase {
 
   private async listDirectory(path: string): Promise<FileDescriptor[]> {
     try {
-      return await this.projectService.listDirectory(path);
+      const entries = await this.projectService.listDirectory(path);
+      return entries.filter(entry => !this.shouldExcludeEntry(entry));
     } catch {
       return [];
     }
   }
 
+  private shouldExcludeEntry(entry: FileDescriptor): boolean {
+    const normalizedPath = this.normalizePath(entry.path);
+    const pathSegments = normalizedPath.split('/').filter(segment => segment.length > 0);
+
+    if (entry.name.startsWith('.')) {
+      return true;
+    }
+
+    if (entry.name === 'node_modules') {
+      return true;
+    }
+
+    if (pathSegments.some(segment => segment.startsWith('.'))) {
+      return true;
+    }
+
+    if (pathSegments.includes('node_modules')) {
+      return true;
+    }
+
+    return false;
+  }
+
   private async loadRoot(): Promise<void> {
-    const entries = await this.listDirectory(this.rootPath || '.');
-    this.tree = entries
-      .map(e => ({
-        name: e.name,
-        path: e.path,
-        kind: e.kind,
-        children: e.kind === 'directory' ? null : [],
-      }))
-      .sort(
-        (a, b) =>
-          Number(b.kind === 'directory') - Number(a.kind === 'directory') ||
-          a.name.localeCompare(b.name)
-      );
+    await this.runSerializedTreeRefresh(async () => {
+      const expandedPaths = new Set<string>();
+      this.collectExpandedPaths(this.tree, expandedPaths);
+
+      const nextTree = await this.buildTreeFromExpandedPaths(this.rootPath || '.', expandedPaths);
+      this.tree = nextTree;
+
+      if (this.selectedPath && !this.findNodeByPath(this.selectedPath)) {
+        this.selectedPath = null;
+      }
+    });
   }
 
   private async refreshDirectory(targetPath: string): Promise<void> {
-    // Find and refresh only the specific directory node
-    const refreshNode = async (nodes: Node[]): Promise<boolean> => {
-      for (const node of nodes) {
-        if (node.path === targetPath && node.kind === 'directory') {
-          // Reload this directory's children
-          console.debug('[AssetTree] Refreshing directory', { path: targetPath });
-          const entries = await this.listDirectory(node.path);
-          node.children = entries
-            .map(e => ({
-              name: e.name,
-              path: e.path,
-              kind: e.kind,
-              children: e.kind === 'directory' ? null : [],
-            }))
-            .sort(
-              (a, b) =>
-                Number(b.kind === 'directory') - Number(a.kind === 'directory') ||
-                a.name.localeCompare(b.name)
-            );
-          // Trigger update
-          this.tree = [...this.tree];
-          return true;
-        }
-        // Recursively search in children
-        if (node.children && node.children.length > 0) {
-          if (await refreshNode(node.children)) {
-            return true;
-          }
-        }
-      }
-      return false;
-    };
-
-    const found = await refreshNode(this.tree);
-    if (!found) {
-      console.debug('[AssetTree] Directory not found in tree, refreshing root', {
-        targetPath,
-      });
-      await this.loadRoot();
-    }
+    console.debug('[AssetTree] Refreshing tree from directory signal', { targetPath });
+    await this.loadRoot();
   }
 
   private async expandNode(node: Node): Promise<void> {

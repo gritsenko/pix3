@@ -89,29 +89,8 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
           const file = await fileHandle.getFile();
           lastModifiedTime = file.lastModified;
 
-          // Set the scene's parent directory as the project root so that
-          // relative res:// paths (like res://images/sprite.png) resolve correctly.
-          // Extract directory path from filePath (e.g., res://scenes/main.pix3scene -> res://scenes)
-          const dirMatch = filePath.match(/^(.+)[/\\]([^/\\]+)$/);
-          if (dirMatch) {
-            const dirPath = dirMatch[1];
-            // Only set project directory if the path is not just the scheme (e.g., not "res://")
-            if (dirPath !== 'res:' && dirPath !== 'res:/') {
-              try {
-                const dirHandle = await this.fileSystem.getDirectoryHandleForPath(dirPath, {
-                  mode: 'read',
-                });
-                this.fileSystem.setProjectDirectory(dirHandle);
-              } catch (err) {
-                // If we can't navigate to parent, that's okay - we'll try to load resources
-                // with fallback to network
-                console.debug(
-                  '[LoadSceneCommand] Could not set project directory from scene path:',
-                  err
-                );
-              }
-            }
-          }
+          // Do not mutate project root from the active scene path.
+          // FileSystemAPIService project directory must always remain the opened project root.
         }
       } catch (error) {
         // File handle retrieval failed, but we can still load the scene
