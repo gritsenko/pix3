@@ -3,7 +3,7 @@ import { ifDefined } from 'lit/directives/if-defined.js';
 import type { AssetActivation } from '@/services';
 import type { FileDescriptor } from '@/services/FileSystemAPIService';
 import { ProjectService } from '@/services/ProjectService';
-import { ResourceManager } from '@/services/ResourceManager';
+import { TemplateService, DEFAULT_TEMPLATE_SCENE_ID } from '@/services/TemplateService';
 import { DialogService } from '@/services/DialogService';
 import { IconService } from '@/services/IconService';
 import { appState } from '@/state';
@@ -23,8 +23,8 @@ type Node = {
 export class AssetTree extends ComponentBase {
   @inject(ProjectService)
   private readonly projectService!: ProjectService;
-  @inject(ResourceManager)
-  private readonly resourceManager!: ResourceManager;
+  @inject(TemplateService)
+  private readonly templateService!: TemplateService;
   @inject(DialogService)
   private readonly dialogService!: DialogService;
   @inject(IconService)
@@ -1140,8 +1140,7 @@ export class AssetTree extends ComponentBase {
           const filePath = this.joinPath(parentPath === '.' ? '' : parentPath, filename);
 
           if (this._isNewScene) {
-            // read template via ResourceManager and write
-            const template = await this.resourceManager.readText('templ://startup-scene');
+            const template = this.templateService.getSceneTemplate(DEFAULT_TEMPLATE_SCENE_ID);
             await this.projectService.writeFile(filePath, template);
           }
 
