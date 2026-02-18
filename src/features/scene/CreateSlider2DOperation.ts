@@ -5,8 +5,9 @@ import type {
   OperationMetadata,
 } from '@/core/Operation';
 import type { Layout2D } from '@pix3/runtime';
-import { Sprite2D } from '@pix3/runtime';
+import { Slider2D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
+import { ref } from 'valtio/vanilla';
 import { Vector2 } from 'three';
 import {
   attachNode,
@@ -15,29 +16,27 @@ import {
   resolveDefault2DParent,
   restoreAutoCreatedLayout,
 } from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
-export interface CreateSprite2DOperationParams {
-  spriteName?: string;
+export interface CreateSlider2DOperationParams {
+  sliderName?: string;
   width?: number;
   height?: number;
   position?: Vector2;
-  texturePath?: string | null;
   parentNodeId?: string | null;
 }
 
-export class CreateSprite2DOperation implements Operation<OperationInvokeResult> {
+export class CreateSlider2DOperation implements Operation<OperationInvokeResult> {
   readonly metadata: OperationMetadata = {
-    id: 'scene.create-sprite2d',
-    title: 'Create Sprite2D',
-    description: 'Create a 2D sprite in the scene',
-    tags: ['scene', '2d', 'sprite', 'node'],
+    id: 'scene.create-slider2d',
+    title: 'Create Slider2D',
+    description: 'Create a 2D slider in the scene',
+    tags: ['scene', '2d', 'slider', 'node', 'ui'],
     affectsNodeStructure: true,
   };
 
-  private readonly params: CreateSprite2DOperationParams;
+  private readonly params: CreateSlider2DOperationParams;
 
-  constructor(params: CreateSprite2DOperationParams = {}) {
+  constructor(params: CreateSlider2DOperationParams = {}) {
     this.params = params;
   }
 
@@ -57,15 +56,13 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       return { didMutate: false };
     }
 
-    const nodeId = `sprite2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const spriteName = this.params.spriteName || 'Sprite2D';
-    const texturePath = this.params.texturePath ?? null;
+    const nodeId = `slider2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const sliderName = this.params.sliderName || 'Slider2D';
 
-    const node = new Sprite2D({
+    const node = new Slider2D({
       id: nodeId,
-      name: spriteName,
-      position: this.params.position,
-      texturePath,
+      name: sliderName,
+      position: this.params.position || new Vector2(100, 100),
       width: this.params.width,
       height: this.params.height,
     });
@@ -81,28 +78,47 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
         return result.parent;
       })();
 
+    const updateHierarchyState = () => {
+      const hierarchy = state.scenes.hierarchies[activeSceneId];
+      if (hierarchy) {
+        state.scenes.hierarchies[activeSceneId] = {
+          version: hierarchy.version,
+          description: hierarchy.description,
+          rootNodes: ref([...sceneGraph.rootNodes]),
+          metadata: hierarchy.metadata,
+        };
+      }
+    };
+
+    const markSceneDirty = () => {
+      const descriptor = state.scenes.descriptors[activeSceneId];
+      if (descriptor) {
+        descriptor.isDirty = true;
+      }
+    };
+
     attachNode(sceneGraph, node, targetParent);
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
+    updateHierarchyState();
+    markSceneDirty();
+
+    // Update selection to the new node for payload extraction
+    state.selection.nodeIds = [nodeId];
 
     return {
       didMutate: true,
       commit: {
-        label: `Create ${spriteName}`,
+        label: `Create ${sliderName}`,
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
           removeAutoCreatedLayoutIfUnused(sceneGraph, autoCreatedLayout);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
+          updateHierarchyState();
+          markSceneDirty();
         },
         redo: () => {
           attachNode(sceneGraph, node, targetParent);
           restoreAutoCreatedLayout(sceneGraph, autoCreatedLayout);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
+          updateHierarchyState();
+          markSceneDirty();
         },
       },
     };

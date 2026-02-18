@@ -5,8 +5,8 @@ import {
     Vector2,
     Vector3,
 } from 'three';
-import { Node2D, type Node2DProps } from '../Node2D';
-import type { PropertySchema } from '../../fw/property-schema';
+import { Node2D, type Node2DProps } from '../../Node2D';
+import type { PropertySchema } from '../../../fw/property-schema';
 
 export interface Joystick2DProps extends Node2DProps {
     radius?: number;
@@ -107,7 +107,7 @@ export class Joystick2D extends Node2D {
         const pointerWorldY = (this.input.height / 2) - pointer.y;
 
         if (this.floating) {
-            if (!this.isDragging && isDown) {
+            if (!this.isDragging && isDown && !this.input.isHoveringUI) {
                 this.isDragging = true;
                 this.pendingResetAfterHide = false;
                 this.handleMesh.position.set(0, 0, this.handleMesh.position.z);

@@ -6,7 +6,7 @@
  */
 
 import { injectable, inject } from '@/fw/di';
-import { SceneManager, type SceneGraph } from '@pix3/runtime';
+import { SceneManager, type SceneGraph, InputService } from '@pix3/runtime';
 import { NodeBase } from '@pix3/runtime';
 
 interface NodeStateSnapshot {
@@ -21,6 +21,9 @@ interface NodeStateSnapshot {
 export class ScriptExecutionService {
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
+
+  @inject(InputService)
+  private readonly input!: InputService;
 
   private animationFrameId: number | null = null;
   private lastTimestamp: number = 0;
@@ -124,6 +127,9 @@ export class ScriptExecutionService {
       return;
     }
 
+    // Reset input state for the new frame
+    this.input.beginFrame();
+
     // Calculate delta time in seconds
     const dt = (timestamp - this.lastTimestamp) / 1000;
     this.lastTimestamp = timestamp;
@@ -133,6 +139,10 @@ export class ScriptExecutionService {
     if (scene) {
       // Tick all root nodes (which will recursively tick children)
       for (const rootNode of scene.rootNodes) {
+        // Ensure nodes have access to input in editor mode
+        if (!rootNode.input) {
+          rootNode.input = this.input;
+        }
         rootNode.tick(dt);
       }
     }

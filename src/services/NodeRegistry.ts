@@ -8,6 +8,12 @@ import { CreateCamera3DCommand } from '@/features/scene/CreateCamera3DCommand';
 import { CreateMeshInstanceCommand } from '@/features/scene/CreateMeshInstanceCommand';
 import { CreateLayout2DCommand } from '@/features/scene/CreateLayout2DCommand';
 import { CreateJoystick2DCommand } from '@/features/scene/CreateJoystick2DCommand';
+import { CreateButton2DCommand } from '@/features/scene/CreateButton2DCommand';
+import { CreateSlider2DCommand } from '@/features/scene/CreateSlider2DCommand';
+import { CreateBar2DCommand } from '@/features/scene/CreateBar2DCommand';
+import { CreateCheckbox2DCommand } from '@/features/scene/CreateCheckbox2DCommand';
+import { CreateInventorySlot2DCommand } from '@/features/scene/CreateInventorySlot2DCommand';
+import { CreateLabel2DCommand } from '@/features/scene/CreateLabel2DCommand';
 import type { Command } from '@/core/command';
 import { injectable } from '@/fw';
 
@@ -21,6 +27,7 @@ export interface NodeTypeInfo {
   displayName: string;
   description: string;
   category: '2D' | '3D';
+  subcategory?: 'UI';
   commandClass: NodeTypeCommandConstructor;
   color: string;
   icon: string;
@@ -87,7 +94,78 @@ export class NodeRegistry {
       keywords: ['create', 'joystick', '2d', 'input', 'control'],
       order: 3,
     });
-
+    this.registerNodeType({
+      id: 'button2d',
+      displayName: 'Button2D',
+      description: 'Clickable button control',
+      category: '2D',
+      subcategory: 'UI',
+      commandClass: CreateButton2DCommand,
+      color: '#96cbf6ff',
+      icon: 'ui-button',
+      keywords: ['create', 'button', '2d', 'ui', 'input', 'clickable'],
+      order: 4,
+    });
+    this.registerNodeType({
+      id: 'label2d',
+      displayName: 'Label2D',
+      description: 'Simple text label',
+      category: '2D',
+      subcategory: 'UI',
+      commandClass: CreateLabel2DCommand,
+      color: '#96cbf6ff',
+      icon: 'text',
+      keywords: ['create', 'label', 'text', '2d', 'ui', 'add'],
+      order: 4.5,
+    });
+    this.registerNodeType({
+      id: 'slider2d',
+      displayName: 'Slider2D',
+      description: 'Horizontal slider for value input',
+      category: '2D',
+      subcategory: 'UI',
+      commandClass: CreateSlider2DCommand,
+      color: '#96cbf6ff',
+      icon: 'ui-slider',
+      keywords: ['create', 'slider', '2d', 'ui', 'input', 'range'],
+      order: 5,
+    });
+    this.registerNodeType({
+      id: 'bar2d',
+      displayName: 'Bar2D',
+      description: 'Progress/status bar for HP, energy, etc',
+      category: '2D',
+      subcategory: 'UI',
+      commandClass: CreateBar2DCommand,
+      color: '#96cbf6ff',
+      icon: 'ui-bar',
+      keywords: ['create', 'bar', '2d', 'ui', 'progress', 'hp', 'energy'],
+      order: 6,
+    });
+    this.registerNodeType({
+      id: 'checkbox2d',
+      displayName: 'Checkbox2D',
+      description: 'Toggle checkbox control',
+      category: '2D',
+      subcategory: 'UI',
+      commandClass: CreateCheckbox2DCommand,
+      color: '#96cbf6ff',
+      icon: 'ui-checkbox',
+      keywords: ['create', 'checkbox', '2d', 'ui', 'toggle', 'boolean'],
+      order: 7,
+    });
+    this.registerNodeType({
+      id: 'inventoryslot2d',
+      displayName: 'InventorySlot2D',
+      description: 'Inventory slot for item display and selection',
+      category: '2D',
+      subcategory: 'UI',
+      commandClass: CreateInventorySlot2DCommand,
+      color: '#96cbf6ff',
+      icon: 'ui-inventory-slot',
+      keywords: ['create', 'inventory', 'slot', '2d', 'ui', 'item'],
+      order: 8,
+    });
     // 3D Node Types
     this.registerNodeType({
       id: 'box',
@@ -264,26 +342,48 @@ export class NodeRegistry {
     items: Array<{ id: string; label: string; icon: string; color: string }>;
   }> {
     const categories = this.getNodeTypesByCategory();
+    const twoDNonUi = categories['2D'].filter(nodeType => nodeType.subcategory !== 'UI');
+    const twoDUi = categories['2D'].filter(nodeType => nodeType.subcategory === 'UI');
 
-    return [
-      {
+    const groups: Array<{
+      label: string;
+      items: Array<{ id: string; label: string; icon: string; color: string }>;
+    }> = [];
+
+    if (twoDNonUi.length > 0) {
+      groups.push({
         label: '2D Nodes',
-        items: categories['2D'].map(nodeType => ({
+        items: twoDNonUi.map(nodeType => ({
           id: nodeType.id,
           label: nodeType.displayName,
           icon: nodeType.icon,
           color: nodeType.color,
         })),
-      },
-      {
-        label: '3D Nodes',
-        items: categories['3D'].map(nodeType => ({
+      });
+    }
+
+    if (twoDUi.length > 0) {
+      groups.push({
+        label: 'UI Controls',
+        items: twoDUi.map(nodeType => ({
           id: nodeType.id,
           label: nodeType.displayName,
           icon: nodeType.icon,
           color: nodeType.color,
         })),
-      },
-    ];
+      });
+    }
+
+    groups.push({
+      label: '3D Nodes',
+      items: categories['3D'].map(nodeType => ({
+        id: nodeType.id,
+        label: nodeType.displayName,
+        icon: nodeType.icon,
+        color: nodeType.color,
+      })),
+    });
+
+    return groups;
   }
 }

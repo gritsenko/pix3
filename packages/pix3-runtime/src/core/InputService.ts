@@ -17,7 +17,30 @@ export class InputService {
     public width = 0;
     public height = 0;
 
+    private hoveredUIElements = new Set<string>();
+
     private element: HTMLElement | null = null;
+
+    /**
+     * Resets frame-based input state. Should be called at the start of each frame.
+     */
+    beginFrame(): void {
+        this.hoveredUIElements.clear();
+    }
+
+    /**
+     * Registers that a UI element is currently being hovered by the pointer.
+     */
+    registerHover(id: string): void {
+        this.hoveredUIElements.add(id);
+    }
+
+    /**
+     * Returns true if any UI element is currently hovered.
+     */
+    get isHoveringUI(): boolean {
+        return this.hoveredUIElements.size > 0;
+    }
 
     /**
      * Set a virtual axis value (e.g. from a specialized controller or script).

@@ -122,3 +122,32 @@ root:
                 scale: [1, 1]
                 rotation: 0
             children: []
+      - id: label2d-1771422490002-wcvk9d9
+        type: Label2D
+        name: Label2D Loaded
+        properties: {}
+      - id: label2d-1771422584843-h4umykj
+        type: Label2D
+        name: Label2D Created
+        properties:
+          transform:
+            position: [-57.09298494654061, 191.0184205540586]
+            scale: [1, 1]
+            rotation: 0
+        children: []
+      - id: button2d-1771422526986-t4o9uis
+        type: Button2D
+        name: Button2D
+        properties:
+          label: Hey!
+          width: 279.8267977021727
+          height: 82.56274840013472
+          backgroundColor: "#4a4a4a"
+          hoverColor: "#5a5a5a"
+          pressedColor: "#3a3a3a"
+          buttonAction: Submit
+          transform:
+            position: [9.086070153895335, 79.71881262630518]
+            scale: [1, 1]
+            rotation: 0
+        children: []

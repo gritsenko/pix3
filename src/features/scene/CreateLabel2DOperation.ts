@@ -5,9 +5,10 @@ import type {
   OperationMetadata,
 } from '@/core/Operation';
 import type { Layout2D } from '@pix3/runtime';
-import { Sprite2D } from '@pix3/runtime';
+import { Label2D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { Vector2 } from 'three';
+import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 import {
   attachNode,
   detachNode,
@@ -15,29 +16,26 @@ import {
   resolveDefault2DParent,
   restoreAutoCreatedLayout,
 } from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
-export interface CreateSprite2DOperationParams {
-  spriteName?: string;
-  width?: number;
-  height?: number;
+export interface CreateLabel2DOperationParams {
+  labelName?: string;
+  text?: string;
   position?: Vector2;
-  texturePath?: string | null;
   parentNodeId?: string | null;
 }
 
-export class CreateSprite2DOperation implements Operation<OperationInvokeResult> {
+export class CreateLabel2DOperation implements Operation<OperationInvokeResult> {
   readonly metadata: OperationMetadata = {
-    id: 'scene.create-sprite2d',
-    title: 'Create Sprite2D',
-    description: 'Create a 2D sprite in the scene',
-    tags: ['scene', '2d', 'sprite', 'node'],
+    id: 'scene.create-label2d',
+    title: 'Create Label2D',
+    description: 'Create a 2D label in the scene',
+    tags: ['scene', '2d', 'label', 'node', 'ui'],
     affectsNodeStructure: true,
   };
 
-  private readonly params: CreateSprite2DOperationParams;
+  private readonly params: CreateLabel2DOperationParams;
 
-  constructor(params: CreateSprite2DOperationParams = {}) {
+  constructor(params: CreateLabel2DOperationParams = {}) {
     this.params = params;
   }
 
@@ -57,17 +55,14 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       return { didMutate: false };
     }
 
-    const nodeId = `sprite2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const spriteName = this.params.spriteName || 'Sprite2D';
-    const texturePath = this.params.texturePath ?? null;
+    const nodeId = `label2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+    const labelName = this.params.labelName || 'Label2D';
 
-    const node = new Sprite2D({
+    const node = new Label2D({
       id: nodeId,
-      name: spriteName,
-      position: this.params.position,
-      texturePath,
-      width: this.params.width,
-      height: this.params.height,
+      name: labelName,
+      label: this.params.text || 'New Label',
+      position: this.params.position || new Vector2(100, 100),
     });
 
     const parentNodeId = this.params.parentNodeId ?? null;
@@ -89,7 +84,7 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
     return {
       didMutate: true,
       commit: {
-        label: `Create ${spriteName}`,
+        label: `Create ${labelName}`,
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
           removeAutoCreatedLayoutIfUnused(sceneGraph, autoCreatedLayout);

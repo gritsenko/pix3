@@ -180,6 +180,54 @@ export class IconService {
   <circle cx="18" cy="14" r="1" fill="currentColor"/>
 </svg>`
     );
+
+    // UI button icon
+    this.customIcons.set(
+      'ui-button',
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="3" y="7" width="18" height="10" rx="2" stroke="currentColor" stroke-width="2"/>
+  <path d="M8 12H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+</svg>`
+    );
+
+    // UI slider icon
+    this.customIcons.set(
+      'ui-slider',
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M4 8H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <path d="M4 16H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="9" cy="8" r="2" fill="currentColor"/>
+  <circle cx="15" cy="16" r="2" fill="currentColor"/>
+</svg>`
+    );
+
+    // UI bar/progress icon
+    this.customIcons.set(
+      'ui-bar',
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="3" y="8" width="18" height="8" rx="2" stroke="currentColor" stroke-width="2"/>
+  <rect x="5" y="10" width="10" height="4" rx="1" fill="currentColor"/>
+</svg>`
+    );
+
+    // UI checkbox icon
+    this.customIcons.set(
+      'ui-checkbox',
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+  <path d="M8 12L11 15L16 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>`
+    );
+
+    // UI inventory slot icon
+    this.customIcons.set(
+      'ui-inventory-slot',
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+  <path d="M12 4V20" stroke="currentColor" stroke-width="1.5"/>
+  <path d="M4 12H20" stroke="currentColor" stroke-width="1.5"/>
+</svg>`
+    );
   }
 
   /**

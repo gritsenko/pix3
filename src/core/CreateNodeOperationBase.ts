@@ -34,8 +34,8 @@ export abstract class CreateNodeOperationBase<TParams> {
       return { didMutate: false };
     }
 
-    const sceneManager = (container as any).getService?.(
-      (container as any).getOrCreateToken?.((container as any)._imported?.('./SceneManager'))
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
     );
 
     if (!sceneManager) {

@@ -262,19 +262,24 @@ export class InspectorPanel extends ComponentBase {
 
   private async handlePropertyInput(propName: string, e: Event) {
     const input = e.target as HTMLInputElement;
-    const value = input.value;
-    const num = parseFloat(value);
-    const isValid = !isNaN(num) || input.type !== 'number';
+    const rawValue = input.value;
+
+    const propDef = this.propertySchema?.properties.find(p => p.name === propName);
+    const expectsNumber = propDef?.type === 'number' || input.type === 'number';
+
+    const numericValue = parseFloat(rawValue);
+    const parsedValue: unknown = expectsNumber ? numericValue : rawValue;
+    const isValid = expectsNumber ? !isNaN(numericValue) : true;
 
     // Update local state
     this.propertyValues = {
       ...this.propertyValues,
-      [propName]: { value, isValid },
+      [propName]: { value: rawValue, isValid },
     };
 
     // Apply if valid and node selected
     if (isValid && this.primaryNode && this.propertySchema) {
-      await this.applyPropertyChange(propName, num);
+      await this.applyPropertyChange(propName, parsedValue);
     }
   }
 

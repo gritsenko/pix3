@@ -7,7 +7,14 @@ import { Node2D } from '../nodes/Node2D';
 import { Group2D } from '../nodes/2D/Group2D';
 import { Layout2D } from '../nodes/2D/Layout2D';
 import { Sprite2D } from '../nodes/2D/Sprite2D';
-import { Joystick2D } from '../nodes/2D/Joystick2D';
+import { Joystick2D } from '../nodes/2D/UI/Joystick2D';
+import { UIControl2D } from '../nodes/2D/UI/UIControl2D';
+import { Button2D } from '../nodes/2D/UI/Button2D';
+import { Slider2D } from '../nodes/2D/UI/Slider2D';
+import { Bar2D } from '../nodes/2D/UI/Bar2D';
+import { Checkbox2D } from '../nodes/2D/UI/Checkbox2D';
+import { InventorySlot2D } from '../nodes/2D/UI/InventorySlot2D';
+import { Label2D } from '../nodes/2D/UI/Label2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
@@ -290,6 +297,60 @@ export class SceneSaver {
       if (node.baseColor !== '#ffffff') props.baseColor = node.baseColor;
       if (node.handleColor !== '#cccccc') props.handleColor = node.handleColor;
       if (node.floating !== false) props.floating = node.floating;
+    } else if (node instanceof Button2D) {
+      this.serializeCommonUIControlProps(node, props);
+      props.width = node.width;
+      props.height = node.height;
+      props.backgroundColor = node.backgroundColor;
+      props.hoverColor = node.hoverColor;
+      props.pressedColor = node.pressedColor;
+      props.buttonAction = node.buttonAction;
+    } else if (node instanceof Label2D) {
+      this.serializeCommonUIControlProps(node, props);
+    } else if (node instanceof Slider2D) {
+      this.serializeCommonUIControlProps(node, props);
+      props.width = node.width;
+      props.height = node.height;
+      props.handleSize = node.handleSize;
+      props.trackBackgroundColor = node.trackBackgroundColor;
+      props.trackFilledColor = node.trackFilledColor;
+      props.handleColor = node.handleColor;
+      props.minValue = node.minValue;
+      props.maxValue = node.maxValue;
+      props.value = node.value;
+      props.axisName = node.axisName;
+    } else if (node instanceof Bar2D) {
+      this.serializeCommonUIControlProps(node, props);
+      props.width = node.width;
+      props.height = node.height;
+      props.backBackgroundColor = node.backBackgroundColor;
+      props.barColor = node.barColor;
+      props.minValue = node.minValue;
+      props.maxValue = node.maxValue;
+      props.value = node.value;
+      props.showBorder = node.showBorder;
+      props.borderColor = node.borderColor;
+      props.borderWidth = node.borderWidth;
+    } else if (node instanceof Checkbox2D) {
+      this.serializeCommonUIControlProps(node, props);
+      props.size = node.size;
+      props.checked = node.checked;
+      props.uncheckedColor = node.uncheckedColor;
+      props.checkedColor = node.checkedColor;
+      props.checkmarkColor = node.checkmarkColor;
+      props.checkmarkAction = node.checkmarkAction;
+    } else if (node instanceof InventorySlot2D) {
+      this.serializeCommonUIControlProps(node, props);
+      props.width = node.width;
+      props.height = node.height;
+      props.backdropColor = node.backdropColor;
+      props.borderColor = node.borderColor;
+      props.borderWidth = node.borderWidth;
+      props.quantity = node.quantity;
+      props.showQuantity = node.showQuantity;
+      props.quantityFontSize = node.quantityFontSize;
+      props.selectionColor = node.selectionColor;
+      props.selectedAction = node.selectedAction;
     } else if (node instanceof GeometryMesh) {
       const mesh = node as GeometryMesh & {
         geometry?: unknown;
@@ -339,5 +400,15 @@ export class SceneSaver {
     }
 
     return props;
+  }
+
+  private serializeCommonUIControlProps(node: UIControl2D, props: Record<string, unknown>): void {
+    if (node.enabled !== true) props.enabled = node.enabled;
+    if (node.label !== '') props.label = node.label;
+    if (node.labelFontFamily !== 'Arial') props.labelFontFamily = node.labelFontFamily;
+    if (node.labelFontSize !== 16) props.labelFontSize = node.labelFontSize;
+    if (node.labelColor !== '#ffffff') props.labelColor = node.labelColor;
+    if (node.labelAlign !== 'center') props.labelAlign = node.labelAlign;
+    if (node.texturePath) props.texturePath = node.texturePath;
   }
 }

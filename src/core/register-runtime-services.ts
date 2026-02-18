@@ -2,6 +2,7 @@ import { ServiceContainer, ServiceLifetime } from '@/fw/di';
 import { ResourceManager } from '@/services/ResourceManager';
 import {
   AssetLoader,
+  InputService,
   SceneLoader,
   SceneManager,
   SceneSaver,
@@ -56,6 +57,13 @@ class EditorSceneManager extends SceneManager {
 
 export function registerRuntimeServices(): void {
   const container = ServiceContainer.getInstance();
+
+  // 0. InputService
+  container.addService(
+    container.getOrCreateToken(InputService),
+    InputService,
+    ServiceLifetime.Singleton
+  );
 
   // 1. ScriptRegistry (No dependencies)
   container.addService(

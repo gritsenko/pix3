@@ -5,6 +5,12 @@ import { Sprite2D } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
 import { Layout2D } from '@pix3/runtime';
 import { Joystick2D } from '@pix3/runtime';
+import { Button2D } from '@pix3/runtime';
+import { Label2D } from '@pix3/runtime';
+import { Slider2D } from '@pix3/runtime';
+import { Bar2D } from '@pix3/runtime';
+import { Checkbox2D } from '@pix3/runtime';
+import { InventorySlot2D } from '@pix3/runtime';
 import { Camera3D } from '@pix3/runtime';
 import { DirectionalLightNode } from '@pix3/runtime';
 import { MeshInstance } from '@pix3/runtime';
@@ -29,6 +35,24 @@ export function getNodeVisuals(node: NodeBase): { color: string; icon: string } 
   }
   if (node instanceof Joystick2D) {
     return { color: NODE_2D_COLOR, icon: 'gamepad' };
+  }
+  if (node instanceof Button2D) {
+    return { color: NODE_2D_COLOR, icon: 'ui-button' };
+  }
+  if (node instanceof Label2D) {
+    return { color: NODE_2D_COLOR, icon: 'text' };
+  }
+  if (node instanceof Slider2D) {
+    return { color: NODE_2D_COLOR, icon: 'ui-slider' };
+  }
+  if (node instanceof Bar2D) {
+    return { color: NODE_2D_COLOR, icon: 'ui-bar' };
+  }
+  if (node instanceof Checkbox2D) {
+    return { color: NODE_2D_COLOR, icon: 'ui-checkbox' };
+  }
+  if (node instanceof InventorySlot2D) {
+    return { color: NODE_2D_COLOR, icon: 'ui-inventory-slot' };
   }
   if (node instanceof Group2D) {
     return { color: NODE_2D_COLOR, icon: 'layout' };

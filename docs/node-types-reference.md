@@ -1,0 +1,477 @@
+# Pix3 Node Types Reference
+
+This document provides a comprehensive reference for all node types available in the Pix3 editor. Each node type is designed for specific use cases in 2D and 3D scene composition.
+
+---
+
+## Base Classes
+
+### NodeBase
+
+The foundation class for all nodes in Pix3. Every node inherits from `NodeBase`, which provides core functionality:
+
+- **Unique ID**: Each node has a system-generated unique identifier
+- **Name**: User-editable name for identification
+- **Type**: The node type string (e.g., "Sprite2D", "Camera3D")
+- **Properties**: Custom key-value data storage
+- **Metadata**: Additional user-defined data
+- **Components**: Script components attached to the node
+
+**Common Properties (all nodes):**
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `id` | string | Unique identifier |
+| `name` | string | Display name |
+| `type` | string | Node type |
+| `visible` | boolean | Visibility toggle |
+| `locked` | boolean | Lock for editing |
+| `instancePath` | string | Path to source file |
+
+---
+
+## 2D Nodes
+
+All 2D nodes operate in screen space and are rendered using an orthographic camera. They use a left-handed coordinate system where X increases to the right and Y increases upward.
+
+### Node2D
+
+The base class for all 2D scene nodes. Use this for simple grouping or as a container for other 2D elements.
+
+**Type String:** `Node2D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `position` | Vector2 | (0, 0) | X and Y coordinates |
+| `rotation` | number | 0 | Rotation in degrees |
+| `scale` | Vector2 | (1, 1) | X and Y scale factors |
+
+**Usage Notes:**
+- Cannot have children by default (set `isContainer = true` to enable)
+- Transforms affect all children in local space
+- Rotation is clockwise, in degrees
+
+---
+
+### Layout2D
+
+The root container for 2D scenes. This is the top-level node that defines the canvas area for all 2D content. All other 2D nodes should be children of a Layout2D.
+
+**Type String:** `Layout2D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `width` | number | 1920 | Canvas width in pixels |
+| `height` | number | 1080 | Canvas height in pixels |
+| `resolutionPreset` | enum | FullHD | Resolution preset |
+| `showViewportOutline` | boolean | true | Show viewport border |
+
+**Resolution Presets:**
+
+| Preset | Dimensions | Description |
+|--------|------------|-------------|
+| `FullHD` | 1920×1080 | Full HD (default) |
+| `HD` | 1280×720 | HD Ready |
+| `Tablet` | 1024×768 | Standard tablet |
+| `MobilePortrait` | 1080×1920 | Mobile portrait |
+| `Custom` | user-defined | Manual dimensions |
+
+**Usage Notes:**
+- Only one Layout2D should exist per scene
+- All 2D content renders within these bounds
+- Changing resolution automatically recalculates child layouts
+
+---
+
+### Sprite2D
+
+A 2D image display node. Renders a textured quad that always faces the camera.
+
+**Type String:** `Sprite2D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `texturePath` | string | null | Path to texture (res://) |
+| `width` | number | 64 | Display width in pixels |
+| `height` | number | 64 | Display height in pixels |
+| `color` | color | #ffffff | Tint color |
+
+**Usage Notes:**
+- Supports PNG, JPG, WebP textures
+- Aspect ratio is controlled by width/height properties
+- Use white color to display texture without tint
+- Texture is scaled to fit the specified dimensions
+
+---
+
+### Button2D
+
+An interactive button control for 2D user interfaces. Responds to pointer clicks and provides visual feedback.
+
+**Type String:** `Button2D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `width` | number | 100 | Button width in pixels |
+| `height` | number | 40 | Button height in pixels |
+| `backgroundColor` | color | #4a4a4a | Default background |
+| `hoverColor` | color | #5a5a5a | Background on hover |
+| `pressedColor` | color | #3a3a3a | Background when pressed |
+| `buttonAction` | string | "Submit" | Action identifier |
+
+**Usage Notes:**
+- Emits button press events when clicked
+- Visual states: default, hover, pressed
+- Use `buttonAction` to identify button function in scripts
+
+---
+
+### Slider2D
+
+A horizontal slider control for selecting numeric values. Useful for volume controls, brightness settings, or any continuous value input.
+
+**Type String:** `Slider2D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `width` | number | 200 | Slider width in pixels |
+| `height` | number | 20 | Slider height in pixels |
+| `handleSize` | number | 20 | Handle knob size |
+| `trackBackgroundColor` | color | #333333 | Empty track color |
+| `trackFilledColor` | color | #4a9eff | Filled track color |
+| `handleColor` | color | #ffffff | Handle color |
+| `minValue` | number | 0 | Minimum value |
+| `maxValue` | number | 100 | Maximum value |
+| `value` | number | 50 | Current value |
+| `axisName` | string | "Slider" | Identifier for axis |
+
+**Usage Notes:**
+- Drag the handle to change values
+- Value is clamped between min and max
+- Emits value change events during interaction
+
+---
+
+### Joystick2D
+
+A virtual analog stick control for touch or mouse input. Commonly used for character movement or camera control in games.
+
+**Type String:** `Joystick2D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `width` | number | 120 | Base diameter in pixels |
+| `height` | number | 120 | Base diameter in pixels |
+| `knobSize` | number | 50 | Knob diameter in pixels |
+| `baseColor` | color | #333333 | Base circle color |
+| `knobColor` | color | #666666 | Knob color |
+| `maxDistance` | number | 40 | Maximum knob travel |
+
+**Usage Notes:**
+- Returns normalized X/Y values (-1 to 1)
+- Center position returns (0, 0)
+- Ideal for mobile/touch interfaces
+
+---
+
+### Checkbox2D
+
+A toggle checkbox control for boolean settings.
+
+**Type String:** `Checkbox2D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `width` | number | 24 | Checkbox size |
+| `height` | number | 24 | Checkbox size |
+| `checked` | boolean | false | Checked state |
+| `uncheckedColor` | color | #333333 | Unchecked border |
+| `checkedColor` | color | #4a9eff | Checked fill color |
+
+**Usage Notes:**
+- Toggle between checked/unchecked states
+- Emits state change events
+
+---
+
+### Bar2D
+
+A progress bar or health bar display.
+
+**Type String:** `Bar2D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `width` | number | 200 | Bar width in pixels |
+| `height` | number | 20 | Bar height in pixels |
+| `value` | number | 50 | Current fill value |
+| `maxValue` | number | 100 | Maximum fill value |
+| `backgroundColor` | color | #333333 | Background color |
+| `fillColor` | color | #4a9eff | Fill bar color |
+
+**Usage Notes:**
+- Fill percentage = value / maxValue
+- Useful for health bars, mana bars, loading progress
+- Can be oriented horizontally
+
+---
+
+### InventorySlot2D
+
+A specialized slot control for inventory systems. Supports drag-and-drop for item management.
+
+**Type String:** `InventorySlot2D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `width` | number | 64 | Slot size |
+| `height` | number | 64 | Slot size |
+| `backgroundColor` | color | #2a2a2a | Empty slot color |
+| `borderColor` | color | #444444 | Border color |
+| `highlightColor` | color | #4a9eff | Selection highlight |
+| `itemCount` | number | 0 | Number of items in slot |
+
+**Usage Notes:**
+- Can hold one item at a time
+- Visual indicator for item count
+- Supports drag operations
+
+---
+
+## 3D Nodes
+
+All 3D nodes operate in world space using a perspective camera by default. They use a right-handed coordinate system where X is right, Y is up, and Z is toward the viewer.
+
+### Node3D
+
+The base class for all 3D scene nodes. Use this for simple grouping or as a container for other 3D elements.
+
+**Type String:** `Node3D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `position` | Vector3 | (0, 0, 0) | X, Y, Z coordinates |
+| `rotation` | Euler | (0, 0, 0) | Pitch, Yaw, Roll in degrees |
+| `scale` | Vector3 | (1, 1, 1) | X, Y, Z scale factors |
+
+**Rotation Order:** XYZ (Pitch → Yaw → Roll)
+
+**Usage Notes:**
+- Rotation values are in degrees, stored as radians internally
+- Default scale (1, 1, 1) means no scaling
+- Children inherit all transforms
+
+---
+
+### Camera3D
+
+A camera node that defines the viewpoint for rendering. The scene can have multiple cameras, but only one is active at a time.
+
+**Type String:** `Camera3D`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `projection` | enum | perspective | Projection type |
+| `fov` | number | 60 | Field of view (degrees) |
+| `near` | number | 0.1 | Near clipping plane |
+| `far` | number | 1000 | Far clipping plane |
+
+**Projection Types:**
+
+| Type | Description |
+|------|-------------|
+| `perspective` | Perspective projection (default) |
+| `orthographic` | Orthographic projection |
+
+**Usage Notes:**
+- Perspective: Objects get smaller with distance
+- Orthographic: No perspective distortion
+- Default looks down the negative Z axis
+- Use `setTargetPosition()` to point camera at a target
+
+---
+
+### GeometryMesh
+
+A 3D mesh node with built-in geometry. Currently supports box geometry but can be extended.
+
+**Type String:** `GeometryMesh`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `geometry` | string | "box" | Geometry type |
+| `size` | Vector3 | (1, 1, 1) | Dimensions (width, height, depth) |
+| `material.color` | color | #4e8df5 | Surface color |
+| `material.roughness` | number | 0.35 | Surface roughness (0-1) |
+| `material.metalness` | number | 0.25 | Metallic appearance (0-1) |
+
+**Geometry Types:**
+
+| Type | Description |
+|------|-------------|
+| `box` | Rectangular box (default) |
+
+**Usage Notes:**
+- Box is the only built-in geometry
+- Material uses PBR (Physically Based Rendering)
+- Roughness: 0 = glossy, 1 = matte
+- Metalness: 0 = non-metal, 1 = metal
+
+---
+
+### MeshInstance
+
+A node that loads and displays external 3D models in GLB or GLTF format.
+
+**Type String:** `MeshInstance`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `src` | string | null | Path to model file (res://) |
+
+**Usage Notes:**
+- Supports GLB (binary) and GLTF formats
+- Path uses `res://` protocol for project resources
+- Can contain multiple meshes, materials, and animations
+- Animations can be played via script components
+
+---
+
+### DirectionalLightNode
+
+A light source that emits parallel rays in a single direction, like the sun. Illuminates all objects from the same angle.
+
+**Type String:** `DirectionalLight`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `color` | color | #ffffff | Light color |
+| `intensity` | number | 1.0 | Light brightness |
+| `castShadow` | boolean | true | Enable shadow casting |
+
+**Usage Notes:**
+- Light direction is determined by node rotation
+- Good for outdoor lighting and sun simulation
+- Constant illumination regardless of distance
+- Shadow map size is auto-calculated
+
+---
+
+### PointLightNode
+
+A light source that emits rays in all directions from a single point. Like a light bulb.
+
+**Type String:** `PointLight`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `color` | color | #ffffff | Light color |
+| `intensity` | number | 1.0 | Light brightness |
+| `distance` | number | 0 | Maximum range (0 = infinite) |
+| `decay` | number | 2 | Falloff rate |
+| `castShadow` | boolean | true | Enable shadow casting |
+
+**Usage Notes:**
+- Intensity decreases with distance (inverse square law)
+- Use `distance` to limit effective range
+- Decay of 2 is physically accurate
+- Good for lamps, candles, torches
+
+---
+
+### SpotLightNode
+
+A light source that emits a cone of light in a specific direction. Like a flashlight or spotlight.
+
+**Type String:** `SpotLight`
+
+**Properties:**
+
+| Property | Type | Default | Description |
+|----------|------|---------|-------------|
+| `color` | color | #ffffff | Light color |
+| `intensity` | number | 1.0 | Light brightness |
+| `distance` | number | 0 | Maximum range (0 = infinite) |
+| `angle` | number | 60 | Cone angle (degrees) |
+| `penumbra` | number | 0 | Edge softness (0-1) |
+| `decay` | number | 2 | Falloff rate |
+| `castShadow` | boolean | true | Enable shadow casting |
+
+**Usage Notes:**
+- Penumbra creates soft edge transitions
+- Angle controls the cone width
+- Good for stage lights, flashlights, focused lighting
+- Target direction is determined by node rotation
+
+---
+
+## Choosing the Right Node
+
+### For 2D Projects:
+
+1. **Start with Layout2D** as your scene root
+2. Add **Sprite2D** for images and graphics
+3. Use **Button2D**, **Slider2D**, **Joystick2D** for UI controls
+4. Use **Node2D** as containers to group related elements
+
+### For 3D Projects:
+
+1. Add a **Camera3D** to define your viewpoint
+2. Use **GeometryMesh** for simple shapes
+3. Use **MeshInstance** for imported 3D models
+4. Add **DirectionalLightNode** for overall lighting
+5. Add **PointLightNode** or **SpotLightNode** for localized lighting
+
+---
+
+## Node Properties Quick Reference
+
+| Node Type | Key Properties |
+|-----------|----------------|
+| NodeBase | id, name, type, visible, locked |
+| Node2D | position (Vector2), rotation, scale (Vector2) |
+| Node3D | position (Vector3), rotation (Euler), scale (Vector3) |
+| Layout2D | width, height, resolutionPreset |
+| Sprite2D | texturePath, width, height, color |
+| Camera3D | projection, fov, near, far |
+| GeometryMesh | geometry, size, material |
+| MeshInstance | src |
+| DirectionalLightNode | color, intensity, castShadow |
+| PointLightNode | color, intensity, distance, decay |
+| SpotLightNode | color, intensity, distance, angle, penumbra |
+| Button2D | width, height, backgroundColor, buttonAction |
+| Slider2D | width, minValue, maxValue, value |
+| Joystick2D | width, height, maxDistance |
+| Checkbox2D | width, checked |
+| Bar2D | width, value, maxValue |
+| InventorySlot2D | width, itemCount |

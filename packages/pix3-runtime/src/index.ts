@@ -19,7 +19,14 @@ export * from './nodes/Node3D';
 export * from './nodes/2D/Sprite2D';
 export * from './nodes/2D/Group2D';
 export * from './nodes/2D/Layout2D';
-export * from './nodes/2D/Joystick2D';
+export * from './nodes/2D/UI/UIControl2D';
+export * from './nodes/2D/UI/Joystick2D';
+export * from './nodes/2D/UI/Button2D';
+export * from './nodes/2D/UI/Label2D';
+export * from './nodes/2D/UI/Slider2D';
+export * from './nodes/2D/UI/Bar2D';
+export * from './nodes/2D/UI/Checkbox2D';
+export * from './nodes/2D/UI/InventorySlot2D';
 
 // 3D Nodes
 export * from './nodes/3D/Camera3D';

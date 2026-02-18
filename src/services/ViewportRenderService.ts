@@ -15,12 +15,19 @@ import { Node3D } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
 import { Sprite2D } from '@pix3/runtime';
 import { Layout2D } from '@pix3/runtime';
+import { UIControl2D } from '@pix3/runtime';
+import { Button2D } from '@pix3/runtime';
+import { Label2D } from '@pix3/runtime';
+import { Slider2D } from '@pix3/runtime';
+import { Bar2D } from '@pix3/runtime';
+import { Checkbox2D } from '@pix3/runtime';
+import { InventorySlot2D } from '@pix3/runtime';
 import { DirectionalLightNode } from '@pix3/runtime';
 import { PointLightNode } from '@pix3/runtime';
 import { SpotLightNode } from '@pix3/runtime';
 import { Camera3D } from '@pix3/runtime';
 import { injectable, inject } from '@/fw/di';
-import { SceneManager } from '@pix3/runtime';
+import { SceneManager, InputService } from '@pix3/runtime';
 import { OperationService } from '@/services/OperationService';
 import { ResourceManager } from '@/services/ResourceManager';
 import { appState } from '@/state';
@@ -51,6 +58,9 @@ export class ViewportRendererService {
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
 
+  @inject(InputService)
+  private readonly inputService!: InputService;
+
   @inject(OperationService)
   private readonly operationService!: OperationService;
 
@@ -76,6 +86,7 @@ export class ViewportRendererService {
   private group2DVisuals = new Map<string, THREE.Group>();
   private sprite2DVisuals = new Map<string, THREE.Group>();
   private layout2dVisuals = new Map<string, THREE.Group>();
+  private uiControl2DVisuals = new Map<string, THREE.Group>();
   private selection2DOverlay?: Selection2DOverlay;
   private active2DTransform?: Active2DTransform;
   // Hover preview frame for 2D nodes (before selection)
@@ -151,6 +162,9 @@ export class ViewportRendererService {
       antialias: true,
       alpha: true,
     });
+
+    // Attach InputService to the renderer canvas
+    this.inputService.attach(this.renderer.domElement);
 
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(0x13161b, 1);
@@ -604,6 +618,19 @@ export class ViewportRendererService {
             }
             visualRoot.visible = node.visible;
           }
+        } else if (node instanceof UIControl2D) {
+          const visualRoot = this.uiControl2DVisuals.get(node.nodeId);
+          if (visualRoot) {
+            visualRoot.position.copy(node.position);
+            visualRoot.rotation.copy(node.rotation);
+            visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+            const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
+            if (sizeGroup) {
+              const { width, height } = this.getUIControlDimensions(node);
+              sizeGroup.scale.set(width, height, 1);
+            }
+            visualRoot.visible = node.visible;
+          }
         }
         updateNode2DVisuals(node.children);
       }
@@ -921,7 +948,10 @@ export class ViewportRendererService {
     raycaster.setFromCamera(mouse, this.orthographicCamera);
 
     // Only hit-test rendered 2D visuals; transparent container groups are intentionally skipped
-    const candidates: THREE.Object3D[] = [...this.sprite2DVisuals.values()];
+    const candidates: THREE.Object3D[] = [
+      ...this.sprite2DVisuals.values(),
+      ...this.uiControl2DVisuals.values(),
+    ];
 
     console.debug('[ViewportRenderer] 2D raycast candidates', {
       count: candidates.length,
@@ -1034,6 +1064,39 @@ export class ViewportRendererService {
         }
         visualRoot.visible = node.visible;
       }
+    } else if (node instanceof UIControl2D) {
+      const visualRoot = this.uiControl2DVisuals.get(node.nodeId);
+      if (visualRoot) {
+        visualRoot.position.copy(node.position);
+        visualRoot.rotation.copy(node.rotation);
+        visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+
+        const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
+        if (sizeGroup) {
+          const { width, height } = this.getUIControlDimensions(node);
+          sizeGroup.scale.set(width, height, 1);
+        }
+
+        const mesh = visualRoot.userData.controlMesh as THREE.Mesh | undefined;
+        if (mesh && mesh.material instanceof THREE.MeshBasicMaterial) {
+          mesh.material.opacity = node instanceof Label2D ? 0 : 1;
+          mesh.material.color.setHex(this.getUIControlDefaultColor(node));
+
+          const currentTexturePath =
+            (node as UIControl2D & { texturePath?: string | null }).texturePath ?? null;
+          const previousTexturePath = (visualRoot.userData.texturePath as string | null) ?? null;
+          if (currentTexturePath !== previousTexturePath) {
+            mesh.material.map = null;
+            mesh.material.needsUpdate = true;
+            this.applyTextureTo2DMaterial(node, mesh.material);
+            visualRoot.userData.texturePath = currentTexturePath;
+          }
+        }
+
+        this.updateUIControlLabelVisual(visualRoot, node);
+
+        visualRoot.visible = node.visible;
+      }
     }
 
     if (node instanceof Node2D && this.selection2DOverlay?.nodeIds.includes(node.nodeId)) {
@@ -1055,6 +1118,11 @@ export class ViewportRendererService {
       }
     } else if (node instanceof Sprite2D) {
       const visualRoot = this.sprite2DVisuals.get(node.nodeId);
+      if (visualRoot) {
+        visualRoot.visible = node.visible;
+      }
+    } else if (node instanceof UIControl2D) {
+      const visualRoot = this.uiControl2DVisuals.get(node.nodeId);
       if (visualRoot) {
         visualRoot.visible = node.visible;
       }
@@ -1273,6 +1341,14 @@ export class ViewportRendererService {
       }
       this.layout2dVisuals.clear();
 
+      for (const visual of this.uiControl2DVisuals.values()) {
+        if (visual.parent) {
+          visual.parent.remove(visual);
+        }
+        this.disposeObject3D(visual);
+      }
+      this.uiControl2DVisuals.clear();
+
       // Remove all root nodes from scene (except lights and helpers)
       const objectsToRemove: THREE.Object3D[] = [];
       this.scene.children.forEach(child => {
@@ -1331,6 +1407,13 @@ export class ViewportRendererService {
     } else if (node instanceof Sprite2D) {
       const visualRoot = this.createSprite2DVisual(node);
       this.sprite2DVisuals.set(node.nodeId, visualRoot);
+
+      const parent = parent2DVisualRoot ?? this.scene;
+      parent.add(visualRoot);
+      current2DVisualRoot = visualRoot;
+    } else if (node instanceof UIControl2D) {
+      const visualRoot = this.createUIControl2DVisual(node);
+      this.uiControl2DVisuals.set(node.nodeId, visualRoot);
 
       const parent = parent2DVisualRoot ?? this.scene;
       parent.add(visualRoot);
@@ -1700,6 +1783,7 @@ export class ViewportRendererService {
                 if (material instanceof THREE.MeshBasicMaterial) {
                   material.map = texture;
                   material.color.set(0xffffff);
+                  material.transparent = true;
                   material.needsUpdate = true;
                 }
               }
@@ -1745,6 +1829,252 @@ export class ViewportRendererService {
     root.userData.sizeGroup = sizeGroup;
 
     return root;
+  }
+
+  private createUIControl2DVisual(node: UIControl2D): THREE.Group {
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    geometry.computeBoundingBox();
+
+    const material = new THREE.MeshBasicMaterial({
+      color: this.getUIControlDefaultColor(node),
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: node instanceof Label2D ? 0 : 1,
+      depthTest: false,
+    });
+
+    this.applyTextureTo2DMaterial(node, material);
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.layers.set(LAYER_2D);
+    mesh.userData.isUIControl2DVisual = true;
+    mesh.userData.nodeId = node.nodeId;
+
+    const root = new THREE.Group();
+    root.position.copy(node.position);
+    root.rotation.copy(node.rotation);
+    root.scale.set(node.scale.x, node.scale.y, 1);
+    root.visible = node.visible;
+    root.layers.set(LAYER_2D);
+
+    const { width, height } = this.getUIControlDimensions(node);
+    const sizeGroup = new THREE.Group();
+    sizeGroup.scale.set(width, height, 1);
+    sizeGroup.layers.set(LAYER_2D);
+    sizeGroup.add(mesh);
+
+    root.add(sizeGroup);
+
+    if (node.label.trim().length > 0) {
+      const labelMesh = this.createUIControlLabelMesh(node);
+      root.add(labelMesh);
+    }
+
+    root.userData.isUIControl2DVisualRoot = true;
+    root.userData.nodeId = node.nodeId;
+    root.userData.sizeGroup = sizeGroup;
+    root.userData.controlMesh = mesh;
+    root.userData.texturePath =
+      (node as UIControl2D & { texturePath?: string | null }).texturePath ?? null;
+
+    return root;
+  }
+
+  private getUIControlDimensions(node: UIControl2D): { width: number; height: number } {
+    if (node instanceof Button2D) {
+      return { width: node.width, height: node.height };
+    }
+
+    if (node instanceof Label2D) {
+      const fontSize = Math.max(8, node.labelFontSize || 16);
+      const textLength = Math.max(1, node.label.length);
+      return {
+        width: Math.max(48, textLength * fontSize * 0.7),
+        height: Math.max(24, fontSize * 1.8),
+      };
+    }
+
+    if (node instanceof Slider2D) {
+      return { width: node.width, height: Math.max(node.height, node.handleSize) };
+    }
+
+    if (node instanceof Bar2D) {
+      return { width: node.width, height: node.height };
+    }
+
+    if (node instanceof InventorySlot2D) {
+      return { width: node.width, height: node.height };
+    }
+
+    if (node instanceof Checkbox2D) {
+      return { width: node.size, height: node.size };
+    }
+
+    return { width: 100, height: 40 };
+  }
+
+  private getUIControlDefaultColor(node: UIControl2D): number {
+    if (node instanceof Button2D) {
+      return new THREE.Color(node.backgroundColor).getHex();
+    }
+    if (node instanceof Slider2D) {
+      return new THREE.Color(node.trackBackgroundColor).getHex();
+    }
+    if (node instanceof Bar2D) {
+      return new THREE.Color(node.backBackgroundColor).getHex();
+    }
+    if (node instanceof InventorySlot2D) {
+      return new THREE.Color(node.backdropColor).getHex();
+    }
+    if (node instanceof Checkbox2D) {
+      return new THREE.Color(node.checked ? node.checkedColor : node.uncheckedColor).getHex();
+    }
+    return 0x96cbf6;
+  }
+
+  private applyTextureTo2DMaterial(node: UIControl2D, material: THREE.MeshBasicMaterial): void {
+    const texturePath = (node as UIControl2D & { texturePath?: string | null }).texturePath;
+    if (!texturePath) {
+      return;
+    }
+
+    const textureLoader = new THREE.TextureLoader();
+
+    (async () => {
+      try {
+        const blob = await this.resourceManager.readBlob(texturePath);
+        const blobUrl = URL.createObjectURL(blob);
+
+        textureLoader.load(
+          blobUrl,
+          texture => {
+            try {
+              material.map = texture;
+              material.color.set(0xffffff);
+              material.transparent = true;
+              material.needsUpdate = true;
+            } finally {
+              URL.revokeObjectURL(blobUrl);
+            }
+          },
+          undefined,
+          () => {
+            URL.revokeObjectURL(blobUrl);
+          }
+        );
+      } catch {
+        const schemeMatch = /^([a-z]+[a-z0-9+.-]*):\/\//i.exec(texturePath);
+        const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : '';
+        if (scheme === 'http' || scheme === 'https' || scheme === '') {
+          try {
+            const texture = textureLoader.load(texturePath);
+            material.map = texture;
+            material.color.set(0xffffff);
+            material.transparent = true;
+            material.needsUpdate = true;
+          } catch {
+            // Keep flat color fallback
+          }
+        }
+      }
+    })();
+  }
+
+  private createUIControlLabelMesh(
+    node: UIControl2D
+  ): THREE.Mesh {
+    const dprRaw = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+    const dpr = Math.max(1, Math.min(3, dprRaw));
+
+    const paddingX = 12;
+    const paddingY = 8;
+    const fontSize = Math.max(8, node.labelFontSize || 16);
+
+    const measureCanvas = document.createElement('canvas');
+    const measureCtx = measureCanvas.getContext('2d');
+    if (!measureCtx) {
+      const fallbackGeometry = new THREE.PlaneGeometry(0.1, 0.1);
+      const fallbackMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+      return new THREE.Mesh(fallbackGeometry, fallbackMaterial);
+    }
+    measureCtx.font = `${fontSize}px ${node.labelFontFamily}`;
+    const measured = measureCtx.measureText(node.label || ' ');
+    const logicalWidth = Math.max(32, Math.ceil(measured.width + paddingX * 2));
+    const logicalHeight = Math.max(20, Math.ceil(fontSize + paddingY * 2));
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(logicalWidth * dpr));
+    canvas.height = Math.max(1, Math.round(logicalHeight * dpr));
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) {
+      const fallbackGeometry = new THREE.PlaneGeometry(0.1, 0.1);
+      const fallbackMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+      return new THREE.Mesh(fallbackGeometry, fallbackMaterial);
+    }
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.scale(dpr, dpr);
+
+    ctx.clearRect(0, 0, logicalWidth, logicalHeight);
+    ctx.fillStyle = node.labelColor;
+    ctx.font = `${fontSize}px ${node.labelFontFamily}`;
+    ctx.textBaseline = 'middle';
+
+    let x = logicalWidth / 2;
+    if (node.labelAlign === 'left') {
+      ctx.textAlign = 'left';
+      x = paddingX;
+    } else if (node.labelAlign === 'right') {
+      ctx.textAlign = 'right';
+      x = logicalWidth - paddingX;
+    } else {
+      ctx.textAlign = 'center';
+    }
+
+    ctx.fillText(node.label, x, logicalHeight / 2);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.needsUpdate = true;
+
+    const geometry = new THREE.PlaneGeometry(logicalWidth, logicalHeight);
+    const material = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      depthTest: false,
+      side: THREE.DoubleSide,
+    });
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.userData.isUIControlLabel = true;
+    mesh.renderOrder = 1002;
+    mesh.position.z = 0.5;
+    mesh.layers.set(LAYER_2D);
+    return mesh;
+  }
+
+  private updateUIControlLabelVisual(
+    visualRoot: THREE.Group,
+    node: UIControl2D
+  ): void {
+    const existingLabel = visualRoot.children.find(child =>
+      Boolean((child as THREE.Object3D).userData?.isUIControlLabel)
+    );
+
+    if (node.label.trim().length === 0) {
+      if (existingLabel) {
+        visualRoot.remove(existingLabel);
+        this.disposeObject3D(existingLabel);
+      }
+      return;
+    }
+
+    if (existingLabel) {
+      visualRoot.remove(existingLabel);
+      this.disposeObject3D(existingLabel);
+    }
+
+    const labelMesh = this.createUIControlLabelMesh(node);
+    visualRoot.add(labelMesh);
   }
 
   private findNodeById(nodeId: string, nodes: NodeBase[]): NodeBase | null {
@@ -1821,6 +2151,10 @@ export class ViewportRendererService {
     } else if (node instanceof Sprite2D) {
       halfWidth = (node.width ?? 64) / 2;
       halfHeight = (node.height ?? 64) / 2;
+    } else if (node instanceof UIControl2D) {
+      const { width, height } = this.getUIControlDimensions(node);
+      halfWidth = width / 2;
+      halfHeight = height / 2;
     }
 
     // Create local corners (center-origin)
@@ -2320,6 +2654,9 @@ export class ViewportRendererService {
     if (node instanceof Sprite2D) {
       return this.sprite2DVisuals.get(node.nodeId);
     }
+    if (node instanceof UIControl2D) {
+      return this.uiControl2DVisuals.get(node.nodeId);
+    }
     return undefined;
   }
 
@@ -2580,6 +2917,11 @@ export class ViewportRendererService {
       this.disposeObject3D(visual);
     }
     this.sprite2DVisuals.clear();
+
+    for (const visual of this.uiControl2DVisuals.values()) {
+      this.disposeObject3D(visual);
+    }
+    this.uiControl2DVisuals.clear();
 
     this.clear2DSelectionOverlay();
 

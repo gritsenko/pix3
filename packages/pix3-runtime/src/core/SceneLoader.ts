@@ -10,7 +10,13 @@ import { Layout2D } from '../nodes/2D/Layout2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
-import { Joystick2D } from '../nodes/2D/Joystick2D';
+import { Joystick2D } from '../nodes/2D/UI/Joystick2D';
+import { Button2D } from '../nodes/2D/UI/Button2D';
+import { Slider2D } from '../nodes/2D/UI/Slider2D';
+import { Bar2D } from '../nodes/2D/UI/Bar2D';
+import { Checkbox2D } from '../nodes/2D/UI/Checkbox2D';
+import { InventorySlot2D } from '../nodes/2D/UI/InventorySlot2D';
+import { Label2D } from '../nodes/2D/UI/Label2D';
 import type { SceneGraph } from './SceneManager';
 
 import { GeometryMesh } from '../nodes/3D/GeometryMesh';
@@ -377,6 +383,167 @@ export class SceneLoader {
           baseColor: this.asString(props.baseColor),
           handleColor: this.asString(props.handleColor),
           floating: typeof props.floating === 'boolean' ? props.floating : undefined,
+        });
+      }
+      case 'Button2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        return new Button2D({
+          ...baseProps,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
+          width: this.asNumber(props.width, undefined),
+          height: this.asNumber(props.height, undefined),
+          backgroundColor: this.asString(props.backgroundColor),
+          hoverColor: this.asString(props.hoverColor),
+          pressedColor: this.asString(props.pressedColor),
+          buttonAction: this.asString(props.buttonAction),
+          label: this.asString(props.label),
+          labelFontFamily: this.asString(props.labelFontFamily),
+          labelFontSize: this.asNumber(props.labelFontSize, undefined),
+          labelColor: this.asString(props.labelColor),
+          labelAlign: this.asString(props.labelAlign) as 'left' | 'center' | 'right' | undefined,
+          texturePath: this.asString(props.texturePath),
+          enabled: typeof props.enabled === 'boolean' ? props.enabled : undefined,
+        });
+      }
+      case 'Label2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        return new Label2D({
+          ...baseProps,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
+          label: this.asString(props.label),
+          labelFontFamily: this.asString(props.labelFontFamily),
+          labelFontSize: this.asNumber(props.labelFontSize, undefined),
+          labelColor: this.asString(props.labelColor),
+          labelAlign: this.asString(props.labelAlign) as 'left' | 'center' | 'right' | undefined,
+          enabled: typeof props.enabled === 'boolean' ? props.enabled : undefined,
+        });
+      }
+      case 'Slider2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        return new Slider2D({
+          ...baseProps,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
+          width: this.asNumber(props.width, undefined),
+          height: this.asNumber(props.height, undefined),
+          handleSize: this.asNumber(props.handleSize, undefined),
+          trackBackgroundColor: this.asString(props.trackBackgroundColor),
+          trackFilledColor: this.asString(props.trackFilledColor),
+          handleColor: this.asString(props.handleColor),
+          minValue: this.asNumber(props.minValue, undefined),
+          maxValue: this.asNumber(props.maxValue, undefined),
+          value: this.asNumber(props.value, undefined),
+          axisName: this.asString(props.axisName),
+          label: this.asString(props.label),
+          labelFontFamily: this.asString(props.labelFontFamily),
+          labelFontSize: this.asNumber(props.labelFontSize, undefined),
+          labelColor: this.asString(props.labelColor),
+          labelAlign: this.asString(props.labelAlign) as 'left' | 'center' | 'right' | undefined,
+          texturePath: this.asString(props.texturePath),
+          enabled: typeof props.enabled === 'boolean' ? props.enabled : undefined,
+        });
+      }
+      case 'Bar2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        return new Bar2D({
+          ...baseProps,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
+          width: this.asNumber(props.width, undefined),
+          height: this.asNumber(props.height, undefined),
+          backBackgroundColor: this.asString(props.backBackgroundColor),
+          barColor: this.asString(props.barColor),
+          minValue: this.asNumber(props.minValue, undefined),
+          maxValue: this.asNumber(props.maxValue, undefined),
+          value: this.asNumber(props.value, undefined),
+          showBorder: typeof props.showBorder === 'boolean' ? props.showBorder : undefined,
+          borderColor: this.asString(props.borderColor),
+          borderWidth: this.asNumber(props.borderWidth, undefined),
+          label: this.asString(props.label),
+          labelFontFamily: this.asString(props.labelFontFamily),
+          labelFontSize: this.asNumber(props.labelFontSize, undefined),
+          labelColor: this.asString(props.labelColor),
+          labelAlign: this.asString(props.labelAlign) as 'left' | 'center' | 'right' | undefined,
+          texturePath: this.asString(props.texturePath),
+          enabled: typeof props.enabled === 'boolean' ? props.enabled : undefined,
+        });
+      }
+      case 'Checkbox2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        return new Checkbox2D({
+          ...baseProps,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
+          size: this.asNumber(props.size, undefined),
+          checked: typeof props.checked === 'boolean' ? props.checked : undefined,
+          uncheckedColor: this.asString(props.uncheckedColor),
+          checkedColor: this.asString(props.checkedColor),
+          checkmarkColor: this.asString(props.checkmarkColor),
+          checkmarkAction: this.asString(props.checkmarkAction),
+          label: this.asString(props.label),
+          labelFontFamily: this.asString(props.labelFontFamily),
+          labelFontSize: this.asNumber(props.labelFontSize, undefined),
+          labelColor: this.asString(props.labelColor),
+          labelAlign: this.asString(props.labelAlign) as 'left' | 'center' | 'right' | undefined,
+          texturePath: this.asString(props.texturePath),
+          enabled: typeof props.enabled === 'boolean' ? props.enabled : undefined,
+        });
+      }
+      case 'InventorySlot2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        return new InventorySlot2D({
+          ...baseProps,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
+          width: this.asNumber(props.width, undefined),
+          height: this.asNumber(props.height, undefined),
+          backdropColor: this.asString(props.backdropColor),
+          borderColor: this.asString(props.borderColor),
+          borderWidth: this.asNumber(props.borderWidth, undefined),
+          quantity: this.asNumber(props.quantity, undefined),
+          showQuantity: typeof props.showQuantity === 'boolean' ? props.showQuantity : undefined,
+          quantityFontSize: this.asNumber(props.quantityFontSize, undefined),
+          selectionColor: this.asString(props.selectionColor),
+          selectedAction: this.asString(props.selectedAction),
+          label: this.asString(props.label),
+          labelFontFamily: this.asString(props.labelFontFamily),
+          labelFontSize: this.asNumber(props.labelFontSize, undefined),
+          labelColor: this.asString(props.labelColor),
+          labelAlign: this.asString(props.labelAlign) as 'left' | 'center' | 'right' | undefined,
+          texturePath: this.asString(props.texturePath),
+          enabled: typeof props.enabled === 'boolean' ? props.enabled : undefined,
         });
       }
       case 'GeometryMesh': {

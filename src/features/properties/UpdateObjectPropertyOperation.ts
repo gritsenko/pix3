@@ -120,10 +120,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       const is2DVisualProperty = this.is2DVisualProperty(propertyPath);
       if (isTransform) {
         vr.updateNodeTransform(node);
-      } else if (
-        is2DVisualProperty &&
-        (node instanceof Layout2D || node instanceof Group2D || node instanceof Sprite2D)
-      ) {
+      } else if (is2DVisualProperty && node instanceof Node2D) {
         vr.updateNodeTransform(node);
         if (this.isParentSizeProperty(propertyPath) && this.is2DContainer(node)) {
           this.updateDescendant2DTransforms(vr, node);
@@ -143,7 +140,45 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
   }
 
   private is2DVisualProperty(propertyPath: string): boolean {
-    return ['width', 'height', 'showViewportOutline', 'resolutionPreset'].includes(propertyPath);
+    return [
+      'width',
+      'height',
+      'size',
+      'radius',
+      'handleRadius',
+      'showViewportOutline',
+      'resolutionPreset',
+      'label',
+      'labelFontFamily',
+      'labelFontSize',
+      'labelColor',
+      'labelAlign',
+      'texturePath',
+      'backgroundColor',
+      'hoverColor',
+      'pressedColor',
+      'trackBackgroundColor',
+      'trackFilledColor',
+      'handleColor',
+      'backdropColor',
+      'borderColor',
+      'selectionColor',
+      'uncheckedColor',
+      'checkedColor',
+      'checkmarkColor',
+      'barColor',
+      'backBackgroundColor',
+      'showBorder',
+      'quantity',
+      'showQuantity',
+      'quantityFontSize',
+      'enabled',
+      'checked',
+      'value',
+      'minValue',
+      'maxValue',
+      'handleSize',
+    ].includes(propertyPath);
   }
 
   private isParentSizeProperty(propertyPath: string): boolean {
