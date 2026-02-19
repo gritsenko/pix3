@@ -1,5 +1,7 @@
 import type { SceneGraph } from '@pix3/runtime';
+import { SceneManager } from '@pix3/runtime';
 import type { AppState } from '@/state';
+import { ServiceContainer } from '@/fw/di';
 import { SceneStateUpdater } from './SceneStateUpdater';
 
 export abstract class CreateNodeOperationBase<TParams> {
@@ -27,7 +29,7 @@ export abstract class CreateNodeOperationBase<TParams> {
     return this.getNodeTypeName();
   }
 
-  async perform(context: { state: AppState; container: unknown }, sceneId: string) {
+  async perform(context: { state: AppState; container: ServiceContainer }, sceneId: string) {
     const { state, container } = context;
 
     if (!sceneId) {
