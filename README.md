@@ -74,6 +74,7 @@ This plan is for adding a **Project -> Build Standalone** command that prepares 
 
 - Keep editor-side changes minimal
 - Store all generated scaffolding in `src/templates/standalone/`
+- Copy runtime sources from `packages/pix3-runtime/` during generation
 - On build command, materialize/actualize templates into the project folder
 - Avoid changing operations/state architecture
 
@@ -112,7 +113,8 @@ Create `src/templates/standalone/` with:
 - `src/main.ts.tpl`
 - `src/engine-api.ts.tpl`
 - `src/register-project-scripts.ts.tpl`
-- `src/runtime/` (if embedding runtime snapshot as templates)
+
+Runtime files are copied from `packages/pix3-runtime/` (not templated in `src/templates/standalone/`).
 
 Use placeholders:
 
@@ -133,8 +135,8 @@ On command execution, generate under opened project root:
 - `standalone/src/engine-api.ts`
 - `standalone/src/register-project-scripts.ts`
 - `standalone/asset-manifest.json`
-- `standalone/scene-manifest.json`
-- `standalone/runtime/**` (if runtime is template-copied)
+- `standalone/src/generated/scene-manifest.ts`
+- `standalone/runtime/**` (copied from `packages/pix3-runtime/`)
 
 ### Command Contract
 
@@ -229,12 +231,15 @@ Add specs for:
 
 ### Implementation Order (for another agent)
 
-1. Add templates in `src/templates/standalone/`
-2. Implement `StandaloneBuildService`
-3. Implement `BuildStandaloneCommand`
-4. Register command in `pix3-editor-shell.ts`
-5. Add/adjust tests
-6. Run `npm run lint`, `npm run test`, `npm run build`
+Progress status:
+
+- [x] Add templates in `src/templates/standalone/`
+- [x] Implement `StandaloneBuildService`
+- [x] Implement `BuildStandaloneCommand`
+- [x] Register command in `pix3-editor-shell.ts`
+- [x] Add/adjust tests
+- [x] Run `npm run lint`, `npm run test`, `npm run build`
+- [x] Add progress modal and logging with build statistics
 
 ## License
 
