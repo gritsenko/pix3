@@ -35,6 +35,12 @@ export { ScriptExecutionService } from './ScriptExecutionService';
 export { ProjectScriptLoaderService } from './ProjectScriptLoaderService';
 export { BehaviorPickerService } from './BehaviorPickerService';
 export {
+  AssetsPreviewService,
+  type AssetPreviewItem,
+  type AssetPreviewType,
+  type AssetsPreviewSnapshot,
+} from './AssetsPreviewService';
+export {
   ScriptCreatorService,
   type ScriptCreationParams,
   type ScriptCreationInstance,

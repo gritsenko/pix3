@@ -123,6 +123,7 @@ export interface PanelVisibilityState {
   viewport: boolean;
   inspector: boolean;
   assetBrowser: boolean;
+  assetsPreview: boolean;
   logs: boolean;
 }
 
@@ -220,6 +221,7 @@ export const createInitialAppState = (): AppState => ({
       viewport: true,
       inspector: true,
       assetBrowser: true,
+      assetsPreview: true,
       logs: true,
     },
     navigationMode: '3d',

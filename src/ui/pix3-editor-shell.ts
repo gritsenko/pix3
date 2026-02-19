@@ -51,6 +51,7 @@ import './shared/pix3-status-bar';
 import './shared/pix3-background';
 import './welcome/pix3-welcome';
 import './logs-view/logs-panel';
+import './assets-preview/assets-preview-panel';
 import './viewport/game-tab';
 import './pix3-editor-shell.ts.css';
 

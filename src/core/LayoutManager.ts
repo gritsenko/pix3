@@ -13,6 +13,7 @@ const PANEL_COMPONENT_TYPES = {
   viewport: 'viewport',
   inspector: 'inspector',
   assetBrowser: 'asset-browser',
+  assetsPreview: 'assets-preview',
   logs: 'logs',
   background: 'background',
   game: 'game',
@@ -25,6 +26,7 @@ const PANEL_TAG_NAMES = {
   [PANEL_COMPONENT_TYPES.viewport]: 'pix3-editor-tab',
   [PANEL_COMPONENT_TYPES.inspector]: 'pix3-inspector-panel',
   [PANEL_COMPONENT_TYPES.assetBrowser]: 'pix3-asset-browser-panel',
+  [PANEL_COMPONENT_TYPES.assetsPreview]: 'pix3-assets-preview-panel',
   [PANEL_COMPONENT_TYPES.logs]: 'pix3-logs-panel',
   [PANEL_COMPONENT_TYPES.background]: 'pix3-background',
   [PANEL_COMPONENT_TYPES.game]: 'pix3-game-tab',
@@ -35,6 +37,7 @@ const PANEL_DISPLAY_TITLES: Record<PanelComponentType, string> = {
   [PANEL_COMPONENT_TYPES.viewport]: 'Viewport',
   [PANEL_COMPONENT_TYPES.inspector]: 'Inspector',
   [PANEL_COMPONENT_TYPES.assetBrowser]: 'Asset Browser',
+  [PANEL_COMPONENT_TYPES.assetsPreview]: 'Assets Preview',
   [PANEL_COMPONENT_TYPES.logs]: 'Logs',
   [PANEL_COMPONENT_TYPES.background]: 'Pix3',
   [PANEL_COMPONENT_TYPES.game]: 'Game',
@@ -45,6 +48,7 @@ const DEFAULT_PANEL_VISIBILITY: PanelVisibilityState = {
   viewport: true,
   inspector: true,
   assetBrowser: true,
+  assetsPreview: true,
   logs: true,
 };
 
@@ -101,11 +105,22 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
             ],
           },
           {
-            type: 'component',
-            componentType: PANEL_COMPONENT_TYPES.logs,
-            title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.logs],
+            type: 'stack',
             height: 25,
-            isClosable: true,
+            content: [
+              {
+                type: 'component',
+                componentType: PANEL_COMPONENT_TYPES.assetsPreview,
+                title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.assetsPreview],
+                isClosable: false,
+              },
+              {
+                type: 'component',
+                componentType: PANEL_COMPONENT_TYPES.logs,
+                title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.logs],
+                isClosable: true,
+              },
+            ],
           },
         ],
       },
@@ -556,7 +571,9 @@ export class LayoutManagerService {
         previousPanelVisibility.sceneTree === nextPanelVisibility.sceneTree &&
         previousPanelVisibility.viewport === nextPanelVisibility.viewport &&
         previousPanelVisibility.inspector === nextPanelVisibility.inspector &&
-        previousPanelVisibility.assetBrowser === nextPanelVisibility.assetBrowser
+        previousPanelVisibility.assetBrowser === nextPanelVisibility.assetBrowser &&
+        previousPanelVisibility.assetsPreview === nextPanelVisibility.assetsPreview &&
+        previousPanelVisibility.logs === nextPanelVisibility.logs
       ) ||
       previousFocusedPanelId !== nextFocusedPanelId;
 

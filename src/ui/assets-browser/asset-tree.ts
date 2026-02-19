@@ -2,6 +2,7 @@ import { ComponentBase, customElement, html, inject, property, state } from '@/f
 import { ifDefined } from 'lit/directives/if-defined.js';
 import type { AssetActivation } from '@/services';
 import type { FileDescriptor } from '@/services/FileSystemAPIService';
+import { AssetsPreviewService } from '@/services/AssetsPreviewService';
 import { ProjectService } from '@/services/ProjectService';
 import { TemplateService, DEFAULT_TEMPLATE_SCENE_ID } from '@/services/TemplateService';
 import { DialogService } from '@/services/DialogService';
@@ -29,6 +30,8 @@ export class AssetTree extends ComponentBase {
   private readonly dialogService!: DialogService;
   @inject(IconService)
   private readonly iconService!: IconService;
+  @inject(AssetsPreviewService)
+  private readonly assetsPreviewService!: AssetsPreviewService;
   // Parent will handle actions via 'asset-activate' event
 
   // root path to show, defaults to project root
@@ -151,6 +154,7 @@ export class AssetTree extends ComponentBase {
           if (remainingSegments.length === 0) {
             // Found the target node
             this.selectedPath = node.path;
+            void this.assetsPreviewService.syncFromAssetSelection(node.path, node.kind);
             this.tree = [...this.tree];
             return true;
           } else if (node.kind === 'directory' && node.children) {
@@ -425,22 +429,10 @@ export class AssetTree extends ComponentBase {
     } else if (isSameNode) {
       this._lastClickedPath = null;
       this.selectedPath = node.path;
-      this.dispatchEvent(
-        new CustomEvent('asset-selected', {
-          detail: { path: node.path, kind: node.kind },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      this.notifyAssetSelected(node);
     } else {
       this.selectedPath = node.path;
-      this.dispatchEvent(
-        new CustomEvent('asset-selected', {
-          detail: { path: node.path, kind: node.kind },
-          bubbles: true,
-          composed: true,
-        })
-      );
+      this.notifyAssetSelected(node);
 
       this._lastClickedPath = node.path;
     }
@@ -492,6 +484,17 @@ export class AssetTree extends ComponentBase {
     this.dispatchEvent(
       new CustomEvent<AssetActivation>('asset-activate', {
         detail: activation,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private notifyAssetSelected(node: Node): void {
+    void this.assetsPreviewService.syncFromAssetSelection(node.path, node.kind);
+    this.dispatchEvent(
+      new CustomEvent('asset-selected', {
+        detail: { path: node.path, kind: node.kind },
         bubbles: true,
         composed: true,
       })
