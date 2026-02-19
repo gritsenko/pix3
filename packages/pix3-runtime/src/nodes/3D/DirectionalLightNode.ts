@@ -3,7 +3,7 @@ import { Node3D, type Node3DProps } from '../Node3D';
 import type { PropertySchema } from '../../fw/property-schema';
 import { defineProperty, mergeSchemas } from '../../fw/property-schema';
 
-const TARGET_DISTANCE = 10;
+const TARGET_DISTANCE = 5;
 
 export interface DirectionalLightNodeProps extends Omit<Node3DProps, 'type'> {
   color?: string;
@@ -20,20 +20,36 @@ export class DirectionalLightNode extends Node3D {
     const intensity = typeof props.intensity === 'number' ? props.intensity : 1;
     this.light = new DirectionalLight(color, intensity);
     this.light.castShadow = props.castShadow ?? true;
+    this.light.position.set(0, 0, 0);
     this.add(this.light);
+    this.add(this.light.target);
+
+    const initialTarget = this.getWorldPosition(new Vector3()).add(
+      new Vector3(0, 0, TARGET_DISTANCE).applyQuaternion(this.getWorldQuaternion(new Quaternion()))
+    );
+    this.setTargetPosition(initialTarget);
   }
 
   getTargetPosition(): Vector3 {
-    const forward = new Vector3(0, 0, -1);
-    forward.applyQuaternion(this.quaternion);
-    return forward.multiplyScalar(TARGET_DISTANCE).add(this.position);
+    this.light.target.updateMatrixWorld(true);
+    return this.light.target.getWorldPosition(new Vector3());
   }
 
   setTargetPosition(targetPos: Vector3): void {
-    const direction = targetPos.clone().sub(this.position).normalize();
-    const quaternion = new Quaternion();
-    quaternion.setFromUnitVectors(new Vector3(0, 0, -1), direction);
-    this.quaternion.copy(quaternion);
+    const worldPosition = this.getWorldPosition(new Vector3());
+    const rawDirection = targetPos.clone().sub(worldPosition);
+    const direction =
+      rawDirection.lengthSq() > 1e-8
+        ? rawDirection.normalize()
+        : new Vector3(0, 0, 1).applyQuaternion(this.getWorldQuaternion(new Quaternion()));
+    const constrainedTarget = worldPosition.add(direction.multiplyScalar(TARGET_DISTANCE));
+
+    this.lookAt(constrainedTarget);
+
+    const localTarget = constrainedTarget.clone();
+    this.worldToLocal(localTarget);
+    this.light.target.position.copy(localTarget);
+    this.light.target.updateMatrixWorld(true);
   }
 
   static override getPropertySchema(): PropertySchema {

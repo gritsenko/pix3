@@ -118,7 +118,6 @@ export class TargetTransformOperation implements Operation<OperationInvokeResult
   private applyTargetTransform(node: Node3D, targetPos: Vector3): void {
     if (node instanceof Camera3D) {
       node.setTargetPosition(targetPos);
-      node.camera.lookAt(targetPos);
     } else if (node instanceof DirectionalLightNode) {
       node.setTargetPosition(targetPos);
     }

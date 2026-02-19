@@ -40,6 +40,7 @@ import {
   Transform2DCompleteOperation,
   type Transform2DState,
 } from '@/features/properties/Transform2DCompleteOperation';
+import { TargetTransformOperation } from '@/features/properties/TargetTransformOperation';
 import {
   TransformTool2d,
   type TwoDHandle,
@@ -52,6 +53,7 @@ export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 const LAYER_3D = 0;
 const LAYER_2D = 1;
 const LAYER_GIZMOS = 2;
+const TARGET_DIRECTION_RAY_LENGTH = 500;
 
 @injectable()
 export class ViewportRendererService {
@@ -104,6 +106,9 @@ export class ViewportRendererService {
     string,
     { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }
   >();
+  private targetTransformStartStates = new Map<string, THREE.Vector3>();
+  private activeTargetNodeId: string | null = null;
+  private activeTargetDragNodeId: string | null = null;
   private lastActiveSceneId: string | null = null;
   private viewportSize = { width: 0, height: 0 };
   private transformTool2d: TransformTool2d;
@@ -261,6 +266,7 @@ export class ViewportRendererService {
     // Update selection box when transform control object changes
     this.transformControls.addEventListener('objectChange', () => {
       this.updateSelectionBoxes();
+      this.updateTargetTransformFromControl();
     });
 
     // Handle transform completion (when mouse is released)
@@ -369,6 +375,7 @@ export class ViewportRendererService {
         });
         this.transformControls.addEventListener('objectChange', () => {
           this.updateSelectionBoxes();
+          this.updateTargetTransformFromControl();
         });
         this.transformControls.addEventListener('mouseUp', () => {
           this.handleTransformCompleted();
@@ -544,7 +551,8 @@ export class ViewportRendererService {
       }
 
       if (icon.material instanceof THREE.SpriteMaterial) {
-        icon.material.map = kind === 'camera' ? this.cameraIconTexture ?? null : this.lampIconTexture ?? null;
+        icon.material.map =
+          kind === 'camera' ? (this.cameraIconTexture ?? null) : (this.lampIconTexture ?? null);
         icon.material.needsUpdate = true;
       }
     }
@@ -871,34 +879,7 @@ export class ViewportRendererService {
     } else if (this.transformControls) {
       // In transform modes, set the mode on TransformControls
       this.transformControls.setMode(mode);
-
-      // Reattach to the selected object if there is one
-      const { nodeIds } = appState.selection;
-      const activeSceneId = appState.scenes.activeSceneId;
-
-      if (nodeIds.length > 0 && activeSceneId) {
-        const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
-        if (sceneGraph) {
-          // Find the first selected node
-          const firstSelectedNodeId = nodeIds[0];
-          const firstSelectedNode = this.findNodeById(firstSelectedNodeId, sceneGraph.rootNodes);
-
-          if (firstSelectedNode && firstSelectedNode instanceof Node3D) {
-            // Attach transform controls to the selected object
-            this.transformControls.attach(firstSelectedNode);
-
-            // Add the transform gizmo to the scene
-            if (this.scene) {
-              this.transformGizmo = this.transformControls.getHelper();
-              this.transformGizmo.userData.isTransformGizmo = true;
-              this.transformGizmo.traverse(child => {
-                child.userData.isTransformGizmo = true;
-              });
-              this.scene.add(this.transformGizmo);
-            }
-          }
-        }
-      }
+      this.attachTransformControlsForSelection();
     }
   }
 
@@ -934,14 +915,28 @@ export class ViewportRendererService {
     }
 
     if (!layer3DEnabled || !this.camera) {
+      this.clearActiveTargetSelection();
       return null;
     }
+
+    const targetNodeId = this.raycastTargetSphere(screenX, screenY);
+    if (targetNodeId) {
+      this.setActiveTargetSelection(targetNodeId);
+      const sceneGraph = this.sceneManager.getActiveSceneGraph();
+      const node = sceneGraph?.nodeMap.get(targetNodeId);
+      if (node instanceof NodeBase && !node.properties.locked) {
+        return node;
+      }
+      return null;
+    }
+
+    this.clearActiveTargetSelection();
 
     const iconNodeId = this.raycastNodeIcon(screenX, screenY);
     if (iconNodeId) {
       const sceneGraph = this.sceneManager.getActiveSceneGraph();
       const node = sceneGraph?.nodeMap.get(iconNodeId);
-      if (node instanceof NodeBase && !Boolean(node.properties.locked)) {
+      if (node instanceof NodeBase && !node.properties.locked) {
         return node;
       }
     }
@@ -1020,6 +1015,41 @@ export class ViewportRendererService {
     }
 
     const hitNodeId = hits[0].object.userData.nodeId;
+    return typeof hitNodeId === 'string' ? hitNodeId : null;
+  }
+
+  private raycastTargetSphere(screenX: number, screenY: number): string | null {
+    if (!this.camera || this.targetGizmos.size === 0 || !appState.ui.showLayer3D) {
+      return null;
+    }
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.layers.set(LAYER_GIZMOS);
+
+    const mouse = new THREE.Vector2();
+    mouse.x = screenX * 2 - 1;
+    mouse.y = -(screenY * 2 - 1);
+    raycaster.setFromCamera(mouse, this.camera);
+
+    const targetSpheres: THREE.Object3D[] = [];
+    for (const gizmo of this.targetGizmos.values()) {
+      gizmo.traverse(child => {
+        if (child.userData.isTargetSphere && child.visible) {
+          targetSpheres.push(child);
+        }
+      });
+    }
+
+    if (!targetSpheres.length) {
+      return null;
+    }
+
+    const hits = raycaster.intersectObjects(targetSpheres, false);
+    if (!hits.length) {
+      return null;
+    }
+
+    const hitNodeId = hits[0].object.userData.parentNodeId;
     return typeof hitNodeId === 'string' ? hitNodeId : null;
   }
 
@@ -1299,6 +1329,9 @@ export class ViewportRendererService {
 
     // Get selected node IDs from app state
     const { nodeIds } = appState.selection;
+    if (this.activeTargetNodeId && !nodeIds.includes(this.activeTargetNodeId)) {
+      this.activeTargetNodeId = null;
+    }
     const activeSceneId = appState.scenes.activeSceneId;
 
     if (!activeSceneId) {
@@ -1383,24 +1416,75 @@ export class ViewportRendererService {
     }
     this.updateNodeIconVisibility();
 
-    // Attach transform controls to the first selected node if any
-    // (but only if not in select mode)
-    if (
-      firstSelectedNode &&
-      this.transformControls &&
-      this.scene &&
-      this.currentTransformMode !== 'select'
-    ) {
-      this.transformControls.attach(firstSelectedNode);
+    this.attachTransformControlsForSelection(firstSelectedNode);
+  }
 
-      // Get and add the transform gizmo to the scene
-      this.transformGizmo = this.transformControls.getHelper();
-      this.transformGizmo.userData.isTransformGizmo = true;
-      this.transformGizmo.traverse(child => {
-        child.userData.isTransformGizmo = true;
-      });
-      this.scene.add(this.transformGizmo);
+  private attachTransformControlsForSelection(firstSelectedNode?: Node3D | null): void {
+    if (!this.transformControls || !this.scene || this.currentTransformMode === 'select') {
+      return;
     }
+
+    let nodeToAttach = firstSelectedNode ?? null;
+    if (!nodeToAttach) {
+      const { nodeIds } = appState.selection;
+      const activeSceneId = appState.scenes.activeSceneId;
+      if (!nodeIds.length || !activeSceneId) {
+        return;
+      }
+
+      const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
+      if (!sceneGraph) {
+        return;
+      }
+
+      const selectedNode = this.findNodeById(nodeIds[0], sceneGraph.rootNodes);
+      if (selectedNode instanceof Node3D) {
+        nodeToAttach = selectedNode;
+      }
+    }
+
+    if (!nodeToAttach) {
+      return;
+    }
+
+    let transformObject: THREE.Object3D = nodeToAttach;
+    const shouldAttachTarget =
+      this.currentTransformMode === 'translate' &&
+      this.activeTargetNodeId === nodeToAttach.nodeId &&
+      (nodeToAttach instanceof Camera3D || nodeToAttach instanceof DirectionalLightNode);
+
+    if (shouldAttachTarget) {
+      const targetSphere = this.getTargetSphere(nodeToAttach.nodeId);
+      if (targetSphere) {
+        transformObject = targetSphere;
+      } else {
+        this.activeTargetNodeId = null;
+      }
+    }
+
+    this.transformControls.attach(transformObject);
+    this.transformGizmo = this.transformControls.getHelper();
+    this.transformGizmo.userData.isTransformGizmo = true;
+    this.transformGizmo.traverse(child => {
+      child.userData.isTransformGizmo = true;
+    });
+    this.scene.add(this.transformGizmo);
+  }
+
+  private setActiveTargetSelection(nodeId: string): void {
+    if (this.activeTargetNodeId === nodeId) {
+      return;
+    }
+    this.activeTargetNodeId = nodeId;
+    this.updateSelection();
+  }
+
+  private clearActiveTargetSelection(): void {
+    if (this.activeTargetNodeId === null) {
+      return;
+    }
+    this.activeTargetNodeId = null;
+    this.updateSelection();
   }
 
   private syncSceneContent(): void {
@@ -1665,7 +1749,7 @@ export class ViewportRendererService {
       }
 
       const material = new THREE.SpriteMaterial({
-        map: isCamera ? this.cameraIconTexture ?? null : this.lampIconTexture ?? null,
+        map: isCamera ? (this.cameraIconTexture ?? null) : (this.lampIconTexture ?? null),
         color: 0xffffff,
         transparent: true,
         depthTest: false,
@@ -1687,7 +1771,9 @@ export class ViewportRendererService {
       for (const node of roots) {
         addIconForNode(node);
         if (node.children.length > 0) {
-          const childNodes = node.children.filter((child): child is NodeBase => child instanceof NodeBase);
+          const childNodes = node.children.filter(
+            (child): child is NodeBase => child instanceof NodeBase
+          );
           traverse(childNodes);
         }
       }
@@ -1784,6 +1870,15 @@ export class ViewportRendererService {
 
   private createCameraTargetGizmo(node: Camera3D): THREE.Object3D {
     const targetPos = node.getTargetPosition();
+    const nodeWorldPos = node.getWorldPosition(new THREE.Vector3());
+    const rawDirection = targetPos.clone().sub(nodeWorldPos);
+    const direction =
+      rawDirection.lengthSq() > 1e-8
+        ? rawDirection.normalize()
+        : new THREE.Vector3(0, 0, -1).applyQuaternion(
+            node.getWorldQuaternion(new THREE.Quaternion())
+          );
+    const farPos = nodeWorldPos.clone().add(direction.multiplyScalar(TARGET_DIRECTION_RAY_LENGTH));
     const gizmo = new THREE.Group();
     gizmo.userData.isTargetGizmo = true;
     gizmo.userData.parentNodeId = node.nodeId;
@@ -1798,6 +1893,7 @@ export class ViewportRendererService {
     );
     sphere.position.copy(targetPos);
     sphere.userData.isTargetSphere = true;
+    sphere.userData.parentNodeId = node.nodeId;
     gizmo.add(sphere);
 
     const outline = new THREE.Mesh(
@@ -1813,7 +1909,7 @@ export class ViewportRendererService {
     gizmo.add(outline);
 
     const line = new THREE.Line(
-      new THREE.BufferGeometry().setFromPoints([node.position, targetPos]),
+      new THREE.BufferGeometry().setFromPoints([nodeWorldPos, farPos]),
       new THREE.LineBasicMaterial({
         color: 0xffff00,
         transparent: true,
@@ -1821,13 +1917,25 @@ export class ViewportRendererService {
       })
     );
     line.userData.isTargetLine = true;
+    line.userData.parentNodeId = node.nodeId;
+    line.userData.rayLength = TARGET_DIRECTION_RAY_LENGTH;
     gizmo.add(line);
 
+    this.updateTargetGizmoSelectionState(gizmo, node.nodeId);
     return gizmo;
   }
 
   private createDirectionalLightTargetGizmo(node: DirectionalLightNode): THREE.Object3D {
     const targetPos = node.getTargetPosition();
+    const nodeWorldPos = node.getWorldPosition(new THREE.Vector3());
+    const rawDirection = targetPos.clone().sub(nodeWorldPos);
+    const direction =
+      rawDirection.lengthSq() > 1e-8
+        ? rawDirection.normalize()
+        : new THREE.Vector3(0, 0, 1).applyQuaternion(
+            node.getWorldQuaternion(new THREE.Quaternion())
+          );
+    const farPos = nodeWorldPos.clone().add(direction.multiplyScalar(TARGET_DIRECTION_RAY_LENGTH));
     const gizmo = new THREE.Group();
     gizmo.userData.isTargetGizmo = true;
     gizmo.userData.parentNodeId = node.nodeId;
@@ -1842,6 +1950,7 @@ export class ViewportRendererService {
     );
     sphere.position.copy(targetPos);
     sphere.userData.isTargetSphere = true;
+    sphere.userData.parentNodeId = node.nodeId;
     gizmo.add(sphere);
 
     const outline = new THREE.Mesh(
@@ -1856,12 +1965,20 @@ export class ViewportRendererService {
     outline.userData.isTargetOutline = true;
     gizmo.add(outline);
 
-    const grid = new THREE.GridHelper(0.5, 4, 0xffff00, 0xffff00);
-    grid.position.copy(targetPos);
-    grid.lookAt(node.position);
-    grid.userData.isTargetGrid = true;
-    gizmo.add(grid);
+    const line = new THREE.Line(
+      new THREE.BufferGeometry().setFromPoints([nodeWorldPos, farPos]),
+      new THREE.LineBasicMaterial({
+        color: 0xffff00,
+        transparent: true,
+        opacity: 0.5,
+      })
+    );
+    line.userData.isTargetLine = true;
+    line.userData.parentNodeId = node.nodeId;
+    line.userData.rayLength = TARGET_DIRECTION_RAY_LENGTH;
+    gizmo.add(line);
 
+    this.updateTargetGizmoSelectionState(gizmo, node.nodeId);
     return gizmo;
   }
 
@@ -1874,25 +1991,87 @@ export class ViewportRendererService {
     }
     if (!cameraNode) return;
 
-    const targetPos = cameraNode.getTargetPosition();
+    let targetPos = cameraNode.getTargetPosition();
+    if (
+      this.activeTargetDragNodeId === node.nodeId &&
+      this.transformControls?.object &&
+      this.getTargetNodeForObject(this.transformControls.object)?.nodeId === node.nodeId
+    ) {
+      targetPos = this.transformControls.object.getWorldPosition(new THREE.Vector3());
+    }
+    const nodeWorldPos = node.getWorldPosition(new THREE.Vector3());
+    const rawDirection = targetPos.clone().sub(nodeWorldPos);
+    const fallbackAxisZ = cameraNode instanceof DirectionalLightNode ? 1 : -1;
+    const direction =
+      rawDirection.lengthSq() > 1e-8
+        ? rawDirection.normalize()
+        : new THREE.Vector3(0, 0, fallbackAxisZ).applyQuaternion(
+            node.getWorldQuaternion(new THREE.Quaternion())
+          );
 
     gizmo.traverse(child => {
       if (child.userData.isTargetSphere || child.userData.isTargetOutline) {
         child.position.copy(targetPos);
       } else if (child.userData.isTargetLine) {
+        const rayLength = child.userData.rayLength as number | undefined;
+        const lineEndPos =
+          typeof rayLength === 'number'
+            ? nodeWorldPos.clone().add(direction.clone().multiplyScalar(rayLength))
+            : targetPos;
         const positions = new Float32Array([
-          node.position.x,
-          node.position.y,
-          node.position.z,
-          targetPos.x,
-          targetPos.y,
-          targetPos.z,
+          nodeWorldPos.x,
+          nodeWorldPos.y,
+          nodeWorldPos.z,
+          lineEndPos.x,
+          lineEndPos.y,
+          lineEndPos.z,
         ]);
         const geo = (child as THREE.Mesh).geometry as THREE.BufferGeometry;
         geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-      } else if (child.userData.isTargetGrid) {
-        child.position.copy(targetPos);
-        child.lookAt(node.position);
+      }
+    });
+
+    this.updateTargetGizmoSelectionState(gizmo, node.nodeId);
+  }
+
+  private getTargetSphere(nodeId: string): THREE.Object3D | null {
+    const gizmo = this.targetGizmos.get(nodeId);
+    if (!gizmo) {
+      return null;
+    }
+
+    let sphere: THREE.Object3D | null = null;
+    gizmo.traverse(child => {
+      if (!sphere && child.userData.isTargetSphere) {
+        sphere = child;
+      }
+    });
+    return sphere;
+  }
+
+  private getTargetNodeForObject(object: THREE.Object3D): Camera3D | DirectionalLightNode | null {
+    const parentNodeId = object.userData.parentNodeId;
+    if (typeof parentNodeId !== 'string') {
+      return null;
+    }
+
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return null;
+    }
+
+    const node = sceneGraph.nodeMap.get(parentNodeId);
+    if (node instanceof Camera3D || node instanceof DirectionalLightNode) {
+      return node;
+    }
+    return null;
+  }
+
+  private updateTargetGizmoSelectionState(gizmo: THREE.Object3D, nodeId: string): void {
+    const isActive = this.activeTargetNodeId === nodeId;
+    gizmo.traverse(child => {
+      if (child.userData.isTargetOutline) {
+        child.visible = isActive;
       }
     });
   }
@@ -2187,10 +2366,8 @@ export class ViewportRendererService {
     })();
   }
 
-  private createUIControlLabelMesh(
-    node: UIControl2D
-  ): THREE.Mesh {
-    const dprRaw = typeof window !== 'undefined' ? (window.devicePixelRatio || 1) : 1;
+  private createUIControlLabelMesh(node: UIControl2D): THREE.Mesh {
+    const dprRaw = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
     const dpr = Math.max(1, Math.min(3, dprRaw));
 
     const paddingX = 12;
@@ -2259,10 +2436,7 @@ export class ViewportRendererService {
     return mesh;
   }
 
-  private updateUIControlLabelVisual(
-    visualRoot: THREE.Group,
-    node: UIControl2D
-  ): void {
+  private updateUIControlLabelVisual(visualRoot: THREE.Group, node: UIControl2D): void {
     const existingLabel = visualRoot.children.find(child =>
       Boolean((child as THREE.Object3D).userData?.isUIControlLabel)
     );
@@ -3021,6 +3195,13 @@ export class ViewportRendererService {
   }
 
   private captureTransformStartState(obj: THREE.Object3D): void {
+    const targetNode = this.getTargetNodeForObject(obj);
+    if (targetNode) {
+      this.targetTransformStartStates.set(targetNode.nodeId, targetNode.getTargetPosition());
+      this.activeTargetDragNodeId = targetNode.nodeId;
+      return;
+    }
+
     if (!(obj instanceof Node3D)) {
       return;
     }
@@ -3033,18 +3214,82 @@ export class ViewportRendererService {
     });
   }
 
-  private async handleTransformCompleted(): Promise<void> {
-    if (!this.transformControls?.object || !(this.transformControls.object instanceof Node3D)) {
-      this.transformStartStates.clear();
+  private updateTargetTransformFromControl(): void {
+    const transformedObject = this.transformControls?.object;
+    if (!transformedObject) {
       return;
     }
 
-    const node = this.transformControls.object;
+    const targetNode = this.getTargetNodeForObject(transformedObject);
+    if (!targetNode) {
+      return;
+    }
+
+    const targetPosition = transformedObject.getWorldPosition(new THREE.Vector3());
+    targetNode.setTargetPosition(targetPosition);
+  }
+
+  private async handleTransformCompleted(): Promise<void> {
+    const transformedObject = this.transformControls?.object;
+    if (!transformedObject) {
+      this.transformStartStates.clear();
+      this.targetTransformStartStates.clear();
+      this.activeTargetDragNodeId = null;
+      return;
+    }
+
+    const targetNode = this.getTargetNodeForObject(transformedObject);
+    if (targetNode) {
+      const startTargetPos = this.targetTransformStartStates.get(targetNode.nodeId);
+      if (!startTargetPos) {
+        this.transformStartStates.clear();
+        this.targetTransformStartStates.clear();
+        this.activeTargetDragNodeId = null;
+        return;
+      }
+
+      try {
+        const currentTargetPos = transformedObject.getWorldPosition(new THREE.Vector3());
+        const operation = new TargetTransformOperation({
+          nodeId: targetNode.nodeId,
+          previousTargetPos: {
+            x: startTargetPos.x,
+            y: startTargetPos.y,
+            z: startTargetPos.z,
+          },
+          currentTargetPos: {
+            x: currentTargetPos.x,
+            y: currentTargetPos.y,
+            z: currentTargetPos.z,
+          },
+        });
+
+        await this.operationService.invokeAndPush(operation);
+      } catch (error) {
+        console.error('[ViewportRenderer] Error handling target transform completion:', error);
+      } finally {
+        this.transformStartStates.clear();
+        this.targetTransformStartStates.clear();
+        this.activeTargetDragNodeId = null;
+      }
+      return;
+    }
+
+    if (!(transformedObject instanceof Node3D)) {
+      this.transformStartStates.clear();
+      this.targetTransformStartStates.clear();
+      this.activeTargetDragNodeId = null;
+      return;
+    }
+
+    const node = transformedObject;
     const nodeId = node.nodeId;
     const startState = this.transformStartStates.get(nodeId);
 
     if (!startState) {
       this.transformStartStates.clear();
+      this.targetTransformStartStates.clear();
+      this.activeTargetDragNodeId = null;
       return;
     }
 
@@ -3091,6 +3336,8 @@ export class ViewportRendererService {
       console.error('[ViewportRenderer] Error handling transform completion:', error);
     } finally {
       this.transformStartStates.clear();
+      this.targetTransformStartStates.clear();
+      this.activeTargetDragNodeId = null;
     }
   }
 

@@ -62,6 +62,9 @@ export class CreateDirectionalLightOperation implements Operation<OperationInvok
       color,
       intensity,
     });
+    const sunPosition = this.params.position ?? new Vector3(20, 25, 15);
+    node.position.copy(sunPosition);
+    node.setTargetPosition(new Vector3(0, 0, 0));
 
     const targetParent = resolveDefault3DParent(sceneGraph);
     attachNode(sceneGraph, node, targetParent);

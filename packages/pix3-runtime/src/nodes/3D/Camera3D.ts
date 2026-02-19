@@ -3,7 +3,7 @@ import { Node3D, type Node3DProps } from '../Node3D';
 import type { PropertySchema } from '../../fw/property-schema';
 import { defineProperty, mergeSchemas } from '../../fw/property-schema';
 
-export const TARGET_DISTANCE = 10;
+export const TARGET_DISTANCE = 5;
 
 export interface Camera3DProps extends Omit<Node3DProps, 'type'> {
   projection?: 'perspective' | 'orthographic';
@@ -14,6 +14,7 @@ export interface Camera3DProps extends Omit<Node3DProps, 'type'> {
 
 export class Camera3D extends Node3D {
   readonly camera: Camera;
+  private targetDistance = TARGET_DISTANCE;
 
   constructor(props: Camera3DProps) {
     super(props, 'Camera3D');
@@ -31,19 +32,45 @@ export class Camera3D extends Node3D {
     }
 
     this.add(this.camera);
+    this.camera.position.set(0, 0, 0);
+    this.camera.rotation.set(0, 0, 0);
   }
 
   getTargetPosition(): Vector3 {
-    const forward = new Vector3(0, 0, -1);
-    forward.applyQuaternion(this.quaternion);
-    return forward.multiplyScalar(TARGET_DISTANCE).add(this.position);
+    const worldPosition = this.getWorldPosition(new Vector3());
+    const worldQuaternion = this.getWorldQuaternion(new Quaternion());
+    const forward = new Vector3(0, 0, -1).applyQuaternion(worldQuaternion);
+    return worldPosition.add(forward.multiplyScalar(this.targetDistance));
   }
 
   setTargetPosition(targetPos: Vector3): void {
-    const direction = targetPos.clone().sub(this.position).normalize();
-    const quaternion = new Quaternion();
-    quaternion.setFromUnitVectors(new Vector3(0, 0, -1), direction);
-    this.quaternion.copy(quaternion);
+    const worldPosition = this.getWorldPosition(new Vector3());
+    const rawDirection = targetPos.clone().sub(worldPosition);
+    const nextDistance = rawDirection.length();
+    if (nextDistance > 1e-6) {
+      this.targetDistance = nextDistance;
+    }
+    const worldDirection =
+      rawDirection.lengthSq() > 1e-8
+        ? rawDirection.normalize()
+        : new Vector3(0, 0, -1).applyQuaternion(this.getWorldQuaternion(new Quaternion()));
+
+    const localDirection = worldDirection.clone();
+    const parent = this.parent;
+    if (parent) {
+      const parentWorldQuaternion = parent.getWorldQuaternion(new Quaternion());
+      localDirection.applyQuaternion(parentWorldQuaternion.invert());
+    }
+    localDirection.normalize();
+
+    const localQuaternion = new Quaternion().setFromUnitVectors(
+      new Vector3(0, 0, -1),
+      localDirection
+    );
+    this.quaternion.copy(localQuaternion);
+
+    this.camera.position.set(0, 0, 0);
+    this.camera.rotation.set(0, 0, 0);
   }
 
   static override getPropertySchema(): PropertySchema {
