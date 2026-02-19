@@ -631,7 +631,10 @@ export class SceneLoader {
       }
       case 'MeshInstance': {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
-        let src = this.asString((baseProps.properties ?? {})['src']) ?? null;
+        const props = baseProps.properties as Record<string, unknown>;
+        let src = this.asString(props['src']) ?? null;
+        const castShadow = typeof props['castShadow'] === 'boolean' ? props['castShadow'] : true;
+        const receiveShadow = typeof props['receiveShadow'] === 'boolean' ? props['receiveShadow'] : true;
 
         const meshInstance = new MeshInstance({
           ...baseProps,
@@ -641,6 +644,8 @@ export class SceneLoader {
           rotationOrder: parsed.rotationOrder,
           scale: parsed.scale,
           src,
+          castShadow,
+          receiveShadow,
         });
 
         // Load GLB/GLTF mesh and animations from resource manager
@@ -661,6 +666,9 @@ export class SceneLoader {
             if ('animations' in loadedNode && Array.isArray(loadedNode.animations)) {
               meshInstance.animations = loadedNode.animations;
             }
+
+            // Apply shadow properties to loaded children
+            meshInstance.applyLoadedShadowProperties();
           } catch (error) {
             console.warn(`[SceneLoader] Error loading GLB model from "${src}":`, error);
           }
