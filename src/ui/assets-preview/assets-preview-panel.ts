@@ -27,6 +27,8 @@ export class AssetsPreviewPanel extends ComponentBase {
     displayPath: 'res://',
     isLoading: false,
     errorMessage: null,
+    selectedItemPath: null,
+    selectedItem: null,
     items: [],
   };
 
@@ -66,12 +68,14 @@ export class AssetsPreviewPanel extends ComponentBase {
   }
 
   private renderItem(item: AssetPreviewItem) {
+    const isSelected = this.snapshot.selectedItemPath === item.path;
     return html`
       <button
-        class="preview-item"
-        title=${item.name}
+        class="preview-item ${isSelected ? 'is-selected' : ''}"
+        title=${this.buildTooltip(item)}
+        @click=${() => this.onItemSelected(item)}
         @dblclick=${() => {
-          void this.onItemActivate(item);
+          void this.onItemDoubleClick(item);
         }}
       >
         <span class="thumb">
@@ -82,6 +86,23 @@ export class AssetsPreviewPanel extends ComponentBase {
         <span class="name">${item.name}</span>
       </button>
     `;
+  }
+
+  private onItemSelected(item: AssetPreviewItem): void {
+    this.assetsPreviewService.selectItem(item.path);
+  }
+
+  private async onItemDoubleClick(item: AssetPreviewItem): Promise<void> {
+    if (item.kind === 'directory') {
+      window.dispatchEvent(
+        new CustomEvent('assets-preview:reveal-path', {
+          detail: { path: item.path },
+        })
+      );
+      return;
+    }
+
+    await this.onItemActivate(item);
   }
 
   private async onItemActivate(item: AssetPreviewItem): Promise<void> {
@@ -103,6 +124,32 @@ export class AssetsPreviewPanel extends ComponentBase {
   private toResourcePath(path: string): string {
     const normalizedPath = path.replace(/\\+/g, '/').replace(/^(\.?\/)+/, '').replace(/^\/+/, '');
     return `res://${normalizedPath}`;
+  }
+
+  private buildTooltip(item: AssetPreviewItem): string {
+    const lines: string[] = [item.name];
+
+    if (item.width !== null && item.height !== null) {
+      lines.push(`Resolution: ${item.width} x ${item.height}`);
+    }
+
+    if (item.sizeBytes !== null) {
+      lines.push(`Size: ${this.formatFileSize(item.sizeBytes)}`);
+    }
+
+    return lines.join('\n');
+  }
+
+  private formatFileSize(sizeBytes: number): string {
+    if (sizeBytes < 1024) {
+      return `${sizeBytes} B`;
+    }
+    const kb = sizeBytes / 1024;
+    if (kb < 1024) {
+      return `${kb.toFixed(1)} KB`;
+    }
+    const mb = kb / 1024;
+    return `${mb.toFixed(2)} MB`;
   }
 }
 

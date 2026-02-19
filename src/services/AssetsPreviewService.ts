@@ -16,6 +16,9 @@ export interface AssetPreviewItem {
   readonly thumbnailUrl: string | null;
   readonly iconName: string;
   readonly extension: string;
+  readonly sizeBytes: number | null;
+  readonly width: number | null;
+  readonly height: number | null;
 }
 
 export interface AssetsPreviewSnapshot {
@@ -23,6 +26,8 @@ export interface AssetsPreviewSnapshot {
   readonly displayPath: string;
   readonly isLoading: boolean;
   readonly errorMessage: string | null;
+  readonly selectedItemPath: string | null;
+  readonly selectedItem: AssetPreviewItem | null;
   readonly items: readonly AssetPreviewItem[];
 }
 
@@ -39,12 +44,16 @@ export class AssetsPreviewService {
     displayPath: string;
     isLoading: boolean;
     errorMessage: string | null;
+    selectedItemPath: string | null;
+    selectedItem: AssetPreviewItem | null;
     items: AssetPreviewItem[];
   } = {
     selectedFolderPath: null,
     displayPath: 'res://',
     isLoading: false,
     errorMessage: null,
+    selectedItemPath: null,
+    selectedItem: null,
     items: [],
   };
 
@@ -70,8 +79,27 @@ export class AssetsPreviewService {
       displayPath: this.state.displayPath,
       isLoading: this.state.isLoading,
       errorMessage: this.state.errorMessage,
+      selectedItemPath: this.state.selectedItemPath,
+      selectedItem: this.state.selectedItem,
       items: this.state.items,
     };
+  }
+
+  public selectItem(path: string): void {
+    const normalizedPath = this.normalizePath(path);
+    this.state.selectedItemPath = normalizedPath;
+    this.state.selectedItem =
+      this.state.items.find(item => this.normalizePath(item.path) === normalizedPath) ?? null;
+    this.notify();
+  }
+
+  public clearSelectedItem(): void {
+    if (!this.state.selectedItemPath && !this.state.selectedItem) {
+      return;
+    }
+    this.state.selectedItemPath = null;
+    this.state.selectedItem = null;
+    this.notify();
   }
 
   public async syncFromAssetSelection(path: string, kind: FileSystemHandleKind): Promise<void> {
@@ -104,6 +132,8 @@ export class AssetsPreviewService {
       this.state.selectedFolderPath = null;
       this.state.displayPath = 'res://';
       this.state.errorMessage = null;
+      this.state.selectedItemPath = null;
+      this.state.selectedItem = null;
       this.state.items = [];
       this.state.isLoading = false;
       this.notify();
@@ -188,6 +218,13 @@ export class AssetsPreviewService {
       }
 
       this.state.items = items;
+      if (this.state.selectedItemPath) {
+        this.state.selectedItem =
+          items.find(item => this.normalizePath(item.path) === this.state.selectedItemPath) ?? null;
+        if (!this.state.selectedItem) {
+          this.state.selectedItemPath = null;
+        }
+      }
       this.state.errorMessage = null;
     } catch (error) {
       if (requestVersion !== this.requestVersion) {
@@ -196,6 +233,8 @@ export class AssetsPreviewService {
 
       this.clearObjectUrls();
       this.state.items = [];
+      this.state.selectedItemPath = null;
+      this.state.selectedItem = null;
       this.state.errorMessage =
         error instanceof Error ? error.message : 'Failed to load assets preview for folder.';
     } finally {
@@ -221,13 +260,25 @@ export class AssetsPreviewService {
         previewType: 'icon',
         thumbnailUrl: null,
         iconName: 'folder',
+        sizeBytes: null,
+        width: null,
+        height: null,
       };
     }
 
+    let fileBlob: Blob | null = null;
+    try {
+      fileBlob = await this.fileSystemService.readBlob(path);
+    } catch {
+      fileBlob = null;
+    }
+
+    const sizeBytes = fileBlob?.size ?? null;
+
     if (IMAGE_EXTENSIONS.has(extension)) {
-      try {
-        const blob = await this.fileSystemService.readBlob(path);
-        const thumbnailUrl = URL.createObjectURL(blob);
+      if (fileBlob) {
+        const thumbnailUrl = URL.createObjectURL(fileBlob);
+        const dimensions = await this.getImageDimensions(fileBlob, thumbnailUrl);
         return {
           name,
           path,
@@ -236,9 +287,10 @@ export class AssetsPreviewService {
           previewType: 'image',
           thumbnailUrl,
           iconName: 'image',
+          sizeBytes,
+          width: dimensions.width,
+          height: dimensions.height,
         };
-      } catch {
-        // Fall back to icon preview when image read fails.
       }
     }
 
@@ -250,7 +302,39 @@ export class AssetsPreviewService {
       previewType: 'icon',
       thumbnailUrl: null,
       iconName: this.resolveIconForExtension(extension),
+      sizeBytes,
+      width: null,
+      height: null,
     };
+  }
+
+  private async getImageDimensions(
+    blob: Blob,
+    objectUrl: string
+  ): Promise<{ width: number | null; height: number | null }> {
+    try {
+      const bitmapFactory = (globalThis as { createImageBitmap?: (source: ImageBitmapSource) => Promise<ImageBitmap> }).createImageBitmap;
+      if (bitmapFactory) {
+        const bitmap = await bitmapFactory(blob);
+        const dimensions = { width: bitmap.width, height: bitmap.height };
+        bitmap.close();
+        return dimensions;
+      }
+    } catch {
+      // fall back to HTMLImageElement
+    }
+
+    return new Promise(resolve => {
+      const image = new Image();
+      image.onload = () => {
+        resolve({
+          width: image.naturalWidth || null,
+          height: image.naturalHeight || null,
+        });
+      };
+      image.onerror = () => resolve({ width: null, height: null });
+      image.src = objectUrl;
+    });
   }
 
   private getExtension(name: string): string {

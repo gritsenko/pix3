@@ -58,6 +58,11 @@ pix3-assets-preview-panel .preview-item:hover {
   background: rgba(var(--pix3-accent-rgb), 0.09);
 }
 
+pix3-assets-preview-panel .preview-item.is-selected {
+  border-color: rgba(var(--pix3-accent-rgb), 0.65);
+  background: rgba(var(--pix3-accent-rgb), 0.16);
+}
+
 pix3-assets-preview-panel .thumb {
   display: grid;
   place-items: center;

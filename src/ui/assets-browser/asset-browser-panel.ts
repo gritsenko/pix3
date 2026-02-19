@@ -18,6 +18,10 @@ interface ScriptRevealRequestDetail {
   candidatePaths: string[];
 }
 
+interface AssetsPreviewRevealPathDetail {
+  path: string;
+}
+
 @customElement('pix3-asset-browser-panel')
 export class AssetBrowserPanel extends ComponentBase {
   @inject(AssetFileActivationService)
@@ -36,6 +40,7 @@ export class AssetBrowserPanel extends ComponentBase {
 
   private scriptFileCreatedHandler?: (e: Event) => void;
   private scriptFileRevealRequestHandler?: (e: Event) => void;
+  private assetsPreviewRevealPathHandler?: (e: Event) => void;
 
   private onAssetActivate = async (e: Event) => {
     const detail = (e as CustomEvent<AssetActivation>).detail;
@@ -167,6 +172,15 @@ export class AssetBrowserPanel extends ComponentBase {
       'script-file-reveal-request',
       this.scriptFileRevealRequestHandler as EventListener
     );
+
+    this.assetsPreviewRevealPathHandler = (e: Event) => {
+      const customEvent = e as CustomEvent<AssetsPreviewRevealPathDetail>;
+      void this.onAssetsPreviewRevealPath(customEvent.detail);
+    };
+    window.addEventListener(
+      'assets-preview:reveal-path',
+      this.assetsPreviewRevealPathHandler as EventListener
+    );
   }
 
   disconnectedCallback(): void {
@@ -186,6 +200,14 @@ export class AssetBrowserPanel extends ComponentBase {
         this.scriptFileRevealRequestHandler as EventListener
       );
       this.scriptFileRevealRequestHandler = undefined;
+    }
+
+    if (this.assetsPreviewRevealPathHandler) {
+      window.removeEventListener(
+        'assets-preview:reveal-path',
+        this.assetsPreviewRevealPathHandler as EventListener
+      );
+      this.assetsPreviewRevealPathHandler = undefined;
     }
   }
 
@@ -225,6 +247,17 @@ export class AssetBrowserPanel extends ComponentBase {
     }
 
     console.warn('[AssetBrowserPanel] Failed to reveal user script in Asset Browser:', detail);
+  }
+
+  private async onAssetsPreviewRevealPath(detail: AssetsPreviewRevealPathDetail): Promise<void> {
+    if (!detail?.path || !this.assetTreeRef) {
+      return;
+    }
+
+    const selected = await this.assetTreeRef.selectPath(detail.path);
+    if (!selected) {
+      console.warn('[AssetBrowserPanel] Failed to reveal folder from assets preview:', detail.path);
+    }
   }
 
   protected render() {

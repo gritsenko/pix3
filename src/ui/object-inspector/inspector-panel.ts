@@ -20,6 +20,7 @@ import { ScriptRegistry } from '@pix3/runtime';
 import { IconService } from '@/services/IconService';
 import { DialogService } from '@/services/DialogService';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
+import { AssetsPreviewService, type AssetPreviewItem } from '@/services';
 import { AddComponentCommand } from '@/features/scripts/AddComponentCommand';
 import { RemoveComponentCommand } from '@/features/scripts/RemoveComponentCommand';
 import { ToggleScriptEnabledCommand } from '@/features/scripts/ToggleScriptEnabledCommand';
@@ -62,6 +63,9 @@ export class InspectorPanel extends ComponentBase {
   @inject(FileSystemAPIService)
   private readonly fileSystemAPI!: FileSystemAPIService;
 
+  @inject(AssetsPreviewService)
+  private readonly assetsPreviewService!: AssetsPreviewService;
+
   @state()
   private selectedNodes: NodeBase[] = [];
 
@@ -74,8 +78,12 @@ export class InspectorPanel extends ComponentBase {
   @state()
   private propertyValues: Record<string, PropertyUIState> = {};
 
+  @state()
+  private selectedAssetItem: AssetPreviewItem | null = null;
+
   private disposeSelectionSubscription?: () => void;
   private disposeSceneSubscription?: () => void;
+  private disposeAssetPreviewSubscription?: () => void;
   private scriptCreatorRequestedHandler?: (e: Event) => void;
 
   connectedCallback() {
@@ -85,6 +93,10 @@ export class InspectorPanel extends ComponentBase {
     });
     this.disposeSceneSubscription = subscribe(appState.scenes, () => {
       this.updateSelectedNodes();
+    });
+    this.disposeAssetPreviewSubscription = this.assetsPreviewService.subscribe(snapshot => {
+      this.selectedAssetItem = snapshot.selectedItem;
+      this.requestUpdate();
     });
     this.updateSelectedNodes();
 
@@ -104,6 +116,8 @@ export class InspectorPanel extends ComponentBase {
     this.disposeSelectionSubscription = undefined;
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
+    this.disposeAssetPreviewSubscription?.();
+    this.disposeAssetPreviewSubscription = undefined;
     if (this.scriptCreatorRequestedHandler) {
       window.removeEventListener(
         'script-creator-requested',
@@ -191,6 +205,10 @@ export class InspectorPanel extends ComponentBase {
   private updateSelectedNodes(): void {
     const { nodeIds, primaryNodeId } = appState.selection;
     const activeSceneId = appState.scenes.activeSceneId;
+
+    if (nodeIds.length > 0 && this.selectedAssetItem) {
+      this.assetsPreviewService.clearSelectedItem();
+    }
 
     if (!activeSceneId) {
       this.selectedNodes = [];
@@ -333,6 +351,7 @@ export class InspectorPanel extends ComponentBase {
 
   protected render() {
     const hasSelection = this.selectedNodes.length > 0;
+    const hasAssetSelection = this.selectedAssetItem !== null;
 
     return html`
       <pix3-panel
@@ -340,9 +359,83 @@ export class InspectorPanel extends ComponentBase {
         panel-description="Adjust properties for the currently selected node."
         actions-label="Inspector actions"
       >
-        <div class="inspector-body">${hasSelection ? this.renderProperties() : ''}</div>
+        <div class="inspector-body">
+          ${hasAssetSelection ? this.renderAssetProperties() : hasSelection ? this.renderProperties() : ''}
+        </div>
       </pix3-panel>
     `;
+  }
+
+  private renderAssetProperties() {
+    if (!this.selectedAssetItem) {
+      return '';
+    }
+
+    const asset = this.selectedAssetItem;
+    const isImage = asset.previewType === 'image' && asset.thumbnailUrl !== null;
+
+    return html`
+      <div class="property-section">
+        <div class="section-header">
+          <h3 class="section-title">Asset Inspector</h3>
+          <p class="node-type">${asset.extension ? asset.extension.toUpperCase() : 'FILE'}</p>
+        </div>
+
+        <div class="property-group-section asset-section">
+          <h4 class="group-title">Preview</h4>
+          ${isImage
+            ? html`
+                <div class="asset-image-preview checker-bg">
+                  <img src=${asset.thumbnailUrl!} alt=${asset.name} />
+                </div>
+              `
+            : html`
+                <div class="asset-file-icon">
+                  ${this.iconService.getIcon(asset.iconName, 42)}
+                </div>
+              `}
+        </div>
+
+        <div class="property-group-section asset-section">
+          <h4 class="group-title">Properties</h4>
+          <div class="property-group">
+            <span class="property-label">Name</span>
+            <span class="asset-value">${asset.name}</span>
+          </div>
+          <div class="property-group">
+            <span class="property-label">Path</span>
+            <span class="asset-value asset-path">${asset.path}</span>
+          </div>
+          ${asset.width !== null && asset.height !== null
+            ? html`
+                <div class="property-group">
+                  <span class="property-label">Resolution</span>
+                  <span class="asset-value">${asset.width} x ${asset.height}</span>
+                </div>
+              `
+            : ''}
+          <div class="property-group">
+            <span class="property-label">Size</span>
+            <span class="asset-value">${this.formatFileSize(asset.sizeBytes)}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  private formatFileSize(sizeBytes: number | null): string {
+    if (sizeBytes === null) {
+      return '-';
+    }
+    if (sizeBytes < 1024) {
+      return `${sizeBytes} B`;
+    }
+    const kb = sizeBytes / 1024;
+    if (kb < 1024) {
+      return `${kb.toFixed(1)} KB`;
+    }
+    const mb = kb / 1024;
+    return `${mb.toFixed(2)} MB`;
   }
 
   private renderProperties() {
