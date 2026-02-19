@@ -144,10 +144,6 @@ export class EditorTabService {
 
     appState.tabs.tabs = [...appState.tabs.tabs, tab];
 
-    if (activate) {
-      appState.tabs.activeTabId = tab.id;
-    }
-
     this.layoutManager.ensureEditorTab(tab);
     // focusEditorTab is now called asynchronously inside ensureEditorTab after the component factory runs
 
@@ -268,7 +264,7 @@ export class EditorTabService {
     // Select a next tab if needed.
     if (appState.tabs.activeTabId === tabId) {
       const next = appState.tabs.tabs[appState.tabs.tabs.length - 1] ?? null;
-      appState.tabs.activeTabId = next?.id ?? null;
+      appState.tabs.activeTabId = null;
       if (next) {
         await this.activateTab(next.id);
       }
