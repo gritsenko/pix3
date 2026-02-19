@@ -1378,6 +1378,10 @@ export class ViewportRendererService {
           const helper = new THREE.Box3Helper(box, new THREE.Color(0x00ff00));
           helper.userData.selectionBoxId = nodeId;
           helper.userData.isSelectionBox = true;
+          helper.layers.set(LAYER_GIZMOS);
+          helper.traverse(child => {
+            child.layers.set(LAYER_GIZMOS);
+          });
           this.selectionBoxes.set(nodeId, helper);
           this.scene?.add(helper);
         }
@@ -1465,8 +1469,10 @@ export class ViewportRendererService {
     this.transformControls.attach(transformObject);
     this.transformGizmo = this.transformControls.getHelper();
     this.transformGizmo.userData.isTransformGizmo = true;
+    this.transformGizmo.layers.set(LAYER_GIZMOS);
     this.transformGizmo.traverse(child => {
       child.userData.isTransformGizmo = true;
+      child.layers.set(LAYER_GIZMOS);
     });
     this.scene.add(this.transformGizmo);
   }

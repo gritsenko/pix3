@@ -3,7 +3,7 @@ import { Node3D, type Node3DProps } from '../Node3D';
 import type { PropertySchema } from '../../fw/property-schema';
 import { defineProperty, mergeSchemas } from '../../fw/property-schema';
 
-export const TARGET_DISTANCE = 5;
+export const TARGET_DISTANCE = 3;
 
 export interface Camera3DProps extends Omit<Node3DProps, 'type'> {
   projection?: 'perspective' | 'orthographic';
