@@ -369,11 +369,13 @@ export class SceneSaver {
     } else if (node instanceof DirectionalLightNode) {
       props.color = '#' + node.light.color.getHexString();
       props.intensity = node.light.intensity;
+      props.castShadow = node.light.castShadow;
     } else if (node instanceof PointLightNode) {
       props.color = '#' + node.light.color.getHexString();
       props.intensity = node.light.intensity;
       props.distance = node.light.distance;
       props.decay = node.light.decay;
+      props.castShadow = node.light.castShadow;
     } else if (node instanceof SpotLightNode) {
       props.color = '#' + node.light.color.getHexString();
       props.intensity = node.light.intensity;
@@ -381,6 +383,7 @@ export class SceneSaver {
       props.angle = (node.light.angle * 180) / Math.PI;
       props.penumbra = node.light.penumbra;
       props.decay = node.light.decay;
+      props.castShadow = node.light.castShadow;
     } else if (node instanceof Camera3D) {
       if (node.camera instanceof PerspectiveCamera) {
         props.projection = 'perspective';
@@ -397,6 +400,8 @@ export class SceneSaver {
       if (inst.src) {
         props.src = inst.src as string;
       }
+      props.castShadow = inst.castShadow;
+      props.receiveShadow = inst.receiveShadow;
     }
 
     return props;

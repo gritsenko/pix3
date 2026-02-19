@@ -38,6 +38,9 @@ export class EditorTabComponent extends ComponentBase {
   private showLayer3D = false;
 
   @state()
+  private showLighting = false;
+
+  @state()
   private navigationMode: NavigationMode = '3d';
 
   private canvasHost?: HTMLElement;
@@ -64,12 +67,14 @@ export class EditorTabComponent extends ComponentBase {
     this.showGrid = appState.ui.showGrid;
     this.showLayer2D = appState.ui.showLayer2D;
     this.showLayer3D = appState.ui.showLayer3D;
+    this.showLighting = appState.ui.showLighting;
     this.navigationMode = appState.ui.navigationMode;
 
     this.disposeUiSubscription = subscribe(appState.ui, () => {
       this.showGrid = appState.ui.showGrid;
       this.showLayer2D = appState.ui.showLayer2D;
       this.showLayer3D = appState.ui.showLayer3D;
+      this.showLighting = appState.ui.showLighting;
       this.navigationMode = appState.ui.navigationMode;
       this.requestUpdate();
     });
@@ -172,6 +177,19 @@ export class EditorTabComponent extends ComponentBase {
             title="Toggle Grid (G)"
           >
             <span class="toolbar-icon">${this.iconService.getIcon('grid')}</span>
+          </button>
+          <button
+            class="toolbar-button"
+            aria-label="Toggle lighting"
+            aria-pressed="${this.showLighting}"
+            @click="${(e: Event) => {
+              e.stopPropagation();
+              e.stopImmediatePropagation();
+              this.toggleLighting();
+            }}"
+            title="Toggle Lighting (L)"
+          >
+            <span class="toolbar-icon">${this.iconService.getIcon('sun')}</span>
           </button>
           <button
             class="toolbar-button layer-toggle-button"
@@ -295,6 +313,10 @@ export class EditorTabComponent extends ComponentBase {
     appState.ui.showLayer3D = !appState.ui.showLayer3D;
   }
 
+  private toggleLighting(): void {
+    appState.ui.showLighting = !appState.ui.showLighting;
+  }
+
   private toggleNavigationMode(): void {
     const command = toggleNavigationMode();
     this.commandDispatcher.execute(command);
@@ -342,6 +364,10 @@ export class EditorTabComponent extends ComponentBase {
       case '3':
         event.preventDefault();
         this.toggleLayer3D();
+        break;
+      case 'l':
+        event.preventDefault();
+        this.toggleLighting();
         break;
       case 'n':
         event.preventDefault();

@@ -95,6 +95,11 @@ export class ViewportRendererService {
   private isPaused = true;
   private disposers: Array<() => void> = [];
   private gridHelper?: THREE.GridHelper;
+  private editorAmbientLight?: THREE.AmbientLight;
+  private editorDirectionalLight?: THREE.DirectionalLight;
+  private nodeIcons = new Map<string, THREE.Sprite>();
+  private cameraIconTexture?: THREE.Texture;
+  private lampIconTexture?: THREE.Texture;
   private transformStartStates = new Map<
     string,
     { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }
@@ -168,6 +173,8 @@ export class ViewportRendererService {
 
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(0x13161b, 1);
+    this.renderer.shadowMap.enabled = appState.ui.showLighting;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     // Create scene
     this.scene = new THREE.Scene();
@@ -192,12 +199,13 @@ export class ViewportRendererService {
     this.orthographicCamera.layers.enable(LAYER_2D);
 
     // Add lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    this.scene.add(ambientLight);
+    this.editorAmbientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    this.scene.add(this.editorAmbientLight);
 
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 10, 7);
-    this.scene.add(directionalLight);
+    this.editorDirectionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    this.editorDirectionalLight.position.set(5, 10, 7);
+    this.editorDirectionalLight.castShadow = true;
+    this.scene.add(this.editorDirectionalLight);
 
     // Add grid helper for reference
     this.gridHelper = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
@@ -292,10 +300,13 @@ export class ViewportRendererService {
     const unsubscribeUi = subscribe(appState.ui, () => {
       this.toggleGrid();
       this.syncNavigationMode();
+      this.syncLighting();
+      this.updateNodeIconVisibility();
     });
     this.disposers.push(unsubscribeUi);
 
     this.syncNavigationMode();
+    this.syncLighting();
 
     // Initial sync
     syncIfActiveSceneChanged();
@@ -492,6 +503,50 @@ export class ViewportRendererService {
   toggleGrid(): void {
     if (this.gridHelper && this.gridHelper) {
       this.gridHelper.visible = appState.ui.showGrid;
+    }
+  }
+
+  private syncLighting(): void {
+    const enabled = appState.ui.showLighting;
+    if (this.renderer) {
+      this.renderer.shadowMap.enabled = enabled;
+    }
+    if (this.editorAmbientLight) {
+      this.editorAmbientLight.visible = enabled;
+    }
+    if (this.editorDirectionalLight) {
+      this.editorDirectionalLight.visible = enabled;
+    }
+  }
+
+  private ensureNodeIconTextures(): void {
+    if (!this.cameraIconTexture) {
+      new THREE.TextureLoader().load('/cam.png', texture => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.cameraIconTexture = texture;
+        this.refreshNodeIconMaterials('camera');
+      });
+    }
+    if (!this.lampIconTexture) {
+      new THREE.TextureLoader().load('/lamp.png', texture => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.lampIconTexture = texture;
+        this.refreshNodeIconMaterials('light');
+      });
+    }
+  }
+
+  private refreshNodeIconMaterials(kind: 'camera' | 'light'): void {
+    for (const icon of this.nodeIcons.values()) {
+      const iconKind = (icon.userData.iconKind as 'camera' | 'light' | undefined) ?? undefined;
+      if (iconKind !== kind) {
+        continue;
+      }
+
+      if (icon.material instanceof THREE.SpriteMaterial) {
+        icon.material.map = kind === 'camera' ? this.cameraIconTexture ?? null : this.lampIconTexture ?? null;
+        icon.material.needsUpdate = true;
+      }
     }
   }
 
@@ -882,6 +937,15 @@ export class ViewportRendererService {
       return null;
     }
 
+    const iconNodeId = this.raycastNodeIcon(screenX, screenY);
+    if (iconNodeId) {
+      const sceneGraph = this.sceneManager.getActiveSceneGraph();
+      const node = sceneGraph?.nodeMap.get(iconNodeId);
+      if (node instanceof NodeBase && !Boolean(node.properties.locked)) {
+        return node;
+      }
+    }
+
     // Create raycaster and convert screen coordinates to normalized device coordinates
     const raycaster = new THREE.Raycaster();
     raycaster.layers.set(LAYER_3D);
@@ -930,6 +994,33 @@ export class ViewportRendererService {
     }
 
     return null;
+  }
+
+  private raycastNodeIcon(screenX: number, screenY: number): string | null {
+    if (!this.camera || this.nodeIcons.size === 0 || !appState.ui.showLayer3D) {
+      return null;
+    }
+
+    const raycaster = new THREE.Raycaster();
+    raycaster.layers.set(LAYER_GIZMOS);
+
+    const mouse = new THREE.Vector2();
+    mouse.x = screenX * 2 - 1;
+    mouse.y = -(screenY * 2 - 1);
+    raycaster.setFromCamera(mouse, this.camera);
+
+    const icons = Array.from(this.nodeIcons.values()).filter(icon => icon.visible);
+    if (!icons.length) {
+      return null;
+    }
+
+    const hits = raycaster.intersectObjects(icons, false);
+    if (!hits.length) {
+      return null;
+    }
+
+    const hitNodeId = hits[0].object.userData.nodeId;
+    return typeof hitNodeId === 'string' ? hitNodeId : null;
   }
 
   private raycast2D(pixelX: number, pixelY: number): NodeBase | null {
@@ -1243,12 +1334,20 @@ export class ViewportRendererService {
           this.previewCamera = node.camera;
         }
 
-        const box = new THREE.Box3().setFromObject(node);
-        const helper = new THREE.Box3Helper(box, new THREE.Color(0x00ff00));
-        helper.userData.selectionBoxId = nodeId;
-        helper.userData.isSelectionBox = true;
-        this.selectionBoxes.set(nodeId, helper);
-        this.scene?.add(helper);
+        const skipSelectionBox =
+          node instanceof Camera3D ||
+          node instanceof DirectionalLightNode ||
+          node instanceof PointLightNode ||
+          node instanceof SpotLightNode;
+
+        if (!skipSelectionBox) {
+          const box = new THREE.Box3().setFromObject(node);
+          const helper = new THREE.Box3Helper(box, new THREE.Color(0x00ff00));
+          helper.userData.selectionBoxId = nodeId;
+          helper.userData.isSelectionBox = true;
+          this.selectionBoxes.set(nodeId, helper);
+          this.scene?.add(helper);
+        }
 
         // Create custom gizmos for specific node types
         const gizmo = this.createNodeGizmo(node);
@@ -1282,6 +1381,7 @@ export class ViewportRendererService {
     } else {
       this.clear2DSelectionOverlay();
     }
+    this.updateNodeIconVisibility();
 
     // Attach transform controls to the first selected node if any
     // (but only if not in select mode)
@@ -1348,6 +1448,7 @@ export class ViewportRendererService {
         this.disposeObject3D(visual);
       }
       this.uiControl2DVisuals.clear();
+      this.clearNodeIcons();
 
       // Remove all root nodes from scene (except lights and helpers)
       const objectsToRemove: THREE.Object3D[] = [];
@@ -1364,6 +1465,7 @@ export class ViewportRendererService {
       sceneGraph.rootNodes.forEach(node => {
         this.processNodeForRendering(node);
       });
+      this.buildNodeIcons(sceneGraph.rootNodes);
 
       this.updateSelection();
 
@@ -1526,6 +1628,110 @@ export class ViewportRendererService {
     root.userData.borderGroup = borderGroup;
 
     return root;
+  }
+
+  private clearNodeIcons(): void {
+    for (const icon of this.nodeIcons.values()) {
+      if (icon.parent) {
+        icon.parent.remove(icon);
+      }
+      if (icon.material instanceof THREE.SpriteMaterial) {
+        icon.material.dispose();
+      }
+    }
+    this.nodeIcons.clear();
+  }
+
+  private buildNodeIcons(nodes: NodeBase[]): void {
+    if (!this.scene) {
+      return;
+    }
+
+    this.ensureNodeIconTextures();
+
+    const addIconForNode = (node: NodeBase) => {
+      if (!(node instanceof Node3D)) {
+        return;
+      }
+
+      const isCamera = node instanceof Camera3D;
+      const isLight =
+        node instanceof DirectionalLightNode ||
+        node instanceof PointLightNode ||
+        node instanceof SpotLightNode;
+
+      if (!isCamera && !isLight) {
+        return;
+      }
+
+      const material = new THREE.SpriteMaterial({
+        map: isCamera ? this.cameraIconTexture ?? null : this.lampIconTexture ?? null,
+        color: 0xffffff,
+        transparent: true,
+        depthTest: false,
+        depthWrite: false,
+        sizeAttenuation: false,
+      });
+
+      const icon = new THREE.Sprite(material);
+      icon.scale.set(0.15, 0.15, 0.15);
+      icon.layers.set(LAYER_GIZMOS);
+      icon.renderOrder = 999;
+      icon.userData.nodeId = node.nodeId;
+      icon.userData.iconKind = isCamera ? 'camera' : 'light';
+      this.nodeIcons.set(node.nodeId, icon);
+      this.scene?.add(icon);
+    };
+
+    const traverse = (roots: NodeBase[]) => {
+      for (const node of roots) {
+        addIconForNode(node);
+        if (node.children.length > 0) {
+          const childNodes = node.children.filter((child): child is NodeBase => child instanceof NodeBase);
+          traverse(childNodes);
+        }
+      }
+    };
+
+    traverse(nodes);
+    this.updateNodeIconPositions();
+    this.updateNodeIconVisibility();
+  }
+
+  private updateNodeIconPositions(): void {
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return;
+    }
+
+    const worldPos = new THREE.Vector3();
+    for (const [nodeId, icon] of this.nodeIcons.entries()) {
+      const node = sceneGraph.nodeMap.get(nodeId);
+      if (!(node instanceof Node3D)) {
+        icon.visible = false;
+        continue;
+      }
+      node.updateMatrixWorld(true);
+      node.getWorldPosition(worldPos);
+      icon.position.copy(worldPos);
+    }
+  }
+
+  private updateNodeIconVisibility(): void {
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return;
+    }
+
+    const selectedNodeIds = new Set(appState.selection.nodeIds);
+    for (const [nodeId, icon] of this.nodeIcons.entries()) {
+      const node = sceneGraph.nodeMap.get(nodeId);
+      icon.visible =
+        appState.ui.showLayer3D &&
+        node instanceof Node3D &&
+        node.visible &&
+        !selectedNodeIds.has(nodeId);
+    }
   }
 
   private createNodeGizmo(node: Node3D): THREE.Object3D | null {
@@ -2681,6 +2887,9 @@ export class ViewportRendererService {
         // Only update selection boxes and gizmos every few frames to avoid performance issues
         if ((this.animationId || 0) % 10 === 0) {
           try {
+            this.updateNodeIconPositions();
+            this.updateNodeIconVisibility();
+
             // Update selection boxes
             for (const [nodeId, box] of this.selectionBoxes.entries()) {
               const sceneGraph = this.sceneManager.getActiveSceneGraph();
@@ -2923,6 +3132,7 @@ export class ViewportRendererService {
       this.disposeObject3D(visual);
     }
     this.uiControl2DVisuals.clear();
+    this.clearNodeIcons();
 
     this.clear2DSelectionOverlay();
 
@@ -2950,6 +3160,10 @@ export class ViewportRendererService {
     }
 
     this.renderer?.dispose();
+    this.cameraIconTexture?.dispose();
+    this.lampIconTexture?.dispose();
+    this.cameraIconTexture = undefined;
+    this.lampIconTexture = undefined;
 
     // Dispose subscriptions
     this.disposers.forEach(dispose => dispose());

@@ -10,6 +10,7 @@ export interface SpotLightNodeProps extends Omit<Node3DProps, 'type'> {
   angle?: number;
   penumbra?: number;
   decay?: number;
+  castShadow?: boolean;
 }
 
 export class SpotLightNode extends Node3D {
@@ -25,7 +26,7 @@ export class SpotLightNode extends Node3D {
     const decay = typeof props.decay === 'number' ? props.decay : 2;
 
     this.light = new SpotLight(color, intensity, distance, angle, penumbra, decay);
-    this.light.castShadow = true;
+    this.light.castShadow = props.castShadow ?? true;
     this.add(this.light);
   }
 

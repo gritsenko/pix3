@@ -83,6 +83,7 @@ export interface Camera3DProperties {
 export interface DirectionalLightNodeProperties {
   color?: string;
   intensity?: number;
+  castShadow?: boolean;
 }
 
 export interface PointLightNodeProperties {
@@ -90,6 +91,7 @@ export interface PointLightNodeProperties {
   intensity?: number;
   distance?: number;
   decay?: number;
+  castShadow?: boolean;
 }
 
 export interface SpotLightNodeProperties {
@@ -99,6 +101,7 @@ export interface SpotLightNodeProperties {
   angle?: number;
   penumbra?: number;
   decay?: number;
+  castShadow?: boolean;
 }
 
 export interface Node2DProperties {
@@ -577,6 +580,7 @@ export class SceneLoader {
           scale: parsed.scale,
           color: props.color ?? '#ffffff',
           intensity: props.intensity ?? 1,
+          castShadow: typeof props.castShadow === 'boolean' ? props.castShadow : true,
         });
       }
       case 'PointLightNode': {
@@ -593,6 +597,7 @@ export class SceneLoader {
           intensity: props.intensity ?? 1,
           distance: props.distance ?? 0,
           decay: props.decay ?? 2,
+          castShadow: typeof props.castShadow === 'boolean' ? props.castShadow : true,
         });
       }
       case 'SpotLightNode': {
@@ -611,6 +616,7 @@ export class SceneLoader {
           angle: typeof props.angle === 'number' ? (props.angle * Math.PI) / 180 : Math.PI / 3,
           penumbra: props.penumbra ?? 0,
           decay: props.decay ?? 2,
+          castShadow: typeof props.castShadow === 'boolean' ? props.castShadow : true,
         });
       }
       case 'Camera3D': {

@@ -7,7 +7,6 @@ import type {
 import { NodeBase } from '@pix3/runtime';
 import { Node2D } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
-import { Sprite2D } from '@pix3/runtime';
 import { Layout2D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { ViewportRendererService } from '@/services/ViewportRenderService';

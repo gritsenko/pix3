@@ -8,6 +8,7 @@ export interface PointLightNodeProps extends Omit<Node3DProps, 'type'> {
   intensity?: number;
   distance?: number;
   decay?: number;
+  castShadow?: boolean;
 }
 
 export class PointLightNode extends Node3D {
@@ -21,7 +22,7 @@ export class PointLightNode extends Node3D {
     const decay = typeof props.decay === 'number' ? props.decay : 2;
 
     this.light = new PointLight(color, intensity, distance, decay);
-    this.light.castShadow = true;
+    this.light.castShadow = props.castShadow ?? true;
     this.add(this.light);
   }
 

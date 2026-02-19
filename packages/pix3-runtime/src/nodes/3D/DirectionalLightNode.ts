@@ -8,6 +8,7 @@ const TARGET_DISTANCE = 10;
 export interface DirectionalLightNodeProps extends Omit<Node3DProps, 'type'> {
   color?: string;
   intensity?: number;
+  castShadow?: boolean;
 }
 
 export class DirectionalLightNode extends Node3D {
@@ -18,7 +19,7 @@ export class DirectionalLightNode extends Node3D {
     const color = new Color(props.color ?? '#ffffff').convertSRGBToLinear();
     const intensity = typeof props.intensity === 'number' ? props.intensity : 1;
     this.light = new DirectionalLight(color, intensity);
-    this.light.castShadow = true;
+    this.light.castShadow = props.castShadow ?? true;
     this.add(this.light);
   }
 
