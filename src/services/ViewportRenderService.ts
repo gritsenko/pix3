@@ -1729,6 +1729,7 @@ export class ViewportRendererService {
                 if (material instanceof THREE.MeshBasicMaterial) {
                   material.map = texture;
                   material.color.set(0xffffff);
+                  material.transparent = true;
                   material.needsUpdate = true;
 
                   // Get actual image dimensions from texture

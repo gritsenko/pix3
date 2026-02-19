@@ -8,6 +8,7 @@ import { SceneManager } from '@pix3/runtime';
 import { canDropNode } from '@/fw/hierarchy-validation';
 import { ref } from 'valtio/vanilla';
 import type { NodeBase } from '@pix3/runtime';
+import { Quaternion, Vector3 } from 'three';
 
 export interface ReparentNodeOperationParams {
   /** ID of the node to move */
@@ -109,38 +110,15 @@ export class ReparentNodeOperation implements Operation<OperationInvokeResult> {
       this.previousIndex = sceneGraph.rootNodes.indexOf(nodeToMove);
     }
 
-    // Remove from old parent using Three.js API
-    if (nodeToMove.parentNode) {
-      nodeToMove.removeFromParent();
-    } else {
-      const index = sceneGraph.rootNodes.indexOf(nodeToMove);
-      if (index !== -1) {
-        sceneGraph.rootNodes.splice(index, 1);
-      }
-    }
-
-    // Add to new parent
     const newIndex = this.params.newIndex ?? -1;
-    if (this.params.newParentId) {
-      const newParent = sceneGraph.nodeMap.get(this.params.newParentId);
-      if (!newParent) {
-        return { didMutate: false };
-      }
-      // Use Three.js API to add child
-      newParent.add(nodeToMove);
-
-      // If we need to insert at a specific index, reorder after adding
-      if (newIndex >= 0 && newIndex < newParent.children.length - 1) {
-        newParent.children.splice(newIndex, 0, newParent.children.pop()!);
-      }
-    } else {
-      // Add to root
-      if (newIndex >= 0 && newIndex < sceneGraph.rootNodes.length) {
-        sceneGraph.rootNodes.splice(newIndex, 0, nodeToMove);
-      } else {
-        sceneGraph.rootNodes.push(nodeToMove);
-      }
+    const newParent = this.params.newParentId
+      ? (sceneGraph.nodeMap.get(this.params.newParentId) ?? null)
+      : null;
+    if (this.params.newParentId && !newParent) {
+      return { didMutate: false };
     }
+
+    this.reparentNode(sceneGraph.rootNodes, nodeToMove, newParent, newIndex);
 
     // Update the state hierarchy - REPLACE the entire object to trigger reactivity
     const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -190,34 +168,10 @@ export class ReparentNodeOperation implements Operation<OperationInvokeResult> {
       return;
     }
 
-    // Remove from current parent using Three.js API
-    if (nodeToMove.parentNode) {
-      nodeToMove.removeFromParent();
-    } else {
-      const index = sceneGraph.rootNodes.indexOf(nodeToMove);
-      if (index !== -1) {
-        sceneGraph.rootNodes.splice(index, 1);
-      }
-    }
-
-    // Restore to previous parent
-    if (this.previousParentId) {
-      const previousParent = sceneGraph.nodeMap.get(this.previousParentId);
-      if (previousParent) {
-        previousParent.add(nodeToMove);
-        // Restore to previous index if applicable
-        if (this.previousIndex >= 0 && this.previousIndex < previousParent.children.length - 1) {
-          previousParent.children.splice(this.previousIndex, 0, previousParent.children.pop()!);
-        }
-      }
-    } else {
-      // Restore to root
-      if (this.previousIndex >= 0 && this.previousIndex < sceneGraph.rootNodes.length) {
-        sceneGraph.rootNodes.splice(this.previousIndex, 0, nodeToMove);
-      } else {
-        sceneGraph.rootNodes.push(nodeToMove);
-      }
-    }
+    const previousParent = this.previousParentId
+      ? (sceneGraph.nodeMap.get(this.previousParentId) ?? null)
+      : null;
+    this.reparentNode(sceneGraph.rootNodes, nodeToMove, previousParent, this.previousIndex);
 
     // Update hierarchy state
     const hierarchy = state.scenes.hierarchies[activeSceneId];
@@ -245,5 +199,47 @@ export class ReparentNodeOperation implements Operation<OperationInvokeResult> {
       current = current.parentNode;
     }
     return false;
+  }
+
+  private reparentNode(
+    rootNodes: NodeBase[],
+    nodeToMove: NodeBase,
+    newParent: NodeBase | null,
+    newIndex: number
+  ): void {
+    nodeToMove.updateWorldMatrix(true, false);
+    const worldPosition = new Vector3();
+    const worldQuaternion = new Quaternion();
+    const worldScale = new Vector3();
+    nodeToMove.getWorldPosition(worldPosition);
+    nodeToMove.getWorldQuaternion(worldQuaternion);
+    nodeToMove.getWorldScale(worldScale);
+
+    const rootIndex = rootNodes.indexOf(nodeToMove);
+    if (rootIndex !== -1) {
+      rootNodes.splice(rootIndex, 1);
+    }
+
+    if (newParent) {
+      newParent.attach(nodeToMove);
+      if (newIndex >= 0 && newIndex < newParent.children.length - 1) {
+        newParent.children.splice(newIndex, 0, newParent.children.pop()!);
+      }
+      return;
+    }
+
+    if (nodeToMove.parentNode) {
+      nodeToMove.removeFromParent();
+    }
+
+    nodeToMove.position.copy(worldPosition);
+    nodeToMove.quaternion.copy(worldQuaternion);
+    nodeToMove.scale.copy(worldScale);
+
+    if (newIndex >= 0 && newIndex <= rootNodes.length) {
+      rootNodes.splice(newIndex, 0, nodeToMove);
+    } else {
+      rootNodes.push(nodeToMove);
+    }
   }
 }
