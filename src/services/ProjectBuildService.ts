@@ -2,13 +2,13 @@ import { injectable, inject } from '@/fw/di';
 import { FileSystemAPIService } from './FileSystemAPIService';
 import type { CommandContext } from '@/core/command';
 
-interface StandalonePackagePatch {
+interface BuildPackagePatch {
   scripts?: Record<string, string>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
 }
 
-export interface StandaloneBuildResult {
+export interface ProjectBuildResult {
   readonly writtenFiles: number;
   readonly createdDirectories: number;
   readonly sceneCount: number;
@@ -16,9 +16,10 @@ export interface StandaloneBuildResult {
   readonly packageJsonUpdated: boolean;
 }
 
-const STANDALONE_BUILD_COMMAND = 'vite build --config standalone/vite.config.ts';
+const RUNTIME_BUILD_COMMAND = 'vite build';
+const RUNTIME_DEV_COMMAND = 'vite';
 
-const templateFiles = import.meta.glob('../templates/standalone/**/*.tpl', {
+const templateFiles = import.meta.glob('../templates/build/**/*.tpl', {
   query: '?raw',
   import: 'default',
   eager: true,
@@ -30,21 +31,21 @@ const runtimeSourceFiles = import.meta.glob('../../packages/pix3-runtime/src/**/
   eager: true,
 }) as Record<string, string>;
 
-const runtimeConfigFiles = import.meta.glob(
-  '../../packages/pix3-runtime/{package.json,tsconfig.json}',
-  {
-    query: '?raw',
-    import: 'default',
-    eager: true,
-  }
-) as Record<string, string>;
+const runtimeConfigFiles = import.meta.glob('../../packages/pix3-runtime/package.json', {
+  query: '?raw',
+  import: 'default',
+  eager: true,
+}) as Record<string, string>;
+
+// Entry-point files that ship in the user's src/ folder (not part of the library).
+const RUNTIME_SRC_ENTRY_FILES = new Set(['main.ts', 'engine-api.ts', 'register-project-scripts.ts']);
 
 @injectable()
-export class StandaloneBuildService {
+export class ProjectBuildService {
   @inject(FileSystemAPIService)
   private readonly fs!: FileSystemAPIService;
 
-  async buildFromTemplates(context: CommandContext): Promise<StandaloneBuildResult> {
+  async buildFromTemplates(context: CommandContext): Promise<ProjectBuildResult> {
     const scenePaths = await this.collectScenePaths(context);
     const activeScenePath = this.getActiveScenePath(context);
     const normalizedActiveScenePath =
@@ -65,6 +66,9 @@ export class StandaloneBuildService {
 
     for (const [templatePath, templateContents] of Object.entries(templateFiles)) {
       const relativeOutputPath = this.toOutputPath(templatePath);
+      if (!relativeOutputPath) {
+        continue;
+      }
       const rendered = this.renderTemplate(templateContents, replacements);
       await this.ensureParentDirectory(relativeOutputPath, ensuredDirectories);
       if (ensuredDirectories.has(this.getDirectoryPart(relativeOutputPath))) {
@@ -75,18 +79,17 @@ export class StandaloneBuildService {
     }
 
     const sceneManifest = this.buildSceneManifestTs(scenePaths, normalizedActiveScenePath);
-    const sceneManifestPath = 'standalone/src/generated/scene-manifest.ts';
+    const sceneManifestPath = 'src/generated/scene-manifest.ts';
     await this.ensureParentDirectory(sceneManifestPath, ensuredDirectories);
     await this.fs.writeTextFile(sceneManifestPath, sceneManifest);
     writtenFiles += 1;
+    writtenFiles += await this.copyRuntimeSources(ensuredDirectories);
 
     const assetManifest = JSON.stringify({ files: assetPaths }, null, 2) + '\n';
-    await this.fs.writeTextFile('standalone/asset-manifest.json', assetManifest);
+    await this.fs.writeTextFile('asset-manifest.json', assetManifest);
     writtenFiles += 1;
 
     const packageJsonUpdated = await this.mergePackageJsonPatch();
-
-    writtenFiles += await this.copyRuntimeSources(ensuredDirectories);
     createdDirectories = ensuredDirectories.size;
 
     return {
@@ -177,7 +180,7 @@ export class StandaloneBuildService {
   }
 
   private async mergePackageJsonPatch(): Promise<boolean> {
-    const patchTemplate = this.getTemplateByOutputPath('standalone/package.patch.json');
+    const patchTemplate = this.getPackagePatchTemplate();
     if (!patchTemplate) {
       return false;
     }
@@ -190,13 +193,15 @@ export class StandaloneBuildService {
     }
 
     const existing = this.parseJsonRecord(existingRaw);
-    const patch = this.parseJsonRecord(patchTemplate) as StandalonePackagePatch;
+    const patch = this.parseJsonRecord(patchTemplate) as BuildPackagePatch;
 
     const scripts = this.ensureStringMap(existing, 'scripts');
-    scripts['build:pix3'] = STANDALONE_BUILD_COMMAND;
+    scripts.build = RUNTIME_BUILD_COMMAND;
+    scripts.dev = RUNTIME_DEV_COMMAND;
 
-    if (!('build' in scripts)) {
-      scripts.build = STANDALONE_BUILD_COMMAND;
+    const patchedScripts = patch.scripts ?? {};
+    for (const [name, command] of Object.entries(patchedScripts)) {
+      scripts[name] = command;
     }
 
     this.mergeStringMap(existing, 'dependencies', patch.dependencies ?? {});
@@ -279,9 +284,9 @@ export class StandaloneBuildService {
     return {};
   }
 
-  private getTemplateByOutputPath(outputPath: string): string | null {
+  private getPackagePatchTemplate(): string | null {
     for (const [templatePath, templateContents] of Object.entries(templateFiles)) {
-      if (this.toOutputPath(templatePath) === outputPath) {
+      if (templatePath.includes('package.patch.json.tpl')) {
         return templateContents;
       }
     }
@@ -301,26 +306,32 @@ export class StandaloneBuildService {
     return path.startsWith('res://') ? path.substring(6) : path;
   }
 
-  private toOutputPath(templatePath: string): string {
-    const marker = '../templates/standalone/';
+  private toOutputPath(templatePath: string): string | null {
+    const marker = '../templates/build/';
     const relative = templatePath.includes(marker) ? templatePath.split(marker)[1] : templatePath;
     const withoutTpl = relative.endsWith('.tpl') ? relative.slice(0, -4) : relative;
-    return `standalone/${withoutTpl}`.replace(/^standalone\/standalone\//, 'standalone/');
+    if (withoutTpl === 'package.patch.json') {
+      return null;
+    }
+
+    // Templates are written directly to project root.
+    return withoutTpl;
   }
 
   private toRuntimeOutputPath(sourcePath: string): string | null {
     const sourceMarker = '/packages/pix3-runtime/src/';
     if (sourcePath.includes(sourceMarker)) {
       const relativePath = sourcePath.split(sourceMarker)[1];
-      return `standalone/runtime/src/${relativePath}`;
-    }
-
-    const packageMarker = '/packages/pix3-runtime/';
-    if (sourcePath.includes(packageMarker)) {
-      const relativePath = sourcePath.split(packageMarker)[1];
-      if (relativePath === 'package.json' || relativePath === 'tsconfig.json') {
-        return `standalone/runtime/${relativePath}`;
+      // Skip placeholder generated files — the service writes scene-manifest itself.
+      if (relativePath.startsWith('generated/')) {
+        return null;
       }
+      // App entry-point files live at src/ in the target project.
+      if (RUNTIME_SRC_ENTRY_FILES.has(relativePath)) {
+        return `src/${relativePath}`;
+      }
+      // All other library files go into pix3-runtime/src/.
+      return `pix3-runtime/src/${relativePath}`;
     }
 
     return null;

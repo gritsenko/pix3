@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { CommandContext } from '@/core/command';
 
-import { BuildStandaloneCommand } from './BuildStandaloneCommand';
+import { BuildProjectCommand } from './BuildProjectCommand';
 
 const createContext = (state: unknown): CommandContext => {
   return {
@@ -18,9 +18,9 @@ const createContext = (state: unknown): CommandContext => {
   };
 };
 
-describe('BuildStandaloneCommand', () => {
+describe('BuildProjectCommand', () => {
   it('fails precondition when project is not ready', () => {
-    const command = new BuildStandaloneCommand();
+    const command = new BuildProjectCommand();
 
     const context = createContext({
       project: { status: 'idle', projectName: '' },
@@ -37,7 +37,7 @@ describe('BuildStandaloneCommand', () => {
   });
 
   it('fails precondition when there are no loaded scenes', () => {
-    const command = new BuildStandaloneCommand();
+    const command = new BuildProjectCommand();
 
     const context = createContext({
       project: { status: 'ready', projectName: 'Demo' },
@@ -53,8 +53,8 @@ describe('BuildStandaloneCommand', () => {
     }
   });
 
-  it('executes standalone build and returns non-mutating result', async () => {
-    const command = new BuildStandaloneCommand();
+  it('executes runtime project build and returns non-mutating result', async () => {
+    const command = new BuildProjectCommand();
     const service = {
       buildFromTemplates: vi.fn(async () => ({
         writtenFiles: 10,
@@ -73,7 +73,7 @@ describe('BuildStandaloneCommand', () => {
       error: vi.fn(),
       warn: vi.fn(),
     };
-    Object.defineProperty(command, 'standaloneBuildService', {
+    Object.defineProperty(command, 'projectBuildService', {
       value: service,
       configurable: true,
     });
@@ -99,7 +99,7 @@ describe('BuildStandaloneCommand', () => {
     const result = await command.execute(context);
 
     expect(service.buildFromTemplates).toHaveBeenCalledWith(context);
-    expect(dialogService.showConfirmation).toHaveBeenCalledTimes(2);
+    expect(dialogService.showConfirmation).toHaveBeenCalledTimes(1);
     expect(loggingService.info).toHaveBeenCalled();
     expect(result.didMutate).toBe(false);
     expect(result.payload).toBeUndefined();

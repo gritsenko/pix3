@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { CommandContext } from '@/core/command';
 
-import { StandaloneBuildService } from './StandaloneBuildService';
+import { ProjectBuildService } from './ProjectBuildService';
 
 type InMemoryFs = {
   readTextFile: (path: string) => Promise<string>;
@@ -46,7 +46,7 @@ const createContext = (): CommandContext => {
   const state = {
     project: {
       status: 'ready',
-      projectName: 'Standalone Demo',
+      projectName: 'Runtime Demo',
     },
     scenes: {
       activeSceneId: 'scene-1',
@@ -67,8 +67,8 @@ const createContext = (): CommandContext => {
   };
 };
 
-describe('StandaloneBuildService', () => {
-  it('generates standalone files and copies runtime sources', async () => {
+describe('ProjectBuildService', () => {
+  it('generates runtime project files and copies runtime sources', async () => {
     const fs = createInMemoryFs({
       'package.json': JSON.stringify(
         {
@@ -83,7 +83,7 @@ describe('StandaloneBuildService', () => {
       'scenes/main.pix3scene': 'root:\n  node:\n    texture: res://assets/hero.png\n',
     });
 
-    const service = new StandaloneBuildService();
+    const service = new ProjectBuildService();
     Object.defineProperty(service, 'fs', {
       value: fs,
       configurable: true,
@@ -91,26 +91,27 @@ describe('StandaloneBuildService', () => {
 
     const result = await service.buildFromTemplates(createContext());
 
-    expect(fs.files.has('standalone/index.html')).toBe(true);
-    expect(fs.files.has('standalone/src/main.ts')).toBe(true);
-    expect(fs.files.has('standalone/src/generated/scene-manifest.ts')).toBe(true);
-    expect(fs.files.has('standalone/asset-manifest.json')).toBe(true);
-    expect(fs.files.has('standalone/runtime/src/index.ts')).toBe(true);
-    expect(fs.files.has('standalone/runtime/package.json')).toBe(true);
-    expect(fs.files.has('standalone/runtime/tsconfig.json')).toBe(true);
+    // Templates land at project root.
+    expect(fs.files.has('index.html')).toBe(true);
+    expect(fs.files.has('tsconfig.json')).toBe(true);
+    expect(fs.files.has('vite.config.ts')).toBe(true);
+    // App entry files land in src/.
+    expect(fs.files.has('src/main.ts')).toBe(true);
+    expect(fs.files.has('src/generated/scene-manifest.ts')).toBe(true);
+    // Asset manifest at project root.
+    expect(fs.files.has('asset-manifest.json')).toBe(true);
+    // Engine library sources land in pix3-runtime/src/.
+    expect(fs.files.has('pix3-runtime/src/index.ts')).toBe(true);
 
+    // Root package.json receives build/dev scripts and preserves existing ones.
     const packageJsonRaw = fs.files.get('package.json');
     expect(typeof packageJsonRaw).toBe('string');
     const packageJson = JSON.parse(packageJsonRaw ?? '{}') as {
       scripts?: Record<string, string>;
     };
 
-    expect(packageJson.scripts?.build).toBe(
-      'vite build --config standalone/vite.config.ts'
-    );
-    expect(packageJson.scripts?.['build:pix3']).toBe(
-      'vite build --config standalone/vite.config.ts'
-    );
+    expect(packageJson.scripts?.build).toBe('vite build');
+    expect(packageJson.scripts?.dev).toBe('vite');
     expect(packageJson.scripts?.test).toBe('vitest');
 
     expect(result.sceneCount).toBe(1);
@@ -119,13 +120,13 @@ describe('StandaloneBuildService', () => {
     expect(result.writtenFiles).toBeGreaterThan(10);
   });
 
-  it('preserves existing build script and adds build:pix3', async () => {
+  it('merges runtime scripts into root package.json while preserving unrelated scripts', async () => {
     const fs = createInMemoryFs({
       'package.json': JSON.stringify(
         {
           name: 'project-demo',
           scripts: {
-            build: 'my-custom-build',
+            test: 'vitest',
           },
         },
         null,
@@ -134,7 +135,7 @@ describe('StandaloneBuildService', () => {
       'scenes/main.pix3scene': 'root:\n  node:\n',
     });
 
-    const service = new StandaloneBuildService();
+    const service = new ProjectBuildService();
     Object.defineProperty(service, 'fs', {
       value: fs,
       configurable: true,
@@ -146,9 +147,9 @@ describe('StandaloneBuildService', () => {
       scripts?: Record<string, string>;
     };
 
-    expect(packageJson.scripts?.build).toBe('my-custom-build');
-    expect(packageJson.scripts?.['build:pix3']).toBe(
-      'vite build --config standalone/vite.config.ts'
-    );
+    // Service sets build/dev scripts; existing test script is preserved.
+    expect(packageJson.scripts?.build).toBe('vite build');
+    expect(packageJson.scripts?.dev).toBe('vite');
+    expect(packageJson.scripts?.test).toBe('vitest');
   });
 });

@@ -10,10 +10,10 @@
     "skipLibCheck": true,
     "baseUrl": ".",
     "paths": {
-      "@pix3/runtime": ["./runtime/src"],
-      "@pix3/runtime/*": ["./runtime/src/*"],
+      "@pix3/runtime": ["./pix3-runtime/src"],
+      "@pix3/runtime/*": ["./pix3-runtime/src/*"],
       "@pix3/engine": ["./src/engine-api.ts"]
     }
   },
-  "include": ["src", "runtime/src"]
+  "include": ["src", "pix3-runtime/src"]
 }

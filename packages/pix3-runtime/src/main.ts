@@ -32,7 +32,7 @@ async function bootstrap(): Promise<void> {
 
   const scenePath = activeScenePath || scenePaths[0];
   if (!scenePath) {
-    throw new Error('No scenes found for standalone build');
+    throw new Error('No scenes found for runtime build');
   }
 
   const sceneText = await resourceManager.readText(`res://${scenePath}`);
@@ -47,5 +47,5 @@ async function bootstrap(): Promise<void> {
 }
 
 void bootstrap().catch(error => {
-  console.error('[StandaloneBuild] Failed to bootstrap game:', error);
+  console.error('[RuntimeBuild] Failed to bootstrap game:', error);
 });

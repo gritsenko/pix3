@@ -1,7 +1,7 @@
 {
   "scripts": {
-    "build": "vite build --config standalone/vite.config.ts",
-    "build:pix3": "vite build --config standalone/vite.config.ts"
+    "dev": "vite",
+    "build": "vite build"
   },
   "dependencies": {
     "lit": "^3.3.1",

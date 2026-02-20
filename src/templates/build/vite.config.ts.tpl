@@ -7,31 +7,30 @@ interface AssetManifest {
   files: string[];
 }
 
-const currentDir = dirname(fileURLToPath(import.meta.url));
-const standaloneDir = currentDir;
-const projectRoot = resolve(standaloneDir, '..');
-const manifestPath = resolve(standaloneDir, 'asset-manifest.json');
+// Project root is the directory containing this vite.config.ts file.
+const projectDir = dirname(fileURLToPath(import.meta.url));
+const manifestPath = resolve(projectDir, 'asset-manifest.json');
 
-function copyStandaloneAssetsPlugin(): Plugin {
+function copyRuntimeAssetsPlugin(): Plugin {
   return {
-    name: 'copy-standalone-assets',
+    name: 'copy-runtime-assets',
     closeBundle() {
       if (!existsSync(manifestPath)) {
-        console.warn('[StandaloneBuild] asset-manifest.json not found, skipping asset copy');
+        console.warn('[RuntimeBuild] asset-manifest.json not found, skipping asset copy');
         return;
       }
 
       const raw = readFileSync(manifestPath, 'utf-8');
       const manifest = JSON.parse(raw) as AssetManifest;
-      const distDir = resolve(projectRoot, 'dist');
+      const distDir = resolve(projectDir, 'dist');
 
       for (const relPath of manifest.files) {
-        const source = resolve(projectRoot, relPath);
+        const source = resolve(projectDir, relPath);
         const target = resolve(distDir, relPath);
         const targetDir = dirname(target);
 
         if (!existsSync(source)) {
-          console.warn(`[StandaloneBuild] Missing source asset: ${relPath}`);
+          console.warn(`[RuntimeBuild] Missing source asset: ${relPath}`);
           continue;
         }
 
@@ -42,22 +41,22 @@ function copyStandaloneAssetsPlugin(): Plugin {
         copyFileSync(source, target);
       }
 
-      console.log(`[StandaloneBuild] Copied ${manifest.files.length} asset file(s) to dist`);
+      console.log(`[RuntimeBuild] Copied ${manifest.files.length} asset file(s) to dist`);
     },
   };
 }
 
 export default defineConfig({
-  root: standaloneDir,
+  root: projectDir,
   resolve: {
     alias: {
-      '@pix3/runtime': resolve(standaloneDir, 'runtime/src'),
-      '@pix3/engine': resolve(standaloneDir, 'src/engine-api.ts'),
+      '@pix3/runtime': resolve(projectDir, 'pix3-runtime/src'),
+      '@pix3/engine': resolve(projectDir, 'src/engine-api.ts'),
     },
   },
   build: {
-    outDir: resolve(projectRoot, 'dist'),
+    outDir: resolve(projectDir, 'dist'),
     emptyOutDir: true,
   },
-  plugins: [copyStandaloneAssetsPlugin()],
+  plugins: [copyRuntimeAssetsPlugin()],
 });

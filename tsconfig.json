@@ -21,6 +21,7 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "rootDir": ".",
     /* Path mapping */
     "baseUrl": ".",
     "paths": {

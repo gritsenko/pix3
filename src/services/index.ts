@@ -50,4 +50,4 @@ export {
   type CompilationResult,
   type CompilationError,
 } from './ScriptCompilerService';
-export { StandaloneBuildService, type StandaloneBuildResult } from './StandaloneBuildService';
+export { ProjectBuildService, type ProjectBuildResult } from './ProjectBuildService';
