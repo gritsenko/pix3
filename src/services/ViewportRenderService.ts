@@ -95,6 +95,7 @@ export class ViewportRendererService {
   private hoverPreview2D?: { nodeId: string; frame: THREE.LineSegments };
   private animationId?: number;
   private isPaused = true;
+  private isWindowFocused = true;
   private disposers: Array<() => void> = [];
   private gridHelper?: THREE.GridHelper;
   private editorAmbientLight?: THREE.AmbientLight;
@@ -308,8 +309,32 @@ export class ViewportRendererService {
       this.syncNavigationMode();
       this.syncLighting();
       this.updateNodeIconVisibility();
+      this.handleFocusPause();
     });
     this.disposers.push(unsubscribeUi);
+
+    // Window focus handling
+    const onFocus = () => {
+      this.isWindowFocused = true;
+      this.handleFocusPause();
+    };
+    const onBlur = () => {
+      this.isWindowFocused = false;
+      this.handleFocusPause();
+    };
+    const onVisibilityChange = () => {
+      this.isWindowFocused = document.visibilityState === 'visible' && document.hasFocus();
+      this.handleFocusPause();
+    };
+
+    window.addEventListener('focus', onFocus);
+    window.addEventListener('blur', onBlur);
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    this.disposers.push(() => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('blur', onBlur);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    });
 
     this.syncNavigationMode();
     this.syncLighting();
@@ -408,6 +433,19 @@ export class ViewportRendererService {
     if (!this.isPaused) return;
     this.isPaused = false;
     this.startRenderLoop();
+  }
+
+  private handleFocusPause(): void {
+    if (appState.ui.pauseRenderingOnUnfocus && !this.isWindowFocused) {
+      if (!this.isPaused && this.animationId) {
+        cancelAnimationFrame(this.animationId);
+        this.animationId = undefined;
+      }
+    } else {
+      if (!this.isPaused && !this.animationId) {
+        this.startRenderLoop();
+      }
+    }
   }
 
   captureCameraState(): {
@@ -1882,8 +1920,8 @@ export class ViewportRendererService {
       rawDirection.lengthSq() > 1e-8
         ? rawDirection.normalize()
         : new THREE.Vector3(0, 0, -1).applyQuaternion(
-            node.getWorldQuaternion(new THREE.Quaternion())
-          );
+          node.getWorldQuaternion(new THREE.Quaternion())
+        );
     const farPos = nodeWorldPos.clone().add(direction.multiplyScalar(TARGET_DIRECTION_RAY_LENGTH));
     const gizmo = new THREE.Group();
     gizmo.userData.isTargetGizmo = true;
@@ -1939,8 +1977,8 @@ export class ViewportRendererService {
       rawDirection.lengthSq() > 1e-8
         ? rawDirection.normalize()
         : new THREE.Vector3(0, 0, 1).applyQuaternion(
-            node.getWorldQuaternion(new THREE.Quaternion())
-          );
+          node.getWorldQuaternion(new THREE.Quaternion())
+        );
     const farPos = nodeWorldPos.clone().add(direction.multiplyScalar(TARGET_DIRECTION_RAY_LENGTH));
     const gizmo = new THREE.Group();
     gizmo.userData.isTargetGizmo = true;
@@ -2012,8 +2050,8 @@ export class ViewportRendererService {
       rawDirection.lengthSq() > 1e-8
         ? rawDirection.normalize()
         : new THREE.Vector3(0, 0, fallbackAxisZ).applyQuaternion(
-            node.getWorldQuaternion(new THREE.Quaternion())
-          );
+          node.getWorldQuaternion(new THREE.Quaternion())
+        );
 
     gizmo.traverse(child => {
       if (child.userData.isTargetSphere || child.userData.isTargetOutline) {
@@ -3050,6 +3088,11 @@ export class ViewportRendererService {
   private startRenderLoop(): void {
     const render = () => {
       if (this.isPaused) {
+        this.animationId = undefined;
+        return;
+      }
+
+      if (appState.ui.pauseRenderingOnUnfocus && !this.isWindowFocused) {
         this.animationId = undefined;
         return;
       }

@@ -1,6 +1,7 @@
 import { ComponentBase, customElement, html, inject, state, css, unsafeCSS } from '@/fw';
 import { SceneManager, SceneRunner, RuntimeRenderer } from '@pix3/runtime';
 import { appState } from '@/state';
+import { subscribe } from 'valtio/vanilla';
 import styles from './game-tab.ts.css?raw';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 
@@ -22,6 +23,7 @@ export class GameViewTab extends ComponentBase {
     private gameContainer?: HTMLElement;
     private viewportContainer?: HTMLElement;
     private resizeObserver?: ResizeObserver;
+    private disposeSubscription?: () => void;
 
     connectedCallback(): void {
         super.connectedCallback();
@@ -32,6 +34,10 @@ export class GameViewTab extends ComponentBase {
         super.disconnectedCallback();
         this.stopGame();
         this.resizeObserver?.disconnect();
+        this.disposeSubscription?.();
+        window.removeEventListener('focus', this.onFocus);
+        window.removeEventListener('blur', this.onBlur);
+        document.removeEventListener('visibilitychange', this.onVisibilityChange);
     }
 
     protected firstUpdated(): void {
@@ -132,6 +138,39 @@ export class GameViewTab extends ComponentBase {
             }
         } else {
             console.warn('[GameView] No active scene to play.');
+        }
+
+        // Handle focus pausing
+        window.addEventListener('focus', this.onFocus);
+        window.addEventListener('blur', this.onBlur);
+        document.addEventListener('visibilitychange', this.onVisibilityChange);
+
+        this.disposeSubscription = subscribe(appState.ui, () => {
+            this.handleFocusPause();
+        });
+    }
+
+    private onFocus = () => {
+        this.handleFocusPause();
+    };
+
+    private onBlur = () => {
+        this.handleFocusPause();
+    };
+
+    private onVisibilityChange = () => {
+        this.handleFocusPause();
+    };
+
+    private handleFocusPause() {
+        if (!this.runner) return;
+
+        const isVisible = document.visibilityState === 'visible' && document.hasFocus();
+        const shouldPause = appState.ui.pauseRenderingOnUnfocus && !isVisible;
+        if (shouldPause) {
+            this.runner.pause();
+        } else {
+            this.runner.resume();
         }
     }
 

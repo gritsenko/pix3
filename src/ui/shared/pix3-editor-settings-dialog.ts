@@ -16,9 +16,13 @@ export class EditorSettingsDialog extends ComponentBase {
   @state()
   private warnOnUnsavedUnload = true;
 
+  @state()
+  private pauseRenderingOnUnfocus = true;
+
   connectedCallback(): void {
     super.connectedCallback();
     this.warnOnUnsavedUnload = appState.ui.warnOnUnsavedUnload;
+    this.pauseRenderingOnUnfocus = appState.ui.pauseRenderingOnUnfocus;
   }
 
   protected render() {
@@ -41,6 +45,20 @@ export class EditorSettingsDialog extends ComponentBase {
                 Disable this to skip the browser confirmation dialog on refresh or navigation.
               </div>
             </div>
+
+            <div class="settings-field">
+              <label class="toggle-row">
+                <input
+                  type="checkbox"
+                  .checked=${this.pauseRenderingOnUnfocus}
+                  @change=${this.onPauseToggle}
+                />
+                <span>Pause rendering when window is unfocused</span>
+              </label>
+              <div class="hint">
+                Reduces CPU/GPU usage and saves battery when you are working in another window.
+              </div>
+            </div>
           </div>
 
           <div class="dialog-actions">
@@ -57,6 +75,11 @@ export class EditorSettingsDialog extends ComponentBase {
     this.warnOnUnsavedUnload = target.checked;
   }
 
+  private onPauseToggle(e: Event): void {
+    const target = e.target as HTMLInputElement;
+    this.pauseRenderingOnUnfocus = target.checked;
+  }
+
   private onCancel(): void {
     this.editorSettingsService.close();
   }
@@ -64,6 +87,7 @@ export class EditorSettingsDialog extends ComponentBase {
   private async onSave(): Promise<void> {
     const operation = new UpdateEditorSettingsOperation({
       warnOnUnsavedUnload: this.warnOnUnsavedUnload,
+      pauseRenderingOnUnfocus: this.pauseRenderingOnUnfocus,
     });
 
     await this.operationService.invoke(operation);

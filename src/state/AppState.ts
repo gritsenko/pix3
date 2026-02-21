@@ -146,6 +146,8 @@ export interface UIState {
   showLighting: boolean;
   /** Warn before leaving the page with unsaved changes */
   warnOnUnsavedUnload: boolean;
+  /** Pause rendering when the window is unfocused for battery economy */
+  pauseRenderingOnUnfocus: boolean;
   /** True when the scene is in play mode (scripts running) */
   isPlaying: boolean;
   playModeStatus: 'stopped' | 'playing' | 'paused';
@@ -232,6 +234,7 @@ export const createInitialAppState = (): AppState => ({
     showGrid: true,
     showLighting: true,
     warnOnUnsavedUnload: true,
+    pauseRenderingOnUnfocus: true,
     isPlaying: false,
     playModeStatus: 'stopped',
   },
