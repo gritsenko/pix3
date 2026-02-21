@@ -11,8 +11,7 @@
     "baseUrl": ".",
     "paths": {
       "@pix3/runtime": ["./pix3-runtime/src"],
-      "@pix3/runtime/*": ["./pix3-runtime/src/*"],
-      "@pix3/engine": ["./src/engine-api.ts"]
+      "@pix3/runtime/*": ["./pix3-runtime/src/*"]
     }
   },
   "include": ["src", "pix3-runtime/src"]

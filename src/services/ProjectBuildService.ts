@@ -38,7 +38,7 @@ const runtimeConfigFiles = import.meta.glob('../../packages/pix3-runtime/package
 }) as Record<string, string>;
 
 // Entry-point files that ship in the user's src/ folder (not part of the library).
-const RUNTIME_SRC_ENTRY_FILES = new Set(['main.ts', 'engine-api.ts', 'register-project-scripts.ts']);
+const RUNTIME_SRC_ENTRY_FILES = new Set(['main.ts', 'register-project-scripts.ts']);
 
 @injectable()
 export class ProjectBuildService {

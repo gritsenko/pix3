@@ -48,10 +48,10 @@ function copyRuntimeAssetsPlugin(): Plugin {
 
 export default defineConfig({
   root: projectDir,
+  base: './',
   resolve: {
     alias: {
       '@pix3/runtime': resolve(projectDir, 'pix3-runtime/src'),
-      '@pix3/engine': resolve(projectDir, 'src/engine-api.ts'),
     },
   },
   build: {

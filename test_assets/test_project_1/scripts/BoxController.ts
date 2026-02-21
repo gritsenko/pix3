@@ -4,7 +4,7 @@
  * Custom script component for node logic
  */
 
-import { Script, type PropertySchema } from '@pix3/engine';
+import { Script, type PropertySchema } from '@pix3/runtime';
 
 export class BoxController extends Script {
   constructor(id: string, type: string) {

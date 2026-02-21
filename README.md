@@ -111,7 +111,7 @@ Create `src/templates/standalone/` with:
 - `tsconfig.json.tpl` (optional but recommended for isolated builds)
 - `package.partial.json.tpl` (scripts/deps fragment or merge map)
 - `src/main.ts.tpl`
-- `src/engine-api.ts.tpl`
+- `src/index.ts`
 - `src/register-project-scripts.ts.tpl`
 
 Runtime files are copied from `packages/pix3-runtime/` (not templated in `src/templates/standalone/`).
@@ -132,7 +132,7 @@ On command execution, generate under opened project root:
 - `standalone/vite.config.ts`
 - `standalone/tsconfig.json` (if used)
 - `standalone/src/main.ts`
-- `standalone/src/engine-api.ts`
+- `standalone/pix3-runtime/src/index.ts`
 - `standalone/src/register-project-scripts.ts`
 - `standalone/asset-manifest.json`
 - `standalone/src/generated/scene-manifest.ts`
@@ -183,11 +183,10 @@ Execute:
 
 ### Runtime + Script Compatibility
 
-Current user scripts import from `@pix3/engine`. Keep this unchanged by generating `standalone/src/engine-api.ts` and aliasing it in standalone `vite.config.ts`.
+Current user scripts import from `@pix3/runtime`. Keep this unchanged by aliasing it to `standalone/pix3-runtime/src/index.ts` in standalone `vite.config.ts`.
 
 Expected standalone aliasing:
 
-- `@pix3/engine` -> `standalone/src/engine-api.ts`
 - `@pix3/runtime` -> generated runtime location (if copied into standalone)
 
 `register-project-scripts.ts` should import discovered user script files and register them in `ScriptRegistry` as `user:<ClassName>`.

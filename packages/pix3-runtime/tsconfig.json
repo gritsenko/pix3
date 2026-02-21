@@ -27,7 +27,6 @@
         "package.json"
     ],
     "exclude": [
-        "src/engine-api.ts",
         "src/main.ts",
         "src/register-project-scripts.ts",
         "src/generated"
