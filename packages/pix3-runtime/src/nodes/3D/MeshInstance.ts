@@ -14,6 +14,8 @@ export class MeshInstance extends Node3D {
   castShadow: boolean;
   receiveShadow: boolean;
   animations: AnimationClip[] = [];
+  /** The name of the animation clip currently selected for preview. Editor-only, not serialized. */
+  activeAnimation: string | null = null;
 
   constructor(props: MeshInstanceProps) {
     super(props, 'MeshInstance');

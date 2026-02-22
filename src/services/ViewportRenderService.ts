@@ -26,6 +26,7 @@ import { DirectionalLightNode } from '@pix3/runtime';
 import { PointLightNode } from '@pix3/runtime';
 import { SpotLightNode } from '@pix3/runtime';
 import { Camera3D } from '@pix3/runtime';
+import { MeshInstance } from '@pix3/runtime';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager, InputService } from '@pix3/runtime';
 import { OperationService } from '@/services/OperationService';
@@ -113,6 +114,11 @@ export class ViewportRendererService {
   private lastActiveSceneId: string | null = null;
   private viewportSize = { width: 0, height: 0 };
   private transformTool2d: TransformTool2d;
+
+  // Animation preview
+  private animationMixers = new Map<string, THREE.AnimationMixer>();
+  private animationClock = new THREE.Clock();
+  private previewAnimationActions = new Map<string, THREE.AnimationAction>();
 
   // Gesture handling for 2D navigation
   private panVelocity = { x: 0, y: 0 };
@@ -687,11 +693,58 @@ export class ViewportRendererService {
   }
 
   /**
+   * Set the animation to preview for a specific MeshInstance node.
+   * Pass null as animationName to stop playback.
+   */
+  setPreviewAnimation(nodeId: string, animationName: string | null): void {
+    const mixer = this.animationMixers.get(nodeId);
+    if (!mixer) return;
+
+    // Stop current action for this node
+    const currentAction = this.previewAnimationActions.get(nodeId);
+    if (currentAction) {
+      currentAction.stop();
+      this.previewAnimationActions.delete(nodeId);
+    }
+
+    if (animationName === null) return;
+
+    // Find the MeshInstance node and look for the clip by name
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) return;
+
+    const findMeshNode = (nodes: NodeBase[]): MeshInstance | null => {
+      for (const node of nodes) {
+        if (node instanceof MeshInstance && node.nodeId === nodeId) return node;
+        const found = findMeshNode(node.children as NodeBase[]);
+        if (found) return found;
+      }
+      return null;
+    };
+
+    const meshNode = findMeshNode(sceneGraph.rootNodes);
+    if (!meshNode) return;
+
+    const clip = meshNode.animations.find(c => c.name === animationName);
+    if (!clip) return;
+
+    const action = mixer.clipAction(clip);
+    action.reset().play();
+    this.previewAnimationActions.set(nodeId, action);
+  }
+
+  /**
    * Manually trigger a single frame render. Useful when the main loop
    * is paused but we still want to update the visual state (e.g. on resize).
    */
   requestRender(): void {
     if (!this.renderer || !this.scene || !this.camera) return;
+
+    // Advance animation mixers
+    const delta = this.animationClock.getDelta();
+    for (const mixer of this.animationMixers.values()) {
+      mixer.update(delta);
+    }
 
     // Update controls once before rendering if they exist
     const is2DMode = appState.ui.navigationMode === '2d';
@@ -1637,6 +1690,16 @@ export class ViewportRendererService {
         return;
       }
 
+      // Stop all preview animations and clean up mixers before rebuilding
+      for (const action of this.previewAnimationActions.values()) {
+        action.stop();
+      }
+      this.previewAnimationActions.clear();
+      for (const mixer of this.animationMixers.values()) {
+        mixer.stopAllAction();
+      }
+      this.animationMixers.clear();
+
       // Clean up previous 2D visuals
       for (const visual of this.group2DVisuals.values()) {
         if (visual.parent) {
@@ -1710,6 +1773,14 @@ export class ViewportRendererService {
     if (node instanceof Node3D && !node.parent) {
       this.scene.add(node);
       node.layers.set(LAYER_3D); // 3D nodes use layer 0
+    }
+
+    // Create AnimationMixer for MeshInstance nodes that have animations
+    if (node instanceof MeshInstance && node.animations.length > 0) {
+      if (!this.animationMixers.has(node.nodeId)) {
+        const mixer = new THREE.AnimationMixer(node);
+        this.animationMixers.set(node.nodeId, mixer);
+      }
     }
 
     let current2DVisualRoot = parent2DVisualRoot;
@@ -3361,6 +3432,16 @@ export class ViewportRendererService {
 
     // Cancel pan momentum animation
     this.cancelPanMomentum();
+
+    // Stop and dispose animation mixers
+    for (const action of this.previewAnimationActions.values()) {
+      action.stop();
+    }
+    this.previewAnimationActions.clear();
+    for (const mixer of this.animationMixers.values()) {
+      mixer.stopAllAction();
+    }
+    this.animationMixers.clear();
 
     // Dispose orbit controls
     this.orbitControls?.dispose();
