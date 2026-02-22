@@ -6,7 +6,7 @@
  */
 
 import { ScriptRegistry } from '../core/ScriptRegistry';
-import { TestRotateBehavior } from './TestRotateBehavior';
+import { RotateBehavior } from './RotateBehavior';
 import { SimpleMoveBehavior } from './SimpleMoveBehavior';
 
 /**
@@ -15,12 +15,12 @@ import { SimpleMoveBehavior } from './SimpleMoveBehavior';
 export function registerBuiltInScripts(registry: ScriptRegistry): void {
   // Register test/example components
   registry.registerComponent({
-    id: 'core:TestRotate',
-    displayName: 'Test Rotate',
-    description: 'Rotates a 3D node continuously (for testing)',
-    category: 'Test',
-    componentClass: TestRotateBehavior,
-    keywords: ['rotate', 'test', 'animation'],
+    id: 'core:Rotate',
+    displayName: 'Rotate',
+    description: 'Rotates a 3D node continuously',
+    category: 'Transform',
+    componentClass: RotateBehavior,
+    keywords: ['rotate', 'animation'],
   });
 
   registry.registerComponent({

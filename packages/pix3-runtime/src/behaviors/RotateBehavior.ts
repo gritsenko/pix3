@@ -1,5 +1,5 @@
 /**
- * TestRotateBehavior - A simple component for testing the script system
+ * RotateBehavior - A simple component for testing the script system
  *
  * Rotates a node continuously based on a configurable speed parameter.
  */
@@ -8,7 +8,7 @@ import { Script } from '../core/ScriptComponent';
 import type { PropertySchema } from '../fw/property-schema';
 import { Node3D } from '../nodes/Node3D';
 
-export class TestRotateBehavior extends Script {
+export class RotateBehavior extends Script {
   private rotationSpeed: number = 1.0; // radians per second
 
   constructor(id: string, type: string) {
@@ -21,7 +21,7 @@ export class TestRotateBehavior extends Script {
 
   static getPropertySchema(): PropertySchema {
     return {
-      nodeType: 'TestRotateBehavior',
+      nodeType: 'RotateBehavior',
       properties: [
         {
           name: 'rotationSpeed',
@@ -34,9 +34,9 @@ export class TestRotateBehavior extends Script {
             max: 10,
             step: 0.1,
           },
-          getValue: (component: unknown) => (component as TestRotateBehavior).config.rotationSpeed,
+          getValue: (component: unknown) => (component as RotateBehavior).config.rotationSpeed,
           setValue: (component: unknown, value: unknown) => {
-            const c = component as TestRotateBehavior;
+            const c = component as RotateBehavior;
             c.config.rotationSpeed = Number(value);
             c.rotationSpeed = Number(value);
           },
@@ -54,7 +54,7 @@ export class TestRotateBehavior extends Script {
 
   onAttach(): void {
     console.log(
-      `[TestRotateBehavior] Attached to node "${this.node?.name}" (${this.node?.nodeId})`
+      `[RotateBehavior] Attached to node "${this.node?.name}" (${this.node?.nodeId})`
     );
     // Read config from storage
     if (this.config.rotationSpeed !== undefined) {
@@ -63,7 +63,7 @@ export class TestRotateBehavior extends Script {
   }
 
   onStart(): void {
-    console.log(`[TestRotateBehavior] Starting on node "${this.node?.name}"`);
+    console.log(`[RotateBehavior] Starting on node "${this.node?.name}"`);
   }
 
   onUpdate(dt: number): void {
@@ -76,6 +76,6 @@ export class TestRotateBehavior extends Script {
   }
 
   onDetach(): void {
-    console.log(`[TestRotateBehavior] Detached from node "${this.node?.name}"`);
+    console.log(`[RotateBehavior] Detached from node "${this.node?.name}"`);
   }
 }

@@ -39,7 +39,7 @@ export * from './nodes/3D/SpotLightNode';
 
 // Behaviors
 export * from './behaviors/register-behaviors';
-export * from './behaviors/TestRotateBehavior';
+export * from './behaviors/RotateBehavior';
 
 // Framework
 export * from './fw/property-schema';

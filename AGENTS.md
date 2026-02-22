@@ -111,7 +111,7 @@ Examples:
 src/
   behaviors/               # Built-in behavior implementations
     register-behaviors.ts
-    TestRotateBehavior.ts
+    RotateBehavior.ts
   core/                    # Core business logic and managers
     AssetLoader.ts
     BulkOperation.ts

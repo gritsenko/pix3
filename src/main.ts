@@ -50,7 +50,7 @@ const createImportMapShim = () => {
     export const PointLightNode = api.PointLightNode;
     export const SpotLightNode = api.SpotLightNode;
     export const registerBuiltInScripts = api.registerBuiltInScripts;
-    export const TestRotateBehavior = api.TestRotateBehavior;
+    export const RotateBehavior = api.RotateBehavior;
     export const getNodePropertySchema = api.getNodePropertySchema;
     export const getPropertiesByGroup = api.getPropertiesByGroup;
     export const getPropertyDisplayValue = api.getPropertyDisplayValue;
