@@ -10,7 +10,7 @@ import {
 } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { appState } from '@/state';
-import type { NodeBase } from '@pix3/runtime';
+import type { NodeBase, ScriptComponent } from '@pix3/runtime';
 import type { PropertySchema, PropertyDefinition } from '@/fw';
 import { UpdateObjectPropertyCommand } from '@/features/properties/UpdateObjectPropertyCommand';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
@@ -25,6 +25,7 @@ import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { AddComponentCommand } from '@/features/scripts/AddComponentCommand';
 import { RemoveComponentCommand } from '@/features/scripts/RemoveComponentCommand';
 import { ToggleScriptEnabledCommand } from '@/features/scripts/ToggleScriptEnabledCommand';
+import { UpdateComponentPropertyCommand } from '@/features/scripts/UpdateComponentPropertyCommand';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
@@ -33,6 +34,11 @@ import './property-editors';
 interface PropertyUIState {
   value: string;
   isValid: boolean;
+}
+
+interface SelectOption {
+  value: string;
+  label: string;
 }
 
 @customElement('pix3-inspector-panel')
@@ -78,6 +84,12 @@ export class InspectorPanel extends ComponentBase {
 
   @state()
   private propertyValues: Record<string, PropertyUIState> = {};
+
+  @state()
+  private componentPropertyValues: Record<string, PropertyUIState> = {};
+
+  @state()
+  private expandedComponentIds: string[] = [];
 
   @state()
   private selectedAssetItem: AssetPreviewItem | null = null;
@@ -251,7 +263,7 @@ export class InspectorPanel extends ComponentBase {
 
     // Reset animation preview when selection changes
     const prevPrimaryId = this.primaryNode?.nodeId;
-    const newPrimaryId = primaryNodeId ?? (nodeIds[0] ?? null);
+    const newPrimaryId = primaryNodeId ?? nodeIds[0] ?? null;
     if (prevPrimaryId !== newPrimaryId && this.activePreviewAnimation !== null) {
       if (prevPrimaryId) {
         this.viewportService.setPreviewAnimation(prevPrimaryId, null);
@@ -279,6 +291,8 @@ export class InspectorPanel extends ComponentBase {
     if (!this.primaryNode) {
       this.propertySchema = null;
       this.propertyValues = {};
+      this.componentPropertyValues = {};
+      this.expandedComponentIds = [];
       return;
     }
 
@@ -298,6 +312,66 @@ export class InspectorPanel extends ComponentBase {
       };
     }
     this.propertyValues = values;
+    this.syncComponentValuesFromNode();
+  }
+
+  private syncComponentValuesFromNode(): void {
+    if (!this.primaryNode) {
+      this.componentPropertyValues = {};
+      return;
+    }
+
+    const values: Record<string, PropertyUIState> = {};
+    for (const component of this.primaryNode.components) {
+      const schema = this.scriptRegistry.getComponentPropertySchema(component.type);
+      if (!schema) {
+        continue;
+      }
+      for (const prop of schema.properties) {
+        if (prop.ui?.hidden || prop.ui?.readOnly) {
+          continue;
+        }
+        const key = this.getComponentPropertyKey(component.id, prop.name);
+        values[key] = {
+          value: this.getPropertyDisplayValue(component, prop),
+          isValid: true,
+        };
+      }
+    }
+    this.componentPropertyValues = values;
+    this.expandedComponentIds = this.expandedComponentIds.filter(componentId =>
+      this.primaryNode?.components.some(component => component.id === componentId)
+    );
+  }
+
+  private getPropertyDisplayValue(target: unknown, prop: PropertyDefinition): string {
+    const value = prop.getValue(target);
+
+    if (prop.type === 'number') {
+      const num = Number(value);
+      if (Number.isNaN(num)) return '0';
+      const precision = prop.ui?.precision ?? 2;
+      return parseFloat(num.toFixed(precision)).toString();
+    }
+
+    if (prop.type === 'boolean') {
+      return String(value === true);
+    }
+
+    if (
+      prop.type === 'vector2' ||
+      prop.type === 'vector3' ||
+      prop.type === 'vector4' ||
+      prop.type === 'euler'
+    ) {
+      return JSON.stringify(value);
+    }
+
+    return String(value ?? '');
+  }
+
+  private getComponentPropertyKey(componentId: string, propertyName: string): string {
+    return `${componentId}:${propertyName}`;
   }
 
   private async handlePropertyInput(propName: string, e: Event) {
@@ -371,6 +445,86 @@ export class InspectorPanel extends ComponentBase {
     }
   }
 
+  private async handleComponentPropertyInput(
+    componentId: string,
+    prop: PropertyDefinition,
+    e: Event
+  ) {
+    const input = e.target as HTMLInputElement;
+    const rawValue = input.value;
+    const key = this.getComponentPropertyKey(componentId, prop.name);
+
+    const expectsNumber = prop.type === 'number' || input.type === 'number';
+    const numericValue = parseFloat(rawValue);
+    const parsedValue: unknown = expectsNumber ? numericValue : rawValue;
+    const isValid = expectsNumber ? !Number.isNaN(numericValue) : true;
+
+    this.componentPropertyValues = {
+      ...this.componentPropertyValues,
+      [key]: { value: rawValue, isValid },
+    };
+
+    if (isValid) {
+      await this.applyComponentPropertyChange(componentId, prop, parsedValue);
+    }
+  }
+
+  private async handleComponentPropertyBlur(
+    componentId: string,
+    prop: PropertyDefinition,
+    e: Event
+  ) {
+    const input = e.target as HTMLInputElement;
+    let value = input.value;
+    const key = this.getComponentPropertyKey(componentId, prop.name);
+
+    if (input.type === 'number') {
+      let num = parseFloat(value);
+      if (Number.isNaN(num)) num = 0;
+      value = parseFloat(num.toFixed(4)).toString();
+    }
+
+    this.componentPropertyValues = {
+      ...this.componentPropertyValues,
+      [key]: { value, isValid: true },
+    };
+
+    await this.applyComponentPropertyChange(componentId, prop, value);
+  }
+
+  private async applyComponentPropertyChange(
+    componentId: string,
+    propDef: PropertyDefinition,
+    value: unknown
+  ): Promise<void> {
+    if (!this.primaryNode) return;
+
+    const command = new UpdateComponentPropertyCommand({
+      nodeId: this.primaryNode.nodeId,
+      componentId,
+      propertyName: propDef.name,
+      value,
+    });
+
+    try {
+      await this.commandDispatcher.execute(command);
+    } catch (error) {
+      console.error('[InspectorPanel] Failed to update component property', propDef.name, error);
+      const component = this.primaryNode.components.find(c => c.id === componentId);
+      if (!component) {
+        return;
+      }
+      const key = this.getComponentPropertyKey(componentId, propDef.name);
+      this.componentPropertyValues = {
+        ...this.componentPropertyValues,
+        [key]: {
+          value: this.getPropertyDisplayValue(component, propDef),
+          isValid: true,
+        },
+      };
+    }
+  }
+
   protected render() {
     const hasSelection = this.selectedNodes.length > 0;
     const hasAssetSelection = this.selectedAssetItem !== null;
@@ -382,7 +536,11 @@ export class InspectorPanel extends ComponentBase {
         actions-label="Inspector actions"
       >
         <div class="inspector-body">
-          ${hasAssetSelection ? this.renderAssetProperties() : hasSelection ? this.renderProperties() : ''}
+          ${hasAssetSelection
+            ? this.renderAssetProperties()
+            : hasSelection
+              ? this.renderProperties()
+              : ''}
         </div>
       </pix3-panel>
     `;
@@ -407,15 +565,13 @@ export class InspectorPanel extends ComponentBase {
         <div class="property-group-section asset-section">
           <h4 class="group-title">Preview</h4>
           ${isImage
-        ? html`
+            ? html`
                 <div class="asset-image-preview checker-bg">
                   <img src=${asset.thumbnailUrl!} alt=${asset.name} />
                 </div>
               `
-        : html`
-                <div class="asset-file-icon">
-                  ${this.iconService.getIcon(asset.iconName, 42)}
-                </div>
+            : html`
+                <div class="asset-file-icon">${this.iconService.getIcon(asset.iconName, 42)}</div>
               `}
         </div>
 
@@ -430,8 +586,8 @@ export class InspectorPanel extends ComponentBase {
             <span class="property-label" title="Resource URL (res://)">Resource</span>
             <div class="asset-value-wrapper">
               <span class="asset-value asset-path">${resourceUrl}</span>
-              <button 
-                class="btn-copy-resource" 
+              <button
+                class="btn-copy-resource"
                 title="Copy Resource URL"
                 @click=${() => this.handleCopyResourceUrl(resourceUrl)}
               >
@@ -445,13 +601,13 @@ export class InspectorPanel extends ComponentBase {
             <span class="asset-value asset-path">${asset.path}</span>
           </div>
           ${asset.width !== null && asset.height !== null
-        ? html`
+            ? html`
                 <div class="property-group">
                   <span class="property-label">Resolution</span>
                   <span class="asset-value">${asset.width} x ${asset.height}</span>
                 </div>
               `
-        : ''}
+            : ''}
           <div class="property-group">
             <span class="property-label">Size</span>
             <span class="asset-value">${this.formatFileSize(asset.sizeBytes)}</span>
@@ -496,14 +652,13 @@ export class InspectorPanel extends ComponentBase {
         <div class="section-header">
           <h3 class="section-title">Object Inspector</h3>
           ${this.selectedNodes.length > 1
-        ? html`<p class="selection-info">${this.selectedNodes.length} objects selected</p>`
-        : ''}
+            ? html`<p class="selection-info">${this.selectedNodes.length} objects selected</p>`
+            : ''}
           <p class="node-type">${nodeType}</p>
         </div>
 
         ${sortedGroups.map(([groupName, props]) => this.renderPropertyGroup(groupName, props))}
-        ${this.renderAnimationsSection()}
-        ${this.renderScriptsSection()}
+        ${this.renderAnimationsSection()} ${this.renderScriptsSection()}
       </div>
     `;
   }
@@ -519,9 +674,9 @@ export class InspectorPanel extends ComponentBase {
         <h4 class="group-title">Animations</h4>
         <div class="animation-list">
           ${clips.map(clip => {
-      const isActive = this.activePreviewAnimation === clip.name;
-      const isDefault = initialAnimation === clip.name;
-      return html`
+            const isActive = this.activePreviewAnimation === clip.name;
+            const isDefault = initialAnimation === clip.name;
+            return html`
               <div class="animation-item ${isActive ? 'animation-item--active' : ''}">
                 <button
                   class="animation-preview-btn"
@@ -536,14 +691,14 @@ export class InspectorPanel extends ComponentBase {
                   class="animation-default-btn ${isDefault ? 'animation-default-btn--active' : ''}"
                   @click=${() => this.setInitialAnimation(clip.name)}
                   title=${isDefault
-          ? 'Default startup animation'
-          : 'Set as default startup animation'}
+                    ? 'Default startup animation'
+                    : 'Set as default startup animation'}
                 >
                   ${isDefault ? 'Default' : 'Set Default'}
                 </button>
               </div>
             `;
-    })}
+          })}
         </div>
         <div class="animation-default-row">
           <button
@@ -589,35 +744,95 @@ export class InspectorPanel extends ComponentBase {
 
         <div class="scripts-list">
           ${components.map(
-      c => html`
+            component => html`
               <div class="script-item component-item">
-                <div class="script-icon">${this.iconService.getIcon(this.getComponentIconName(c.type), 16)}</div>
+                <button
+                  class="script-foldout-btn"
+                  @click=${() => this.toggleComponentExpanded(component.id)}
+                  title=${this.isComponentExpanded(component.id) ? 'Collapse' : 'Expand'}
+                >
+                  ${this.iconService.getIcon(
+                    this.isComponentExpanded(component.id) ? 'chevron-down' : 'chevron-right',
+                    14
+                  )}
+                </button>
+                <div class="script-icon">
+                  ${this.iconService.getIcon(this.getComponentIconName(component.type), 16)}
+                </div>
                 <div class="script-info">
-                  <div class="script-name">${c.type}</div>
+                  <div class="script-name">${component.type}</div>
                 </div>
                 <div class="script-actions">
                   <button
                     class="btn-icon"
-                    @click=${() => this.onToggleComponent(c.id, !c.enabled)}
-                    title=${c.enabled ? 'Disable' : 'Enable'}
+                    @click=${() => this.onToggleComponent(component.id, !component.enabled)}
+                    title=${component.enabled ? 'Disable' : 'Enable'}
                   >
-                    ${this.iconService.getIcon(c.enabled ? 'check-circle' : 'circle', 16)}
+                    ${this.iconService.getIcon(component.enabled ? 'check-circle' : 'circle', 16)}
                   </button>
                   <button
                     class="btn-icon"
-                    @click=${() => this.onRemoveComponent(c.id)}
+                    @click=${() => this.onRemoveComponent(component.id)}
                     title="Remove"
                   >
                     ${this.iconService.getIcon('trash-2', 16)}
                   </button>
                 </div>
               </div>
+              ${this.renderComponentProperties(component)}
             `
-    )}
+          )}
           ${components.length === 0
-        ? html`<div class="no-scripts">No components attached</div>`
-        : ''}
+            ? html`<div class="no-scripts">No components attached</div>`
+            : ''}
         </div>
+      </div>
+    `;
+  }
+
+  private isComponentExpanded(componentId: string): boolean {
+    return this.expandedComponentIds.includes(componentId);
+  }
+
+  private toggleComponentExpanded(componentId: string): void {
+    if (this.isComponentExpanded(componentId)) {
+      this.expandedComponentIds = this.expandedComponentIds.filter(id => id !== componentId);
+      return;
+    }
+    this.expandedComponentIds = [...this.expandedComponentIds, componentId];
+  }
+
+  private renderComponentProperties(component: ScriptComponent) {
+    if (!this.isComponentExpanded(component.id)) {
+      return '';
+    }
+
+    const schema = this.scriptRegistry.getComponentPropertySchema(component.type);
+    if (!schema || schema.properties.length === 0) {
+      return html`<div class="script-props-empty">No editable properties</div>`;
+    }
+
+    const groupedProps = getPropertiesByGroup(schema);
+    const sortedGroups = Array.from(groupedProps.entries()).sort(([groupA], [groupB]) =>
+      groupA.localeCompare(groupB)
+    );
+
+    return html`
+      <div class="script-props">
+        ${sortedGroups.map(([groupName, props]) => {
+          const groupDef = schema.groups?.[groupName];
+          const label = groupDef?.label ?? groupName;
+          const visibleProps = props.filter(prop => !prop.ui?.hidden);
+          if (visibleProps.length === 0) {
+            return '';
+          }
+          return html`
+            <div class="script-prop-group">
+              <div class="script-prop-group-title">${label}</div>
+              ${visibleProps.map(prop => this.renderComponentPropertyInput(component, prop))}
+            </div>
+          `;
+        })}
       </div>
     `;
   }
@@ -715,11 +930,11 @@ export class InspectorPanel extends ComponentBase {
           <div class="preset-label">Anchor Presets</div>
           <div class="preset-grid">
             ${presetRows.map(
-      row => html`
+              row => html`
                 <div class="preset-row">
                   ${row.map(presetId => {
-        const preset = LAYOUT_PRESETS[presetId];
-        return html`
+                    const preset = LAYOUT_PRESETS[presetId];
+                    return html`
                       <button
                         class="preset-btn"
                         title=${preset.label}
@@ -728,10 +943,10 @@ export class InspectorPanel extends ComponentBase {
                         ${this.renderPresetIcon(presetId)}
                       </button>
                     `;
-      })}
+                  })}
                 </div>
               `
-    )}
+            )}
           </div>
         </div>
 
@@ -817,9 +1032,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.x.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-            const newX = parseFloat((e.target as HTMLInputElement).value);
-            this.applyPropertyChange(prop.name, { x: newX, y: value.y });
-          }}
+                  const newX = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: newX, y: value.y });
+                }}
               />
 
               <div class="transform-field-label">Y</div>
@@ -830,9 +1045,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.y.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-            const newY = parseFloat((e.target as HTMLInputElement).value);
-            this.applyPropertyChange(prop.name, { x: value.x, y: newY });
-          }}
+                  const newY = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: newY });
+                }}
               />
 
               <div></div>
@@ -858,9 +1073,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.x.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-            const newX = parseFloat((e.target as HTMLInputElement).value);
-            this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
-          }}
+                  const newX = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
+                }}
               />
 
               <div class="transform-field-label">Y</div>
@@ -871,9 +1086,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.y.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-            const newY = parseFloat((e.target as HTMLInputElement).value);
-            this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
-          }}
+                  const newY = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
+                }}
               />
 
               <div class="transform-field-label">Z</div>
@@ -884,9 +1099,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.z.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-            const newZ = parseFloat((e.target as HTMLInputElement).value);
-            this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
-          }}
+                  const newZ = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
+                }}
               />
             </div>
           </div>
@@ -909,9 +1124,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.x.toFixed(prop.ui?.precision ?? 1)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-            const newX = parseFloat((e.target as HTMLInputElement).value);
-            this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
-          }}
+                  const newX = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
+                }}
               />
 
               <div class="transform-field-label">Y</div>
@@ -922,9 +1137,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.y.toFixed(prop.ui?.precision ?? 1)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-            const newY = parseFloat((e.target as HTMLInputElement).value);
-            this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
-          }}
+                  const newY = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
+                }}
               />
 
               <div class="transform-field-label">Z</div>
@@ -935,9 +1150,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.z.toFixed(prop.ui?.precision ?? 1)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-            const newZ = parseFloat((e.target as HTMLInputElement).value);
-            this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
-          }}
+                  const newZ = parseFloat((e.target as HTMLInputElement).value);
+                  this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
+                }}
               />
             </div>
           </div>
@@ -954,8 +1169,8 @@ export class InspectorPanel extends ComponentBase {
             type="number"
             step=${prop.ui?.step ?? 0.01}
             class="property-input property-input--number ${state.isValid
-          ? ''
-          : 'property-input--invalid'}"
+              ? ''
+              : 'property-input--invalid'}"
             .value=${state.value}
             ?disabled=${readOnly}
             @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
@@ -966,6 +1181,188 @@ export class InspectorPanel extends ComponentBase {
     }
 
     return '';
+  }
+
+  private getSelectOptions(prop: PropertyDefinition): SelectOption[] {
+    const options = prop.ui?.options;
+    if (!options) {
+      return [];
+    }
+
+    if (Array.isArray(options)) {
+      return options.map(option => ({
+        value: String(option),
+        label: String(option),
+      }));
+    }
+
+    if (typeof options === 'object') {
+      return Object.entries(options).map(([label, value]) => ({
+        label,
+        value: String(value),
+      }));
+    }
+
+    return [];
+  }
+
+  private renderComponentPropertyInput(component: ScriptComponent, prop: PropertyDefinition) {
+    const key = this.getComponentPropertyKey(component.id, prop.name);
+    const state = this.componentPropertyValues[key];
+    if (!state) {
+      return '';
+    }
+
+    const label = prop.ui?.label || prop.name;
+    const readOnly = prop.ui?.readOnly;
+
+    if (prop.type === 'boolean') {
+      return html`
+        <div class="property-group component-property-group">
+          <label class="property-label property-label--checkbox">
+            <input
+              type="checkbox"
+              class="property-checkbox"
+              .checked=${state.value === 'true'}
+              ?disabled=${readOnly}
+              @change=${(e: Event) =>
+                this.applyComponentPropertyChange(
+                  component.id,
+                  prop,
+                  (e.target as HTMLInputElement).checked
+                )}
+            />
+            ${label}
+          </label>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'vector2') {
+      let value = { x: 0, y: 0 };
+      try {
+        value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
+      } catch {
+        console.warn(`Failed to parse vector2 component value for ${prop.name}:`, state.value);
+      }
+      return html`
+        <div class="property-group component-property-group">
+          <span class="property-label">${label}</span>
+          <pix3-vector2-editor
+            .x=${value.x}
+            .y=${value.y}
+            step=${prop.ui?.step ?? 0.01}
+            precision=${prop.ui?.precision ?? 2}
+            ?disabled=${readOnly}
+            @change=${(e: CustomEvent) =>
+              this.applyComponentPropertyChange(component.id, prop, e.detail)}
+          ></pix3-vector2-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'vector3') {
+      let value = { x: 0, y: 0, z: 0 };
+      try {
+        value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
+      } catch {
+        console.warn(`Failed to parse vector3 component value for ${prop.name}:`, state.value);
+      }
+      return html`
+        <div class="property-group component-property-group">
+          <span class="property-label">${label}</span>
+          <pix3-vector3-editor
+            .x=${value.x}
+            .y=${value.y}
+            .z=${value.z}
+            step=${prop.ui?.step ?? 0.01}
+            precision=${prop.ui?.precision ?? 2}
+            ?disabled=${readOnly}
+            @change=${(e: CustomEvent) =>
+              this.applyComponentPropertyChange(component.id, prop, e.detail)}
+          ></pix3-vector3-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'euler') {
+      let value = { x: 0, y: 0, z: 0 };
+      try {
+        value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
+      } catch {
+        console.warn(`Failed to parse euler component value for ${prop.name}:`, state.value);
+      }
+      return html`
+        <div class="property-group component-property-group">
+          <span class="property-label">${label}</span>
+          <pix3-euler-editor
+            .x=${value.x}
+            .y=${value.y}
+            .z=${value.z}
+            step=${prop.ui?.step ?? 0.1}
+            precision=${prop.ui?.precision ?? 1}
+            ?disabled=${readOnly}
+            @change=${(e: CustomEvent) =>
+              this.applyComponentPropertyChange(component.id, prop, e.detail)}
+          ></pix3-euler-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'select' || prop.type === 'enum') {
+      const options = this.getSelectOptions(prop);
+      return html`
+        <div class="property-group component-property-group">
+          <span class="property-label">${label}</span>
+          <select
+            class="property-select"
+            .value=${state.value}
+            ?disabled=${readOnly}
+            @change=${(e: Event) =>
+              this.applyComponentPropertyChange(
+                component.id,
+                prop,
+                (e.target as HTMLSelectElement).value
+              )}
+          >
+            ${options.map(option => html`<option value=${option.value}>${option.label}</option>`)}
+          </select>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'number') {
+      return html`
+        <div class="property-group component-property-group">
+          <span class="property-label">${label}${prop.ui?.unit ? ` (${prop.ui.unit})` : ''}</span>
+          <input
+            type="number"
+            step=${prop.ui?.step ?? 0.01}
+            class="property-input property-input--number ${state.isValid
+              ? ''
+              : 'property-input--invalid'}"
+            .value=${state.value}
+            ?disabled=${readOnly}
+            @input=${(e: Event) => this.handleComponentPropertyInput(component.id, prop, e)}
+            @blur=${(e: Event) => this.handleComponentPropertyBlur(component.id, prop, e)}
+          />
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="property-group component-property-group">
+        <span class="property-label">${label}</span>
+        <input
+          type="text"
+          class="property-input property-input--text"
+          .value=${state.value}
+          ?disabled=${readOnly}
+          @input=${(e: Event) => this.handleComponentPropertyInput(component.id, prop, e)}
+          @blur=${(e: Event) => this.handleComponentPropertyBlur(component.id, prop, e)}
+        />
+      </div>
+    `;
   }
 
   private renderPropertyInput(prop: PropertyDefinition) {
@@ -987,7 +1384,7 @@ export class InspectorPanel extends ComponentBase {
               .checked=${state.value === 'true'}
               ?disabled=${readOnly}
               @change=${(e: Event) =>
-          this.applyPropertyChange(prop.name, (e.target as HTMLInputElement).checked)}
+                this.applyPropertyChange(prop.name, (e.target as HTMLInputElement).checked)}
             />
             ${label}
           </label>
@@ -1063,6 +1460,24 @@ export class InspectorPanel extends ComponentBase {
       `;
     }
 
+    if (prop.type === 'select' || prop.type === 'enum') {
+      const options = this.getSelectOptions(prop);
+      return html`
+        <div class="property-group">
+          <span class="property-label">${label}</span>
+          <select
+            class="property-select"
+            .value=${state.value}
+            ?disabled=${readOnly}
+            @change=${(e: Event) =>
+              this.applyPropertyChange(prop.name, (e.target as HTMLSelectElement).value)}
+          >
+            ${options.map(option => html`<option value=${option.value}>${option.label}</option>`)}
+          </select>
+        </div>
+      `;
+    }
+
     if (prop.type === 'number') {
       return html`
         <div class="property-group">
@@ -1071,8 +1486,8 @@ export class InspectorPanel extends ComponentBase {
             type="number"
             step=${prop.ui?.step ?? 0.01}
             class="property-input property-input--number ${state.isValid
-          ? ''
-          : 'property-input--invalid'}"
+              ? ''
+              : 'property-input--invalid'}"
             .value=${state.value}
             ?disabled=${readOnly}
             @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}

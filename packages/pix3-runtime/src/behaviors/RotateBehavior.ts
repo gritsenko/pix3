@@ -9,11 +9,10 @@ import type { PropertySchema } from '../fw/property-schema';
 import { Node3D } from '../nodes/Node3D';
 
 export class RotateBehavior extends Script {
-  private rotationSpeed: number = 1.0; // radians per second
+  private rotationSpeed = 1.0; // radians per second
 
   constructor(id: string, type: string) {
     super(id, type);
-    // Initialize with default config
     this.config = {
       rotationSpeed: this.rotationSpeed,
     };
@@ -34,11 +33,14 @@ export class RotateBehavior extends Script {
             max: 10,
             step: 0.1,
           },
-          getValue: (component: unknown) => (component as RotateBehavior).config.rotationSpeed,
+          getValue: (component: unknown) => (component as RotateBehavior).getRotationSpeed(),
           setValue: (component: unknown, value: unknown) => {
-            const c = component as RotateBehavior;
-            c.config.rotationSpeed = Number(value);
-            c.rotationSpeed = Number(value);
+            const behavior = component as RotateBehavior;
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed < 0) {
+              return;
+            }
+            behavior.setRotationSpeed(parsed);
           },
         },
       ],
@@ -53,13 +55,8 @@ export class RotateBehavior extends Script {
   }
 
   onAttach(): void {
-    console.log(
-      `[RotateBehavior] Attached to node "${this.node?.name}" (${this.node?.nodeId})`
-    );
-    // Read config from storage
-    if (this.config.rotationSpeed !== undefined) {
-      this.rotationSpeed = Number(this.config.rotationSpeed);
-    }
+    console.log(`[RotateBehavior] Attached to node "${this.node?.name}" (${this.node?.nodeId})`);
+    this.setRotationSpeed(this.getRotationSpeed());
   }
 
   onStart(): void {
@@ -71,11 +68,21 @@ export class RotateBehavior extends Script {
       return;
     }
 
-    // Rotate the node around Y axis
     this.node.rotation.y += this.rotationSpeed * dt;
   }
 
   onDetach(): void {
     console.log(`[RotateBehavior] Detached from node "${this.node?.name}"`);
+  }
+
+  private getRotationSpeed(): number {
+    const raw = this.config.rotationSpeed;
+    const parsed = typeof raw === 'number' ? raw : Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 1.0;
+  }
+
+  private setRotationSpeed(value: number): void {
+    this.rotationSpeed = value;
+    this.config.rotationSpeed = value;
   }
 }

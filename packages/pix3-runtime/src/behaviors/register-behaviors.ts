@@ -8,6 +8,7 @@
 import { ScriptRegistry } from '../core/ScriptRegistry';
 import { RotateBehavior } from './RotateBehavior';
 import { SimpleMoveBehavior } from './SimpleMoveBehavior';
+import { SineBehavior } from './SineBehavior';
 
 /**
  * Register all built-in script components
@@ -30,6 +31,15 @@ export function registerBuiltInScripts(registry: ScriptRegistry): void {
     category: 'Test',
     componentClass: SimpleMoveBehavior,
     keywords: ['move', 'test', 'animation'],
+  });
+
+  registry.registerComponent({
+    id: 'core:Sine',
+    displayName: 'Sine Oscillator',
+    description: 'Oscillates a node along a selected axis',
+    category: 'Animation',
+    componentClass: SineBehavior,
+    keywords: ['sine', 'oscillation', 'animation'],
   });
 
   console.log('[ScriptRegistry] Registered built-in script components');

@@ -181,6 +181,23 @@ pix3-panel {
   align-items: center;
 }
 
+.script-foldout-btn {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #aaa);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.script-foldout-btn:hover {
+  color: var(--pix3-accent-color, #ffcf33);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.1);
+}
+
 .script-info {
   flex: 1;
   min-width: 0;
@@ -225,6 +242,61 @@ pix3-panel {
   font-style: italic;
   text-align: center;
   padding: 8px;
+}
+
+.script-props {
+  margin: 2px 0 8px 22px;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border-subtle, #2a2a2a);
+  background: rgba(255, 255, 255, 0.02);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.script-props-empty {
+  margin: 2px 0 8px 22px;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px dashed var(--color-border-subtle, #2a2a2a);
+  color: var(--color-text-subtle, #777);
+  font-size: 0.74rem;
+}
+
+.script-prop-group {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.script-prop-group-title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--color-text-secondary, #9a9a9a);
+  margin-bottom: 2px;
+}
+
+.component-property-group {
+  padding: 2px 0;
+}
+
+.property-select {
+  flex: 1;
+  min-width: 10rem;
+  background: var(--color-input-bg, #222);
+  color: var(--color-text-primary, #eee);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.property-select:focus {
+  outline: none;
+  border-color: var(--pix3-accent-color, #ffcf33);
+  box-shadow: 0 0 0 1px rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.2);
 }
 .property-input:disabled {
   opacity: 0.5;
@@ -498,8 +570,9 @@ pix3-panel {
 }
 
 .asset-path {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
-    'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   font-size: 0.74rem;
 }
 
@@ -527,7 +600,9 @@ pix3-panel {
   cursor: pointer;
   font-size: 0.8rem;
   text-align: left;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .animation-preview-btn {

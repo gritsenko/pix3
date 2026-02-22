@@ -1,48 +1,130 @@
 /**
- * BoxController - Auto-generated script component
- *
- * Custom script component for node logic
+ * SimpleMoveBehavior - Joystick-driven movement behavior.
  */
 
 import { Script } from '../core/ScriptComponent';
 import type { PropertySchema } from '../fw/property-schema';
 
+type MovementPlane = 'xz' | 'xy';
+
+interface SimpleMoveConfig {
+  speed: number;
+  axisHorizontal: string;
+  axisVertical: string;
+  movementPlane: MovementPlane;
+  invertVertical: boolean;
+}
+
 export class SimpleMoveBehavior extends Script {
   constructor(id: string, type: string) {
     super(id, type);
-    // Initialize default config
     this.config = {
-      // Add your config here
-    };
+      speed: 5,
+      axisHorizontal: 'Horizontal',
+      axisVertical: 'Vertical',
+      movementPlane: 'xz',
+      invertVertical: true,
+    } satisfies SimpleMoveConfig;
   }
 
   static getPropertySchema(): PropertySchema {
     return {
       nodeType: 'SimpleMoveBehavior',
       properties: [
-        // Add property definitions here
-        // Example:
-        // {
-        //   name: 'speed',
-        //   type: 'number',
-        //   ui: {
-        //     label: 'Speed',
-        //     description: 'Movement speed',
-        //     group: 'Component',
-        //     min: 0,
-        //     max: 10,
-        //     step: 0.1,
-        //   },
-        //   getValue: (script: unknown) => (script as BoxController).config.speed,
-        //   setValue: (script: unknown, value: unknown) => {
-        //     (script as BoxController).config.speed = Number(value);
-        //   },
-        // },
+        {
+          name: 'speed',
+          type: 'number',
+          ui: {
+            label: 'Speed',
+            description: 'Movement speed units per second',
+            group: 'Movement',
+            min: 0,
+            max: 50,
+            step: 0.1,
+          },
+          getValue: (script: unknown) => (script as SimpleMoveBehavior).getSpeed(),
+          setValue: (script: unknown, value: unknown) => {
+            const behavior = script as SimpleMoveBehavior;
+            const parsed = Number(value);
+            if (!Number.isFinite(parsed) || parsed < 0) {
+              return;
+            }
+            behavior.config.speed = parsed;
+          },
+        },
+        {
+          name: 'axisHorizontal',
+          type: 'string',
+          ui: {
+            label: 'Horizontal Axis',
+            description: 'Input axis name for horizontal movement',
+            group: 'Input',
+          },
+          getValue: (script: unknown) => (script as SimpleMoveBehavior).getHorizontalAxis(),
+          setValue: (script: unknown, value: unknown) => {
+            if (typeof value !== 'string' || value.trim().length === 0) {
+              return;
+            }
+            (script as SimpleMoveBehavior).config.axisHorizontal = value;
+          },
+        },
+        {
+          name: 'axisVertical',
+          type: 'string',
+          ui: {
+            label: 'Vertical Axis',
+            description: 'Input axis name for vertical movement',
+            group: 'Input',
+          },
+          getValue: (script: unknown) => (script as SimpleMoveBehavior).getVerticalAxis(),
+          setValue: (script: unknown, value: unknown) => {
+            if (typeof value !== 'string' || value.trim().length === 0) {
+              return;
+            }
+            (script as SimpleMoveBehavior).config.axisVertical = value;
+          },
+        },
+        {
+          name: 'movementPlane',
+          type: 'select',
+          ui: {
+            label: 'Movement Plane',
+            description: 'Select whether vertical input moves on XY or XZ plane',
+            group: 'Movement',
+            options: ['xz', 'xy'],
+          },
+          getValue: (script: unknown) => (script as SimpleMoveBehavior).getMovementPlane(),
+          setValue: (script: unknown, value: unknown) => {
+            if (value === 'xz' || value === 'xy') {
+              (script as SimpleMoveBehavior).config.movementPlane = value;
+            }
+          },
+        },
+        {
+          name: 'invertVertical',
+          type: 'boolean',
+          ui: {
+            label: 'Invert Vertical',
+            description: 'Invert sign for vertical input axis',
+            group: 'Movement',
+          },
+          getValue: (script: unknown) => (script as SimpleMoveBehavior).isVerticalInverted(),
+          setValue: (script: unknown, value: unknown) => {
+            if (typeof value === 'boolean') {
+              (script as SimpleMoveBehavior).config.invertVertical = value;
+            }
+          },
+        },
       ],
       groups: {
-        Component: {
-          label: 'Component Parameters',
-          description: 'Configuration for SimpleMoveBehavior component',
+        Movement: {
+          label: 'Movement',
+          description: 'Movement settings',
+          expanded: true,
+        },
+        Input: {
+          label: 'Input',
+          description: 'Input axis mapping',
           expanded: true,
         },
       },
@@ -50,32 +132,65 @@ export class SimpleMoveBehavior extends Script {
   }
 
   onAttach(): void {
-    console.log(`[SimpleMoveBehavior] Attached to node "${this.node?.name}" (${this.node?.nodeId})`);
-    // Initialize script when attached to a node
+    console.log(
+      `[SimpleMoveBehavior] Attached to node "${this.node?.name}" (${this.node?.nodeId})`
+    );
   }
 
   onStart(): void {
     console.log(`[SimpleMoveBehavior] Starting on node "${this.node?.name}"`);
-    // Called on the first frame after attachment
   }
 
   onUpdate(dt: number): void {
     if (!this.input || !this.node) return;
 
-    const horizontal = this.input.getAxis('Horizontal');
-    const vertical = this.input.getAxis('Vertical');
+    const horizontal = this.input.getAxis(this.getHorizontalAxis());
+    const vertical = this.input.getAxis(this.getVerticalAxis());
 
-    if (horizontal !== 0 || vertical !== 0) {
-      console.log(`[SimpleMoveBehavior] Joystick input: ${horizontal.toFixed(2)}, ${vertical.toFixed(2)}`);
+    if (horizontal === 0 && vertical === 0) {
+      return;
+    }
 
-      const speed = 5;
-      this.node.position.x += horizontal * speed * dt;
-      this.node.position.z -= vertical * speed * dt; // Move in Z plane for 3D box
+    const signedVertical = this.isVerticalInverted() ? -vertical : vertical;
+    const deltaHorizontal = horizontal * this.getSpeed() * dt;
+    const deltaVertical = signedVertical * this.getSpeed() * dt;
+
+    this.node.position.x += deltaHorizontal;
+
+    if (this.getMovementPlane() === 'xy') {
+      this.node.position.y += deltaVertical;
+    } else {
+      this.node.position.z += deltaVertical;
     }
   }
 
   onDetach(): void {
     console.log(`[SimpleMoveBehavior] Detached from node "${this.node?.name}"`);
-    // Clean up resources when detached
+  }
+
+  private getSpeed(): number {
+    const raw = this.config.speed;
+    const parsed = typeof raw === 'number' ? raw : Number(raw);
+    return Number.isFinite(parsed) && parsed >= 0 ? parsed : 5;
+  }
+
+  private getHorizontalAxis(): string {
+    const raw = this.config.axisHorizontal;
+    return typeof raw === 'string' && raw.length > 0 ? raw : 'Horizontal';
+  }
+
+  private getVerticalAxis(): string {
+    const raw = this.config.axisVertical;
+    return typeof raw === 'string' && raw.length > 0 ? raw : 'Vertical';
+  }
+
+  private getMovementPlane(): MovementPlane {
+    const raw = this.config.movementPlane;
+    return raw === 'xy' || raw === 'xz' ? raw : 'xz';
+  }
+
+  private isVerticalInverted(): boolean {
+    const raw = this.config.invertVertical;
+    return typeof raw === 'boolean' ? raw : true;
   }
 }

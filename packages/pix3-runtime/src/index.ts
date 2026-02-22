@@ -40,6 +40,8 @@ export * from './nodes/3D/SpotLightNode';
 // Behaviors
 export * from './behaviors/register-behaviors';
 export * from './behaviors/RotateBehavior';
+export * from './behaviors/SimpleMoveBehavior';
+export * from './behaviors/SineBehavior';
 
 // Framework
 export * from './fw/property-schema';
