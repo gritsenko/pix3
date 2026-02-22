@@ -6,7 +6,7 @@
  * and user-authored scripts.
  *
  * User scripts will write:
- *   import { ScriptControllerBase, NodeBase } from '@pix3/engine';
+ *   import { Script, NodeBase } from '@pix3/engine';
  *
  * At runtime, this will resolve to the engine API exposed through the import map.
  */
@@ -32,7 +32,7 @@ export type {
 } from '@pix3/runtime';
 
 // State management (if users need to read app state)
-export { appState } from '@/state';
+export { appState } from '../state/index';
 export { snapshot } from 'valtio/vanilla';
 
 // Commonly used decorators and utilities

@@ -4,7 +4,7 @@ import 'golden-layout/dist/css/themes/goldenlayout-dark-theme.css';
 import './index.css';
 
 // Expose Engine API for user scripts
-import * as EngineAPI from './fw/engine-api';
+import * as EngineAPI from '@pix3/runtime';
 
 interface WindowWithEngine extends Window {
   __PIX3_ENGINE__: typeof EngineAPI;
@@ -12,8 +12,8 @@ interface WindowWithEngine extends Window {
 
 (window as unknown as WindowWithEngine).__PIX3_ENGINE__ = EngineAPI;
 
-// Create dynamic import map for @pix3/engine
-// This allows user scripts to import from '@pix3/engine' at runtime
+// Create dynamic import map for @pix3/runtime
+// This allows user scripts to import from '@pix3/runtime' at runtime
 const createImportMapShim = () => {
   // Generate module code that re-exports the global API
   const moduleCode = `
@@ -22,8 +22,6 @@ const createImportMapShim = () => {
     export const NodeBase = api.NodeBase;
     export const Node2D = api.Node2D;
     export const Node3D = api.Node3D;
-    export const appState = api.appState;
-    export const snapshot = api.snapshot;
     export const property = api.property;
     export const state = api.state;
   `;
@@ -37,7 +35,7 @@ const createImportMapShim = () => {
   importMap.type = 'importmap';
   importMap.textContent = JSON.stringify({
     imports: {
-      '@pix3/engine': blobUrl,
+      '@pix3/runtime': blobUrl,
     },
   });
   document.head.appendChild(importMap);

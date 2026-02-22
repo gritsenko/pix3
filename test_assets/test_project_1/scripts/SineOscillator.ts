@@ -1,5 +1,5 @@
-import { Script, NodeBase } from '@pix3/engine';
-import type { PropertySchema } from '@pix3/engine';
+import { Script, NodeBase } from '@pix3/runtime';
+import type { PropertySchema } from '@pix3/runtime';
 
 /**
  * SineOscillator - Custom behavior script for oscillating a node.

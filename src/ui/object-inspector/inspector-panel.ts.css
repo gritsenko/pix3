@@ -470,3 +470,72 @@ pix3-panel {
     'Courier New', monospace;
   font-size: 0.74rem;
 }
+
+/* === Animations Section === */
+.animations-section {
+  margin-top: 0.25rem;
+}
+
+.animation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.animation-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px;
+  background: var(--color-bg-item, #222);
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--color-text-primary, #eee);
+  cursor: pointer;
+  font-size: 0.8rem;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.animation-item:hover {
+  border-color: var(--color-border, #444);
+  background: var(--color-bg-hover, #2a2a2a);
+}
+
+.animation-item--active {
+  border-color: var(--pix3-accent-color, #ffcf33);
+  background: rgba(255, 207, 51, 0.08);
+}
+
+.animation-play-icon {
+  font-size: 0.7rem;
+  width: 14px;
+  text-align: center;
+  color: var(--color-text-secondary, #aaa);
+  flex-shrink: 0;
+}
+
+.animation-item--active .animation-play-icon {
+  color: var(--pix3-accent-color, #ffcf33);
+}
+
+.animation-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text-primary, #eee);
+}
+
+.animation-item--active .animation-name {
+  color: var(--pix3-accent-color, #ffcf33);
+}
+
+.animation-duration {
+  font-size: 0.7rem;
+  color: var(--color-text-subtle, #888);
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+

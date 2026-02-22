@@ -43,3 +43,6 @@ export * from './behaviors/TestRotateBehavior';
 // Framework
 export * from './fw/property-schema';
 export * from './fw/property-schema-utils';
+
+// Decorators
+export { property, state } from 'lit/decorators.js';

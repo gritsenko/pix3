@@ -21,6 +21,7 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "noEmit": true,
+    "rootDir": ".",
     /* Path mapping */
     "baseUrl": ".",
     "paths": {
@@ -44,9 +45,6 @@
       ],
       "@pix3/runtime/*": [
         "packages/pix3-runtime/src/*"
-      ],
-      "@pix3/engine": [
-        "src/fw/engine-api.ts"
       ]
     },
     /* Linting */

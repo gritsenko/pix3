@@ -9,7 +9,7 @@
  * 1. Initialize esbuild-wasm with the WASM binary
  * 2. Accept a map of filenames to TypeScript source code
  * 3. Create a virtual entry point that exports all scripts
- * 4. Use esbuild to bundle with '@pix3/engine' marked as external
+ * 4. Use esbuild to bundle with '@pix3/runtime' marked as external
  * 5. Return the compiled JavaScript code ready for dynamic import
  */
 
@@ -105,7 +105,7 @@ export class ScriptCompilerService {
         format: 'esm',
         platform: 'browser',
         target: 'es2022',
-        external: ['@pix3/engine'],
+        external: ['@pix3/runtime'],
         write: false,
         logLevel: 'silent',
         plugins: [this.createVirtualFileSystemPlugin(files)],

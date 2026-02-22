@@ -50,3 +50,4 @@ export {
   type CompilationResult,
   type CompilationError,
 } from './ScriptCompilerService';
+export { ProjectBuildService, type ProjectBuildResult } from './ProjectBuildService';

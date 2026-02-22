@@ -13,9 +13,9 @@
  * 5. Enter Play Mode to see the rotation in action
  */
 
-import { ScriptControllerBase } from '@pix3/engine';
+import { Script } from '@pix3/engine';
 
-export class RotatingCube extends ScriptControllerBase {
+export class RotatingCube extends Script {
   /**
    * Define editable properties for this controller.
    * These will appear in the Inspector panel.
@@ -27,9 +27,9 @@ export class RotatingCube extends ScriptControllerBase {
         {
           name: 'rotationSpeed',
           type: 'number',
-          getValue: (obj: any) => obj.parameters.rotationSpeed ?? 1.0,
+          getValue: (obj: any) => obj.config.rotationSpeed ?? 1.0,
           setValue: (obj: any, value: any) => {
-            obj.parameters.rotationSpeed = value;
+            obj.config.rotationSpeed = value;
           },
           uiHints: {
             label: 'Rotation Speed',
@@ -43,9 +43,9 @@ export class RotatingCube extends ScriptControllerBase {
         {
           name: 'axis',
           type: 'select',
-          getValue: (obj: any) => obj.parameters.axis ?? 'y',
+          getValue: (obj: any) => obj.config.axis ?? 'y',
           setValue: (obj: any, value: any) => {
-            obj.parameters.axis = value;
+            obj.config.axis = value;
           },
           uiHints: {
             label: 'Rotation Axis',
@@ -75,8 +75,8 @@ export class RotatingCube extends ScriptControllerBase {
    * Called once before the first update
    */
   onStart(): void {
-    const speed = this.parameters.rotationSpeed ?? 1.0;
-    const axis = this.parameters.axis ?? 'y';
+    const speed = this.config.rotationSpeed ?? 1.0;
+    const axis = this.config.axis ?? 'y';
     console.log(`RotatingCube started - Speed: ${speed}, Axis: ${axis}`);
   }
 
@@ -87,8 +87,8 @@ export class RotatingCube extends ScriptControllerBase {
   onUpdate(dt: number): void {
     if (!this.node) return;
 
-    const speed = (this.parameters.rotationSpeed as number) ?? 1.0;
-    const axis = (this.parameters.axis as string) ?? 'y';
+    const speed = (this.config.rotationSpeed as number) ?? 1.0;
+    const axis = (this.config.axis as string) ?? 'y';
 
     // Rotate the node based on selected axis
     switch (axis) {

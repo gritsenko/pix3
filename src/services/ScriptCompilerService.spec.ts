@@ -5,7 +5,7 @@
  * 1. Initialize esbuild-wasm
  * 2. Compile user TypeScript scripts
  * 3. Handle virtual file system
- * 4. Mark @pix3/engine as external
+ * 4. Mark @pix3/runtime as external
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';

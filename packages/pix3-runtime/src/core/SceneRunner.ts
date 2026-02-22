@@ -98,6 +98,8 @@ export class SceneRunner {
     this.tick();
   }
 
+  private isPaused: boolean = false;
+
   stop(): void {
     this.isRunning = false;
     this.clock.stop();
@@ -117,8 +119,23 @@ export class SceneRunner {
     this.inputService.detach();
   }
 
+  pause(): void {
+    if (!this.isRunning || this.isPaused) return;
+    this.isPaused = true;
+    if (this.animationFrameId !== null) {
+      cancelAnimationFrame(this.animationFrameId);
+      this.animationFrameId = null;
+    }
+  }
+
+  resume(): void {
+    if (!this.isRunning || !this.isPaused) return;
+    this.isPaused = false;
+    this.tick();
+  }
+
   private tick = (): void => {
-    if (!this.isRunning) return;
+    if (!this.isRunning || this.isPaused) return;
 
     const dt = this.clock.getDelta();
 
