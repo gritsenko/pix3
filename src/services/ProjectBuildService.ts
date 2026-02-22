@@ -25,7 +25,7 @@ const templateFiles = import.meta.glob('../templates/build/**/*.tpl', {
   eager: true,
 }) as Record<string, string>;
 
-const runtimeSourceFiles = import.meta.glob('../../packages/pix3-runtime/src/**/*.ts', {
+const runtimeSourceFiles = import.meta.glob('../../packages/pix3-runtime/src/**/*.{ts,d.ts}', {
   query: '?raw',
   import: 'default',
   eager: true,

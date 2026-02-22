@@ -13,11 +13,25 @@ export interface ReadResourceOptions {
   readonly allowNetworkFallback?: boolean;
 }
 
+export interface EmbeddedResourceEntry {
+  readonly base64: string;
+  readonly mimeType?: string;
+}
+
+export type EmbeddedResourceMap = Record<string, EmbeddedResourceEntry>;
+
 export class ResourceManager {
   private baseUrl: string;
+  private readonly embeddedResources: Map<string, EmbeddedResourceEntry>;
 
-  constructor(baseUrl: string = '/') {
+  constructor(baseUrl: string = '/', embeddedResources: EmbeddedResourceMap = {}) {
     this.baseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+    this.embeddedResources = new Map<string, EmbeddedResourceEntry>();
+
+    for (const [path, entry] of Object.entries(embeddedResources)) {
+      const normalizedPath = this.normalizeEmbeddedPath(path);
+      this.embeddedResources.set(normalizedPath, entry);
+    }
   }
 
   /**
@@ -40,11 +54,25 @@ export class ResourceManager {
   }
 
   async readText(resource: string): Promise<string> {
+    const embeddedEntry = this.getEmbeddedEntry(resource);
+    if (embeddedEntry) {
+      const bytes = this.decodeBase64ToBytes(embeddedEntry.base64);
+      return new TextDecoder().decode(bytes);
+    }
+
     const url = this.normalize(resource);
     return await this.fetchText(url);
   }
 
   async readBlob(resource: string): Promise<Blob> {
+    const embeddedEntry = this.getEmbeddedEntry(resource);
+    if (embeddedEntry) {
+      const bytes = this.decodeBase64ToBytes(embeddedEntry.base64);
+      return new Blob([bytes], {
+        type: embeddedEntry.mimeType ?? 'application/octet-stream',
+      });
+    }
+
     const url = this.normalize(resource);
     return await this.fetchBlob(url);
   }
@@ -76,5 +104,43 @@ export class ResourceManager {
   protected buildUrl(relativePath: string): string {
     const trimmedPath = relativePath.replace(/^\/+/, '');
     return `${this.baseUrl}${trimmedPath}`;
+  }
+
+  private getEmbeddedEntry(resource: string): EmbeddedResourceEntry | null {
+    const path = this.toEmbeddedPath(resource);
+    if (!path) {
+      return null;
+    }
+
+    return this.embeddedResources.get(path) ?? null;
+  }
+
+  private toEmbeddedPath(resource: string): string | null {
+    const scheme = this.getScheme(resource);
+
+    if (scheme === 'res') {
+      return this.normalizeEmbeddedPath(resource.substring(6));
+    }
+
+    if (!scheme) {
+      return this.normalizeEmbeddedPath(resource);
+    }
+
+    return null;
+  }
+
+  private normalizeEmbeddedPath(path: string): string {
+    return path.replace(/\\/g, '/').replace(/^\/+/, '');
+  }
+
+  private decodeBase64ToBytes(base64: string): Uint8Array {
+    const binary = atob(base64);
+    const bytes = new Uint8Array(binary.length);
+
+    for (let index = 0; index < binary.length; index += 1) {
+      bytes[index] = binary.charCodeAt(index);
+    }
+
+    return bytes;
   }
 }

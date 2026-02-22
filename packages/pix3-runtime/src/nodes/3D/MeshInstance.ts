@@ -1,6 +1,5 @@
-import { Mesh, Object3D } from 'three';
+import { Mesh, Object3D, AnimationClip, AnimationMixer, AnimationAction } from 'three';
 import { Node3D, type Node3DProps } from '../Node3D';
-import { AnimationClip } from 'three';
 import type { PropertySchema } from '../../fw/property-schema';
 
 export interface MeshInstanceProps extends Omit<Node3DProps, 'type'> {
@@ -14,6 +13,8 @@ export class MeshInstance extends Node3D {
   castShadow: boolean;
   receiveShadow: boolean;
   animations: AnimationClip[] = [];
+  mixer: AnimationMixer | null = null;
+  currentAction: AnimationAction | null = null;
   /** The name of the animation clip currently selected for preview. Editor-only, not serialized. */
   activeAnimation: string | null = null;
 
@@ -26,6 +27,42 @@ export class MeshInstance extends Node3D {
     // Apply shadow properties to self
     this.castShadow = this.castShadow;
     this.receiveShadow = this.receiveShadow;
+  }
+
+  /**
+   * Play an animation by name.
+   * @param name - The name of the animation clip to play
+   */
+  playAnimation(name: string): void {
+    const clip = this.animations.find(a => a.name === name);
+    if (!clip) {
+      console.warn(`[MeshInstance] Animation '${name}' not found on node ${this.nodeId}`);
+      return;
+    }
+
+    if (!this.mixer) {
+      this.mixer = new AnimationMixer(this);
+    }
+
+    if (this.currentAction) {
+      this.currentAction.stop();
+    }
+
+    this.currentAction = this.mixer.clipAction(clip);
+    this.currentAction.reset().play();
+    this.activeAnimation = name;
+  }
+
+  /**
+   * Tick method called every frame.
+   * Updates the animation mixer if it exists.
+   * @param dt - Delta time in seconds since last frame
+   */
+  override tick(dt: number): void {
+    super.tick(dt);
+    if (this.mixer) {
+      this.mixer.update(dt);
+    }
   }
 
   /**

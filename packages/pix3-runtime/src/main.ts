@@ -13,6 +13,7 @@ import {
 } from '@pix3/runtime';
 import { activeScenePath, scenePaths } from './generated/scene-manifest';
 import { registerProjectScripts } from './register-project-scripts';
+import { embeddedAssets } from 'virtual:runtime-embedded-assets';
 
 async function bootstrap(): Promise<void> {
   const app = document.getElementById('app');
@@ -20,7 +21,7 @@ async function bootstrap(): Promise<void> {
     throw new Error('Missing #app container');
   }
 
-  const resourceManager = new ResourceManager('/');
+  const resourceManager = new ResourceManager('/', embeddedAssets);
   const scriptRegistry = new ScriptRegistry();
   registerBuiltInScripts(scriptRegistry);
   registerProjectScripts(scriptRegistry);

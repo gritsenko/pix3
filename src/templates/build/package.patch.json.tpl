@@ -11,6 +11,7 @@
   },
   "devDependencies": {
     "typescript": "~5.8.3",
-    "vite": "^7.1.7"
+    "vite": "^7.1.7",
+    "vite-plugin-singlefile": "^2.3.0"
   }
 }
