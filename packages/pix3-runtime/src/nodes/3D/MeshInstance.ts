@@ -6,6 +6,8 @@ export interface MeshInstanceProps extends Omit<Node3DProps, 'type'> {
   src?: string | null; // res:// or templ:// path to .glb/.gltf
   castShadow?: boolean;
   receiveShadow?: boolean;
+  /** Optional clip name to auto-play on first runtime tick. Falls back to first available clip. */
+  initialAnimation?: string | null;
 }
 
 export class MeshInstance extends Node3D {
@@ -17,12 +19,15 @@ export class MeshInstance extends Node3D {
   currentAction: AnimationAction | null = null;
   /** The name of the animation clip currently selected for preview. Editor-only, not serialized. */
   activeAnimation: string | null = null;
+  initialAnimation: string | null;
+  private hasAttemptedInitialAnimation = false;
 
   constructor(props: MeshInstanceProps) {
     super(props, 'MeshInstance');
     this.src = props.src ?? null;
     this.castShadow = props.castShadow ?? true;
     this.receiveShadow = props.receiveShadow ?? true;
+    this.initialAnimation = props.initialAnimation ?? null;
 
     // Apply shadow properties to self
     this.castShadow = this.castShadow;
@@ -51,6 +56,7 @@ export class MeshInstance extends Node3D {
     this.currentAction = this.mixer.clipAction(clip);
     this.currentAction.reset().play();
     this.activeAnimation = name;
+    this.hasAttemptedInitialAnimation = true;
   }
 
   /**
@@ -60,9 +66,33 @@ export class MeshInstance extends Node3D {
    */
   override tick(dt: number): void {
     super.tick(dt);
+    this.playInitialAnimationIfNeeded();
     if (this.mixer) {
       this.mixer.update(dt);
     }
+  }
+
+  private playInitialAnimationIfNeeded(): void {
+    if (this.hasAttemptedInitialAnimation || this.currentAction) {
+      this.hasAttemptedInitialAnimation = true;
+      return;
+    }
+
+    if (this.animations.length === 0) {
+      return;
+    }
+
+    const preferredClip = this.initialAnimation
+      ? this.animations.find(clip => clip.name === this.initialAnimation)
+      : null;
+    if (this.initialAnimation && !preferredClip) {
+      console.warn(
+        `[MeshInstance] Initial animation '${this.initialAnimation}' not found on node ${this.nodeId}. Falling back to first clip.`
+      );
+    }
+
+    const clipToPlay = preferredClip ?? this.animations[0];
+    this.playAnimation(clipToPlay.name);
   }
 
   /**
@@ -77,6 +107,25 @@ export class MeshInstance extends Node3D {
       extends: 'Node3D',
       properties: [
         ...baseSchema.properties,
+        {
+          name: 'initialAnimation',
+          type: 'string',
+          ui: {
+            label: 'Initial Animation',
+            description: 'Clip name to auto-play on scene start (uses first clip when empty)',
+            group: 'Animation',
+          },
+          getValue: (node: unknown) => {
+            const n = node as MeshInstance;
+            return n.initialAnimation ?? '';
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as MeshInstance;
+            const v = typeof value === 'string' ? value.trim() : '';
+            n.initialAnimation = v.length > 0 ? v : null;
+            n.hasAttemptedInitialAnimation = false;
+          },
+        },
         {
           name: 'castShadow',
           type: 'boolean',
@@ -118,6 +167,11 @@ export class MeshInstance extends Node3D {
       ],
       groups: {
         ...baseSchema.groups,
+        Animation: {
+          label: 'Animation',
+          description: 'Animation playback properties',
+          expanded: true,
+        },
         Rendering: {
           label: 'Rendering',
           description: 'Shadow and rendering properties',

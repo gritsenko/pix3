@@ -400,6 +400,9 @@ export class SceneSaver {
       if (inst.src) {
         props.src = inst.src as string;
       }
+      if (inst.initialAnimation) {
+        props.initialAnimation = inst.initialAnimation;
+      }
       props.castShadow = inst.castShadow;
       props.receiveShadow = inst.receiveShadow;
     }

@@ -498,6 +498,20 @@ pix3-panel {
   transition: border-color 0.15s ease, background 0.15s ease;
 }
 
+.animation-preview-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  padding: 0;
+  cursor: pointer;
+}
+
 .animation-item:hover {
   border-color: var(--color-border, #444);
   background: var(--color-bg-hover, #2a2a2a);
@@ -505,7 +519,7 @@ pix3-panel {
 
 .animation-item--active {
   border-color: var(--pix3-accent-color, #ffcf33);
-  background: rgba(255, 207, 51, 0.08);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.08);
 }
 
 .animation-play-icon {
@@ -539,3 +553,49 @@ pix3-panel {
   font-variant-numeric: tabular-nums;
 }
 
+.animation-default-btn {
+  border: 1px solid var(--color-border, #444);
+  background: transparent;
+  color: var(--color-text-secondary, #aaa);
+  border-radius: 4px;
+  font-size: 0.68rem;
+  padding: 3px 6px;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.animation-default-btn:hover {
+  border-color: var(--pix3-accent-color, #ffcf33);
+  color: var(--color-text-primary, #eee);
+}
+
+.animation-default-btn--active {
+  border-color: var(--pix3-accent-color, #ffcf33);
+  color: var(--pix3-accent-color, #ffcf33);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.12);
+}
+
+.animation-default-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.animation-default-clear {
+  border: 1px solid var(--color-border, #444);
+  background: transparent;
+  color: var(--color-text-secondary, #aaa);
+  border-radius: 4px;
+  font-size: 0.72rem;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+.animation-default-clear:hover:not(:disabled) {
+  border-color: var(--color-text-primary, #eee);
+  color: var(--color-text-primary, #eee);
+}
+
+.animation-default-clear:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

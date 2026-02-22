@@ -12,8 +12,7 @@ import { SceneManager } from '@pix3/runtime';
 import { appState } from '@/state';
 import type { NodeBase } from '@pix3/runtime';
 import type { PropertySchema, PropertyDefinition } from '@/fw';
-import { UpdateObjectPropertyOperation } from '@/features/properties/UpdateObjectPropertyOperation';
-import { OperationService } from '@/services/OperationService';
+import { UpdateObjectPropertyCommand } from '@/features/properties/UpdateObjectPropertyCommand';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { BehaviorPickerService } from '@/services/BehaviorPickerService';
 import { ScriptCreatorService } from '@/services/ScriptCreatorService';
@@ -40,9 +39,6 @@ interface PropertyUIState {
 export class InspectorPanel extends ComponentBase {
   @inject(SceneManager)
   private readonly sceneManager!: SceneManager;
-
-  @inject(OperationService)
-  private readonly operationService!: OperationService;
 
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
@@ -348,14 +344,14 @@ export class InspectorPanel extends ComponentBase {
     const propDef = this.propertySchema.properties.find(p => p.name === propertyName);
     if (!propDef) return;
 
-    const op = new UpdateObjectPropertyOperation({
+    const command = new UpdateObjectPropertyCommand({
       nodeId: this.primaryNode.nodeId,
       propertyPath: propertyName,
       value,
     });
 
     try {
-      await this.operationService.invokeAndPush(op);
+      await this.commandDispatcher.execute(command);
     } catch (error) {
       console.error('[InspectorPanel] Failed to update property', propertyName, error);
       // Revert UI state on error
@@ -492,6 +488,7 @@ export class InspectorPanel extends ComponentBase {
     if (!(this.primaryNode instanceof MeshInstance)) return '';
     const clips = this.primaryNode.animations;
     if (clips.length === 0) return '';
+    const initialAnimation = this.primaryNode.initialAnimation;
 
     return html`
       <div class="property-group-section animations-section">
@@ -499,21 +496,48 @@ export class InspectorPanel extends ComponentBase {
         <div class="animation-list">
           ${clips.map(clip => {
       const isActive = this.activePreviewAnimation === clip.name;
+      const isDefault = initialAnimation === clip.name;
       return html`
-              <button
-                class="animation-item ${isActive ? 'animation-item--active' : ''}"
-                @click=${() => this.toggleAnimation(clip.name)}
-                title=${isActive ? 'Stop animation' : 'Play animation'}
-              >
-                <span class="animation-play-icon">${isActive ? '⏹' : '▶'}</span>
-                <span class="animation-name">${clip.name}</span>
-                <span class="animation-duration">${clip.duration.toFixed(2)}s</span>
-              </button>
+              <div class="animation-item ${isActive ? 'animation-item--active' : ''}">
+                <button
+                  class="animation-preview-btn"
+                  @click=${() => this.toggleAnimation(clip.name)}
+                  title=${isActive ? 'Stop preview animation' : 'Play preview animation'}
+                >
+                  <span class="animation-play-icon">${isActive ? '⏹' : '▶'}</span>
+                  <span class="animation-name">${clip.name}</span>
+                  <span class="animation-duration">${clip.duration.toFixed(2)}s</span>
+                </button>
+                <button
+                  class="animation-default-btn ${isDefault ? 'animation-default-btn--active' : ''}"
+                  @click=${() => this.setInitialAnimation(clip.name)}
+                  title=${isDefault
+          ? 'Default startup animation'
+          : 'Set as default startup animation'}
+                >
+                  ${isDefault ? 'Default' : 'Set Default'}
+                </button>
+              </div>
             `;
     })}
         </div>
+        <div class="animation-default-row">
+          <button
+            class="animation-default-clear"
+            @click=${() => this.setInitialAnimation(null)}
+            ?disabled=${initialAnimation === null}
+            title="Clear default startup animation (fallback to first clip)"
+          >
+            Clear Default
+          </button>
+        </div>
       </div>
     `;
+  }
+
+  private setInitialAnimation(name: string | null): void {
+    const value = name ?? '';
+    void this.applyPropertyChange('initialAnimation', value);
   }
 
   private toggleAnimation(name: string) {

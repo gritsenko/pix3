@@ -641,6 +641,7 @@ export class SceneLoader {
         let src = this.asString(props['src']) ?? null;
         const castShadow = typeof props['castShadow'] === 'boolean' ? props['castShadow'] : true;
         const receiveShadow = typeof props['receiveShadow'] === 'boolean' ? props['receiveShadow'] : true;
+        const initialAnimation = this.asString(props['initialAnimation']) ?? null;
 
         const meshInstance = new MeshInstance({
           ...baseProps,
@@ -652,6 +653,7 @@ export class SceneLoader {
           src,
           castShadow,
           receiveShadow,
+          initialAnimation,
         });
 
         // Load GLB/GLTF mesh and animations from resource manager
