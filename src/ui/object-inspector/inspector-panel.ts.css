@@ -465,6 +465,38 @@ pix3-panel {
   white-space: nowrap;
 }
 
+.asset-value-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.asset-value-wrapper .asset-value {
+  flex: 1;
+  min-width: 0;
+}
+
+.btn-copy-resource {
+  background: transparent;
+  border: none;
+  color: var(--color-text-secondary, #aaa);
+  padding: 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-copy-resource:hover {
+  background: var(--color-bg-hover, #333);
+  color: var(--pix3-accent-color, #ffcf33);
+}
+
 .asset-path {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono',
     'Courier New', monospace;

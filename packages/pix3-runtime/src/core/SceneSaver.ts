@@ -21,6 +21,7 @@ import { SpotLightNode } from '../nodes/3D/SpotLightNode';
 import { GeometryMesh } from '../nodes/3D/GeometryMesh';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
+import { Sprite3D } from '../nodes/3D/Sprite3D';
 import type { SceneGraph } from './SceneManager';
 import type { SceneNodeDefinition } from './SceneLoader';
 
@@ -405,6 +406,15 @@ export class SceneSaver {
       }
       props.castShadow = inst.castShadow;
       props.receiveShadow = inst.receiveShadow;
+    } else if (node instanceof Sprite3D) {
+      if (node.texturePath) {
+        props.texturePath = node.texturePath;
+      }
+      props.width = node.width;
+      props.height = node.height;
+      props.color = node.color;
+      props.billboard = node.billboard;
+      props.billboardRoll = node.billboardRoll;
     }
 
     return props;

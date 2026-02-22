@@ -206,6 +206,14 @@ export class InspectorPanel extends ComponentBase {
     }
   }
 
+  private async handleCopyResourceUrl(url: string) {
+    try {
+      await navigator.clipboard.writeText(url);
+    } catch (err) {
+      console.error('Failed to copy resource URL:', err);
+    }
+  }
+
   private updateSelectedNodes(): void {
     const { nodeIds, primaryNodeId } = appState.selection;
     const activeSceneId = appState.scenes.activeSceneId;
@@ -387,6 +395,7 @@ export class InspectorPanel extends ComponentBase {
 
     const asset = this.selectedAssetItem;
     const isImage = asset.previewType === 'image' && asset.thumbnailUrl !== null;
+    const resourceUrl = asset.path === '.' ? 'res://' : `res://${asset.path}`;
 
     return html`
       <div class="property-section">
@@ -416,6 +425,21 @@ export class InspectorPanel extends ComponentBase {
             <span class="property-label">Name</span>
             <span class="asset-value">${asset.name}</span>
           </div>
+
+          <div class="property-group">
+            <span class="property-label" title="Resource URL (res://)">Resource</span>
+            <div class="asset-value-wrapper">
+              <span class="asset-value asset-path">${resourceUrl}</span>
+              <button 
+                class="btn-copy-resource" 
+                title="Copy Resource URL"
+                @click=${() => this.handleCopyResourceUrl(resourceUrl)}
+              >
+                ${this.iconService.getIcon('copy', 14)}
+              </button>
+            </div>
+          </div>
+
           <div class="property-group">
             <span class="property-label">Path</span>
             <span class="asset-value asset-path">${asset.path}</span>

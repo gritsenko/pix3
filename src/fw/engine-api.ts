@@ -22,6 +22,7 @@ export type { NodeBaseProps, NodeMetadata } from '@pix3/runtime';
 // Node types that users might reference
 export { Node2D } from '@pix3/runtime';
 export { Node3D } from '@pix3/runtime';
+export { Sprite3D } from '@pix3/runtime';
 
 // Property schema system for defining script parameters
 export type {

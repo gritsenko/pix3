@@ -6,6 +6,7 @@ import { CreatePointLightCommand } from '@/features/scene/CreatePointLightComman
 import { CreateSpotLightCommand } from '@/features/scene/CreateSpotLightCommand';
 import { CreateCamera3DCommand } from '@/features/scene/CreateCamera3DCommand';
 import { CreateMeshInstanceCommand } from '@/features/scene/CreateMeshInstanceCommand';
+import { CreateSprite3DCommand } from '@/features/scene/CreateSprite3DCommand';
 import { CreateLayout2DCommand } from '@/features/scene/CreateLayout2DCommand';
 import { CreateJoystick2DCommand } from '@/features/scene/CreateJoystick2DCommand';
 import { CreateButton2DCommand } from '@/features/scene/CreateButton2DCommand';
@@ -237,6 +238,18 @@ export class NodeRegistry {
       icon: 'package',
       keywords: ['create', 'mesh', 'model', '3d', 'import', 'glb', 'gltf'],
       order: 4,
+    });
+
+    this.registerNodeType({
+      id: 'sprite3d',
+      displayName: 'Sprite3D',
+      description: 'Textured quad in 3D space with optional camera billboarding',
+      category: '3D',
+      commandClass: CreateSprite3DCommand,
+      color: '#fe9ebeff',
+      icon: 'image',
+      keywords: ['create', 'sprite', '3d', 'image', 'texture', 'billboard', 'marker'],
+      order: 5,
     });
   }
 

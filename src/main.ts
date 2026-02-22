@@ -46,6 +46,7 @@ const createImportMapShim = () => {
     export const DirectionalLightNode = api.DirectionalLightNode;
     export const GeometryMesh = api.GeometryMesh;
     export const MeshInstance = api.MeshInstance;
+    export const Sprite3D = api.Sprite3D;
     export const PointLightNode = api.PointLightNode;
     export const SpotLightNode = api.SpotLightNode;
     export const registerBuiltInScripts = api.registerBuiltInScripts;

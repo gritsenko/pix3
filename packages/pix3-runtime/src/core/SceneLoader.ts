@@ -10,6 +10,7 @@ import { Layout2D } from '../nodes/2D/Layout2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
+import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { Joystick2D } from '../nodes/2D/UI/Joystick2D';
 import { Button2D } from '../nodes/2D/UI/Button2D';
 import { Slider2D } from '../nodes/2D/UI/Slider2D';
@@ -102,6 +103,15 @@ export interface SpotLightNodeProperties {
   penumbra?: number;
   decay?: number;
   castShadow?: boolean;
+}
+
+export interface Sprite3DProperties {
+  texturePath?: string | null;
+  width?: number;
+  height?: number;
+  color?: string;
+  billboard?: boolean;
+  billboardRoll?: number;
 }
 
 export interface Node2DProperties {
@@ -683,6 +693,38 @@ export class SceneLoader {
         }
 
         return meshInstance;
+      }
+      case 'Sprite3D': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as Sprite3DProperties;
+        const sprite = new Sprite3D({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          texturePath: this.asString(props.texturePath) ?? null,
+          width: this.asNumber(props.width, 1),
+          height: this.asNumber(props.height, 1),
+          color: this.asString(props.color) ?? '#ffffff',
+          billboard: typeof props.billboard === 'boolean' ? props.billboard : false,
+          billboardRoll: this.asNumber(props.billboardRoll, 0),
+        });
+
+        if (sprite.texturePath) {
+          try {
+            const texture = await this.assetLoader.loadTexture(sprite.texturePath);
+            sprite.setTexture(texture);
+          } catch (error) {
+            console.warn(
+              `[SceneLoader] Error loading texture for Sprite3D "${sprite.nodeId}":`,
+              error
+            );
+          }
+        }
+
+        return sprite;
       }
       default:
         return new NodeBase({ ...baseProps, type: definition.type });

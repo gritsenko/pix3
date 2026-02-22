@@ -8,6 +8,7 @@ import { NodeBase } from '@pix3/runtime';
 import { Node2D } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
 import { Layout2D } from '@pix3/runtime';
+import { Sprite3D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { getNodePropertySchema } from '@pix3/runtime';
@@ -119,6 +120,8 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       const is2DVisualProperty = this.is2DVisualProperty(propertyPath);
       if (isTransform) {
         vr.updateNodeTransform(node);
+      } else if (this.is3DVisualProperty(propertyPath) && node instanceof Sprite3D) {
+        vr.updateNodeTransform(node);
       } else if (is2DVisualProperty && node instanceof Node2D) {
         vr.updateNodeTransform(node);
         if (this.isParentSizeProperty(propertyPath) && this.is2DContainer(node)) {
@@ -178,6 +181,10 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       'maxValue',
       'handleSize',
     ].includes(propertyPath);
+  }
+
+  private is3DVisualProperty(propertyPath: string): boolean {
+    return ['texturePath', 'width', 'height', 'billboard', 'billboardRoll'].includes(propertyPath);
   }
 
   private isParentSizeProperty(propertyPath: string): boolean {

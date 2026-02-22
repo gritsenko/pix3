@@ -33,6 +33,7 @@ export * from './nodes/3D/Camera3D';
 export * from './nodes/3D/DirectionalLightNode';
 export * from './nodes/3D/GeometryMesh';
 export * from './nodes/3D/MeshInstance';
+export * from './nodes/3D/Sprite3D';
 export * from './nodes/3D/PointLightNode';
 export * from './nodes/3D/SpotLightNode';
 

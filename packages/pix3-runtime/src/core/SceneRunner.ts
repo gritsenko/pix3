@@ -1,9 +1,11 @@
 import {
+  Camera,
   Clock,
   Scene,
   PerspectiveCamera,
   OrthographicCamera,
   Color,
+  Quaternion,
 } from 'three';
 import { SceneManager } from './SceneManager';
 import { RuntimeRenderer } from './RuntimeRenderer';
@@ -11,6 +13,7 @@ import { InputService } from './InputService';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
 import { Layout2D } from '../nodes/2D/Layout2D';
+import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { LAYER_3D, LAYER_2D } from '../constants';
 
 export class SceneRunner {
@@ -227,6 +230,7 @@ export class SceneRunner {
 
     // Pass 1: 3D
     if (this.activeCamera) {
+      this.updateBillboardSprites(this.runtimeGraph?.rootNodes ?? [], this.activeCamera.camera);
       this.renderer.setAutoClear(true);
       this.renderer.render(this.scene, this.activeCamera.camera);
     } else {
@@ -264,5 +268,16 @@ export class SceneRunner {
     }
     return null;
   }
-}
 
+  private updateBillboardSprites(nodes: NodeBase[], camera: Camera): void {
+    const cameraQuaternion = camera.getWorldQuaternion(new Quaternion());
+    for (const node of nodes) {
+      if (node instanceof Sprite3D) {
+        node.applyBillboard(cameraQuaternion);
+      }
+      if (node.children.length > 0) {
+        this.updateBillboardSprites(node.children, camera);
+      }
+    }
+  }
+}

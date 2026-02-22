@@ -27,6 +27,7 @@ import { PointLightNode } from '@pix3/runtime';
 import { SpotLightNode } from '@pix3/runtime';
 import { Camera3D } from '@pix3/runtime';
 import { MeshInstance } from '@pix3/runtime';
+import { Sprite3D } from '@pix3/runtime';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager, InputService } from '@pix3/runtime';
 import { OperationService } from '@/services/OperationService';
@@ -88,6 +89,7 @@ export class ViewportRendererService {
   private previewCamera: THREE.Camera | null = null;
   private group2DVisuals = new Map<string, THREE.Group>();
   private sprite2DVisuals = new Map<string, THREE.Group>();
+  private sprite3DTexturePaths = new Map<string, string | null>();
   private layout2dVisuals = new Map<string, THREE.Group>();
   private uiControl2DVisuals = new Map<string, THREE.Group>();
   private selection2DOverlay?: Selection2DOverlay;
@@ -754,6 +756,8 @@ export class ViewportRendererService {
       this.orbitControls?.update();
     }
 
+    this.syncSprite3DBillboarding(this.camera);
+
     // Render main scene with perspective camera (3D layer and gizmos)
     if (appState.ui.showLayer3D) {
       this.renderer.autoClear = true;
@@ -1332,6 +1336,10 @@ export class ViewportRendererService {
           }
         });
       }
+
+      if (node instanceof Sprite3D) {
+        this.syncSprite3DTexture(node);
+      }
     } else if (node instanceof Layout2D) {
       const visualRoot = this.layout2dVisuals.get(node.nodeId);
       if (visualRoot) {
@@ -1716,6 +1724,7 @@ export class ViewportRendererService {
         this.disposeObject3D(visual);
       }
       this.sprite2DVisuals.clear();
+      this.sprite3DTexturePaths.clear();
 
       for (const visual of this.layout2dVisuals.values()) {
         if (visual.parent) {
@@ -1781,6 +1790,10 @@ export class ViewportRendererService {
         const mixer = new THREE.AnimationMixer(node);
         this.animationMixers.set(node.nodeId, mixer);
       }
+    }
+
+    if (node instanceof Sprite3D) {
+      this.syncSprite3DTexture(node);
     }
 
     let current2DVisualRoot = parent2DVisualRoot;
@@ -2423,6 +2436,76 @@ export class ViewportRendererService {
     root.userData.sizeGroup = sizeGroup;
 
     return root;
+  }
+
+  private syncSprite3DBillboarding(camera: THREE.Camera): void {
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return;
+    }
+
+    const cameraQuaternion = camera.getWorldQuaternion(new THREE.Quaternion());
+    const visit = (nodes: NodeBase[]) => {
+      for (const node of nodes) {
+        if (node instanceof Sprite3D) {
+          node.applyBillboard(cameraQuaternion);
+        }
+        if (node.children.length > 0) {
+          visit(node.children);
+        }
+      }
+    };
+
+    visit(sceneGraph.rootNodes);
+  }
+
+  private syncSprite3DTexture(node: Sprite3D): void {
+    const currentTexturePath = node.texturePath ?? null;
+    const previousTexturePath = this.sprite3DTexturePaths.get(node.nodeId) ?? null;
+    if (currentTexturePath === previousTexturePath) {
+      return;
+    }
+
+    this.sprite3DTexturePaths.set(node.nodeId, currentTexturePath);
+    if (!currentTexturePath) {
+      node.clearTexture();
+      return;
+    }
+
+    const textureLoader = new THREE.TextureLoader();
+    void (async () => {
+      try {
+        const blob = await this.resourceManager.readBlob(currentTexturePath);
+        const blobUrl = URL.createObjectURL(blob);
+        textureLoader.load(
+          blobUrl,
+          texture => {
+            try {
+              node.setTexture(texture);
+            } finally {
+              URL.revokeObjectURL(blobUrl);
+            }
+          },
+          undefined,
+          () => {
+            URL.revokeObjectURL(blobUrl);
+          }
+        );
+        return;
+      } catch {
+        const schemeMatch = /^([a-z]+[a-z0-9+.-]*):\/\//i.exec(currentTexturePath);
+        const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : '';
+        if (scheme === 'http' || scheme === 'https' || scheme === '') {
+          const texture = textureLoader.load(currentTexturePath, undefined, undefined, () => {
+            console.warn('[ViewportRenderer] Failed to load Sprite3D texture', currentTexturePath);
+          });
+          node.setTexture(texture);
+          return;
+        }
+      }
+
+      console.warn('[ViewportRenderer] Skipping Sprite3D texture load for scheme', currentTexturePath);
+    })();
   }
 
   private createUIControl2DVisual(node: UIControl2D): THREE.Group {
@@ -3467,6 +3550,7 @@ export class ViewportRendererService {
       this.disposeObject3D(visual);
     }
     this.sprite2DVisuals.clear();
+    this.sprite3DTexturePaths.clear();
 
     for (const visual of this.uiControl2DVisuals.values()) {
       this.disposeObject3D(visual);
