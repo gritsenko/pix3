@@ -244,6 +244,9 @@ export class ViewportRendererService {
     this.transformControls.setMode('translate'); // Default to translate mode
     this.transformControls.size = 0.6; // Make gizmos smaller/thinner (default is 1)
 
+    // Ensure the internal raycaster can intersect with the gizmo, which we place on LAYER_GIZMOS
+    this.transformControls.getRaycaster().layers.enable(LAYER_GIZMOS);
+
     // When dragging with transform controls, disable orbit controls
     this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
       if (event.value) {
@@ -387,6 +390,10 @@ export class ViewportRendererService {
               : 'translate';
         this.transformControls.setMode(mode);
         this.transformControls.size = 0.6;
+
+        // Ensure the internal raycaster can intersect with the gizmo, which we place on LAYER_GIZMOS
+        this.transformControls.getRaycaster().layers.enable(LAYER_GIZMOS);
+
         this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
           if (event.value) {
             this.setOrbitEnabled(false);
@@ -408,6 +415,10 @@ export class ViewportRendererService {
 
         // TransformControls is a control object, not a Three.js object,
         // so we don't add it to the scene. It is attached to the DOM via attach() method.
+
+        // Ensure the newly created TransformControls attaches to the currently selected object
+        // and its new internal gizmo helper is added to the scene, replacing any stale visual helpers.
+        this.updateSelection();
       }
     } catch {
       // ignore
@@ -669,6 +680,88 @@ export class ViewportRendererService {
 
     // Sync all 2D visuals after layout recalculation
     this.syncAll2DVisuals();
+
+    // Trigger a single frame render to ensure the viewport is updated
+    // even if rendering is currently paused (e.g. window unfocused).
+    this.requestRender();
+  }
+
+  /**
+   * Manually trigger a single frame render. Useful when the main loop
+   * is paused but we still want to update the visual state (e.g. on resize).
+   */
+  requestRender(): void {
+    if (!this.renderer || !this.scene || !this.camera) return;
+
+    // Update controls once before rendering if they exist
+    const is2DMode = appState.ui.navigationMode === '2d';
+    if (is2DMode) {
+      this.orthographicControls?.update();
+    } else {
+      this.orbitControls?.update();
+    }
+
+    // Render main scene with perspective camera (3D layer and gizmos)
+    if (appState.ui.showLayer3D) {
+      this.renderer.autoClear = true;
+      this.renderer.render(this.scene, this.camera);
+    } else {
+      this.renderer.autoClear = true;
+      this.renderer.clear();
+    }
+
+    // Render 2D layer with orthographic camera if enabled
+    if (appState.ui.showLayer2D && this.orthographicCamera) {
+      const savedBackground = this.scene.background;
+      this.scene.background = null;
+      this.renderer.autoClear = false;
+      this.renderer.clearDepth();
+      this.renderer.render(this.scene, this.orthographicCamera);
+      this.scene.background = savedBackground;
+    }
+
+    // Render camera preview inset if a camera is selected
+    if (this.previewCamera) {
+      const savedBackground = this.scene.background;
+      this.scene.background = null;
+
+      const insetWidth = this.viewportSize.width * 0.25;
+      const insetHeight = this.viewportSize.height * 0.25;
+      const insetX = this.viewportSize.width - insetWidth - 20;
+      const insetY = 20;
+
+      const pixelRatio = this.renderer.getPixelRatio();
+      this.renderer.setViewport(
+        insetX * pixelRatio,
+        insetY * pixelRatio,
+        insetWidth * pixelRatio,
+        insetHeight * pixelRatio
+      );
+      this.renderer.setScissor(
+        insetX * pixelRatio,
+        insetY * pixelRatio,
+        insetWidth * pixelRatio,
+        insetHeight * pixelRatio
+      );
+      this.renderer.setScissorTest(true);
+      this.renderer.clearDepth();
+
+      const savedMask = this.previewCamera.layers.mask;
+      this.previewCamera.layers.set(LAYER_3D);
+      this.renderer.render(this.scene, this.previewCamera);
+
+      this.previewCamera.layers.mask = savedMask;
+      this.renderer.setScissorTest(false);
+      this.renderer.setViewport(
+        0,
+        0,
+        this.viewportSize.width * pixelRatio,
+        this.viewportSize.height * pixelRatio
+      );
+      this.scene.background = savedBackground;
+    }
+
+    this.renderer.autoClear = true;
   }
 
   /**
@@ -2516,15 +2609,23 @@ export class ViewportRendererService {
   }
 
   private updateSelectionBoxes(): void {
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) return;
+
     // Update all selection boxes to follow their objects during transform
     for (const [nodeId, box] of this.selectionBoxes.entries()) {
-      const sceneGraph = this.sceneManager.getActiveSceneGraph();
-      if (sceneGraph) {
-        const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
-        if (node && node instanceof Node3D) {
-          const newBox = new THREE.Box3().setFromObject(node);
-          box.box.copy(newBox);
-        }
+      const node = sceneGraph.nodeMap.get(nodeId);
+      if (node && node instanceof Node3D) {
+        const newBox = new THREE.Box3().setFromObject(node);
+        box.box.copy(newBox);
+      }
+    }
+
+    // Update all target gizmos to follow their objects during transform
+    for (const [nodeId, gizmo] of this.targetGizmos.entries()) {
+      const node = sceneGraph.nodeMap.get(nodeId);
+      if (node && node instanceof Node3D) {
+        this.updateTargetGizmo(node, gizmo);
       }
     }
   }
@@ -3098,145 +3199,7 @@ export class ViewportRendererService {
       }
 
       this.animationId = requestAnimationFrame(render);
-
-      if (this.renderer && this.scene && this.camera) {
-        const is2DMode = appState.ui.navigationMode === '2d';
-        if (is2DMode) {
-          this.orthographicControls?.update();
-        } else {
-          this.orbitControls?.update();
-        }
-
-        // Only update selection boxes and gizmos every few frames to avoid performance issues
-        if ((this.animationId || 0) % 10 === 0) {
-          try {
-            this.updateNodeIconPositions();
-            this.updateNodeIconVisibility();
-
-            // Update selection boxes
-            for (const [nodeId, box] of this.selectionBoxes.entries()) {
-              const sceneGraph = this.sceneManager.getActiveSceneGraph();
-              if (sceneGraph) {
-                const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
-                if (node && node instanceof Node3D) {
-                  const newBox = new THREE.Box3().setFromObject(node);
-                  box.box.copy(newBox);
-                }
-              }
-            }
-
-            // Update gizmos
-            for (const [nodeId, gizmo] of this.selectionGizmos.entries()) {
-              const sceneGraph = this.sceneManager.getActiveSceneGraph();
-              if (sceneGraph) {
-                const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
-                if (node && node instanceof Node3D) {
-                  node.updateMatrixWorld(true);
-                  if (gizmo instanceof THREE.PointLightHelper) {
-                    node.getWorldPosition(gizmo.position);
-                  }
-                }
-              }
-
-              gizmo.traverse(child => {
-                const updatable = child as unknown as { update?: () => void };
-                if (typeof updatable.update === 'function') {
-                  updatable.update();
-                }
-              });
-            }
-
-            // Update target gizmos
-            for (const [nodeId, gizmo] of this.targetGizmos.entries()) {
-              const sceneGraph = this.sceneManager.getActiveSceneGraph();
-              if (sceneGraph) {
-                const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
-                if (node && node instanceof Node3D) {
-                  this.updateTargetGizmo(node, gizmo);
-                }
-              }
-            }
-          } catch (error) {
-            console.error('[ViewportRenderer] Error updating selection:', error);
-          }
-        }
-
-        // Render main scene with perspective camera (3D layer and gizmos)
-        if (appState.ui.showLayer3D) {
-          this.renderer.autoClear = true;
-          this.renderer.render(this.scene, this.camera);
-        } else {
-          // Clear the canvas when 3D layer is disabled
-          this.renderer.autoClear = true;
-          this.renderer.clear();
-        }
-
-        // Render 2D layer with orthographic camera if enabled
-        if (appState.ui.showLayer2D && this.orthographicCamera) {
-          // Save and remove scene background to prevent it from overwriting 3D content
-          const savedBackground = this.scene.background;
-          this.scene.background = null;
-
-          this.renderer.autoClear = false;
-          this.renderer.clearDepth();
-          this.renderer.render(this.scene, this.orthographicCamera);
-
-          // Restore scene background
-          this.scene.background = savedBackground;
-        }
-
-        // Render camera preview inset if a camera is selected
-        if (this.previewCamera) {
-          const savedBackground = this.scene.background;
-          this.scene.background = null;
-
-          // Calculate inset size (e.g., 25% of viewport)
-          const insetWidth = this.viewportSize.width * 0.25;
-          const insetHeight = this.viewportSize.height * 0.25;
-
-          // Position in bottom-right corner
-          const insetX = this.viewportSize.width - insetWidth - 20;
-          const insetY = 20;
-
-          // Set viewport and scissor for the inset
-          const pixelRatio = this.renderer.getPixelRatio();
-          this.renderer.setViewport(
-            insetX * pixelRatio,
-            insetY * pixelRatio,
-            insetWidth * pixelRatio,
-            insetHeight * pixelRatio
-          );
-          this.renderer.setScissor(
-            insetX * pixelRatio,
-            insetY * pixelRatio,
-            insetWidth * pixelRatio,
-            insetHeight * pixelRatio
-          );
-          this.renderer.setScissorTest(true);
-
-          // Clear depth for the inset
-          this.renderer.clearDepth();
-
-          // Render only 3D layer (no gizmos)
-          const savedMask = this.previewCamera.layers.mask;
-          this.previewCamera.layers.set(LAYER_3D);
-
-          this.renderer.render(this.scene, this.previewCamera);
-
-          // Restore state
-          this.previewCamera.layers.mask = savedMask;
-          this.renderer.setScissorTest(false);
-          this.renderer.setViewport(
-            0,
-            0,
-            this.viewportSize.width * pixelRatio,
-            this.viewportSize.height * pixelRatio
-          );
-          this.scene.background = savedBackground;
-        }
-
-        this.renderer.autoClear = true;
-      }
+      this.requestRender();
     };
 
     this.isPaused = false;
