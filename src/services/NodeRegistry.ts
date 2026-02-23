@@ -15,6 +15,7 @@ import { CreateBar2DCommand } from '@/features/scene/CreateBar2DCommand';
 import { CreateCheckbox2DCommand } from '@/features/scene/CreateCheckbox2DCommand';
 import { CreateInventorySlot2DCommand } from '@/features/scene/CreateInventorySlot2DCommand';
 import { CreateLabel2DCommand } from '@/features/scene/CreateLabel2DCommand';
+import { CreateNode3DCommand } from '@/features/scene/CreateNode3DCommand';
 import type { Command } from '@/core/command';
 import { injectable } from '@/fw';
 
@@ -168,6 +169,18 @@ export class NodeRegistry {
       order: 8,
     });
     // 3D Node Types
+    this.registerNodeType({
+      id: 'node3d',
+      displayName: 'Node3D',
+      description: 'Empty 3D node for organizing objects',
+      category: '3D',
+      commandClass: CreateNode3DCommand,
+      color: '#fe9ebeff',
+      icon: 'layout',
+      keywords: ['create', 'node3d', 'empty', '3d', 'group', 'container'],
+      order: 0,
+    });
+
     this.registerNodeType({
       id: 'box',
       displayName: 'Box',
