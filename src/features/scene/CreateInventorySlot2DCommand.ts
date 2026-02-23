@@ -1,24 +1,16 @@
+import { type CommandMetadata } from '@/core/command';
 import {
-  CommandBase,
-  type CommandExecutionResult,
-  type CommandMetadata,
-  type CommandContext,
-} from '@/core/command';
-import { OperationService } from '@/services/OperationService';
+  CreateNodeBaseCommand,
+  type CreateNodeCommandPayload,
+} from '@/features/scene/CreateNodeBaseCommand';
 import {
   CreateInventorySlot2DOperation,
   type CreateInventorySlot2DOperationParams,
 } from '@/features/scene/CreateInventorySlot2DOperation';
-import {
-  getCreatedNodeIdFromSelection,
-  requireActiveScene,
-} from '@/features/scene/scene-command-utils';
 
-export interface CreateInventorySlot2DCommandPayload {
-  nodeId: string;
-}
+export interface CreateInventorySlot2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateInventorySlot2DCommand extends CommandBase<CreateInventorySlot2DCommandPayload, void> {
+export class CreateInventorySlot2DCommand extends CreateNodeBaseCommand<CreateInventorySlot2DOperationParams, CreateInventorySlot2DCommandPayload> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-inventoryslot2d',
     title: 'Create InventorySlot2D',
@@ -26,31 +18,11 @@ export class CreateInventorySlot2DCommand extends CommandBase<CreateInventorySlo
     keywords: ['create', 'inventory', 'slot', '2d', 'ui', 'item', 'add'],
   };
 
-  private readonly params: CreateInventorySlot2DOperationParams;
-
   constructor(params: CreateInventorySlot2DOperationParams = {}) {
-    super();
-    this.params = params;
-  }
-
-  preconditions(context: CommandContext) {
-    return requireActiveScene(context, 'An active scene is required to create an InventorySlot2D');
-  }
-
-  async execute(
-    context: CommandContext
-  ): Promise<CommandExecutionResult<CreateInventorySlot2DCommandPayload>> {
-    const operationService = context.container.getService<OperationService>(
-      context.container.getOrCreateToken(OperationService)
+    super(
+      params,
+      operationParams => new CreateInventorySlot2DOperation(operationParams),
+      'An active scene is required to create an InventorySlot2D'
     );
-
-    const op = new CreateInventorySlot2DOperation(this.params);
-    const pushed = await operationService.invokeAndPush(op);
-    const nodeId = getCreatedNodeIdFromSelection(context, pushed);
-
-    return {
-      didMutate: pushed,
-      payload: { nodeId },
-    };
   }
 }

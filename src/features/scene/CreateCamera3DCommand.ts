@@ -1,24 +1,16 @@
+import { type CommandMetadata } from '@/core/command';
 import {
-  CommandBase,
-  type CommandExecutionResult,
-  type CommandMetadata,
-  type CommandContext,
-} from '@/core/command';
-import { OperationService } from '@/services/OperationService';
+  CreateNodeBaseCommand,
+  type CreateNodeCommandPayload,
+} from '@/features/scene/CreateNodeBaseCommand';
 import {
   CreateCamera3DOperation,
   type CreateCamera3DOperationParams,
 } from '@/features/scene/CreateCamera3DOperation';
-import {
-  getCreatedNodeIdFromSelection,
-  requireActiveScene,
-} from '@/features/scene/scene-command-utils';
 
-export interface CreateCamera3DCommandPayload {
-  nodeId: string;
-}
+export interface CreateCamera3DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateCamera3DCommand extends CommandBase<CreateCamera3DCommandPayload, void> {
+export class CreateCamera3DCommand extends CreateNodeBaseCommand<CreateCamera3DOperationParams, CreateCamera3DCommandPayload> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-camera3d',
     title: 'Create Camera3D',
@@ -26,28 +18,11 @@ export class CreateCamera3DCommand extends CommandBase<CreateCamera3DCommandPayl
     keywords: ['create', 'camera', '3d', 'viewport', 'add'],
   };
 
-  private readonly params: CreateCamera3DOperationParams;
-
   constructor(params: CreateCamera3DOperationParams = {}) {
-    super();
-    this.params = params;
-  }
-
-  preconditions(context: CommandContext) {
-    return requireActiveScene(context, 'An active scene is required to create a camera');
-  }
-
-  async execute(
-    context: CommandContext
-  ): Promise<CommandExecutionResult<CreateCamera3DCommandPayload>> {
-    const operationService = context.container.getService<OperationService>(
-      context.container.getOrCreateToken(OperationService)
+    super(
+      params,
+      operationParams => new CreateCamera3DOperation(operationParams),
+      'An active scene is required to create a camera'
     );
-
-    const op = new CreateCamera3DOperation(this.params);
-    const pushed = await operationService.invokeAndPush(op);
-    const nodeId = getCreatedNodeIdFromSelection(context, pushed);
-
-    return { didMutate: pushed, payload: { nodeId } };
   }
 }

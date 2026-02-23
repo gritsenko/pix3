@@ -103,6 +103,7 @@ export class CreateSlider2DOperation implements Operation<OperationInvokeResult>
 
     // Update selection to the new node for payload extraction
     state.selection.nodeIds = [nodeId];
+    state.selection.primaryNodeId = nodeId;
 
     return {
       didMutate: true,
@@ -113,12 +114,18 @@ export class CreateSlider2DOperation implements Operation<OperationInvokeResult>
           removeAutoCreatedLayoutIfUnused(sceneGraph, autoCreatedLayout);
           updateHierarchyState();
           markSceneDirty();
+          if (state.selection.primaryNodeId === nodeId) {
+            state.selection.primaryNodeId = null;
+          }
+          state.selection.nodeIds = state.selection.nodeIds.filter(id => id !== nodeId);
         },
         redo: () => {
           attachNode(sceneGraph, node, targetParent);
           restoreAutoCreatedLayout(sceneGraph, autoCreatedLayout);
           updateHierarchyState();
           markSceneDirty();
+          state.selection.nodeIds = [nodeId];
+          state.selection.primaryNodeId = nodeId;
         },
       },
     };

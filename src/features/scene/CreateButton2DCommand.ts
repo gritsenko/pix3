@@ -1,24 +1,16 @@
+import { type CommandMetadata } from '@/core/command';
 import {
-  CommandBase,
-  type CommandExecutionResult,
-  type CommandMetadata,
-  type CommandContext,
-} from '@/core/command';
-import { OperationService } from '@/services/OperationService';
+  CreateNodeBaseCommand,
+  type CreateNodeCommandPayload,
+} from '@/features/scene/CreateNodeBaseCommand';
 import {
   CreateButton2DOperation,
   type CreateButton2DOperationParams,
 } from '@/features/scene/CreateButton2DOperation';
-import {
-  getCreatedNodeIdFromSelection,
-  requireActiveScene,
-} from '@/features/scene/scene-command-utils';
 
-export interface CreateButton2DCommandPayload {
-  nodeId: string;
-}
+export interface CreateButton2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateButton2DCommand extends CommandBase<CreateButton2DCommandPayload, void> {
+export class CreateButton2DCommand extends CreateNodeBaseCommand<CreateButton2DOperationParams, CreateButton2DCommandPayload> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-button2d',
     title: 'Create Button2D',
@@ -26,31 +18,11 @@ export class CreateButton2DCommand extends CommandBase<CreateButton2DCommandPayl
     keywords: ['create', 'button', '2d', 'ui', 'add'],
   };
 
-  private readonly params: CreateButton2DOperationParams;
-
   constructor(params: CreateButton2DOperationParams = {}) {
-    super();
-    this.params = params;
-  }
-
-  preconditions(context: CommandContext) {
-    return requireActiveScene(context, 'An active scene is required to create a Button2D');
-  }
-
-  async execute(
-    context: CommandContext
-  ): Promise<CommandExecutionResult<CreateButton2DCommandPayload>> {
-    const operationService = context.container.getService<OperationService>(
-      context.container.getOrCreateToken(OperationService)
+    super(
+      params,
+      operationParams => new CreateButton2DOperation(operationParams),
+      'An active scene is required to create a Button2D'
     );
-
-    const op = new CreateButton2DOperation(this.params);
-    const pushed = await operationService.invokeAndPush(op);
-    const nodeId = getCreatedNodeIdFromSelection(context, pushed);
-
-    return {
-      didMutate: pushed,
-      payload: { nodeId },
-    };
   }
 }

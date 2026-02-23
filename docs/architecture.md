@@ -361,7 +361,20 @@ All scene creation commands share `scene-command-utils.ts` for:
 - active-scene preconditions (`requireActiveScene`)
 - created-node payload resolution from selection (`getCreatedNodeIdFromSelection`)
 
-This avoids duplicate precondition code and prevents incorrect node ID payloads when a new node is created under a non-root parent.
+Scene create commands also share a common base class, `CreateNodeBaseCommand`, which centralizes:
+
+- active-scene precondition checks
+- operation execution through `OperationService.invokeAndPush()`
+- created-node payload extraction from selection
+
+Each concrete `Create*Command` remains as a thin wrapper that defines metadata (`id`, `title`, `keywords`) and provides the operation factory. This keeps `NodeRegistry` integration stable while removing duplicated command logic.
+
+To keep created-node payloads reliable, create operations must update selection consistently:
+
+- set `state.selection.nodeIds = [nodeId]`
+- set `state.selection.primaryNodeId = nodeId`
+
+and keep undo/redo selection cleanup symmetric.
 
 ### Node Manipulation Commands
 

@@ -1,24 +1,19 @@
+import { type CommandMetadata } from '@/core/command';
 import {
-  CommandBase,
-  type CommandExecutionResult,
-  type CommandMetadata,
-  type CommandContext,
-} from '@/core/command';
-import { OperationService } from '@/services/OperationService';
+  CreateNodeBaseCommand,
+  type CreateNodeCommandPayload,
+} from '@/features/scene/CreateNodeBaseCommand';
 import {
   CreateSpotLightOperation,
   type CreateSpotLightOperationParams,
 } from '@/features/scene/CreateSpotLightOperation';
-import {
-  getCreatedNodeIdFromSelection,
-  requireActiveScene,
-} from '@/features/scene/scene-command-utils';
 
-export interface CreateSpotLightCommandPayload {
-  nodeId: string;
-}
+export interface CreateSpotLightCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateSpotLightCommand extends CommandBase<CreateSpotLightCommandPayload, void> {
+export class CreateSpotLightCommand extends CreateNodeBaseCommand<
+  CreateSpotLightOperationParams,
+  CreateSpotLightCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-spot-light',
     title: 'Create Spot Light',
@@ -26,28 +21,11 @@ export class CreateSpotLightCommand extends CommandBase<CreateSpotLightCommandPa
     keywords: ['create', 'light', 'spot', '3d', 'add'],
   };
 
-  private readonly params: CreateSpotLightOperationParams;
-
   constructor(params: CreateSpotLightOperationParams = {}) {
-    super();
-    this.params = params;
-  }
-
-  preconditions(context: CommandContext) {
-    return requireActiveScene(context, 'An active scene is required to create a spot light');
-  }
-
-  async execute(
-    context: CommandContext
-  ): Promise<CommandExecutionResult<CreateSpotLightCommandPayload>> {
-    const operationService = context.container.getService<OperationService>(
-      context.container.getOrCreateToken(OperationService)
+    super(
+      params,
+      operationParams => new CreateSpotLightOperation(operationParams),
+      'An active scene is required to create a spot light'
     );
-
-    const op = new CreateSpotLightOperation(this.params);
-    const pushed = await operationService.invokeAndPush(op);
-    const nodeId = getCreatedNodeIdFromSelection(context, pushed);
-
-    return { didMutate: pushed, payload: { nodeId } };
   }
 }

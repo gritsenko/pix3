@@ -1,24 +1,16 @@
+import { type CommandMetadata } from '@/core/command';
 import {
-  CommandBase,
-  type CommandExecutionResult,
-  type CommandMetadata,
-  type CommandContext,
-} from '@/core/command';
-import { OperationService } from '@/services/OperationService';
+  CreateNodeBaseCommand,
+  type CreateNodeCommandPayload,
+} from '@/features/scene/CreateNodeBaseCommand';
 import {
   CreateMeshInstanceOperation,
   type CreateMeshInstanceOperationParams,
 } from '@/features/scene/CreateMeshInstanceOperation';
-import {
-  getCreatedNodeIdFromSelection,
-  requireActiveScene,
-} from '@/features/scene/scene-command-utils';
 
-export interface CreateMeshInstanceCommandPayload {
-  nodeId: string;
-}
+export interface CreateMeshInstanceCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateMeshInstanceCommand extends CommandBase<CreateMeshInstanceCommandPayload, void> {
+export class CreateMeshInstanceCommand extends CreateNodeBaseCommand<CreateMeshInstanceOperationParams, CreateMeshInstanceCommandPayload> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-mesh-instance',
     title: 'Create Mesh Instance',
@@ -26,28 +18,11 @@ export class CreateMeshInstanceCommand extends CommandBase<CreateMeshInstanceCom
     keywords: ['create', 'mesh', 'model', '3d', 'import', 'add'],
   };
 
-  private readonly params: CreateMeshInstanceOperationParams;
-
   constructor(params: CreateMeshInstanceOperationParams = {}) {
-    super();
-    this.params = params;
-  }
-
-  preconditions(context: CommandContext) {
-    return requireActiveScene(context, 'An active scene is required to create a mesh instance');
-  }
-
-  async execute(
-    context: CommandContext
-  ): Promise<CommandExecutionResult<CreateMeshInstanceCommandPayload>> {
-    const operationService = context.container.getService<OperationService>(
-      context.container.getOrCreateToken(OperationService)
+    super(
+      params,
+      operationParams => new CreateMeshInstanceOperation(operationParams),
+      'An active scene is required to create a mesh instance'
     );
-
-    const op = new CreateMeshInstanceOperation(this.params);
-    const pushed = await operationService.invokeAndPush(op);
-    const nodeId = getCreatedNodeIdFromSelection(context, pushed);
-
-    return { didMutate: pushed, payload: { nodeId } };
   }
 }

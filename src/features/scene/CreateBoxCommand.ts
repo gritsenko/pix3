@@ -1,24 +1,16 @@
+import { type CommandMetadata } from '@/core/command';
 import {
-  CommandBase,
-  type CommandExecutionResult,
-  type CommandMetadata,
-  type CommandContext,
-} from '@/core/command';
-import { OperationService } from '@/services/OperationService';
+  CreateNodeBaseCommand,
+  type CreateNodeCommandPayload,
+} from '@/features/scene/CreateNodeBaseCommand';
 import {
   CreateBoxOperation,
   type CreateBoxOperationParams,
 } from '@/features/scene/CreateBoxOperation';
-import {
-  getCreatedNodeIdFromSelection,
-  requireActiveScene,
-} from '@/features/scene/scene-command-utils';
 
-export interface CreateBoxCommandPayload {
-  nodeId: string;
-}
+export interface CreateBoxCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateBoxCommand extends CommandBase<CreateBoxCommandPayload, void> {
+export class CreateBoxCommand extends CreateNodeBaseCommand<CreateBoxOperationParams, CreateBoxCommandPayload> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-box',
     title: 'Create Box',
@@ -26,26 +18,11 @@ export class CreateBoxCommand extends CommandBase<CreateBoxCommandPayload, void>
     keywords: ['create', 'box', 'geometry', 'mesh', 'add'],
   };
 
-  private readonly params: CreateBoxOperationParams;
-
   constructor(params: CreateBoxOperationParams = {}) {
-    super();
-    this.params = params;
-  }
-
-  preconditions(context: CommandContext) {
-    return requireActiveScene(context, 'An active scene is required to create a box');
-  }
-
-  async execute(context: CommandContext): Promise<CommandExecutionResult<CreateBoxCommandPayload>> {
-    const operationService = context.container.getService<OperationService>(
-      context.container.getOrCreateToken(OperationService)
+    super(
+      params,
+      operationParams => new CreateBoxOperation(operationParams),
+      'An active scene is required to create a box'
     );
-
-    const op = new CreateBoxOperation(this.params);
-    const pushed = await operationService.invokeAndPush(op);
-    const nodeId = getCreatedNodeIdFromSelection(context, pushed);
-
-    return { didMutate: pushed, payload: { nodeId } };
   }
 }

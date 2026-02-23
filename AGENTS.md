@@ -83,7 +83,8 @@ Examples:
 - **Commands** are thin wrappers: `preconditions()` → `execute()` → OperationService via CommandDispatcher
 - Commands never implement their own undo/redo logic
 - **Play mode UI state** (`ui.isPlaying`, `ui.playModeStatus`) must be changed via `SetPlayModeOperation` (no direct writes in commands/services)
-- **Scene create commands** must use `scene-command-utils.ts` helpers for active-scene preconditions and created-node payload extraction
+- **Scene create commands** must inherit from `CreateNodeBaseCommand` and use `scene-command-utils.ts` helpers for active-scene preconditions and created-node payload extraction
+- **Create operations must keep selection consistent** — whenever a node is created, set both `selection.nodeIds = [nodeId]` and `selection.primaryNodeId = nodeId`; undo/redo must clear/restore both symmetrically
 
 ### Property Schema System (NEW)
 
@@ -130,6 +131,7 @@ src/
       UpdateObjectPropertyCommand.ts
       UpdateObjectPropertyOperation.ts
     scene/
+      CreateNodeBaseCommand.ts    # Shared base for all Create*Command wrappers
       scene-command-utils.ts      # Shared create-scene command helpers
       LoadSceneCommand.ts
     scripts/
@@ -295,6 +297,7 @@ src/
 15. **Never use `any` types** — Always provide explicit types. When dealing with external libraries or dynamic structures, use `unknown` with type guards or cast to specific interfaces/types. This prevents `@typescript-eslint/no-explicit-any` lint errors and improves type safety.
 16. **Never infer created node IDs from root-node array order** — use selection-based extraction (`getCreatedNodeIdFromSelection`) after successful create operations.
 17. **Script lifecycle teardown must be explicit** — stop/scene-switch paths must call component `onDetach()` and reset started state so `onStart()` runs on the next play session.
+18. **Create-operation selection updates must include primary selection** — set both `nodeIds` and `primaryNodeId` on create and keep undo/redo selection cleanup symmetric.
 
 Always verify architectural decisions against the specification before implementing features.
 

@@ -1,24 +1,16 @@
+import { type CommandMetadata } from '@/core/command';
 import {
-  CommandBase,
-  type CommandExecutionResult,
-  type CommandMetadata,
-  type CommandContext,
-} from '@/core/command';
-import { OperationService } from '@/services/OperationService';
+  CreateNodeBaseCommand,
+  type CreateNodeCommandPayload,
+} from '@/features/scene/CreateNodeBaseCommand';
 import {
   CreateLayout2DOperation,
   type CreateLayout2DOperationParams,
 } from '@/features/scene/CreateLayout2DOperation';
-import {
-  getCreatedNodeIdFromSelection,
-  requireActiveScene,
-} from '@/features/scene/scene-command-utils';
 
-export interface CreateLayout2DCommandPayload {
-  nodeId: string;
-}
+export interface CreateLayout2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateLayout2DCommand extends CommandBase<CreateLayout2DCommandPayload, void> {
+export class CreateLayout2DCommand extends CreateNodeBaseCommand<CreateLayout2DOperationParams, CreateLayout2DCommandPayload> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-layout2d',
     title: 'Create Layout2D',
@@ -26,28 +18,11 @@ export class CreateLayout2DCommand extends CommandBase<CreateLayout2DCommandPayl
     keywords: ['create', 'layout2d', 'viewport', 'container', 'root'],
   };
 
-  private readonly params: CreateLayout2DOperationParams;
-
   constructor(params: CreateLayout2DOperationParams = {}) {
-    super();
-    this.params = params;
-  }
-
-  preconditions(context: CommandContext) {
-    return requireActiveScene(context, 'An active scene is required to create a Layout2D');
-  }
-
-  async execute(
-    context: CommandContext
-  ): Promise<CommandExecutionResult<CreateLayout2DCommandPayload>> {
-    const operationService = context.container.getService<OperationService>(
-      context.container.getOrCreateToken(OperationService)
+    super(
+      params,
+      operationParams => new CreateLayout2DOperation(operationParams),
+      'An active scene is required to create a Layout2D'
     );
-
-    const op = new CreateLayout2DOperation(this.params);
-    const pushed = await operationService.invokeAndPush(op);
-    const nodeId = getCreatedNodeIdFromSelection(context, pushed);
-
-    return { didMutate: pushed, payload: { nodeId } };
   }
 }
