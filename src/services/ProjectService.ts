@@ -1,8 +1,15 @@
 import { injectable, ServiceContainer } from '@/fw/di';
 import { appState } from '@/state';
 import { resolveFileSystemAPIService, type FileDescriptor } from './FileSystemAPIService';
+import { parse, stringify } from 'yaml';
+import {
+  createDefaultProjectManifest,
+  normalizeProjectManifest,
+  type ProjectManifest,
+} from '@/core/ProjectManifest';
 
 const RECENTS_KEY = 'pix3.recentProjects:v1';
+const PROJECT_MANIFEST_PATH = 'pix3project.yaml';
 
 export interface RecentProjectEntry {
   readonly id?: string;
@@ -114,6 +121,7 @@ export class ProjectService {
       appState.project.projectName = handle.name ?? 'Untitled Project';
       appState.project.status = 'ready';
       appState.project.errorMessage = null;
+      appState.project.manifest = await this.loadProjectManifest();
 
       // save recent entry with id and persist handle to IndexedDB (best-effort)
       this.addRecentProject({
@@ -127,6 +135,7 @@ export class ProjectService {
     } catch (error) {
       // propagate error after recording state
       appState.project.status = 'error';
+      appState.project.manifest = null;
       appState.project.errorMessage =
         error instanceof Error ? error.message : String(error ?? 'Failed to open project');
       throw error;
@@ -152,6 +161,7 @@ export class ProjectService {
             appState.project.localAbsolutePath = entry.localAbsolutePath ?? null;
             appState.project.status = 'ready';
             appState.project.errorMessage = null;
+            appState.project.manifest = await this.loadProjectManifest();
             // update timestamp in recents
             this.addRecentProject({
               id: entry.id,
@@ -317,9 +327,11 @@ export class ProjectService {
         : `handle-${Date.now()}`;
 
       appState.project.directoryHandle = handle;
+      appState.project.id = id;
       appState.project.projectName = handle.name ?? 'New Project';
       appState.project.status = 'ready';
       appState.project.errorMessage = null;
+      appState.project.manifest = await this.loadProjectManifest();
 
       // Save to recent projects
       this.addRecentProject({
@@ -333,6 +345,7 @@ export class ProjectService {
     } catch (error) {
       // Propagate error after recording state
       appState.project.status = 'error';
+      appState.project.manifest = null;
       appState.project.errorMessage =
         error instanceof Error ? error.message : String(error ?? 'Failed to create new project');
       throw error;
@@ -381,6 +394,34 @@ Happy creating! 🎨
 `;
 
     await this.fs.writeTextFile('README.md', readmeContent);
+    await this.saveProjectManifest(createDefaultProjectManifest());
+  }
+
+  async loadProjectManifest(): Promise<ProjectManifest> {
+    try {
+      const yaml = await this.fs.readTextFile(PROJECT_MANIFEST_PATH);
+      const parsed = parse(yaml);
+      const manifest = normalizeProjectManifest(parsed);
+      return manifest;
+    } catch {
+      return createDefaultProjectManifest();
+    }
+  }
+
+  async saveProjectManifest(manifest: ProjectManifest): Promise<void> {
+    const normalized = normalizeProjectManifest(manifest);
+    const payload = {
+      version: normalized.version,
+      metadata: normalized.metadata ?? {},
+      autoloads: normalized.autoloads.map(entry => ({
+        scriptPath: entry.scriptPath,
+        singleton: entry.singleton,
+        enabled: entry.enabled,
+      })),
+    };
+    const yaml = stringify(payload, { indent: 2 });
+    await this.fs.writeTextFile(PROJECT_MANIFEST_PATH, yaml);
+    appState.project.manifest = normalized;
   }
 }
 
@@ -389,4 +430,3 @@ export const resolveProjectService = (): ProjectService => {
     ServiceContainer.getInstance().getOrCreateToken(ProjectService)
   ) as ProjectService;
 };
-

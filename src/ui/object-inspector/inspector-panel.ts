@@ -26,6 +26,8 @@ import { AddComponentCommand } from '@/features/scripts/AddComponentCommand';
 import { RemoveComponentCommand } from '@/features/scripts/RemoveComponentCommand';
 import { ToggleScriptEnabledCommand } from '@/features/scripts/ToggleScriptEnabledCommand';
 import { UpdateComponentPropertyCommand } from '@/features/scripts/UpdateComponentPropertyCommand';
+import { AddNodeToGroupCommand } from '@/features/scene/AddNodeToGroupCommand';
+import { RemoveNodeFromGroupCommand } from '@/features/scene/RemoveNodeFromGroupCommand';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
@@ -96,6 +98,12 @@ export class InspectorPanel extends ComponentBase {
 
   @state()
   private activePreviewAnimation: string | null = null;
+
+  @state()
+  private newGroupName: string = '';
+
+  @state()
+  private newGroupError: string | null = null;
 
   private disposeSelectionSubscription?: () => void;
   private disposeSceneSubscription?: () => void;
@@ -298,6 +306,7 @@ export class InspectorPanel extends ComponentBase {
 
     // Get the schema for this node
     this.propertySchema = getNodePropertySchema(this.primaryNode);
+    this.newGroupError = null;
 
     // Initialize UI values from node properties
     const values: Record<string, PropertyUIState> = {};
@@ -658,7 +667,52 @@ export class InspectorPanel extends ComponentBase {
         </div>
 
         ${sortedGroups.map(([groupName, props]) => this.renderPropertyGroup(groupName, props))}
-        ${this.renderAnimationsSection()} ${this.renderScriptsSection()}
+        ${this.renderGroupsSection()} ${this.renderAnimationsSection()} ${this.renderScriptsSection()}
+      </div>
+    `;
+  }
+
+  private renderGroupsSection() {
+    if (!this.primaryNode) return '';
+
+    const groups = Array.from(this.primaryNode.groups).sort((a, b) => a.localeCompare(b));
+    return html`
+      <div class="property-group-section groups-section">
+        <h4 class="group-title">Groups</h4>
+        <div class="group-chip-list">
+          ${groups.length === 0
+            ? html`<div class="groups-empty">No groups assigned</div>`
+            : groups.map(
+                group => html`
+                  <span class="group-chip">
+                    ${group}
+                    <button
+                      class="group-chip-remove"
+                      title="Remove from group"
+                      @click=${() => this.removeFromGroup(group)}
+                    >
+                      ×
+                    </button>
+                  </span>
+                `
+              )}
+        </div>
+        <div class="group-add-row">
+          <input
+            class="property-input property-input--text group-input"
+            .value=${this.newGroupName}
+            placeholder="group_name"
+            @input=${(e: Event) => this.onGroupNameInput(e)}
+            @keydown=${(e: KeyboardEvent) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                void this.addToGroup();
+              }
+            }}
+          />
+          <button class="btn-add-group" @click=${() => this.addToGroup()}>Add</button>
+        </div>
+        ${this.newGroupError ? html`<div class="groups-error">${this.newGroupError}</div>` : ''}
       </div>
     `;
   }
@@ -724,6 +778,48 @@ export class InspectorPanel extends ComponentBase {
     const next = this.activePreviewAnimation === name ? null : name;
     this.activePreviewAnimation = next;
     this.viewportService.setPreviewAnimation(this.primaryNode.nodeId, next);
+  }
+
+  private onGroupNameInput(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    this.newGroupName = input.value;
+    this.newGroupError = null;
+  }
+
+  private async addToGroup(): Promise<void> {
+    if (!this.primaryNode) {
+      return;
+    }
+
+    const groupName = this.newGroupName.trim();
+    if (!/^[A-Za-z0-9_]+$/.test(groupName)) {
+      this.newGroupError = 'Use letters, numbers, and underscores only.';
+      return;
+    }
+
+    const command = new AddNodeToGroupCommand({
+      nodeId: this.primaryNode.nodeId,
+      group: groupName,
+    });
+    const didMutate = await this.commandDispatcher.execute(command);
+    if (!didMutate) {
+      this.newGroupError = 'Group update failed. Check project/scene state and duplicate names.';
+      return;
+    }
+
+    this.newGroupName = '';
+    this.newGroupError = null;
+  }
+
+  private async removeFromGroup(group: string): Promise<void> {
+    if (!this.primaryNode) {
+      return;
+    }
+    const command = new RemoveNodeFromGroupCommand({
+      nodeId: this.primaryNode.nodeId,
+      group,
+    });
+    await this.commandDispatcher.execute(command);
   }
 
   private renderScriptsSection() {

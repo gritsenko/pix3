@@ -7,7 +7,7 @@ Based on the authoritative copilot instructions for Pix3 development. These guid
 - **Pix3** is a browser-based editor for HTML5 scenes blending 2D and 3D layers
 - **Target stack**: TypeScript + Vite, Lit web components, Valtio state, Three.js, Golden Layout
 - **Architecture model**: Operations-first with OperationService as single mutation gateway
-- **Source of truth**: `docs/pix3-specification.md` (v1.13, 2026-02-03)
+- **Source of truth**: `docs/pix3-specification.md` (v1.14, 2026-02-23)
 
 ## Essential Architecture Patterns
 

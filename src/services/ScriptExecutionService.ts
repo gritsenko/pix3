@@ -8,6 +8,7 @@
 import { injectable, inject } from '@/fw/di';
 import { SceneManager, type SceneGraph, InputService } from '@pix3/runtime';
 import { NodeBase } from '@pix3/runtime';
+import { AutoloadService } from './AutoloadService';
 
 interface NodeStateSnapshot {
   nodeId: string;
@@ -24,6 +25,9 @@ export class ScriptExecutionService {
 
   @inject(InputService)
   private readonly input!: InputService;
+
+  @inject(AutoloadService)
+  private readonly autoloadService!: AutoloadService;
 
   private animationFrameId: number | null = null;
   private lastTimestamp: number = 0;
@@ -50,6 +54,7 @@ export class ScriptExecutionService {
       this.captureNodeState(scene);
     }
 
+    this.startAutoloadScripts();
     this.scheduleNextFrame();
 
     console.log('[ScriptExecutionService] Started script execution loop');
@@ -127,12 +132,26 @@ export class ScriptExecutionService {
       return;
     }
 
+    const input = this.getInputServiceSafe();
+    if (!input) {
+      return;
+    }
+
     // Reset input state for the new frame
-    this.input.beginFrame();
+    input.beginFrame();
 
     // Calculate delta time in seconds
     const dt = (timestamp - this.lastTimestamp) / 1000;
     this.lastTimestamp = timestamp;
+
+    const autoloadService = this.getAutoloadServiceSafe();
+    if (autoloadService) {
+      const globalRoot = autoloadService.getGlobalRoot();
+      if (!globalRoot.input) {
+        globalRoot.input = input;
+      }
+      globalRoot.tick(dt);
+    }
 
     // Get active scene
     const scene = this.sceneManager.getActiveSceneGraph();
@@ -344,5 +363,36 @@ export class ScriptExecutionService {
 
   private getSnapshotKey(sceneId: string | null): string {
     return sceneId ?? '__active_scene__';
+  }
+
+  private startAutoloadScripts(): void {
+    const autoloadService = this.getAutoloadServiceSafe();
+    if (!autoloadService) {
+      return;
+    }
+
+    for (const component of autoloadService.getAutoloadInstances()) {
+      if (!component.enabled || component._started || !component.onStart) {
+        continue;
+      }
+      component.onStart();
+      component._started = true;
+    }
+  }
+
+  private getAutoloadServiceSafe(): AutoloadService | null {
+    try {
+      return this.autoloadService;
+    } catch {
+      return null;
+    }
+  }
+
+  private getInputServiceSafe(): InputService | null {
+    try {
+      return this.input;
+    } catch {
+      return null;
+    }
   }
 }

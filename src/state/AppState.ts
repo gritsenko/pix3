@@ -1,3 +1,5 @@
+import type { ProjectManifest } from '@/core/ProjectManifest';
+
 export const THEME_IDS = ['dark', 'light', 'high-contrast'] as const;
 
 export type ThemeName = (typeof THEME_IDS)[number];
@@ -107,6 +109,8 @@ export interface ProjectState {
   scriptRefreshSignal: number;
   /** Directory path that was modified (e.g., 'Scenes' or 'Assets'). Used to refresh only affected folders. */
   lastModifiedDirectoryPath: string | null;
+  /** Project manifest loaded from pix3project.yaml. */
+  manifest: ProjectManifest | null;
 }
 
 export interface SelectionState {
@@ -194,6 +198,7 @@ export const createInitialAppState = (): AppState => ({
     fileRefreshSignal: 0,
     scriptRefreshSignal: 0,
     lastModifiedDirectoryPath: null,
+    manifest: null,
   },
   scenes: {
     activeSceneId: null,

@@ -1,8 +1,8 @@
 # Pix3 — Technical Specification
 
-Version: 1.13
+Version: 1.14
 
-Date: 2026-02-03
+Date: 2026-02-23
 
 ## 1. Introduction
 
@@ -437,6 +437,114 @@ Layout2D triggers layout recalculation for all Group2D children when its size ch
 - Border visibility can be toggled via checkbox in inspector
 - Children (Group2D, Sprite2D) render normally within Layout2D bounds
 
+## 6.12 Autoload Scripts and Asset Browser Template Flow
+
+Pix3 supports project-level autoload scripts configured in `pix3project.yaml` under `autoloads`.
+Each autoload entry includes:
+
+- `scriptPath` - file path relative to project root (for example, `scripts/Events.ts`)
+- `singleton` - global singleton name
+- `enabled` - whether the autoload is active
+
+Autoload management is available in two editor entry points:
+
+- **Project Settings > Autoload tab** for add/remove/enable/reorder.
+- **Asset Browser > Create dropdown > Create autoload script** for fast scaffolding.
+
+When `Create autoload script` is used, the editor:
+
+1. Prompts for a singleton name.
+2. Creates `scripts/<SingletonName>.ts` from the autoload template.
+3. Triggers project script compilation.
+4. Adds the autoload entry to `pix3project.yaml`.
+5. Reveals the created script in the Asset Browser.
+
+### 6.12.1 Autoload Runtime Model
+
+- Autoload scripts are instantiated as script components and attached to an internal global root node.
+- They are initialized from project manifest order and persist across scene changes.
+- They are ticked before active-scene root nodes.
+- They are not serialized into `.pix3scene` files.
+
+### 6.12.2 `pix3project.yaml` Example
+
+```yaml
+version: 1.0.0
+autoloads:
+  - scriptPath: scripts/Events.ts
+    singleton: Events
+    enabled: true
+  - scriptPath: scripts/GameManager.ts
+    singleton: GameManager
+    enabled: true
+```
+
+## 6.13 Signals Engine
+
+Pix3 provides a node-local signal system on `NodeBase` for script-to-script communication.
+
+### 6.13.1 API
+
+- `signal(name)` - declares a signal channel (optional but recommended).
+- `connect(signalName, target, method)` - subscribes target method.
+- `emit(signalName, ...args)` - dispatches event payload to subscribers.
+- `disconnect(signalName, target, method)` - removes one specific subscription.
+- `disconnectAll(signalName?)` - clears one signal or all signal subscriptions on the emitter node.
+- `disconnectAllFromTarget(target)` - removes all subscriptions matching a target object.
+
+### 6.13.2 Lifecycle Safety
+
+- `Script.onDetach()` base implementation automatically calls `node.disconnectAllFromTarget(this)`.
+- This avoids leaking listeners tied to detached script instances.
+- Preferred connection style: `node.connect('signal_name', this, this.onSomething)`.
+- Avoid using `.bind(this)` when connecting signals; bound functions are harder to match for exact disconnects.
+
+### 6.13.3 Example
+
+```typescript
+// emitter
+this.node?.signal('score_changed');
+this.node?.emit('score_changed', scoreValue);
+
+// listener
+playerNode.connect('score_changed', this, this.onScoreChanged);
+
+private onScoreChanged(newScore: number): void {
+  // update UI
+}
+```
+
+## 6.14 Groups Engine
+
+Groups provide runtime categorization for nodes (for example, `enemies`, `ui`, `interactables`).
+
+### 6.14.1 Node API
+
+- `addToGroup(group)`
+- `removeFromGroup(group)`
+- `isInGroup(group)`
+
+### 6.14.2 Scene API
+
+`SceneManager` provides group-based queries and invocation:
+
+- `getNodesInGroup(group)` - returns matching nodes in the active scene.
+- `callGroup(group, method, ...args)` - calls matching component methods across grouped nodes.
+
+`callGroup` performs runtime method checks and warns if no callable method is found.
+
+### 6.14.3 Serialization
+
+Groups are serialized in `.pix3scene` nodes via `groups: []`.
+
+```yaml
+root:
+  - id: player_001
+    type: Node3D
+    name: Player
+    groups: [actors, player]
+```
+
 ## 7. Scene File Format (\*.pix3scene)
 
 The scene file uses the YAML format to ensure readability for both humans and machines (including AI agents).
@@ -667,3 +775,4 @@ root:
 - **1.11 (2025-12-30):** Removed Pixi.js from technology stack. Updated to Three.js-only rendering pipeline. Removed Pixi.js references from architecture notes and rendering architecture sections. Updated MVP plan to remove 2D rendering requirements via Pixi.js. Added details about the Icon Service under the Services section.
 - **1.12 (2026-01-01):** Added Script Component System section (6.0-6.11). Implemented behaviors and controller scripts attachments in inspector. Nodes now support `behaviors` array and optional `controller`. Added ScriptRegistry service for registering script types. Added BehaviorPickerService for modal dialog. Added ScriptExecutionService for game loop and script lifecycle management. Added commands for Attach/DetachBehavior, Set/ClearController, ToggleScriptEnabled, PlayScene, StopScene. Updated inspector panel to display "Scripts & Behaviors" section. Updated scene tree to show script indicators. Updated project structure to include `behaviors/` directory and `features/scripts/`. Added example RotateBehavior implementation. Updated node lifecycle with `tick(dt)` method for script updates.
 - **1.13 (2026-02-03):** Added Layout2D Node System section (6.5). Implemented Layout2D node class in `packages/pix3-runtime/src/nodes/2D/Layout2D.ts` with properties for width, height, resolutionPreset, and showViewportOutline. Added Layout2D YAML parsing support in SceneLoader with Layout2DProperties interface. Modified SceneManager to add `skipLayout2D` parameter to `resizeRoot()` and `findLayout2D()` helper method. Created CreateLayout2DCommand/Operation and UpdateLayout2DSizeCommand/Operation for mutation support. Updated ViewportRenderService with `layout2dVisuals` map, `createLayout2DVisual()` method (purple dashed border), and Layout2D handling in processNodeForRendering, syncAll2DVisuals, updateNodeTransform, and updateNodeVisibility. Removed isViewportContainer property from Group2D and all related logic. Updated startup scene template to use Layout2D root instead of Group2D. Layout2D size is now independent of editor viewport and only changeable via inspector properties.
+- **1.14 (2026-02-23):** Added project autoload manifest support (`pix3project.yaml`) with editor commands/operations for add/remove/toggle/reorder. Added node-local signal and group APIs, scene group serialization, and inspector group editing UI. Added Asset Browser create action `Create autoload script` that scaffolds a template script in `scripts/`, compiles scripts, and auto-registers the singleton in project autoloads.

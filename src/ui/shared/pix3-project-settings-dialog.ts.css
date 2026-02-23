@@ -20,8 +20,10 @@ pix3-project-settings-dialog {
   border: 1px solid var(--pix3-border, #444);
   border-radius: 8px;
   padding: 1.5rem;
-  width: 500px;
+  width: 760px;
   max-width: 90vw;
+  max-height: 85vh;
+  overflow: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
@@ -36,6 +38,27 @@ pix3-project-settings-dialog {
   display: flex;
   flex-direction: column;
   gap: 1.2rem;
+}
+
+.settings-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 1rem;
+}
+
+.settings-tab {
+  border: 1px solid var(--pix3-border, #444);
+  background: transparent;
+  color: var(--pix3-text-secondary, #ccc);
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+}
+
+.settings-tab--active {
+  border-color: var(--pix3-accent-color, #ffcf33);
+  color: var(--pix3-text-primary, #fff);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.12);
 }
 
 .settings-field {
@@ -61,6 +84,84 @@ pix3-project-settings-dialog {
 .settings-field input:focus {
   outline: 1px solid var(--pix3-accent-color, #ffcf33);
   border-color: var(--pix3-accent-color, #ffcf33);
+}
+
+.autoload-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr auto auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.autoload-enabled-label {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--pix3-text-secondary, #aaa);
+  font-size: 0.9rem;
+}
+
+.autoload-table {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 0.5rem;
+}
+
+.autoload-row {
+  display: grid;
+  grid-template-columns: 32px 72px 160px 1fr 160px;
+  gap: 8px;
+  align-items: center;
+  border: 1px solid var(--pix3-border, #444);
+  border-radius: 4px;
+  padding: 0.35rem 0.5rem;
+}
+
+.autoload-row--header {
+  font-size: 0.76rem;
+  color: var(--pix3-text-muted, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.autoload-path {
+  font-family: monospace;
+  font-size: 0.8rem;
+  color: var(--pix3-text-secondary, #bbb);
+}
+
+.autoload-actions {
+  display: inline-flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.btn-small {
+  border: 1px solid var(--pix3-border, #444);
+  background: transparent;
+  color: var(--pix3-text-primary, #eee);
+  border-radius: 3px;
+  padding: 0.2rem 0.45rem;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.btn-small:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-small--danger:hover {
+  border-color: #dc6b6b;
+  color: #ffb0b0;
+}
+
+.autoload-error {
+  grid-column: 1 / -1;
+  color: #ff8c8c;
+  font-size: 0.8rem;
 }
 
 .settings-field .hint {

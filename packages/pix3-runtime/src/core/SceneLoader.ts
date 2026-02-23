@@ -55,6 +55,7 @@ export interface SceneNodeDefinition {
   type?: string;
   name?: string;
   instance?: string;
+  groups?: string[];
   properties?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   children?: SceneNodeDefinition[];
@@ -211,6 +212,13 @@ export class SceneLoader {
     }
 
     const node = await this.createNodeFromDefinition(definition);
+    if (Array.isArray(definition.groups)) {
+      for (const group of definition.groups) {
+        if (typeof group === 'string' && group.trim().length > 0) {
+          node.addToGroup(group);
+        }
+      }
+    }
     index.set(node.nodeId, node);
 
     // Load components

@@ -125,6 +125,7 @@ export class SceneSaver {
       id: node.nodeId,
       type: node.type !== 'Group' ? node.type : undefined,
       name: node.name,
+      groups: node.groups.size > 0 ? Array.from(node.groups.values()) : undefined,
       properties: properties,
       metadata: node.metadata && Object.keys(node.metadata).length > 0 ? node.metadata : undefined,
     };

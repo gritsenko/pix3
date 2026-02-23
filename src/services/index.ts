@@ -32,6 +32,7 @@ export { EditorTabService } from './EditorTabService';
 export { IconService, IconSize, type IconSizeValue } from './IconService';
 export { ScriptRegistry } from '@pix3/runtime';
 export { ScriptExecutionService } from './ScriptExecutionService';
+export { AutoloadService } from './AutoloadService';
 export { ProjectScriptLoaderService } from './ProjectScriptLoaderService';
 export { BehaviorPickerService } from './BehaviorPickerService';
 export {

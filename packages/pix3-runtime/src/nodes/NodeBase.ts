@@ -11,8 +11,14 @@ export interface NodeBaseProps {
   type?: string;
   name?: string;
   instancePath?: string | null;
+  groups?: string[];
   properties?: Record<string, unknown>;
   metadata?: NodeMetadata;
+}
+
+export interface SignalConnection {
+  target: unknown;
+  method: (...args: unknown[]) => void;
 }
 
 export class NodeBase extends Object3D {
@@ -27,6 +33,9 @@ export class NodeBase extends Object3D {
   isContainer: boolean = true;
   /** Script components attached to this node */
   readonly components: ScriptComponent[] = [];
+  /** Groups associated with this node */
+  readonly groups: Set<string> = new Set();
+  private readonly _signals: Map<string, Set<SignalConnection>> = new Map();
 
   /** Reference to InputSystem (injected by runtime) */
   _input?: import('../core/InputService').InputService;
@@ -41,6 +50,11 @@ export class NodeBase extends Object3D {
     this.properties = { ...(props.properties ?? {}) };
     this.metadata = { ...(props.metadata ?? {}) };
     this.instancePath = props.instancePath ?? null;
+    for (const group of props.groups ?? []) {
+      if (typeof group === 'string' && group.trim().length > 0) {
+        this.groups.add(group.trim());
+      }
+    }
 
     // Initialize visibility and lock state from properties
     if (this.properties.visible !== undefined) {
@@ -209,6 +223,103 @@ export class NodeBase extends Object3D {
     }
   }
 
+  signal(name: string): void {
+    if (!name || !name.trim()) {
+      return;
+    }
+    if (!this._signals.has(name)) {
+      this._signals.set(name, new Set());
+    }
+  }
+
+  emit(name: string, ...args: unknown[]): void {
+    const connections = this._signals.get(name);
+    if (!connections || connections.size === 0) {
+      return;
+    }
+
+    for (const connection of connections) {
+      try {
+        connection.method.call(connection.target, ...args);
+      } catch (error) {
+        console.error('[NodeBase] Signal listener failed', {
+          nodeId: this.nodeId,
+          signal: name,
+          error,
+        });
+      }
+    }
+  }
+
+  connect(signalName: string, target: unknown, method: (...args: unknown[]) => void): void {
+    if (!signalName || !signalName.trim()) {
+      return;
+    }
+    if (typeof method !== 'function') {
+      return;
+    }
+
+    const connections = this._signals.get(signalName) ?? new Set<SignalConnection>();
+    connections.add({ target, method });
+    this._signals.set(signalName, connections);
+  }
+
+  disconnect(signalName: string, target: unknown, method: (...args: unknown[]) => void): void {
+    const connections = this._signals.get(signalName);
+    if (!connections) {
+      return;
+    }
+
+    for (const connection of connections) {
+      if (connection.target === target && connection.method === method) {
+        connections.delete(connection);
+      }
+    }
+
+    if (connections.size === 0) {
+      this._signals.delete(signalName);
+    }
+  }
+
+  disconnectAll(signalName?: string): void {
+    if (!signalName) {
+      this._signals.clear();
+      return;
+    }
+    this._signals.delete(signalName);
+  }
+
+  disconnectAllFromTarget(target: unknown): void {
+    for (const [signalName, connections] of this._signals.entries()) {
+      for (const connection of connections) {
+        if (connection.target === target) {
+          connections.delete(connection);
+        }
+      }
+      if (connections.size === 0) {
+        this._signals.delete(signalName);
+      }
+    }
+  }
+
+  addToGroup(group: string): boolean {
+    const trimmed = group.trim();
+    if (!trimmed) {
+      return false;
+    }
+    const sizeBefore = this.groups.size;
+    this.groups.add(trimmed);
+    return this.groups.size !== sizeBefore;
+  }
+
+  removeFromGroup(group: string): boolean {
+    return this.groups.delete(group.trim());
+  }
+
+  isInGroup(group: string): boolean {
+    return this.groups.has(group.trim());
+  }
+
   /**
    * Get the property schema for this node type.
    * Defines all editable properties and their metadata for the inspector.
@@ -257,6 +368,28 @@ export class NodeBase extends Object3D {
           getValue: (node: unknown) => (node as NodeBase).type,
           setValue: () => {
             // Read-only, no-op
+          },
+        },
+        {
+          name: 'groups',
+          type: 'object',
+          ui: {
+            label: 'Groups',
+            description: 'Node groups used for runtime querying and call-group operations',
+            group: 'Base',
+            hidden: true,
+          },
+          getValue: (node: unknown) => Array.from((node as NodeBase).groups),
+          setValue: (node: unknown, value: unknown) => {
+            const next = Array.isArray(value) ? value.filter(v => typeof v === 'string') : [];
+            const base = node as NodeBase;
+            base.groups.clear();
+            for (const group of next) {
+              const trimmed = group.trim();
+              if (trimmed) {
+                base.groups.add(trimmed);
+              }
+            }
           },
         },
         {

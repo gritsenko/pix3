@@ -21,6 +21,7 @@ import {
   type EditorSettingsDialogInstance,
 } from '@/services/EditorSettingsService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
+import { AutoloadService } from '@/services/AutoloadService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { ScriptCompilerService } from '@/services/ScriptCompilerService';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
@@ -102,6 +103,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(ScriptCompilerService)
   private readonly _scriptCompiler!: ScriptCompilerService; // Injected to ensure service initialization
+
+  @inject(AutoloadService)
+  private readonly _autoloadService!: AutoloadService; // Injected to ensure autoload lifecycle initialization
 
   // project open handled by <pix3-welcome>
 
@@ -193,6 +197,7 @@ export class Pix3EditorShell extends ComponentBase {
     // Touch injected services to avoid unused var lint error (they are singletons for side-effects)
     void this._projectScriptLoader;
     void this._scriptCompiler;
+    void this._autoloadService;
 
     // Subscribe to component picker changes
     this.disposeBehaviorPickerSubscription = this.behaviorPickerService.subscribe(pickers => {

@@ -3,6 +3,7 @@ export * from './core/ResourceManager';
 export * from './core/AssetLoader';
 export * from './core/ScriptRegistry';
 export * from './core/ScriptComponent';
+export * from './core/ProjectManifest';
 export * from './core/SceneLoader';
 export * from './core/SceneSaver';
 export * from './core/SceneManager';

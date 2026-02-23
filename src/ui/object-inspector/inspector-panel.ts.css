@@ -124,6 +124,72 @@ pix3-panel {
   margin-top: 0.5rem;
 }
 
+.groups-section {
+  margin-top: 0.5rem;
+}
+
+.group-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.15);
+  color: var(--color-text-primary, #eee);
+  font-size: 0.75rem;
+}
+
+.group-chip-remove {
+  border: none;
+  background: transparent;
+  color: var(--color-text-primary, #eee);
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+}
+
+.groups-empty {
+  color: var(--color-text-subtle, #777);
+  font-size: 0.75rem;
+  font-style: italic;
+}
+
+.group-add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.group-input {
+  flex: 1;
+}
+
+.btn-add-group {
+  border: 1px solid var(--color-border, #333);
+  background: transparent;
+  color: var(--color-text-primary, #eee);
+  border-radius: 4px;
+  padding: 0 10px;
+  cursor: pointer;
+  font-size: 0.75rem;
+}
+
+.btn-add-group:hover {
+  border-color: var(--pix3-accent-color, #ffcf33);
+}
+
+.groups-error {
+  color: #ff8c8c;
+  margin-top: 6px;
+  font-size: 0.72rem;
+}
+
 .scripts-section .group-header {
   display: flex;
   justify-content: space-between;

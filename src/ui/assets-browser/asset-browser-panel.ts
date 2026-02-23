@@ -2,6 +2,9 @@ import { ComponentBase, customElement, html, inject, state } from '@/fw';
 import { ref } from 'lit/directives/ref.js';
 import { AssetFileActivationService, type AssetActivation, CommandDispatcher } from '@/services';
 import { DialogService } from '@/services/DialogService';
+import { ProjectService } from '@/services/ProjectService';
+import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
+import { AddAutoloadCommand } from '@/features/project/AddAutoloadCommand';
 import type { AssetTree } from './asset-tree';
 
 import '../shared/pix3-panel';
@@ -32,6 +35,12 @@ export class AssetBrowserPanel extends ComponentBase {
 
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
+
+  @inject(ProjectService)
+  private readonly projectService!: ProjectService;
+
+  @inject(ProjectScriptLoaderService)
+  private readonly scriptLoader!: ProjectScriptLoaderService;
 
   private assetTreeRef: AssetTree | null = null;
 
@@ -75,6 +84,115 @@ export class AssetBrowserPanel extends ComponentBase {
       console.error('[AssetBrowserPanel] Failed to create scene:', error);
     }
   };
+
+  private onCreateAutoloadScript = async () => {
+    const singletonName = this.promptForAutoloadSingleton();
+    if (!singletonName) {
+      return;
+    }
+
+    const filePath = `scripts/${singletonName}.ts`;
+    try {
+      await this.ensureScriptsDirectory();
+      const exists = await this.fileExists(filePath);
+      if (exists) {
+        await this.dialogService.showConfirmation({
+          title: 'File Already Exists',
+          message: `A script file already exists at "${filePath}". Choose a different singleton name.`,
+          confirmLabel: 'OK',
+          cancelLabel: 'Close',
+        });
+        return;
+      }
+
+      const template = this.generateAutoloadTemplate(singletonName);
+      await this.projectService.writeFile(filePath, template);
+
+      await this.scriptLoader.syncAndBuild();
+
+      const didMutate = await this.commandDispatcher.execute(
+        new AddAutoloadCommand({
+          scriptPath: filePath,
+          singleton: singletonName,
+          enabled: true,
+        })
+      );
+
+      if (!didMutate) {
+        await this.dialogService.showConfirmation({
+          title: 'Autoload Registration Failed',
+          message: `Created "${filePath}", but failed to add "${singletonName}" to project autoloads.`,
+          confirmLabel: 'OK',
+          cancelLabel: 'Close',
+        });
+        return;
+      }
+
+      window.dispatchEvent(
+        new CustomEvent('script-file-created', {
+          detail: {
+            filePath,
+          },
+        })
+      );
+    } catch (error) {
+      console.error('[AssetBrowserPanel] Failed to create autoload script:', error);
+      await this.dialogService.showConfirmation({
+        title: 'Autoload Creation Failed',
+        message: error instanceof Error ? error.message : 'Failed to create autoload script.',
+        confirmLabel: 'OK',
+        cancelLabel: 'Close',
+      });
+    }
+  };
+
+  private promptForAutoloadSingleton(): string | null {
+    const input = window.prompt('Autoload singleton name (letters, numbers, underscore):', 'Events');
+    if (!input) {
+      return null;
+    }
+    const singletonName = input.trim();
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(singletonName)) {
+      void this.dialogService.showConfirmation({
+        title: 'Invalid Singleton Name',
+        message:
+          'Singleton name must start with a letter or underscore and contain only letters, numbers, and underscores.',
+        confirmLabel: 'OK',
+        cancelLabel: 'Close',
+      });
+      return null;
+    }
+    return singletonName;
+  }
+
+  private async ensureScriptsDirectory(): Promise<void> {
+    try {
+      await this.projectService.createDirectory('scripts');
+    } catch {
+      // Directory already exists.
+    }
+  }
+
+  private async fileExists(path: string): Promise<boolean> {
+    try {
+      const entries = await this.projectService.listDirectory('scripts');
+      return entries.some(entry => entry.kind === 'file' && entry.path === path);
+    } catch {
+      return false;
+    }
+  }
+
+  private generateAutoloadTemplate(singletonName: string): string {
+    return `import { Script } from '@pix3/runtime';
+
+export class ${singletonName} extends Script {
+  onAttach(): void {
+    this.node?.signal('initialized');
+    this.node?.emit('initialized');
+  }
+}
+`;
+  }
 
   private onDeleteClick = () => {
     try {
@@ -274,12 +392,15 @@ export class AssetBrowserPanel extends ComponentBase {
             .items=${[
               { id: 'folder', label: 'Create folder', icon: 'folder' },
               { id: 'scene', label: 'Create scene', icon: 'film' },
+              { id: 'autoload-script', label: 'Create autoload script', icon: 'code' },
             ]}
             @item-select=${(e: CustomEvent) => {
               if (e.detail.id === 'folder') {
                 this.onCreateFolder();
               } else if (e.detail.id === 'scene') {
                 this.onCreateScene();
+              } else if (e.detail.id === 'autoload-script') {
+                void this.onCreateAutoloadScript();
               }
             }}
           ></pix3-dropdown-button>

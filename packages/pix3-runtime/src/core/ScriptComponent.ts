@@ -107,7 +107,11 @@ export abstract class Script implements ScriptComponent {
   onAttach?(node: NodeBase): void;
   onStart?(): void;
   onUpdate?(dt: number): void;
-  onDetach?(): void;
+  onDetach(): void {
+    if (this.node) {
+      this.node.disconnectAllFromTarget(this);
+    }
+  }
 
   /**
    * Reset the started state

@@ -11,6 +11,31 @@ Scene creation commands use a shared `CreateNodeBaseCommand` in `src/features/sc
 See full specification in [docs/pix3-specification.md](docs/pix3-specification.md).
 Additional agent guidelines: [AGENTS.md](AGENTS.md).
 
+## Autoload Workflow
+
+Pix3 supports project-level autoload scripts via `pix3project.yaml`.
+
+- Manage entries in **Project Settings > Autoload**.
+- Quick-create from **Assets Browser > Create > Create autoload script**.
+  - Generates `scripts/<SingletonName>.ts` from template.
+  - Rebuilds project scripts.
+  - Registers the singleton in project autoloads automatically.
+
+## Signals and Groups Engine
+
+Pix3 includes a node-local signals engine and scene-level groups engine.
+
+- Signals (`NodeBase`):
+  - `signal(name)`, `connect(signal, target, method)`, `emit(signal, ...args)`, `disconnect(...)`
+  - Base `Script.onDetach()` auto-cleans listeners via `disconnectAllFromTarget(this)`.
+- Groups (`NodeBase` + `SceneManager`):
+  - `addToGroup()`, `removeFromGroup()`, `isInGroup()`
+  - `sceneManager.getNodesInGroup(group)`
+  - `sceneManager.callGroup(group, method, ...args)`
+- Groups are stored in scene YAML as `groups: []`.
+
+Recommended pattern for global events: create an `Events` autoload singleton and emit/connect signals through it.
+
 ## Development Quick Start
 
 ### Prerequisites
