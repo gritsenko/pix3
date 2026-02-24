@@ -28,6 +28,8 @@ import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
 import { ReloadSceneCommand } from '@/features/scene/ReloadSceneCommand';
 import { DeleteObjectCommand } from '@/features/scene/DeleteObjectCommand';
+import { DuplicateNodesCommand } from '@/features/scene/DuplicateNodesCommand';
+import { GroupSelectedNodesCommand } from '@/features/scene/GroupSelectedNodesCommand';
 import { UndoCommand } from '@/features/history/UndoCommand';
 import { RedoCommand } from '@/features/history/RedoCommand';
 import { PlaySceneCommand } from '@/features/scripts/PlaySceneCommand';
@@ -151,6 +153,8 @@ export class Pix3EditorShell extends ComponentBase {
     const saveCommand = new SaveSceneCommand();
     const saveAsCommand = new SaveAsSceneCommand();
     const deleteCommand = new DeleteObjectCommand();
+    const duplicateCommand = new DuplicateNodesCommand();
+    const groupSelectedCommand = new GroupSelectedNodesCommand();
     const undoCommand = new UndoCommand(this.operationService);
     const redoCommand = new RedoCommand(this.operationService);
     const playCommand = new PlaySceneCommand(this.scriptExecutionService);
@@ -167,6 +171,8 @@ export class Pix3EditorShell extends ComponentBase {
       saveCommand,
       saveAsCommand,
       deleteCommand,
+      duplicateCommand,
+      groupSelectedCommand,
       playCommand,
       stopCommand,
       startGameCommand,
@@ -382,6 +388,54 @@ export class Pix3EditorShell extends ComponentBase {
       void this.executeDeleteCommand();
       return;
     }
+
+    // Save As: Cmd+Shift+S (Mac) or Ctrl+Shift+S (Windows/Linux)
+    if (
+      (e.key === 's' || e.key === 'S') &&
+      (e.metaKey || e.ctrlKey) &&
+      e.shiftKey &&
+      !isInputElement
+    ) {
+      e.preventDefault();
+      void this.executeSaveAsCommand();
+      return;
+    }
+
+    // Save: Cmd+S (Mac) or Ctrl+S (Windows/Linux)
+    if (
+      (e.key === 's' || e.key === 'S') &&
+      (e.metaKey || e.ctrlKey) &&
+      !e.shiftKey &&
+      !isInputElement
+    ) {
+      e.preventDefault();
+      void this.executeSaveCommand();
+      return;
+    }
+
+    // Duplicate: Cmd+D (Mac) or Ctrl+D (Windows/Linux)
+    if (
+      (e.key === 'd' || e.key === 'D') &&
+      (e.metaKey || e.ctrlKey) &&
+      !e.shiftKey &&
+      !isInputElement
+    ) {
+      e.preventDefault();
+      void this.executeDuplicateCommand();
+      return;
+    }
+
+    // Group: Cmd+G (Mac) or Ctrl+G (Windows/Linux)
+    if (
+      (e.key === 'g' || e.key === 'G') &&
+      (e.metaKey || e.ctrlKey) &&
+      !e.shiftKey &&
+      !isInputElement
+    ) {
+      e.preventDefault();
+      void this.executeGroupSelectedCommand();
+      return;
+    }
   }
 
   private async executeUndoCommand(): Promise<void> {
@@ -408,6 +462,38 @@ export class Pix3EditorShell extends ComponentBase {
       }
     } catch (error) {
       console.error('[Pix3EditorShell] Failed to delete objects', error);
+    }
+  }
+
+  private async executeSaveCommand(): Promise<void> {
+    try {
+      await this.commandDispatcher.executeById('scene.save');
+    } catch (error) {
+      console.error('[Pix3EditorShell] Failed to save scene', error);
+    }
+  }
+
+  private async executeSaveAsCommand(): Promise<void> {
+    try {
+      await this.commandDispatcher.executeById('scene.save-as');
+    } catch (error) {
+      console.error('[Pix3EditorShell] Failed to save scene as', error);
+    }
+  }
+
+  private async executeDuplicateCommand(): Promise<void> {
+    try {
+      await this.commandDispatcher.executeById('scene.duplicate-nodes');
+    } catch (error) {
+      console.error('[Pix3EditorShell] Failed to duplicate nodes', error);
+    }
+  }
+
+  private async executeGroupSelectedCommand(): Promise<void> {
+    try {
+      await this.commandDispatcher.executeById('scene.group-selected-nodes');
+    } catch (error) {
+      console.error('[Pix3EditorShell] Failed to group selected nodes', error);
     }
   }
 

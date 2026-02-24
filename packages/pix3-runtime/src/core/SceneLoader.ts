@@ -695,6 +695,9 @@ export class SceneLoader {
 
             // Apply shadow properties to loaded children
             meshInstance.applyLoadedShadowProperties();
+
+            // Show default animation at t=0 for editor and initial scene display
+            meshInstance.showDefaultPose();
           } catch (error) {
             console.warn(`[SceneLoader] Error loading GLB model from "${src}":`, error);
           }

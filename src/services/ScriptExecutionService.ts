@@ -6,7 +6,7 @@
  */
 
 import { injectable, inject } from '@/fw/di';
-import { SceneManager, type SceneGraph, InputService } from '@pix3/runtime';
+import { SceneManager, type SceneGraph, InputService, MeshInstance } from '@pix3/runtime';
 import { NodeBase } from '@pix3/runtime';
 import { AutoloadService } from './AutoloadService';
 
@@ -78,6 +78,7 @@ export class ScriptExecutionService {
     const scene = this.sceneManager.getActiveSceneGraph();
     if (scene) {
       this.restoreNodeState(scene);
+      this.resetMeshInstanceAnimations(scene);
     }
 
     this.nodeStateSnapshots.delete(this.getSnapshotKey(this.currentSceneId));
@@ -266,6 +267,27 @@ export class ScriptExecutionService {
     for (const child of node.children) {
       if (child instanceof NodeBase) {
         this.resetScriptStartedState(child);
+      }
+    }
+  }
+
+  /**
+   * Reset all MeshInstance animations to their default pose (t=0) in the scene.
+   * Called after stopping play mode so the viewport shows the correct initial frame.
+   */
+  private resetMeshInstanceAnimations(scene: SceneGraph): void {
+    for (const rootNode of scene.rootNodes) {
+      this.resetMeshInstanceAnimationsRecursive(rootNode);
+    }
+  }
+
+  private resetMeshInstanceAnimationsRecursive(node: NodeBase): void {
+    if (node instanceof MeshInstance) {
+      node.showDefaultPose();
+    }
+    for (const child of node.children) {
+      if (child instanceof NodeBase) {
+        this.resetMeshInstanceAnimationsRecursive(child);
       }
     }
   }

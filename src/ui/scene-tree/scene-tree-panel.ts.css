@@ -34,3 +34,46 @@ pix3-panel {
   color: rgba(245, 247, 250, 0.58);
   font-style: italic;
 }
+
+.scene-tree-context-menu {
+  position: absolute;
+  z-index: 1200;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.25rem;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 0.4rem;
+  background: rgba(16, 20, 28, 0.96);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.35);
+}
+
+.scene-tree-context-menu button {
+  appearance: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  border: none;
+  border-radius: 0.28rem;
+  background: transparent;
+  color: rgba(245, 247, 250, 0.92);
+  text-align: left;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+}
+
+.context-menu-shortcut {
+  margin-left: 1.5rem;
+  opacity: 0.55;
+  font-size: 0.7rem;
+  white-space: nowrap;
+}
+
+.scene-tree-context-menu button:hover,
+.scene-tree-context-menu button:focus-visible {
+  outline: none;
+  background: rgba(var(--pix3-accent-rgb), 0.18);
+}

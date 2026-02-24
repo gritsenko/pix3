@@ -7,6 +7,7 @@ import { NodeBase } from '@pix3/runtime';
 import { getNodeVisuals } from './node-visuals.helper';
 import type { SceneTreeNode } from './scene-tree-node';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { CommandRegistry } from '@/services/CommandRegistry';
 import { NodeRegistry } from '@/services/NodeRegistry';
 import { ReparentNodeCommand } from '@/features/scene/ReparentNodeCommand';
 import { SceneManager } from '@pix3/runtime';
@@ -18,10 +19,19 @@ import '../shared/pix3-dropdown-button';
 import './scene-tree-node';
 import './scene-tree-panel.ts.css';
 
+interface NodeContextMenuDetail {
+  nodeId: string;
+  clientX: number;
+  clientY: number;
+}
+
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
+
+  @inject(CommandRegistry)
+  private readonly commandRegistry!: CommandRegistry;
 
   @inject(NodeRegistry)
   private readonly nodeRegistry!: NodeRegistry;
@@ -68,9 +78,37 @@ export class SceneTreePanel extends ComponentBase {
     items: Array<{ id: string; label: string; icon: string; color: string }>;
   }> = [];
 
+  @state()
+  private contextMenu:
+    | {
+        nodeId: string;
+        x: number;
+        y: number;
+      }
+    | null = null;
+
   private lastHierarchyRef: NodeBase[] | null = null;
   private disposeSceneSubscription?: () => void;
   private disposeSelectionSubscription?: () => void;
+  private readonly onWindowPointerDown = (event: PointerEvent): void => {
+    const target = event.target;
+    if (!(target instanceof Node)) {
+      this.contextMenu = null;
+      return;
+    }
+
+    const menuElement = this.querySelector('.scene-tree-context-menu');
+    if (menuElement && menuElement.contains(target)) {
+      return;
+    }
+
+    this.contextMenu = null;
+  };
+  private readonly onWindowEscape = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape' && this.contextMenu) {
+      this.contextMenu = null;
+    }
+  };
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -83,6 +121,8 @@ export class SceneTreePanel extends ComponentBase {
     this.disposeSelectionSubscription = subscribe(appState.selection, () => {
       this.syncSelectionState();
     });
+    window.addEventListener('pointerdown', this.onWindowPointerDown);
+    window.addEventListener('keydown', this.onWindowEscape);
   }
 
   disconnectedCallback(): void {
@@ -90,6 +130,8 @@ export class SceneTreePanel extends ComponentBase {
     this.disposeSceneSubscription = undefined;
     this.disposeSelectionSubscription?.();
     this.disposeSelectionSubscription = undefined;
+    window.removeEventListener('pointerdown', this.onWindowPointerDown);
+    window.removeEventListener('keydown', this.onWindowEscape);
     super.disconnectedCallback();
   }
 
@@ -118,6 +160,7 @@ export class SceneTreePanel extends ComponentBase {
           @node-drop=${this.onNodeDrop.bind(this)}
           @node-drag-start=${this.onNodeDragStart.bind(this)}
           @node-drag-end=${this.onNodeDragEnd.bind(this)}
+          @node-context-menu=${this.onNodeContextMenu.bind(this)}
         >
           ${hasHierarchy
             ? html`<ul
@@ -142,9 +185,42 @@ export class SceneTreePanel extends ComponentBase {
                 )}
               </ul>`
             : html`<p class="panel-placeholder">${this.getPlaceholderMessage()}</p>`}
+          ${this.renderContextMenu()}
         </div>
       </pix3-panel>
     `;
+  }
+
+  private renderContextMenu() {
+    if (!this.contextMenu) {
+      return null;
+    }
+
+    return html`
+      <div
+        class="scene-tree-context-menu"
+        role="menu"
+        style="left: ${this.contextMenu.x}px; top: ${this.contextMenu.y}px;"
+      >
+        <button type="button" role="menuitem" @click=${() => this.onContextMenuAction('duplicate')}>
+          <span>Duplicate</span>
+          <span class="context-menu-shortcut">${this.getCommandShortcut('scene.duplicate-nodes')}</span>
+        </button>
+        <button type="button" role="menuitem" @click=${() => this.onContextMenuAction('group')}>
+          <span>Group Selection</span>
+          <span class="context-menu-shortcut">${this.getCommandShortcut('scene.group-selected-nodes')}</span>
+        </button>
+        <button type="button" role="menuitem" @click=${() => this.onContextMenuAction('delete')}>
+          <span>Delete</span>
+          <span class="context-menu-shortcut">${this.getCommandShortcut('scene.delete-object')}</span>
+        </button>
+      </div>
+    `;
+  }
+
+  private getCommandShortcut(commandId: string): string {
+    const command = this.commandRegistry.getCommand(commandId);
+    return command?.metadata.shortcut ?? '';
   }
 
   private syncSceneState(): void {
@@ -380,6 +456,40 @@ export class SceneTreePanel extends ComponentBase {
     this.draggedNodeId = null;
     this.draggedNodeType = null;
     console.log('[SceneTreePanel] Drag ended');
+  }
+
+  private onNodeContextMenu(event: CustomEvent<NodeContextMenuDetail>): void {
+    event.stopPropagation();
+    const container = this.renderRoot.querySelector<HTMLElement>('.tree-container');
+    if (!container) {
+      return;
+    }
+    const rect = container.getBoundingClientRect();
+    const x = event.detail.clientX - rect.left + container.scrollLeft;
+    const y = event.detail.clientY - rect.top + container.scrollTop;
+
+    this.contextMenu = {
+      nodeId: event.detail.nodeId,
+      x,
+      y,
+    };
+  }
+
+  private async onContextMenuAction(action: 'duplicate' | 'group' | 'delete'): Promise<void> {
+    this.contextMenu = null;
+
+    const commandIdByAction: Record<typeof action, string> = {
+      duplicate: 'scene.duplicate-nodes',
+      group: 'scene.group-selected-nodes',
+      delete: 'scene.delete-object',
+    };
+
+    const commandId = commandIdByAction[action];
+    try {
+      await this.commandDispatcher.executeById(commandId);
+    } catch (error) {
+      console.error(`[SceneTreePanel] Failed to execute context menu action "${action}"`, error);
+    }
   }
 }
 

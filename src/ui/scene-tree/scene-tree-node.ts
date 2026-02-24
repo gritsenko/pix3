@@ -41,6 +41,12 @@ interface ScriptRevealRequestDetail {
   candidatePaths: string[];
 }
 
+interface NodeContextMenuDetail {
+  nodeId: string;
+  clientX: number;
+  clientY: number;
+}
+
 @customElement('pix3-scene-tree-node')
 export class SceneTreeNodeComponent extends ComponentBase {
   static useShadowDom = false; // Use light DOM for proper nesting
@@ -165,6 +171,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
           data-node-id=${this.node.id}
           title=${this.getNodeTooltip(this.node)}
           @click=${(event: Event) => this.onSelectNode(event)}
+          @contextmenu=${(event: MouseEvent) => {
+        void this.onContextMenu(event);
+      }}
           @keydown=${(event: KeyboardEvent) => {
         if (event.key === 'Enter' || event.key === ' ') {
           this.onSelectNode(event);
@@ -485,6 +494,33 @@ export class SceneTreeNodeComponent extends ComponentBase {
     } catch (error) {
       console.error('[SceneTreeNode] Failed to execute selection command', error);
     }
+  }
+
+  private async onContextMenu(event: MouseEvent): Promise<void> {
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (!this.selectedNodeIds.includes(this.node.id)) {
+      try {
+        await this.commandDispatcher.execute(selectObject(this.node.id));
+      } catch (error) {
+        console.error('[SceneTreeNode] Failed to select node for context menu', error);
+      }
+    }
+
+    const detail: NodeContextMenuDetail = {
+      nodeId: this.node.id,
+      clientX: event.clientX,
+      clientY: event.clientY,
+    };
+
+    this.dispatchEvent(
+      new CustomEvent<NodeContextMenuDetail>('node-context-menu', {
+        detail,
+        bubbles: true,
+        composed: true,
+      })
+    );
   }
 
   private onDragStart(event: DragEvent): void {

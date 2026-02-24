@@ -60,6 +60,45 @@ export class MeshInstance extends Node3D {
   }
 
   /**
+   * Show the default animation at time 0 (for editor mode and post-stop).
+   * Uses initialAnimation if set, otherwise falls back to the first available clip.
+   * Clears mixer state if no animations are available (restores default mesh pose).
+   * Resets hasAttemptedInitialAnimation so play mode restarts the animation cleanly.
+   */
+  showDefaultPose(): void {
+    if (this.animations.length === 0) {
+      if (this.mixer) {
+        this.mixer.stopAllAction();
+      }
+      this.currentAction = null;
+      this.activeAnimation = null;
+      this.hasAttemptedInitialAnimation = false;
+      return;
+    }
+
+    const preferredClip = this.initialAnimation
+      ? this.animations.find(clip => clip.name === this.initialAnimation)
+      : null;
+    const clipToShow = preferredClip ?? this.animations[0];
+
+    if (!this.mixer) {
+      this.mixer = new AnimationMixer(this);
+    }
+
+    if (this.currentAction) {
+      this.currentAction.stop();
+    }
+
+    const action = this.mixer.clipAction(clipToShow);
+    action.reset().play();
+    this.mixer.update(0); // Evaluate at t=0 to apply bone transforms
+    action.paused = true; // Freeze at frame 0
+    this.currentAction = action;
+    this.activeAnimation = clipToShow.name;
+    this.hasAttemptedInitialAnimation = false; // Allow play mode to restart
+  }
+
+  /**
    * Tick method called every frame.
    * Updates the animation mixer if it exists.
    * @param dt - Delta time in seconds since last frame
@@ -73,8 +112,7 @@ export class MeshInstance extends Node3D {
   }
 
   private playInitialAnimationIfNeeded(): void {
-    if (this.hasAttemptedInitialAnimation || this.currentAction) {
-      this.hasAttemptedInitialAnimation = true;
+    if (this.hasAttemptedInitialAnimation) {
       return;
     }
 
@@ -123,7 +161,7 @@ export class MeshInstance extends Node3D {
             const n = node as MeshInstance;
             const v = typeof value === 'string' ? value.trim() : '';
             n.initialAnimation = v.length > 0 ? v : null;
-            n.hasAttemptedInitialAnimation = false;
+            n.showDefaultPose(); // Show new default at t=0 immediately in editor
           },
         },
         {
