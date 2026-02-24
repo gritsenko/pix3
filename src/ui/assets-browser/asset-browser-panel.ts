@@ -52,14 +52,7 @@ export class AssetBrowserPanel extends ComponentBase {
   private scriptFileRevealRequestHandler?: (e: Event) => void;
   private assetsPreviewRevealPathHandler?: (e: Event) => void;
 
-  connectedCallback(): void {
-    super.connectedCallback();
 
-    // Track focus for context-aware shortcuts
-    this.addEventListener('focusin', () => {
-      appState.editorContext.focusedArea = 'assets';
-    });
-  }
 
   private onAssetActivate = async (e: Event) => {
     const detail = (e as CustomEvent<AssetActivation>).detail;
@@ -283,6 +276,11 @@ export class ${singletonName} extends Script {
 
   connectedCallback(): void {
     super.connectedCallback();
+
+    // Track focus for context-aware shortcuts
+    this.addEventListener('focusin', () => {
+      appState.editorContext.focusedArea = 'assets';
+    });
 
     this.scriptFileCreatedHandler = (e: Event) => {
       const customEvent = e as CustomEvent;
