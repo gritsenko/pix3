@@ -298,6 +298,7 @@ src/
 16. **Never infer created node IDs from root-node array order** — use selection-based extraction (`getCreatedNodeIdFromSelection`) after successful create operations.
 17. **Script lifecycle teardown must be explicit** — stop/scene-switch paths must call component `onDetach()` and reset started state so `onStart()` runs on the next play session.
 18. **Create-operation selection updates must include primary selection** — set both `nodeIds` and `primaryNodeId` on create and keep undo/redo selection cleanup symmetric.
+19. **Portal-based UI for floating elements** — Always use `DropdownPortal` or similar portal pattern for floating UI elements like dropdowns, context menus, and tooltips. Never render these elements inline inside panel containers with `overflow: hidden/auto`, as they will be clipped. Render them at the `document.body` level via portals with `position: fixed` to ensure they appear on top of all other panels.
 
 Always verify architectural decisions against the specification before implementing features.
 

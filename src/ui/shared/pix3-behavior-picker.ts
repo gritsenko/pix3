@@ -57,6 +57,7 @@ export class BehaviorPicker extends ComponentBase {
     }
 
     const sortedCategories = Array.from(groupedScripts.keys()).sort();
+    const selectedScript = scripts.find(s => s.id === this.selectedScriptId);
 
     return html`
       <div class="dialog-backdrop" @click=${this.onBackdropClick}>
@@ -72,11 +73,11 @@ export class BehaviorPicker extends ComponentBase {
                 @click=${this.dispatchCreateNew}
                 title="Create new script file"
               >
-                ${this.iconService.getIcon('plus', 16)} Create New
+                ${this.iconService.getIcon('plus', 14)} Create New
               </button>
             </div>
             <div class="search-box">
-              ${this.iconService.getIcon('search', 16)}
+              ${this.iconService.getIcon('search', 14)}
               <input
                 type="text"
                 placeholder="Search components..."
@@ -107,10 +108,9 @@ export class BehaviorPicker extends ComponentBase {
                             @click=${() => (this.selectedScriptId = s.id)}
                             @dblclick=${() => this.dispatchSelect(s)}
                           >
-                            <div class="behavior-icon">${this.iconService.getIcon('code', 24)}</div>
+                            <div class="behavior-icon">${this.iconService.getIcon('code', 18)}</div>
                             <div class="behavior-info">
                               <div class="behavior-name">${s.displayName}</div>
-                              <div class="behavior-desc">${s.description}</div>
                             </div>
                           </div>
                         `
@@ -124,6 +124,15 @@ export class BehaviorPicker extends ComponentBase {
                     <div class="no-results">No components found matching "${this.searchQuery}"</div>
                   `
                 : ''}
+            </div>
+
+            <div class="selected-description-panel">
+              ${selectedScript
+                ? html`
+                    <div class="description-title">${selectedScript.displayName}</div>
+                    <div class="description-text">${selectedScript.description}</div>
+                  `
+                : html`<div class="description-empty">Select a component to see its description.</div>`}
             </div>
           </div>
 

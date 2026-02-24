@@ -13,6 +13,7 @@ import { NodeRegistry } from '@/services/NodeRegistry';
 import { ReparentNodeCommand } from '@/features/scene/ReparentNodeCommand';
 import { SceneManager } from '@pix3/runtime';
 import { ServiceContainer } from '@/fw/di';
+import { DropdownPortal } from '../shared/dropdown-portal';
 
 import '../shared/pix3-panel';
 import '../shared/pix3-toolbar';
@@ -91,22 +92,20 @@ export class SceneTreePanel extends ComponentBase {
       }
     | null = null;
 
+  private portal = new DropdownPortal({ minWidth: '12rem' });
   private lastHierarchyRef: NodeBase[] | null = null;
   private disposeSceneSubscription?: () => void;
   private disposeSelectionSubscription?: () => void;
-  private readonly onWindowPointerDown = (event: PointerEvent): void => {
-    const target = event.target;
-    if (!(target instanceof Node)) {
+  private readonly onWindowClick = (event: MouseEvent): void => {
+    if (!this.contextMenu) {
+      return;
+    }
+
+    const target = event.target as Node;
+    // Close menu if click was NOT on the portal menu
+    if (!this.portal.contains(target)) {
       this.contextMenu = null;
-      return;
     }
-
-    const menuElement = this.querySelector('.scene-tree-context-menu');
-    if (menuElement && menuElement.contains(target)) {
-      return;
-    }
-
-    this.contextMenu = null;
   };
   private readonly onWindowEscape = (event: KeyboardEvent): void => {
     if (event.key === 'Escape' && this.contextMenu) {
@@ -131,7 +130,7 @@ export class SceneTreePanel extends ComponentBase {
       appState.editorContext.focusedArea = 'scene-tree';
     });
 
-    window.addEventListener('pointerdown', this.onWindowPointerDown);
+    document.addEventListener('click', this.onWindowClick, { capture: true });
     window.addEventListener('keydown', this.onWindowEscape);
   }
 
@@ -140,8 +139,9 @@ export class SceneTreePanel extends ComponentBase {
     this.disposeSceneSubscription = undefined;
     this.disposeSelectionSubscription?.();
     this.disposeSelectionSubscription = undefined;
-    window.removeEventListener('pointerdown', this.onWindowPointerDown);
+    document.removeEventListener('click', this.onWindowClick, { capture: true });
     window.removeEventListener('keydown', this.onWindowEscape);
+    this.portal.close();
     super.disconnectedCallback();
   }
 
@@ -201,17 +201,27 @@ export class SceneTreePanel extends ComponentBase {
     `;
   }
 
+  protected updated(changed: Map<string, unknown>): void {
+    super.updated(changed);
+    if (changed.has('contextMenu')) {
+      if (this.contextMenu && !this.portal.isOpen()) {
+        const menuElement = this.querySelector('.scene-tree-context-menu') as HTMLElement;
+        if (menuElement) {
+          this.portal.openAt(this.contextMenu.x, this.contextMenu.y, menuElement);
+        }
+      } else if (!this.contextMenu && this.portal.isOpen()) {
+        this.portal.close();
+      }
+    }
+  }
+
   private renderContextMenu() {
     if (!this.contextMenu) {
       return null;
     }
 
     return html`
-      <div
-        class="scene-tree-context-menu"
-        role="menu"
-        style="left: ${this.contextMenu.x}px; top: ${this.contextMenu.y}px;"
-      >
+      <div class="scene-tree-context-menu" role="menu" @click=${(e: Event) => e.stopPropagation()}>
         <button type="button" role="menuitem" @click=${() => this.onContextMenuAction('duplicate')}>
           <span>Duplicate</span>
           <span class="context-menu-shortcut">${this.getCommandShortcut('scene.duplicate-nodes')}</span>
@@ -470,18 +480,10 @@ export class SceneTreePanel extends ComponentBase {
 
   private onNodeContextMenu(event: CustomEvent<NodeContextMenuDetail>): void {
     event.stopPropagation();
-    const container = this.renderRoot.querySelector<HTMLElement>('.tree-container');
-    if (!container) {
-      return;
-    }
-    const rect = container.getBoundingClientRect();
-    const x = event.detail.clientX - rect.left + container.scrollLeft;
-    const y = event.detail.clientY - rect.top + container.scrollTop;
-
     this.contextMenu = {
       nodeId: event.detail.nodeId,
-      x,
-      y,
+      x: event.detail.clientX,
+      y: event.detail.clientY,
     };
   }
 

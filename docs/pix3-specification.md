@@ -104,6 +104,16 @@ Notes:
 - `ComponentBase` defaults to light DOM but allows opting into shadow DOM via a static `useShadowDom` flag.
 - The `inject` decorator automatically resolves services registered with the `fw/di` container. Services can be registered using the `@injectable()` helper in `fw/di`. Ensure `emitDecoratorMetadata` and `reflect-metadata` are enabled within the build configuration.
 
+### UI Portals and Floating Elements
+
+Floating UI elements such as dropdowns, context menus, and tooltips must use the **portal pattern** via `DropdownPortal` or a similar utility. Rendering these elements inline inside a panel's DOM tree is discouraged because:
+
+1. Panels often use `overflow: hidden` or `overflow: auto`, which clips any child element that extends beyond the panel's boundaries.
+2. Portals allow rendering the element at the `document.body` level with `position: fixed`, ensuring it appears on top of all other panels and UI layers.
+3. The `DropdownPortal` utility automatically handles viewport collision detection, ensuring the menu stays within the visible area.
+
+When implementing a context menu or dropdown, always check for the existence of an appropriate portal utility in `src/ui/shared`.
+
 ### 4.1 Core Architecture Contracts
 
 - **Operation Lifecycle (source of truth):** An operation implements `perform(context)` and returns an `OperationCommit` object containing closures for `undo()`/`redo()` and metadata for coalescing. OperationService executes operations, pushes commits to history when requested, emits telemetry, and is solely responsible for undo/redo.

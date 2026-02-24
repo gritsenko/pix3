@@ -51,18 +51,46 @@ export class DropdownPortal {
   }
 
   /**
+   * Creates and positions a dropdown portal at the given viewport coordinates
+   * Useful for context menus.
+   * @param x - Viewport X coordinate
+   * @param y - Viewport Y coordinate
+   * @param menuElement - The HTML element containing the menu
+   */
+  openAt(x: number, y: number, menuElement: HTMLElement): void {
+    this.menuElement = menuElement;
+    // Store original position to restore later
+    this.originalParent = menuElement.parentElement;
+    this.originalNextSibling = menuElement.nextSibling;
+    this.create();
+    this.positionInternal({ left: x, right: x, top: y, bottom: y, width: 0, height: 0 } as DOMRect, true);
+  }
+
+  /**
    * Closes and removes the dropdown portal, restoring the menu to its original position
    */
   close(): void {
     // Restore menu to original position if possible
-    if (this.menuElement && this.originalParent) {
-      if (this.originalNextSibling) {
-        this.originalParent.insertBefore(this.menuElement, this.originalNextSibling);
-      } else {
-        this.originalParent.appendChild(this.menuElement);
+    if (this.menuElement && this.originalParent && this.originalParent.isConnected) {
+      try {
+        // Check if originalNextSibling is still a child of originalParent
+        if (this.originalNextSibling && this.originalNextSibling.parentNode === this.originalParent) {
+          this.originalParent.insertBefore(this.menuElement, this.originalNextSibling);
+        } else {
+          this.originalParent.appendChild(this.menuElement);
+        }
+      } catch (e) {
+        // If restoration fails, just append to original parent
+        if (this.originalParent.isConnected) {
+          this.originalParent.appendChild(this.menuElement);
+        }
       }
     }
     this.remove();
+    // Clear references
+    this.menuElement = null;
+    this.originalParent = null;
+    this.originalNextSibling = null;
   }
 
   /**
@@ -73,6 +101,13 @@ export class DropdownPortal {
   }
 
   /**
+   * Returns whether the context node is inside the portal
+   */
+  contains(node: Node): boolean {
+    return this.portalElement !== null && this.portalElement.contains(node);
+  }
+
+  /**
    * Updates the position of the portal based on the trigger element
    * @param trigger - The button or element that triggered the dropdown
    */
@@ -80,7 +115,7 @@ export class DropdownPortal {
     if (!this.portalElement) {
       return;
     }
-    this.position(trigger);
+    this.positionInternal(trigger.getBoundingClientRect());
   }
 
   private create(): void {
@@ -106,15 +141,16 @@ export class DropdownPortal {
   }
 
   private position(trigger: HTMLElement): void {
+    this.positionInternal(trigger.getBoundingClientRect());
+  }
+
+  private positionInternal(triggerRect: DOMRect, isExactPosition: boolean = false): void {
     if (!this.portalElement) {
       return;
     }
 
-    // Get the trigger's viewport position
-    const triggerRect = trigger.getBoundingClientRect();
-
-    // Position the portal menu below the trigger
-    let top = triggerRect.bottom + 8; // 0.5rem gap
+    // Position the portal menu below the trigger, or at exact position for context menus
+    let top = isExactPosition ? triggerRect.top : triggerRect.bottom + 8; // 0.5rem gap
     let left = triggerRect.left;
 
     // Get the portal's dimensions to check viewport bounds
@@ -126,7 +162,9 @@ export class DropdownPortal {
 
       // If menu goes off bottom, position it above the trigger instead
       if (top + portalRect.height > viewportHeight) {
-        top = Math.max(0, triggerRect.top - portalRect.height - 8);
+        top = isExactPosition 
+          ? Math.max(0, viewportHeight - portalRect.height - 8)
+          : Math.max(0, triggerRect.top - portalRect.height - 8);
       }
 
       // If menu goes off right, adjust left position
