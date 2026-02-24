@@ -14,6 +14,11 @@ export class ToggleNavigationModeCommand extends CommandBase<object, void> {
     title: 'Toggle Navigation Mode',
     description: 'Switch between 3D orbit navigation and 2D orthographic navigation',
     keywords: ['viewport', 'navigation', '2d', '3d', 'camera'],
+    menuPath: 'view',
+    keybinding: 'N',
+    when: 'viewportFocused && !isInputFocused',
+    addToMenu: true,
+    menuOrder: 24,
   } as const;
 
   private readonly params: ToggleNavigationModeParams;

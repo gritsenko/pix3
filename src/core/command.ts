@@ -2,6 +2,7 @@ import { snapshot, type Snapshot } from 'valtio/vanilla';
 
 import type { AppState, AppStateSnapshot } from '@/state';
 import { ServiceContainer } from '@/fw/di';
+import type { KeybindingDescriptor, KeybindingContext } from './keybinding';
 
 /**
  * Unique identifier for a command. Use a stable namespace (e.g. `scene.select-node`).
@@ -27,8 +28,41 @@ export interface CommandMetadata {
    */
   readonly menuPath?: string;
   /**
-   * Keyboard shortcut display string (e.g., '⌘Z', 'Ctrl+Z').
-   * Used to display shortcuts in menus; actual key handling is separate.
+   * Keyboard shortcut descriptor (e.g., 'Mod+D', 'Mod+Shift+Z | Ctrl+Y').
+   * 
+   * Format: Abstract keybinding where 'Mod' expands to Cmd on macOS, Ctrl elsewhere.
+   * Multiple alternatives can be separated with '|'.
+   * 
+   * Examples:
+   * - 'Mod+D' - Cmd+D on Mac, Ctrl+D elsewhere
+   * - 'Mod+Shift+Z | Ctrl+Y' - Two alternatives for redo
+   * - 'Delete | Backspace' - Either Delete or Backspace
+   * 
+   * The keybinding is automatically registered with KeybindingService and
+   * displayed in menus with platform-appropriate formatting.
+   */
+  readonly keybinding?: KeybindingDescriptor;
+  /**
+   * Context clause for conditional keybinding execution (VS Code-style "when" clause).
+   * 
+   * Examples:
+   * - '!isInputFocused' - Execute only when not typing in an input
+   * - 'viewportFocused && !isModalOpen' - Execute only in viewport when no modal is open
+   * - '(viewportFocused || sceneTreeFocused) && !isInputFocused'
+   * 
+   * Available context keys:
+   * - viewportFocused, sceneTreeFocused, inspectorFocused, assetsFocused
+   * - isInputFocused, isModalOpen
+   */
+  readonly when?: KeybindingContext;
+  /**
+   * Prevent command execution on key repeat (default: true).
+   * Set to false for commands that should repeat while holding the key.
+   */
+  readonly preventRepeat?: boolean;
+  /**
+   * @deprecated Use `keybinding` instead. Will be removed in a future version.
+   * Old display-only shortcut string (e.g., '⌘Z', 'Ctrl+Z').
    */
   readonly shortcut?: string;
   /**

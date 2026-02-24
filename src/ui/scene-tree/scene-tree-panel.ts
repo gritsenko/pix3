@@ -8,6 +8,7 @@ import { getNodeVisuals } from './node-visuals.helper';
 import type { SceneTreeNode } from './scene-tree-node';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { CommandRegistry } from '@/services/CommandRegistry';
+import { KeybindingService } from '@/services/KeybindingService';
 import { NodeRegistry } from '@/services/NodeRegistry';
 import { ReparentNodeCommand } from '@/features/scene/ReparentNodeCommand';
 import { SceneManager } from '@pix3/runtime';
@@ -32,6 +33,9 @@ export class SceneTreePanel extends ComponentBase {
 
   @inject(CommandRegistry)
   private readonly commandRegistry!: CommandRegistry;
+
+  @inject(KeybindingService)
+  private readonly keybindingService!: KeybindingService;
 
   @inject(NodeRegistry)
   private readonly nodeRegistry!: NodeRegistry;
@@ -121,6 +125,12 @@ export class SceneTreePanel extends ComponentBase {
     this.disposeSelectionSubscription = subscribe(appState.selection, () => {
       this.syncSelectionState();
     });
+
+    // Track focus for context-aware shortcuts
+    this.addEventListener('focusin', () => {
+      appState.editorContext.focusedArea = 'scene-tree';
+    });
+
     window.addEventListener('pointerdown', this.onWindowPointerDown);
     window.addEventListener('keydown', this.onWindowEscape);
   }
@@ -219,8 +229,8 @@ export class SceneTreePanel extends ComponentBase {
   }
 
   private getCommandShortcut(commandId: string): string {
-    const command = this.commandRegistry.getCommand(commandId);
-    return command?.metadata.shortcut ?? '';
+    const displayString = this.keybindingService.getDisplayString(commandId);
+    return displayString ?? '';
   }
 
   private syncSceneState(): void {

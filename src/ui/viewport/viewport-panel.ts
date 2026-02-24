@@ -76,8 +76,11 @@ export class ViewportPanel extends ComponentBase {
       this.showLayer3D = appState.ui.showLayer3D;
     });
 
-    // Add keyboard shortcuts for transform modes
-    this.addEventListener('keydown', this.handleKeyDown);
+    // Track focus for context-aware shortcuts
+    this.addEventListener('focusin', () => {
+      appState.editorContext.focusedArea = 'viewport';
+    });
+
     // Add wheel listener for gesture control - use capture to ensure we get it before children
     this.addEventListener('wheel', this.handleWheel as EventListener, {
       passive: false,
@@ -101,7 +104,6 @@ export class ViewportPanel extends ComponentBase {
     this.resizeObserver.disconnect();
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
-    this.removeEventListener('keydown', this.handleKeyDown);
     this.removeEventListener('wheel', this.handleWheel as EventListener, true);
     window.removeEventListener('wheel', this.handleWheel as EventListener, true);
     this.renderRoot.removeEventListener('wheel', this.handleWheel as EventListener, true);
@@ -268,52 +270,6 @@ export class ViewportPanel extends ComponentBase {
   private zoomAll(): void {
     this.viewportRenderer.zoomAll();
   }
-
-  private handleKeyDown = (event: KeyboardEvent): void => {
-    // Only handle keypresses when viewport has focus or is active
-    if (event.target !== this && !this.contains(event.target as Node)) {
-      return;
-    }
-
-    switch (event.key.toLowerCase()) {
-      case 'q':
-        event.preventDefault();
-        this.handleTransformModeChange('select');
-        break;
-      case 'w':
-        event.preventDefault();
-        this.handleTransformModeChange('translate');
-        break;
-      case 'e':
-        event.preventDefault();
-        this.handleTransformModeChange('rotate');
-        break;
-      case 'r':
-        event.preventDefault();
-        this.handleTransformModeChange('scale');
-        break;
-      case 'g':
-        event.preventDefault();
-        this.toggleGrid();
-        break;
-      case '2':
-        event.preventDefault();
-        this.toggleLayer2D();
-        break;
-      case '3':
-        event.preventDefault();
-        this.toggleLayer3D();
-        break;
-      case 'home':
-        event.preventDefault();
-        this.zoomDefault();
-        break;
-      case 'f':
-        event.preventDefault();
-        this.zoomAll();
-        break;
-    }
-  };
 
   private handleCanvasPointerDown = (event: PointerEvent): void => {
     // Ignore pointer events from toolbar

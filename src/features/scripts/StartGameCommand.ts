@@ -15,10 +15,10 @@ export class StartGameCommand extends CommandBase<void, void> {
     title: 'Start Game',
     description: 'Start the game in a new tab',
     keywords: ['play', 'game', 'start'],
-    menuPath: 'game',
-    shortcut: 'Ctrl+Enter',
+    menuPath: 'project',
+    keybinding: 'Mod+Ctrl+Enter',
     addToMenu: true,
-    menuOrder: 100,
+    menuOrder: 102,
   };
 
   private readonly editorTabService: EditorTabService;

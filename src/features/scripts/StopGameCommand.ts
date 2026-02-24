@@ -15,10 +15,10 @@ export class StopGameCommand extends CommandBase<void, void> {
     title: 'Stop Game',
     description: 'Stop the game and close the tab',
     keywords: ['stop', 'game', 'close'],
-    menuPath: 'game',
-    shortcut: 'Ctrl+Shift+Enter',
+    menuPath: 'project',
+    keybinding: 'Mod+Ctrl+Shift+Enter',
     addToMenu: true,
-    menuOrder: 101,
+    menuOrder: 103,
   };
 
   private readonly editorTabService: EditorTabService;

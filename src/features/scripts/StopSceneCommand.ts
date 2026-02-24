@@ -15,8 +15,9 @@ export class StopSceneCommand extends CommandBase<void, void> {
     title: 'Stop Scene',
     description: 'Stop script execution for the entire scene',
     keywords: ['stop', 'pause', 'halt', 'scripts'],
-    menuPath: 'scene',
-    shortcut: 'Ctrl+Shift+Enter',
+    menuPath: 'project',
+    keybinding: 'Mod+Shift+Enter',
+    when: '!isModalOpen',
     addToMenu: true,
     menuOrder: 101,
   };

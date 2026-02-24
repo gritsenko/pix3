@@ -15,8 +15,9 @@ export class PlaySceneCommand extends CommandBase<void, void> {
     title: 'Play Scene',
     description: 'Start script execution for the entire scene',
     keywords: ['play', 'start', 'run', 'scripts'],
-    menuPath: 'scene',
-    shortcut: 'Ctrl+Enter',
+    menuPath: 'project',
+    keybinding: 'Mod+Enter',
+    when: '!isModalOpen',
     addToMenu: true,
     menuOrder: 100,
   };

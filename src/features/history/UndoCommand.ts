@@ -14,7 +14,8 @@ export class UndoCommand extends CommandBase<void, void> {
     description: 'Undo the last action',
     keywords: ['undo', 'revert', 'history'],
     menuPath: 'edit',
-    shortcut: '⌘Z',
+    keybinding: 'Mod+Z',
+    when: '!isInputFocused',
     addToMenu: true,
     menuOrder: 0,
   };

@@ -83,7 +83,6 @@ export class EditorTabComponent extends ComponentBase {
       this.syncActiveState();
     });
 
-    this.addEventListener('keydown', this.handleKeyDown);
     this.addEventListener('wheel', this.handleWheel as EventListener, {
       passive: false,
       capture: true,
@@ -110,7 +109,6 @@ export class EditorTabComponent extends ComponentBase {
     this.disposeUiSubscription = undefined;
     this.disposeTabsSubscription?.();
     this.disposeTabsSubscription = undefined;
-    this.removeEventListener('keydown', this.handleKeyDown);
     this.removeEventListener('wheel', this.handleWheel as EventListener, true);
     this.renderRoot.removeEventListener('wheel', this.handleWheel as EventListener, true);
     this.wheelCanvas?.removeEventListener('wheel', this.handleWheel as EventListener, true);
@@ -329,60 +327,6 @@ export class EditorTabComponent extends ComponentBase {
   private zoomAll(): void {
     this.viewportRenderer.zoomAll();
   }
-
-  private handleKeyDown = (event: KeyboardEvent): void => {
-    if (appState.tabs.activeTabId !== this.tabId) return;
-    if (event.target !== this && !this.contains(event.target as Node)) {
-      return;
-    }
-
-    switch (event.key.toLowerCase()) {
-      case 'q':
-        event.preventDefault();
-        this.handleTransformModeChange('select');
-        break;
-      case 'w':
-        event.preventDefault();
-        this.handleTransformModeChange('translate');
-        break;
-      case 'e':
-        event.preventDefault();
-        this.handleTransformModeChange('rotate');
-        break;
-      case 'r':
-        event.preventDefault();
-        this.handleTransformModeChange('scale');
-        break;
-      case 'g':
-        event.preventDefault();
-        this.toggleGrid();
-        break;
-      case '2':
-        event.preventDefault();
-        this.toggleLayer2D();
-        break;
-      case '3':
-        event.preventDefault();
-        this.toggleLayer3D();
-        break;
-      case 'l':
-        event.preventDefault();
-        this.toggleLighting();
-        break;
-      case 'n':
-        event.preventDefault();
-        this.toggleNavigationMode();
-        break;
-      case 'home':
-        event.preventDefault();
-        this.zoomDefault();
-        break;
-      case 'f':
-        event.preventDefault();
-        this.zoomAll();
-        break;
-    }
-  };
 
   private handleWheel = (event: WheelEvent): void => {
     if (appState.tabs.activeTabId !== this.tabId) return;

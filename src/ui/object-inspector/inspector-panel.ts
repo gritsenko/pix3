@@ -124,6 +124,11 @@ export class InspectorPanel extends ComponentBase {
     });
     this.updateSelectedNodes();
 
+    // Track focus for context-aware shortcuts
+    this.addEventListener('focusin', () => {
+      appState.editorContext.focusedArea = 'inspector';
+    });
+
     // Listen for script creator requested event from editor shell
     this.scriptCreatorRequestedHandler = (_e: Event) => {
       void this.handleScriptCreatorRequested();

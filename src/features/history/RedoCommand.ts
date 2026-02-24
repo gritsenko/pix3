@@ -14,7 +14,8 @@ export class RedoCommand extends CommandBase<void, void> {
     description: 'Redo the last undone action',
     keywords: ['redo', 'history'],
     menuPath: 'edit',
-    shortcut: '⌘⇧Z',
+    keybinding: 'Mod+Shift+Z | Ctrl+Y',
+    when: '!isInputFocused',
     addToMenu: true,
     menuOrder: 1,
   };

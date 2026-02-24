@@ -1,5 +1,7 @@
 import { injectable } from '@/fw/di';
 import type { Command } from '@/core/command';
+import { KeybindingService } from './KeybindingService';
+import { ServiceContainer } from '@/fw/di';
 
 /**
  * Represents a menu item generated from a registered command.
@@ -30,6 +32,23 @@ export class CommandRegistry {
   private commands = new Map<string, Command>();
   private registrationOrder = new Map<string, number>();
   private registrationCounter = 0;
+  private keybindingService: KeybindingService;
+
+  constructor(keybindingService?: KeybindingService) {
+    if (keybindingService) {
+      this.keybindingService = keybindingService;
+      return;
+    }
+
+    const container = ServiceContainer.getInstance();
+    try {
+      this.keybindingService = container.getService<KeybindingService>(
+        container.getOrCreateToken(KeybindingService)
+      );
+    } catch {
+      this.keybindingService = new KeybindingService();
+    }
+  }
 
   /**
    * Register a command for discovery, shortcuts, and menu generation.
@@ -38,6 +57,18 @@ export class CommandRegistry {
   register(command: Command): void {
     this.commands.set(command.metadata.id, command);
     this.registrationOrder.set(command.metadata.id, this.registrationCounter++);
+
+    // Register keybinding if specified
+    if (command.metadata.keybinding) {
+      this.keybindingService.register(
+        command.metadata.id,
+        command.metadata.keybinding,
+        {
+          when: command.metadata.when,
+          preventRepeat: command.metadata.preventRepeat,
+        }
+      );
+    }
   }
 
   /**
@@ -83,7 +114,8 @@ export class CommandRegistry {
           id: `${menuPath}-${command.metadata.id}`,
           commandId: command.metadata.id,
           label: command.metadata.title,
-          shortcut: command.metadata.shortcut,
+          // Get shortcut dynamically from KeybindingService (platform-aware formatting)
+          shortcut: this.keybindingService.getDisplayString(command.metadata.id),
           command,
         };
 
@@ -96,11 +128,12 @@ export class CommandRegistry {
       file: 'File',
       edit: 'Edit',
       view: 'View',
+      project: 'Project',
       help: 'Help',
     };
 
     // Standard menu section order - File, Edit, View, Insert, Window, Help
-    const standardMenuOrder = ['file', 'edit', 'view', 'insert', 'window', 'help'];
+    const standardMenuOrder = ['file', 'edit', 'view', 'project', 'insert', 'window', 'help'];
 
     const sections: MenuSection[] = Array.from(sectionMap.entries())
       .sort((a, b) => {

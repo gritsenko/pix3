@@ -122,6 +122,21 @@ export interface SelectionState {
   hoveredNodeId: string | null;
 }
 
+export type FocusedArea = 'viewport' | 'scene-tree' | 'inspector' | 'assets' | null;
+
+/**
+ * Editor context state for keyboard shortcut execution context ("when" clauses).
+ * Tracks which area of the editor is focused for context-sensitive shortcuts.
+ */
+export interface EditorContextState {
+  /** Currently focused editor area/panel. */
+  focusedArea: FocusedArea;
+  /** True if an input element (input, textarea, contenteditable) has focus. */
+  isInputFocused: boolean;
+  /** True if a modal dialog is currently open. */
+  isModalOpen: boolean;
+}
+
 export interface PanelVisibilityState {
   sceneTree: boolean;
   viewport: boolean;
@@ -178,6 +193,7 @@ export interface AppState {
   scenes: ScenesState;
   tabs: TabsState;
   selection: SelectionState;
+  editorContext: EditorContextState;
   ui: UIState;
   operations: OperationState;
   telemetry: TelemetryState;
@@ -219,6 +235,11 @@ export const createInitialAppState = (): AppState => ({
     nodeIds: [],
     primaryNodeId: null,
     hoveredNodeId: null,
+  },
+  editorContext: {
+    focusedArea: null,
+    isInputFocused: false,
+    isModalOpen: false,
   },
   ui: {
     theme: DEFAULT_THEME,

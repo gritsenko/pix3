@@ -19,7 +19,8 @@ export class SaveSceneCommand extends CommandBase<void, void> {
     description: 'Save the active scene to its current file',
     keywords: ['save', 'scene'],
     menuPath: 'file',
-    shortcut: 'Ctrl+S',
+    keybinding: 'Mod+S',
+    when: '!isInputFocused',
     addToMenu: true,
     menuOrder: 10,
   };

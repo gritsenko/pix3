@@ -1,5 +1,6 @@
 import { ComponentBase, customElement, html, inject, state } from '@/fw';
 import { ref } from 'lit/directives/ref.js';
+import { appState } from '@/state';
 import { AssetFileActivationService, type AssetActivation, CommandDispatcher } from '@/services';
 import { DialogService } from '@/services/DialogService';
 import { ProjectService } from '@/services/ProjectService';
@@ -50,6 +51,15 @@ export class AssetBrowserPanel extends ComponentBase {
   private scriptFileCreatedHandler?: (e: Event) => void;
   private scriptFileRevealRequestHandler?: (e: Event) => void;
   private assetsPreviewRevealPathHandler?: (e: Event) => void;
+
+  connectedCallback(): void {
+    super.connectedCallback();
+
+    // Track focus for context-aware shortcuts
+    this.addEventListener('focusin', () => {
+      appState.editorContext.focusedArea = 'assets';
+    });
+  }
 
   private onAssetActivate = async (e: Event) => {
     const detail = (e as CustomEvent<AssetActivation>).detail;

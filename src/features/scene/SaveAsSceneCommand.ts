@@ -20,7 +20,8 @@ export class SaveAsSceneCommand extends CommandBase<void, void> {
     description: 'Save the active scene to a new file',
     keywords: ['save', 'scene', 'export', 'as'],
     menuPath: 'file',
-    shortcut: 'Ctrl+Shift+S',
+    keybinding: 'Mod+Shift+S',
+    when: '!isInputFocused',
     addToMenu: true,
   };
 

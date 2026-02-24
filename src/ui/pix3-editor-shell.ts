@@ -5,6 +5,7 @@ import { LayoutManagerService } from '@/core/LayoutManager';
 import { OperationService } from '@/services/OperationService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { CommandRegistry } from '@/services/CommandRegistry';
+import { KeybindingService } from '@/services/KeybindingService';
 import { FileWatchService } from '@/services/FileWatchService';
 import { DialogService, type DialogInstance } from '@/services/DialogService';
 import {
@@ -40,6 +41,14 @@ import { OpenProjectSettingsCommand } from '@/features/project/OpenProjectSettin
 import { OpenProjectInIdeCommand } from '@/features/project/OpenProjectInIdeCommand';
 import { BuildProjectCommand } from '@/features/project/BuildProjectCommand';
 import { OpenEditorSettingsCommand } from '@/features/editor/OpenEditorSettingsCommand';
+import { SetTransformModeCommand } from '@/features/viewport/SetTransformModeCommand';
+import { ToggleGridCommand } from '@/features/viewport/ToggleGridCommand';
+import { ToggleLayer2DCommand } from '@/features/viewport/ToggleLayer2DCommand';
+import { ToggleLayer3DCommand } from '@/features/viewport/ToggleLayer3DCommand';
+import { ZoomDefaultCommand } from '@/features/viewport/ZoomDefaultCommand';
+import { ZoomAllCommand } from '@/features/viewport/ZoomAllCommand';
+import { ToggleLightingCommand } from '@/features/viewport/ToggleLightingCommand';
+import { ToggleNavigationModeCommand } from '@/features/viewport/ToggleNavigationModeCommand';
 import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import { EditorTabService } from '@/services/EditorTabService';
@@ -75,6 +84,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(CommandRegistry)
   private readonly commandRegistry!: CommandRegistry;
+
+  @inject(KeybindingService)
+  private readonly keybindingService!: KeybindingService;
 
   @inject(EditorTabService)
   private readonly editorTabService!: EditorTabService;
@@ -165,6 +177,20 @@ export class Pix3EditorShell extends ComponentBase {
     const openProjectInIdeCommand = new OpenProjectInIdeCommand();
     const buildProjectCommand = new BuildProjectCommand();
     const editorSettingsCommand = new OpenEditorSettingsCommand();
+    
+    // Register viewport commands
+    const selectModeCommand = new SetTransformModeCommand('select');
+    const translateModeCommand = new SetTransformModeCommand('translate');
+    const rotateModeCommand = new SetTransformModeCommand('rotate');
+    const scaleModeCommand = new SetTransformModeCommand('scale');
+    const toggleGridCommand = new ToggleGridCommand();
+    const toggleLayer2DCommand = new ToggleLayer2DCommand();
+    const toggleLayer3DCommand = new ToggleLayer3DCommand();
+    const zoomDefaultCommand = new ZoomDefaultCommand();
+    const zoomAllCommand = new ZoomAllCommand();
+    const toggleLightingCommand = new ToggleLightingCommand();
+    const toggleNavigationModeCommand = new ToggleNavigationModeCommand();
+    
     this.commandRegistry.registerMany(
       undoCommand,
       redoCommand,
@@ -180,7 +206,18 @@ export class Pix3EditorShell extends ComponentBase {
       editorSettingsCommand,
       projectSettingsCommand,
       openProjectInIdeCommand,
-      buildProjectCommand
+      buildProjectCommand,
+      selectModeCommand,
+      translateModeCommand,
+      rotateModeCommand,
+      scaleModeCommand,
+      toggleGridCommand,
+      toggleLayer2DCommand,
+      toggleLayer3DCommand,
+      zoomDefaultCommand,
+      zoomAllCommand,
+      toggleLightingCommand,
+      toggleNavigationModeCommand
     );
 
     // Subscribe to dialog changes
@@ -348,152 +385,11 @@ export class Pix3EditorShell extends ComponentBase {
   }
 
   private handleKeyboardShortcuts(e: KeyboardEvent): void {
-    // Check if target is an input element where we should not intercept
-    const target = e.target as HTMLElement;
-    const isInputElement =
-      target.tagName === 'INPUT' ||
-      target.tagName === 'TEXTAREA' ||
-      target.contentEditable === 'true';
-
-    // Undo: Cmd+Z (Mac) or Ctrl+Z (Windows/Linux)
-    if (
-      (e.key === 'z' || e.key === 'Z') &&
-      (e.metaKey || e.ctrlKey) &&
-      !e.shiftKey &&
-      !isInputElement
-    ) {
+    // Use KeybindingService to find matching command
+    const commandId = this.keybindingService.handleKeyboardEvent(e);
+    if (commandId) {
       e.preventDefault();
-      void this.executeUndoCommand();
-      return;
-    }
-
-    // Redo: Shift+Cmd+Z (Mac) or Ctrl+Y (Windows/Linux)
-    if (
-      ((e.key === 'z' || e.key === 'Z') && (e.metaKey || e.ctrlKey) && e.shiftKey) ||
-      ((e.key === 'y' || e.key === 'Y') && e.ctrlKey && !isInputElement)
-    ) {
-      e.preventDefault();
-      void this.executeRedoCommand();
-      return;
-    }
-
-    // Delete: Delete or Backspace key
-    if (
-      (e.key === 'Delete' || e.key === 'Backspace') &&
-      !e.metaKey &&
-      !e.ctrlKey &&
-      !isInputElement
-    ) {
-      e.preventDefault();
-      void this.executeDeleteCommand();
-      return;
-    }
-
-    // Save As: Cmd+Shift+S (Mac) or Ctrl+Shift+S (Windows/Linux)
-    if (
-      (e.key === 's' || e.key === 'S') &&
-      (e.metaKey || e.ctrlKey) &&
-      e.shiftKey &&
-      !isInputElement
-    ) {
-      e.preventDefault();
-      void this.executeSaveAsCommand();
-      return;
-    }
-
-    // Save: Cmd+S (Mac) or Ctrl+S (Windows/Linux)
-    if (
-      (e.key === 's' || e.key === 'S') &&
-      (e.metaKey || e.ctrlKey) &&
-      !e.shiftKey &&
-      !isInputElement
-    ) {
-      e.preventDefault();
-      void this.executeSaveCommand();
-      return;
-    }
-
-    // Duplicate: Cmd+D (Mac) or Ctrl+D (Windows/Linux)
-    if (
-      (e.key === 'd' || e.key === 'D') &&
-      (e.metaKey || e.ctrlKey) &&
-      !e.shiftKey &&
-      !isInputElement
-    ) {
-      e.preventDefault();
-      void this.executeDuplicateCommand();
-      return;
-    }
-
-    // Group: Cmd+G (Mac) or Ctrl+G (Windows/Linux)
-    if (
-      (e.key === 'g' || e.key === 'G') &&
-      (e.metaKey || e.ctrlKey) &&
-      !e.shiftKey &&
-      !isInputElement
-    ) {
-      e.preventDefault();
-      void this.executeGroupSelectedCommand();
-      return;
-    }
-  }
-
-  private async executeUndoCommand(): Promise<void> {
-    try {
-      await this.operationService.undo();
-    } catch (error) {
-      console.error('[Pix3EditorShell] Failed to undo', error);
-    }
-  }
-
-  private async executeRedoCommand(): Promise<void> {
-    try {
-      await this.operationService.redo();
-    } catch (error) {
-      console.error('[Pix3EditorShell] Failed to redo', error);
-    }
-  }
-
-  private async executeDeleteCommand(): Promise<void> {
-    try {
-      const command = this.commandRegistry.getCommand('scene.delete-object');
-      if (command) {
-        await this.commandDispatcher.execute(command);
-      }
-    } catch (error) {
-      console.error('[Pix3EditorShell] Failed to delete objects', error);
-    }
-  }
-
-  private async executeSaveCommand(): Promise<void> {
-    try {
-      await this.commandDispatcher.executeById('scene.save');
-    } catch (error) {
-      console.error('[Pix3EditorShell] Failed to save scene', error);
-    }
-  }
-
-  private async executeSaveAsCommand(): Promise<void> {
-    try {
-      await this.commandDispatcher.executeById('scene.save-as');
-    } catch (error) {
-      console.error('[Pix3EditorShell] Failed to save scene as', error);
-    }
-  }
-
-  private async executeDuplicateCommand(): Promise<void> {
-    try {
-      await this.commandDispatcher.executeById('scene.duplicate-nodes');
-    } catch (error) {
-      console.error('[Pix3EditorShell] Failed to duplicate nodes', error);
-    }
-  }
-
-  private async executeGroupSelectedCommand(): Promise<void> {
-    try {
-      await this.commandDispatcher.executeById('scene.group-selected-nodes');
-    } catch (error) {
-      console.error('[Pix3EditorShell] Failed to group selected nodes', error);
+      void this.commandDispatcher.executeById(commandId);
     }
   }
 

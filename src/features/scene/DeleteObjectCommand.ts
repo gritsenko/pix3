@@ -18,7 +18,8 @@ export class DeleteObjectCommand extends CommandBase<void, void> {
     description: 'Delete one or more nodes from the scene',
     keywords: ['delete', 'remove', 'erase', 'destroy'],
     menuPath: 'edit',
-    shortcut: 'Delete',
+    keybinding: 'Delete | Backspace',
+    when: '!isInputFocused && (viewportFocused || sceneTreeFocused)',
     addToMenu: true,
     menuOrder: 5,
   };

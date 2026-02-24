@@ -80,11 +80,12 @@ createImportMapShim();
 
 // Register runtime services
 import { registerRuntimeServices } from './core/register-runtime-services';
+import { ServiceContainer } from './fw/di';
+
 registerRuntimeServices();
 
 // Register built-in script components
 import { ScriptRegistry, registerBuiltInScripts } from '@pix3/runtime';
-import { ServiceContainer } from './fw/di';
 
 const container = ServiceContainer.getInstance();
 const registry = container.getService<ScriptRegistry>(container.getOrCreateToken(ScriptRegistry));

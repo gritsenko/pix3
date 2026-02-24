@@ -19,7 +19,8 @@ export class GroupSelectedNodesCommand extends CommandBase<void, void> {
     description: 'Group selected nodes under a new Node3D or Group2D container',
     keywords: ['group', 'selection', 'container'],
     menuPath: 'edit',
-    shortcut: '⌘G',
+    keybinding: 'Mod+G',
+    when: '!isInputFocused && (viewportFocused || sceneTreeFocused)',
     addToMenu: true,
     menuOrder: 16,
   };

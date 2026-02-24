@@ -19,7 +19,8 @@ export class DuplicateNodesCommand extends CommandBase<void, void> {
     description: 'Duplicate selected nodes including their child hierarchy',
     keywords: ['duplicate', 'clone', 'copy', 'nodes'],
     menuPath: 'edit',
-    shortcut: '⌘D',
+    keybinding: 'Mod+D',
+    when: '!isInputFocused && (viewportFocused || sceneTreeFocused)',
     addToMenu: true,
     menuOrder: 15,
   };
