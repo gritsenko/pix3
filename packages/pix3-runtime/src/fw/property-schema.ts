@@ -18,7 +18,8 @@ export type PropertyType =
   | 'color'
   | 'enum'
   | 'select'
-  | 'object';
+  | 'object'
+  | 'node';
 
 /** UI hints for better editor presentation */
 export interface PropertyUIHints {
@@ -63,6 +64,9 @@ export interface PropertyUIHints {
 
   /** Property is read-only */
   readOnly?: boolean;
+
+  /** For 'node' type - array of allowed node types (e.g. ['MeshInstance', 'Node3D']) */
+  nodeTypes?: string[];
 }
 
 /** Validation rule for a property */

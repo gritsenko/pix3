@@ -281,11 +281,32 @@ export class AssetTree extends ComponentBase {
 
   protected async firstUpdated(): Promise<void> {
     await this.loadRoot();
+
+    // Restore asset browser state (expanded folders and selected path) from localStorage
+    await this.restoreState();
+
     // Subscribe only to lastModifiedDirectoryPath changes (file system changes)
     // Do not subscribe to lastOpenedScenePath (scene loading UI state)
     let previousModifiedDir = appState.project.lastModifiedDirectoryPath;
+    let previousProjectId = appState.project.id;
     this.disposeSubscription = subscribe(appState.project, async () => {
       const modifiedDir = appState.project.lastModifiedDirectoryPath;
+      const currentProjectId = appState.project.id;
+
+      // Check if project changed - restore state for new project
+      if (currentProjectId !== previousProjectId) {
+        console.debug('[AssetTree] Project changed, restoring asset browser state', {
+          previousProjectId,
+          newProjectId: currentProjectId,
+        });
+        previousProjectId = currentProjectId;
+        if (currentProjectId) {
+          await this.loadRoot();
+          await this.restoreState();
+        }
+        return;
+      }
+
       // Only refresh if lastModifiedDirectoryPath actually changed
       if (modifiedDir !== previousModifiedDir) {
         console.debug('[AssetTree] Project file refresh signal received', {
@@ -319,6 +340,76 @@ export class AssetTree extends ComponentBase {
 
     window.removeEventListener('focus', this.onWindowFocus);
     document.removeEventListener('visibilitychange', this.onVisibilityChange);
+  }
+
+  /**
+   * Saves current asset browser state (expanded paths and selected path) to appState and localStorage.
+   */
+  private saveState(): void {
+    // Collect expanded paths from the tree
+    const expandedPaths = new Set<string>();
+    this.collectExpandedPaths(this.tree, expandedPaths);
+
+    // Update appState
+    appState.project.assetBrowserExpandedPaths = Array.from(expandedPaths);
+    appState.project.assetBrowserSelectedPath = this.selectedPath;
+
+    // Persist to localStorage
+    this.projectService.saveAssetBrowserState(
+      Array.from(expandedPaths),
+      this.selectedPath
+    );
+  }
+
+  /**
+   * Restores asset browser state (expanded paths and selected path) from localStorage.
+   */
+  private async restoreState(): Promise<void> {
+    // First, load state from localStorage
+    const loadedState = this.projectService.loadAssetBrowserState();
+
+    if (!loadedState) {
+      return;
+    }
+
+    // Update appState with loaded state
+    appState.project.assetBrowserExpandedPaths = loadedState.expandedPaths;
+    appState.project.assetBrowserSelectedPath = loadedState.selectedPath;
+
+    const expandedPaths = loadedState.expandedPaths;
+    const selectedPath = loadedState.selectedPath;
+
+    if (!expandedPaths || expandedPaths.length === 0) {
+      return;
+    }
+
+    // Build a map of path -> node for quick lookup
+    const pathToNode = new Map<string, Node>();
+    const buildPathMap = (nodes: Node[]) => {
+      for (const node of nodes) {
+        const normalizedPath = this.normalizePath(node.path);
+        pathToNode.set(normalizedPath, node);
+        if (node.children) {
+          buildPathMap(node.children);
+        }
+      }
+    };
+    buildPathMap(this.tree);
+
+    // Expand folders in order (parent before child)
+    const sortedPaths = [...expandedPaths].sort((a, b) => a.split('/').length - b.split('/').length);
+
+    for (const path of sortedPaths) {
+      const node = pathToNode.get(path);
+      if (node && node.kind === 'directory' && !node.expanded) {
+        await this.expandNode(node);
+      }
+    }
+
+    // Restore selected path if it exists
+    if (selectedPath) {
+      await this.selectPath(selectedPath);
+    }
   }
 
   private async listDirectory(path: string): Promise<FileDescriptor[]> {
@@ -392,11 +483,15 @@ export class AssetTree extends ComponentBase {
     node.expanded = true;
     // trigger update
     this.tree = [...this.tree];
+    // Save state after expanding
+    this.saveState();
   }
 
   private collapseNode(node: Node): void {
     node.expanded = false;
     this.tree = [...this.tree];
+    // Save state after collapsing
+    this.saveState();
   }
 
   private toggleNode(node: Node): void {
@@ -438,6 +533,9 @@ export class AssetTree extends ComponentBase {
     }
 
     this.requestUpdate();
+
+    // Save state after selection changes
+    this.saveState();
   }
 
   private onNodeDoubleClick(event: MouseEvent, node: Node): void {

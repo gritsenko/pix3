@@ -551,10 +551,10 @@ export class InspectorPanel extends ComponentBase {
       >
         <div class="inspector-body">
           ${hasAssetSelection
-            ? this.renderAssetProperties()
-            : hasSelection
-              ? this.renderProperties()
-              : ''}
+        ? this.renderAssetProperties()
+        : hasSelection
+          ? this.renderProperties()
+          : ''}
         </div>
       </pix3-panel>
     `;
@@ -579,12 +579,12 @@ export class InspectorPanel extends ComponentBase {
         <div class="property-group-section asset-section">
           <h4 class="group-title">Preview</h4>
           ${isImage
-            ? html`
+        ? html`
                 <div class="asset-image-preview checker-bg">
                   <img src=${asset.thumbnailUrl!} alt=${asset.name} />
                 </div>
               `
-            : html`
+        : html`
                 <div class="asset-file-icon">${this.iconService.getIcon(asset.iconName, 42)}</div>
               `}
         </div>
@@ -615,13 +615,13 @@ export class InspectorPanel extends ComponentBase {
             <span class="asset-value asset-path">${asset.path}</span>
           </div>
           ${asset.width !== null && asset.height !== null
-            ? html`
+        ? html`
                 <div class="property-group">
                   <span class="property-label">Resolution</span>
                   <span class="asset-value">${asset.width} x ${asset.height}</span>
                 </div>
               `
-            : ''}
+        : ''}
           <div class="property-group">
             <span class="property-label">Size</span>
             <span class="asset-value">${this.formatFileSize(asset.sizeBytes)}</span>
@@ -666,8 +666,8 @@ export class InspectorPanel extends ComponentBase {
         <div class="section-header">
           <h3 class="section-title">Object Inspector</h3>
           ${this.selectedNodes.length > 1
-            ? html`<p class="selection-info">${this.selectedNodes.length} objects selected</p>`
-            : ''}
+        ? html`<p class="selection-info">${this.selectedNodes.length} objects selected</p>`
+        : ''}
           <p class="node-type">${nodeType}</p>
         </div>
 
@@ -686,9 +686,9 @@ export class InspectorPanel extends ComponentBase {
         <h4 class="group-title">Groups</h4>
         <div class="group-chip-list">
           ${groups.length === 0
-            ? html`<div class="groups-empty">No groups assigned</div>`
-            : groups.map(
-                group => html`
+        ? html`<div class="groups-empty">No groups assigned</div>`
+        : groups.map(
+          group => html`
                   <span class="group-chip">
                     ${group}
                     <button
@@ -700,7 +700,7 @@ export class InspectorPanel extends ComponentBase {
                     </button>
                   </span>
                 `
-              )}
+        )}
         </div>
         <div class="group-add-row">
           <input
@@ -709,11 +709,11 @@ export class InspectorPanel extends ComponentBase {
             placeholder="group_name"
             @input=${(e: Event) => this.onGroupNameInput(e)}
             @keydown=${(e: KeyboardEvent) => {
-              if (e.key === 'Enter') {
-                e.preventDefault();
-                void this.addToGroup();
-              }
-            }}
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          void this.addToGroup();
+        }
+      }}
           />
           <button class="btn-add-group" @click=${() => this.addToGroup()}>Add</button>
         </div>
@@ -733,9 +733,9 @@ export class InspectorPanel extends ComponentBase {
         <h4 class="group-title">Animations</h4>
         <div class="animation-list">
           ${clips.map(clip => {
-            const isActive = this.activePreviewAnimation === clip.name;
-            const isDefault = initialAnimation === clip.name;
-            return html`
+      const isActive = this.activePreviewAnimation === clip.name;
+      const isDefault = initialAnimation === clip.name;
+      return html`
               <div class="animation-item ${isActive ? 'animation-item--active' : ''}">
                 <button
                   class="animation-preview-btn"
@@ -750,14 +750,14 @@ export class InspectorPanel extends ComponentBase {
                   class="animation-default-btn ${isDefault ? 'animation-default-btn--active' : ''}"
                   @click=${() => this.setInitialAnimation(clip.name)}
                   title=${isDefault
-                    ? 'Default startup animation'
-                    : 'Set as default startup animation'}
+          ? 'Default startup animation'
+          : 'Set as default startup animation'}
                 >
                   ${isDefault ? 'Default' : 'Set Default'}
                 </button>
               </div>
             `;
-          })}
+    })}
         </div>
         <div class="animation-default-row">
           <button
@@ -845,7 +845,7 @@ export class InspectorPanel extends ComponentBase {
 
         <div class="scripts-list">
           ${components.map(
-            component => html`
+      component => html`
               <div class="script-item component-item">
                 <button
                   class="script-foldout-btn"
@@ -853,9 +853,9 @@ export class InspectorPanel extends ComponentBase {
                   title=${this.isComponentExpanded(component.id) ? 'Collapse' : 'Expand'}
                 >
                   ${this.iconService.getIcon(
-                    this.isComponentExpanded(component.id) ? 'chevron-down' : 'chevron-right',
-                    14
-                  )}
+        this.isComponentExpanded(component.id) ? 'chevron-down' : 'chevron-right',
+        14
+      )}
                 </button>
                 <div class="script-icon">
                   ${this.iconService.getIcon(this.getComponentIconName(component.type), 16)}
@@ -882,10 +882,10 @@ export class InspectorPanel extends ComponentBase {
               </div>
               ${this.renderComponentProperties(component)}
             `
-          )}
+    )}
           ${components.length === 0
-            ? html`<div class="no-scripts">No components attached</div>`
-            : ''}
+        ? html`<div class="no-scripts">No components attached</div>`
+        : ''}
         </div>
       </div>
     `;
@@ -921,19 +921,19 @@ export class InspectorPanel extends ComponentBase {
     return html`
       <div class="script-props">
         ${sortedGroups.map(([groupName, props]) => {
-          const groupDef = schema.groups?.[groupName];
-          const label = groupDef?.label ?? groupName;
-          const visibleProps = props.filter(prop => !prop.ui?.hidden);
-          if (visibleProps.length === 0) {
-            return '';
-          }
-          return html`
+      const groupDef = schema.groups?.[groupName];
+      const label = groupDef?.label ?? groupName;
+      const visibleProps = props.filter(prop => !prop.ui?.hidden);
+      if (visibleProps.length === 0) {
+        return '';
+      }
+      return html`
             <div class="script-prop-group">
               <div class="script-prop-group-title">${label}</div>
               ${visibleProps.map(prop => this.renderComponentPropertyInput(component, prop))}
             </div>
           `;
-        })}
+    })}
       </div>
     `;
   }
@@ -1031,11 +1031,11 @@ export class InspectorPanel extends ComponentBase {
           <div class="preset-label">Anchor Presets</div>
           <div class="preset-grid">
             ${presetRows.map(
-              row => html`
+      row => html`
                 <div class="preset-row">
                   ${row.map(presetId => {
-                    const preset = LAYOUT_PRESETS[presetId];
-                    return html`
+        const preset = LAYOUT_PRESETS[presetId];
+        return html`
                       <button
                         class="preset-btn"
                         title=${preset.label}
@@ -1044,10 +1044,10 @@ export class InspectorPanel extends ComponentBase {
                         ${this.renderPresetIcon(presetId)}
                       </button>
                     `;
-                  })}
+      })}
                 </div>
               `
-            )}
+    )}
           </div>
         </div>
 
@@ -1133,9 +1133,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.x.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-                  const newX = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: newX, y: value.y });
-                }}
+            const newX = parseFloat((e.target as HTMLInputElement).value);
+            this.applyPropertyChange(prop.name, { x: newX, y: value.y });
+          }}
               />
 
               <div class="transform-field-label">Y</div>
@@ -1146,9 +1146,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.y.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-                  const newY = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: newY });
-                }}
+            const newY = parseFloat((e.target as HTMLInputElement).value);
+            this.applyPropertyChange(prop.name, { x: value.x, y: newY });
+          }}
               />
 
               <div></div>
@@ -1174,9 +1174,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.x.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-                  const newX = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
-                }}
+            const newX = parseFloat((e.target as HTMLInputElement).value);
+            this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
+          }}
               />
 
               <div class="transform-field-label">Y</div>
@@ -1187,9 +1187,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.y.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-                  const newY = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
-                }}
+            const newY = parseFloat((e.target as HTMLInputElement).value);
+            this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
+          }}
               />
 
               <div class="transform-field-label">Z</div>
@@ -1200,9 +1200,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.z.toFixed(prop.ui?.precision ?? 2)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-                  const newZ = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
-                }}
+            const newZ = parseFloat((e.target as HTMLInputElement).value);
+            this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
+          }}
               />
             </div>
           </div>
@@ -1225,9 +1225,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.x.toFixed(prop.ui?.precision ?? 1)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-                  const newX = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
-                }}
+            const newX = parseFloat((e.target as HTMLInputElement).value);
+            this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
+          }}
               />
 
               <div class="transform-field-label">Y</div>
@@ -1238,9 +1238,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.y.toFixed(prop.ui?.precision ?? 1)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-                  const newY = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
-                }}
+            const newY = parseFloat((e.target as HTMLInputElement).value);
+            this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
+          }}
               />
 
               <div class="transform-field-label">Z</div>
@@ -1251,9 +1251,9 @@ export class InspectorPanel extends ComponentBase {
                 .value=${value.z.toFixed(prop.ui?.precision ?? 1)}
                 ?disabled=${readOnly}
                 @change=${(e: Event) => {
-                  const newZ = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
-                }}
+            const newZ = parseFloat((e.target as HTMLInputElement).value);
+            this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
+          }}
               />
             </div>
           </div>
@@ -1270,8 +1270,8 @@ export class InspectorPanel extends ComponentBase {
             type="number"
             step=${prop.ui?.step ?? 0.01}
             class="property-input property-input--number ${state.isValid
-              ? ''
-              : 'property-input--invalid'}"
+          ? ''
+          : 'property-input--invalid'}"
             .value=${state.value}
             ?disabled=${readOnly}
             @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
@@ -1327,11 +1327,11 @@ export class InspectorPanel extends ComponentBase {
               .checked=${state.value === 'true'}
               ?disabled=${readOnly}
               @change=${(e: Event) =>
-                this.applyComponentPropertyChange(
-                  component.id,
-                  prop,
-                  (e.target as HTMLInputElement).checked
-                )}
+          this.applyComponentPropertyChange(
+            component.id,
+            prop,
+            (e.target as HTMLInputElement).checked
+          )}
             />
             ${label}
           </label>
@@ -1356,7 +1356,7 @@ export class InspectorPanel extends ComponentBase {
             precision=${prop.ui?.precision ?? 2}
             ?disabled=${readOnly}
             @change=${(e: CustomEvent) =>
-              this.applyComponentPropertyChange(component.id, prop, e.detail)}
+          this.applyComponentPropertyChange(component.id, prop, e.detail)}
           ></pix3-vector2-editor>
         </div>
       `;
@@ -1380,7 +1380,7 @@ export class InspectorPanel extends ComponentBase {
             precision=${prop.ui?.precision ?? 2}
             ?disabled=${readOnly}
             @change=${(e: CustomEvent) =>
-              this.applyComponentPropertyChange(component.id, prop, e.detail)}
+          this.applyComponentPropertyChange(component.id, prop, e.detail)}
           ></pix3-vector3-editor>
         </div>
       `;
@@ -1404,8 +1404,41 @@ export class InspectorPanel extends ComponentBase {
             precision=${prop.ui?.precision ?? 1}
             ?disabled=${readOnly}
             @change=${(e: CustomEvent) =>
-              this.applyComponentPropertyChange(component.id, prop, e.detail)}
+          this.applyComponentPropertyChange(component.id, prop, e.detail)}
           ></pix3-euler-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'node') {
+      const activeScene = this.sceneManager.getActiveSceneGraph();
+      if (!activeScene) {
+        return html`<div class="property-group component-property-group"><span class="property-label">${label}</span><span class="error-text">No active scene</span></div>`;
+      }
+
+      const allowedTypes = prop.ui?.nodeTypes;
+      const nodes = Array.from(activeScene.nodeMap.values()).filter(n => {
+        if (!allowedTypes || allowedTypes.length === 0) return true;
+        return allowedTypes.includes(n.type);
+      });
+
+      return html`
+        <div class="property-group component-property-group">
+          <span class="property-label">${label}</span>
+          <select
+            class="property-select"
+            .value=${state.value || ''}
+            ?disabled=${readOnly}
+            @change=${(e: Event) =>
+          this.applyComponentPropertyChange(
+            component.id,
+            prop,
+            (e.target as HTMLSelectElement).value
+          )}
+          >
+            <option value="">[None]</option>
+            ${nodes.map(n => html`<option value=${n.nodeId}>${n.name} (${n.type})</option>`)}
+          </select>
         </div>
       `;
     }
@@ -1420,11 +1453,11 @@ export class InspectorPanel extends ComponentBase {
             .value=${state.value}
             ?disabled=${readOnly}
             @change=${(e: Event) =>
-              this.applyComponentPropertyChange(
-                component.id,
-                prop,
-                (e.target as HTMLSelectElement).value
-              )}
+          this.applyComponentPropertyChange(
+            component.id,
+            prop,
+            (e.target as HTMLSelectElement).value
+          )}
           >
             ${options.map(option => html`<option value=${option.value}>${option.label}</option>`)}
           </select>
@@ -1440,8 +1473,8 @@ export class InspectorPanel extends ComponentBase {
             type="number"
             step=${prop.ui?.step ?? 0.01}
             class="property-input property-input--number ${state.isValid
-              ? ''
-              : 'property-input--invalid'}"
+          ? ''
+          : 'property-input--invalid'}"
             .value=${state.value}
             ?disabled=${readOnly}
             @input=${(e: Event) => this.handleComponentPropertyInput(component.id, prop, e)}
@@ -1485,7 +1518,7 @@ export class InspectorPanel extends ComponentBase {
               .checked=${state.value === 'true'}
               ?disabled=${readOnly}
               @change=${(e: Event) =>
-                this.applyPropertyChange(prop.name, (e.target as HTMLInputElement).checked)}
+          this.applyPropertyChange(prop.name, (e.target as HTMLInputElement).checked)}
             />
             ${label}
           </label>
@@ -1561,6 +1594,35 @@ export class InspectorPanel extends ComponentBase {
       `;
     }
 
+    if (prop.type === 'node') {
+      const activeScene = this.sceneManager.getActiveSceneGraph();
+      if (!activeScene) {
+        return html`<div class="property-group"><span class="property-label">${label}</span><span class="error-text">No active scene</span></div>`;
+      }
+
+      const allowedTypes = prop.ui?.nodeTypes;
+      const nodes = Array.from(activeScene.nodeMap.values()).filter(n => {
+        if (!allowedTypes || allowedTypes.length === 0) return true;
+        return allowedTypes.includes(n.type);
+      });
+
+      return html`
+        <div class="property-group">
+          <span class="property-label">${label}</span>
+          <select
+            class="property-select"
+            .value=${state.value || ''}
+            ?disabled=${readOnly}
+            @change=${(e: Event) =>
+          this.applyPropertyChange(prop.name, (e.target as HTMLSelectElement).value)}
+          >
+            <option value="">[None]</option>
+            ${nodes.map(n => html`<option value=${n.nodeId}>${n.name} (${n.type})</option>`)}
+          </select>
+        </div>
+      `;
+    }
+
     if (prop.type === 'select' || prop.type === 'enum') {
       const options = this.getSelectOptions(prop);
       return html`
@@ -1571,7 +1633,7 @@ export class InspectorPanel extends ComponentBase {
             .value=${state.value}
             ?disabled=${readOnly}
             @change=${(e: Event) =>
-              this.applyPropertyChange(prop.name, (e.target as HTMLSelectElement).value)}
+          this.applyPropertyChange(prop.name, (e.target as HTMLSelectElement).value)}
           >
             ${options.map(option => html`<option value=${option.value}>${option.label}</option>`)}
           </select>
@@ -1587,8 +1649,8 @@ export class InspectorPanel extends ComponentBase {
             type="number"
             step=${prop.ui?.step ?? 0.01}
             class="property-input property-input--number ${state.isValid
-              ? ''
-              : 'property-input--invalid'}"
+          ? ''
+          : 'property-input--invalid'}"
             .value=${state.value}
             ?disabled=${readOnly}
             @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}

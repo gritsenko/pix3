@@ -10,6 +10,7 @@ import {
 
 const RECENTS_KEY = 'pix3.recentProjects:v1';
 const PROJECT_MANIFEST_PATH = 'pix3project.yaml';
+const ASSET_BROWSER_STORAGE_PREFIX = 'pix3.assetBrowser:v1:';
 
 export interface RecentProjectEntry {
   readonly id?: string;
@@ -49,6 +50,52 @@ export class ProjectService {
       localStorage.setItem(RECENTS_KEY, JSON.stringify(list.slice(0, 10)));
     } catch {
       // ignore
+    }
+  }
+
+  /**
+   * Saves asset browser state (expanded paths and selected path) to localStorage.
+   * Should be called whenever the asset browser state changes.
+   */
+  saveAssetBrowserState(expandedPaths: string[], selectedPath: string | null): void {
+    const projectId = appState.project.id;
+    if (!projectId) return;
+
+    try {
+      const key = `${ASSET_BROWSER_STORAGE_PREFIX}${projectId}`;
+      const state = {
+        expandedPaths,
+        selectedPath,
+        savedAt: Date.now(),
+      };
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch {
+      // ignore storage errors
+    }
+  }
+
+  /**
+   * Loads asset browser state (expanded paths and selected path) from localStorage.
+   * Returns null if no state is saved for the current project.
+   */
+  loadAssetBrowserState(): { expandedPaths: string[]; selectedPath: string | null } | null {
+    const projectId = appState.project.id;
+    if (!projectId) return null;
+
+    try {
+      const key = `${ASSET_BROWSER_STORAGE_PREFIX}${projectId}`;
+      const raw = localStorage.getItem(key);
+      if (!raw) return null;
+
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+
+      return {
+        expandedPaths: Array.isArray(parsed.expandedPaths) ? parsed.expandedPaths : [],
+        selectedPath: typeof parsed.selectedPath === 'string' ? parsed.selectedPath : null,
+      };
+    } catch {
+      return null;
     }
   }
 

@@ -101,6 +101,10 @@ export interface ProjectState {
   recentProjects: string[];
   /** Last opened scene file relative to the project root. */
   lastOpenedScenePath: string | null;
+  /** Asset browser expanded folder paths (persisted per project). */
+  assetBrowserExpandedPaths: string[];
+  /** Asset browser selected path (persisted per project). */
+  assetBrowserSelectedPath: string | null;
   /** Current status of script compilation and loading. */
   scriptsStatus: ScriptLoadStatus;
   /** Signal counter incremented when project files change (triggers asset explorer refresh). */
@@ -210,6 +214,8 @@ export const createInitialAppState = (): AppState => ({
     errorMessage: null,
     recentProjects: [],
     lastOpenedScenePath: null,
+    assetBrowserExpandedPaths: [],
+    assetBrowserSelectedPath: null,
     scriptsStatus: 'idle',
     fileRefreshSignal: 0,
     scriptRefreshSignal: 0,

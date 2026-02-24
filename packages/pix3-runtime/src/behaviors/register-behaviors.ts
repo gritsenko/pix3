@@ -9,6 +9,7 @@ import { ScriptRegistry } from '../core/ScriptRegistry';
 import { RotateBehavior } from './RotateBehavior';
 import { SimpleMoveBehavior } from './SimpleMoveBehavior';
 import { SineBehavior } from './SineBehavior';
+import { PinToNodeBehavior } from './PinToNodeBehavior';
 
 /**
  * Register all built-in script components
@@ -40,6 +41,15 @@ export function registerBuiltInScripts(registry: ScriptRegistry): void {
     category: 'Animation',
     componentClass: SineBehavior,
     keywords: ['sine', 'oscillation', 'animation'],
+  });
+
+  registry.registerComponent({
+    id: 'core:PinToNode',
+    displayName: 'Pin to Node',
+    description: 'Pins a 2D UI node to a 3D target node',
+    category: 'UI',
+    componentClass: PinToNodeBehavior,
+    keywords: ['ui', 'tracking', 'pin'],
   });
 
   console.log('[ScriptRegistry] Registered built-in script components');
