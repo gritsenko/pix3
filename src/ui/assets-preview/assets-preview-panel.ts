@@ -73,10 +73,12 @@ export class AssetsPreviewPanel extends ComponentBase {
       <button
         class="preview-item ${isSelected ? 'is-selected' : ''}"
         title=${this.buildTooltip(item)}
+        ?draggable=${item.kind === 'file'}
         @click=${() => this.onItemSelected(item)}
         @dblclick=${() => {
           void this.onItemDoubleClick(item);
         }}
+        @dragstart=${(event: DragEvent) => this.onItemDragStart(event, item)}
       >
         <span class="thumb">
           ${item.previewType === 'image' && item.thumbnailUrl
@@ -90,6 +92,19 @@ export class AssetsPreviewPanel extends ComponentBase {
 
   private onItemSelected(item: AssetPreviewItem): void {
     this.assetsPreviewService.selectItem(item.path);
+  }
+
+  private onItemDragStart(event: DragEvent, item: AssetPreviewItem): void {
+    if (item.kind !== 'file' || !event.dataTransfer) {
+      return;
+    }
+
+    const resourcePath = this.toResourcePath(item.path);
+    event.dataTransfer.effectAllowed = 'copy';
+    event.dataTransfer.setData('text/plain', item.path);
+    event.dataTransfer.setData('application/x-pix3-asset-path', item.path);
+    event.dataTransfer.setData('application/x-pix3-asset-resource', resourcePath);
+    event.dataTransfer.setData('text/uri-list', resourcePath);
   }
 
   private async onItemDoubleClick(item: AssetPreviewItem): Promise<void> {

@@ -75,7 +75,8 @@ export function getPropertyDisplayValue(node: NodeBase, prop: PropertyDefinition
     prop.type === 'vector2' ||
     prop.type === 'vector3' ||
     prop.type === 'vector4' ||
-    prop.type === 'euler'
+    prop.type === 'euler' ||
+    prop.type === 'object'
   ) {
     // Vector and Euler values are objects - serialize as JSON
     return JSON.stringify(value);

@@ -78,6 +78,11 @@ pix3-panel {
   padding: 0.25rem 0;
 }
 
+.property-group pix3-texture-resource-editor {
+  flex: 1;
+  min-width: 0;
+}
+
 .property-label {
   font-size: 0.8rem;
   color: var(--color-text-secondary, #aaa);

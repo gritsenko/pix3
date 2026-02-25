@@ -155,6 +155,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       'labelFontSize',
       'labelColor',
       'labelAlign',
+      'texture',
       'texturePath',
       'backgroundColor',
       'hoverColor',
@@ -184,7 +185,9 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
   }
 
   private is3DVisualProperty(propertyPath: string): boolean {
-    return ['texturePath', 'width', 'height', 'billboard', 'billboardRoll'].includes(propertyPath);
+    return ['texture', 'texturePath', 'width', 'height', 'billboard', 'billboardRoll'].includes(
+      propertyPath
+    );
   }
 
   private isParentSizeProperty(propertyPath: string): boolean {

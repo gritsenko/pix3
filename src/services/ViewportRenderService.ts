@@ -1373,8 +1373,24 @@ export class ViewportRendererService {
         visualRoot.scale.set(node.scale.x, node.scale.y, 1);
         const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
         if (sizeGroup) {
-          sizeGroup.scale.set(node.width ?? 64, node.height ?? 64, 1);
+          // Use natural dimensions if width/height are undefined (first load)
+          const w = node.width ?? (node as any).originalWidth ?? 64;
+          const h = node.height ?? (node as any).originalHeight ?? 64;
+          sizeGroup.scale.set(w, h, 1);
         }
+
+        const mesh = visualRoot.userData.spriteMesh as THREE.Mesh | undefined;
+        if (mesh && mesh.material instanceof THREE.MeshBasicMaterial) {
+          const currentTexturePath = node.texturePath ?? null;
+          const previousTexturePath = (visualRoot.userData.texturePath as string | null) ?? null;
+          if (currentTexturePath !== previousTexturePath) {
+            mesh.material.map = null;
+            mesh.material.needsUpdate = true;
+            this.applyTextureToSprite2DMaterial(node, mesh.material);
+            visualRoot.userData.texturePath = currentTexturePath;
+          }
+        }
+
         visualRoot.visible = node.visible;
       }
     } else if (node instanceof UIControl2D) {
@@ -2309,110 +2325,10 @@ export class ViewportRendererService {
     const geometry = new THREE.PlaneGeometry(1, 1);
     geometry.computeBoundingBox();
 
-    let material: THREE.Material;
-
-    // Try to load texture if available; if it references a templ:// or res:// URL,
-    // use ResourceManager to resolve it to a Blob and create an object URL for the TextureLoader.
-    const textureLoader = new THREE.TextureLoader();
-    const meshRef = { current: null as THREE.Mesh | null };
-
-    if (node.texturePath) {
-      // Use a placeholder material immediately, and patch in the texture asynchronously
-      material = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
-
-      // Asynchronously resolve resource to a Blob using ResourceManager
-      (async () => {
-        const texturePath = node.texturePath as string;
-        try {
-          const blob = await this.resourceManager.readBlob(texturePath);
-          const blobUrl = URL.createObjectURL(blob);
-
-          // Load texture from object URL and patch material when loaded
-          textureLoader.load(
-            blobUrl,
-            texture => {
-              try {
-                if (material instanceof THREE.MeshBasicMaterial) {
-                  material.map = texture;
-                  material.color.set(0xffffff);
-                  material.transparent = true;
-                  material.needsUpdate = true;
-
-                  // Get actual image dimensions from texture
-                  const image = texture.source.data as HTMLImageElement;
-                  if (image && image.width && image.height) {
-                    // Update node's width/height to match texture (if not already set from scene file)
-                    // Only update if dimensions are still at placeholder values (undefined)
-                    if (node.width === undefined || node.height === undefined) {
-                      node.width = image.width;
-                      node.height = image.height;
-                    }
-
-                    // Ensure the visual reflects updated dimensions
-                    this.updateNodeTransform(node);
-                  }
-                }
-              } finally {
-                // Revoke the object URL once the texture has been decoded
-                try {
-                  URL.revokeObjectURL(blobUrl);
-                } catch {
-                  // ignore
-                }
-              }
-            },
-            undefined,
-            err => {
-              // Loading error — keep placeholder material
-              console.warn(
-                '[ViewportRenderer] Failed to load sprite texture',
-                node.texturePath,
-                err
-              );
-              try {
-                URL.revokeObjectURL(blobUrl);
-              } catch {
-                // ignore
-              }
-            }
-          );
-        } catch {
-          // failed to fetch blob via ResourceManager — only attempt direct load for http/https or no-scheme paths.
-          const schemeMatch = /^([a-z]+[a-z0-9+.-]*):\/\//i.exec(texturePath);
-          const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : '';
-
-          if (scheme === 'http' || scheme === 'https' || scheme === '') {
-            try {
-              const texture = textureLoader.load(texturePath, undefined, undefined, e => {
-                console.warn('[ViewportRenderer] Direct texture load failed', node.texturePath, e);
-              });
-              if (texture) {
-                if (material instanceof THREE.MeshBasicMaterial) {
-                  material.map = texture;
-                  material.color.set(0xffffff);
-                  material.transparent = true;
-                  material.needsUpdate = true;
-                }
-              }
-            } catch (err2) {
-              console.warn('[ViewportRenderer] Failed to load texture for', node.texturePath, err2);
-            }
-          } else {
-            // If the scheme is templ:// or res://, avoid direct load (these schemes are handled by ResourceManager)
-            console.warn(
-              '[ViewportRenderer] Skipping direct load for unsupported scheme:',
-              texturePath
-            );
-          }
-        }
-      })();
-    } else {
-      // No texture path - use placeholder material (light gray)
-      material = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
-    }
+    const material = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
+    this.applyTextureToSprite2DMaterial(node, material);
 
     const mesh = new THREE.Mesh(geometry, material);
-    meshRef.current = mesh; // Store reference for async texture loading callback
 
     mesh.layers.set(LAYER_2D);
     mesh.userData.isSprite2DVisual = true;
@@ -2426,7 +2342,9 @@ export class ViewportRendererService {
     root.layers.set(LAYER_2D);
 
     const sizeGroup = new THREE.Group();
-    sizeGroup.scale.set(node.width ?? 64, node.height ?? 64, 1);
+    const w = node.width ?? (node as any).originalWidth ?? 64;
+    const h = node.height ?? (node as any).originalHeight ?? 96 / 217 * 64; // arbitrary but consistent
+    sizeGroup.scale.set(w, h, 1);
     sizeGroup.layers.set(LAYER_2D);
     sizeGroup.add(mesh);
     root.add(sizeGroup);
@@ -2434,8 +2352,59 @@ export class ViewportRendererService {
     root.userData.isSprite2DVisualRoot = true;
     root.userData.nodeId = node.nodeId;
     root.userData.sizeGroup = sizeGroup;
+    root.userData.spriteMesh = mesh;
+    root.userData.texturePath = node.texturePath ?? null;
 
     return root;
+  }
+
+  private applyTextureToSprite2DMaterial(node: Sprite2D, material: THREE.MeshBasicMaterial): void {
+    const texturePath = node.texturePath;
+    if (!texturePath) {
+      return;
+    }
+
+    const textureLoader = new THREE.TextureLoader();
+
+    void (async () => {
+      try {
+        const blob = await this.resourceManager.readBlob(texturePath);
+        const blobUrl = URL.createObjectURL(blob);
+
+        textureLoader.load(
+          blobUrl,
+          texture => {
+            try {
+              material.map = texture;
+              material.color.set(0xffffff);
+              material.transparent = true;
+              material.needsUpdate = true;
+            } finally {
+              URL.revokeObjectURL(blobUrl);
+            }
+          },
+          undefined,
+          () => {
+            URL.revokeObjectURL(blobUrl);
+          }
+        );
+      } catch {
+        const schemeMatch = /^([a-z]+[a-z0-9+.-]*):\/\//i.exec(texturePath);
+        const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : '';
+
+        if (scheme === 'http' || scheme === 'https' || scheme === '') {
+          try {
+            const texture = textureLoader.load(texturePath);
+            material.map = texture;
+            material.color.set(0xffffff);
+            material.transparent = true;
+            material.needsUpdate = true;
+          } catch {
+            // Keep placeholder material
+          }
+        }
+      }
+    })();
   }
 
   private syncSprite3DBillboarding(camera: THREE.Camera): void {

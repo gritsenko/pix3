@@ -27,6 +27,7 @@ import { Camera3D } from '../nodes/3D/Camera3D';
 import { Node2D } from '../nodes/Node2D';
 import { AssetLoader } from './AssetLoader';
 import { ScriptRegistry } from './ScriptRegistry';
+import { coerceTextureResource, type TextureResourceRef } from './TextureResource';
 
 const ZERO_VECTOR3 = new Vector3(0, 0, 0);
 const UNIT_VECTOR3 = new Vector3(1, 1, 1);
@@ -107,6 +108,7 @@ export interface SpotLightNodeProperties {
 }
 
 export interface Sprite3DProperties {
+  texture?: TextureResourceRef | null;
   texturePath?: string | null;
   width?: number;
   height?: number;
@@ -285,7 +287,8 @@ export class SceneLoader {
       case 'Sprite2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
-        const texturePath = typeof props.texturePath === 'string' ? props.texturePath : null;
+        const texture = coerceTextureResource(props.texture ?? props.texturePath ?? null);
+        const texturePath = texture?.url ?? null;
 
         const sprite = new Sprite2D({
           ...baseProps,
@@ -296,7 +299,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
-          texturePath,
+          texture,
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
           color: typeof props.color === 'string' ? props.color : undefined,
@@ -708,6 +711,7 @@ export class SceneLoader {
       case 'Sprite3D': {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
         const props = baseProps.properties as Sprite3DProperties;
+        const texture = coerceTextureResource(props.texture ?? props.texturePath ?? null);
         const sprite = new Sprite3D({
           ...baseProps,
           properties: parsed.restProps,
@@ -715,7 +719,7 @@ export class SceneLoader {
           rotation: parsed.rotation,
           rotationOrder: parsed.rotationOrder,
           scale: parsed.scale,
-          texturePath: this.asString(props.texturePath) ?? null,
+          texture,
           width: this.asNumber(props.width, 1),
           height: this.asNumber(props.height, 1),
           color: this.asString(props.color) ?? '#ffffff',

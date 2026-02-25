@@ -1,8 +1,13 @@
 import { Mesh, MeshBasicMaterial, PlaneGeometry, Texture } from 'three';
 import { Node2D, type Node2DProps } from '../Node2D';
 import type { PropertySchema } from '../../fw/property-schema';
+import {
+  coerceTextureResource,
+  type TextureResourceRef,
+} from '../../core/TextureResource';
 
 export interface Sprite2DProps extends Omit<Node2DProps, 'type'> {
+  texture?: TextureResourceRef | null;
   texturePath?: string | null;
   width?: number;
   height?: number;
@@ -10,11 +15,19 @@ export interface Sprite2DProps extends Omit<Node2DProps, 'type'> {
 }
 
 export class Sprite2D extends Node2D {
-  readonly texturePath: string | null;
+  texture: TextureResourceRef | null;
   /** Width in pixels. Defaults to texture width when loaded, or 64 as placeholder. */
   width: number | undefined;
   /** Height in pixels. Defaults to texture height when loaded, or 64 as placeholder. */
   height: number | undefined;
+  /** Stored aspect ratio of the original texture (width / height), null if unknown. */
+  textureAspectRatio: number | null;
+  /** If true, height changes proportionally when width is modified and vice versa. */
+  aspectRatioLocked: boolean;
+  /** Original width (from texture). Used to reset to natural size. */
+  originalWidth: number | null;
+  /** Original height (from texture). Used to reset to natural size. */
+  originalHeight: number | null;
 
   private mesh: Mesh;
   private geometry: PlaneGeometry;
@@ -22,13 +35,17 @@ export class Sprite2D extends Node2D {
 
   constructor(props: Sprite2DProps) {
     super(props, 'Sprite2D');
-    this.texturePath = props.texturePath ?? null;
-    this.width = props.width ?? 64;
-    this.height = props.height ?? 64;
+    this.texture = coerceTextureResource(props.texture ?? props.texturePath ?? null);
+    this.width = props.width;
+    this.height = props.height;
+    this.textureAspectRatio = (props as any).textureAspectRatio ?? null;
+    this.aspectRatioLocked = (props as any).aspectRatioLocked ?? false;
+    this.originalWidth = null;
+    this.originalHeight = null;
     this.isContainer = false;
 
     // Create visuals
-    this.geometry = new PlaneGeometry(this.width, this.height);
+    this.geometry = new PlaneGeometry(this.width ?? 64, this.height ?? 64);
     this.material = new MeshBasicMaterial({
       color: props.color ?? '#ffffff',
       transparent: true,
@@ -38,6 +55,18 @@ export class Sprite2D extends Node2D {
     this.mesh = new Mesh(this.geometry, this.material);
     this.mesh.name = `${this.name}-Mesh`;
     this.add(this.mesh);
+  }
+
+  get texturePath(): string | null {
+    return this.texture?.url ?? null;
+  }
+
+  set texturePath(value: string | null) {
+    this.texture = coerceTextureResource(value);
+  }
+
+  setTextureResource(value: unknown): void {
+    this.texture = coerceTextureResource(value);
   }
 
   /**
@@ -58,13 +87,24 @@ export class Sprite2D extends Node2D {
     this.material.color.set('#ffffff'); // Reset to white once texture is loaded
     this.material.needsUpdate = true;
 
-    // If no explicit dimensions, use texture dimensions
-    if (texture.image && (this.width === undefined || this.height === undefined)) {
-      const w = (texture.image as HTMLImageElement).width;
-      const h = (texture.image as HTMLImageElement).height;
-      console.log(`[Sprite2D] Auto-resizing "${this.name}" to texture dimensions: ${w}x${h}`);
+    // Capture the texture aspect ratio and original dimensions
+    if (texture.image) {
+      const img = texture.image as any;
+      const w = img.naturalWidth ?? img.width;
+      const h = img.naturalHeight ?? img.height;
+
+      console.log(`[Sprite2D] Texture loaded: ${w}x${h} for node "${this.name}" (natural=${img.naturalWidth}x${img.naturalHeight})`);
+
       if (w && h) {
-        this.updateSize(w, h);
+        this.textureAspectRatio = w / h; // Store aspect ratio
+        this.originalWidth = w;
+        this.originalHeight = h;
+
+        // If no explicit dimensions, use texture dimensions
+        if (this.width === undefined || this.height === undefined) {
+          console.log(`[Sprite2D] Auto-resizing "${this.name}" to texture dimensions: ${w}x${h}`);
+          this.updateSize(w, h);
+        }
       }
     }
   }
@@ -75,6 +115,18 @@ export class Sprite2D extends Node2D {
     this.geometry.dispose();
     this.geometry = new PlaneGeometry(w, h);
     this.mesh.geometry = this.geometry;
+  }
+
+  /**
+   * Reset sprite size to its original texture dimensions.
+   * If no original dimensions are known, does nothing.
+   */
+  resetToOriginalSize(): void {
+    if (!this.originalWidth || !this.originalHeight) {
+      return;
+    }
+
+    this.updateSize(this.originalWidth, this.originalHeight);
   }
 
   /**
@@ -90,17 +142,22 @@ export class Sprite2D extends Node2D {
       properties: [
         ...baseSchema.properties,
         {
-          name: 'texturePath',
-          type: 'string',
+          name: 'texture',
+          type: 'object',
           ui: {
             label: 'Texture',
             description: 'Path to the sprite texture',
             group: 'Sprite',
+            editor: 'texture-resource',
+            resourceType: 'texture',
           },
-          getValue: (node: unknown) => (node as Sprite2D).texturePath ?? '',
-          setValue: () => {
-            // Texture path is read-only in constructor, but would be updated via operations
-            // This is here for completeness; actual updates happen via UpdateObjectPropertyOperation
+          getValue: (node: unknown) =>
+            (node as Sprite2D).texture ?? {
+              type: 'texture',
+              url: '',
+            },
+          setValue: (node: unknown, value: unknown) => {
+            (node as Sprite2D).setTextureResource(value);
           },
         },
         {

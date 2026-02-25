@@ -43,6 +43,26 @@ interface SelectOption {
   label: string;
 }
 
+interface TextureResourceValue {
+  type: 'texture';
+  url: string;
+}
+
+const ASSET_RESOURCE_MIME = 'application/x-pix3-asset-resource';
+const ASSET_PATH_MIME = 'application/x-pix3-asset-path';
+const IMAGE_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'svg',
+  'tif',
+  'tiff',
+  'avif',
+]);
+
 @customElement('pix3-inspector-panel')
 export class InspectorPanel extends ComponentBase {
   @inject(SceneManager)
@@ -110,6 +130,9 @@ export class InspectorPanel extends ComponentBase {
   private disposeAssetPreviewSubscription?: () => void;
   private scriptCreatorRequestedHandler?: (e: Event) => void;
 
+  private readonly texturePreviewUrls = new Map<string, string>();
+  private readonly texturePreviewLoads = new Set<string>();
+
   connectedCallback() {
     super.connectedCallback();
     this.disposeSelectionSubscription = subscribe(appState.selection, () => {
@@ -154,6 +177,12 @@ export class InspectorPanel extends ComponentBase {
       );
       this.scriptCreatorRequestedHandler = undefined;
     }
+
+    for (const previewUrl of this.texturePreviewUrls.values()) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    this.texturePreviewUrls.clear();
+    this.texturePreviewLoads.clear();
   }
 
   private toUrlSafeClassName(name: string): string {
@@ -376,7 +405,8 @@ export class InspectorPanel extends ComponentBase {
       prop.type === 'vector2' ||
       prop.type === 'vector3' ||
       prop.type === 'vector4' ||
-      prop.type === 'euler'
+      prop.type === 'euler' ||
+      prop.type === 'object'
     ) {
       return JSON.stringify(value);
     }
@@ -386,6 +416,125 @@ export class InspectorPanel extends ComponentBase {
 
   private getComponentPropertyKey(componentId: string, propertyName: string): string {
     return `${componentId}:${propertyName}`;
+  }
+
+  private toTextureResourceValue(rawValue: unknown): TextureResourceValue {
+    if (typeof rawValue === 'object' && rawValue !== null) {
+      const value = rawValue as { type?: unknown; url?: unknown };
+      if (value.type === 'texture' && typeof value.url === 'string') {
+        return { type: 'texture', url: value.url };
+      }
+      if (typeof value.url === 'string') {
+        return { type: 'texture', url: value.url };
+      }
+    }
+
+    if (typeof rawValue === 'string') {
+      try {
+        const parsed = JSON.parse(rawValue) as unknown;
+        return this.toTextureResourceValue(parsed);
+      } catch {
+        return { type: 'texture', url: rawValue };
+      }
+    }
+
+    return { type: 'texture', url: '' };
+  }
+
+  private getTexturePreviewUrl(textureUrl: string): string {
+    const resourceUrl = textureUrl.trim();
+    if (!resourceUrl || !this.isImageResource(resourceUrl)) {
+      return '';
+    }
+
+    if (resourceUrl.startsWith('http://') || resourceUrl.startsWith('https://')) {
+      return resourceUrl;
+    }
+
+    const cached = this.texturePreviewUrls.get(resourceUrl);
+    if (cached) {
+      return cached;
+    }
+
+    if (resourceUrl.startsWith('res://') && !this.texturePreviewLoads.has(resourceUrl)) {
+      this.texturePreviewLoads.add(resourceUrl);
+      void (async () => {
+        try {
+          const blob = await this.fileSystemAPI.readBlob(resourceUrl);
+          const objectUrl = URL.createObjectURL(blob);
+          this.texturePreviewUrls.set(resourceUrl, objectUrl);
+          this.requestUpdate();
+        } catch {
+          // Keep empty preview when read fails.
+        } finally {
+          this.texturePreviewLoads.delete(resourceUrl);
+        }
+      })();
+    }
+
+    return '';
+  }
+
+  private isImageResource(path: string): boolean {
+    const cleaned = path.split('?')[0].split('#')[0];
+    const extension = cleaned.includes('.') ? cleaned.split('.').pop()?.toLowerCase() ?? '' : '';
+    return IMAGE_EXTENSIONS.has(extension);
+  }
+
+  private normalizeDroppedResource(rawValue: string): string | null {
+    const value = rawValue.trim();
+    if (!value) {
+      return null;
+    }
+
+    if (value.startsWith('res://') || value.startsWith('http://') || value.startsWith('https://')) {
+      return this.isImageResource(value) ? value : null;
+    }
+
+    if (value.includes('://')) {
+      return null;
+    }
+
+    const normalized = value.replace(/^\.\//, '').replace(/^\/+/, '').replace(/\\+/g, '/');
+    const resourcePath = `res://${normalized}`;
+    return this.isImageResource(resourcePath) ? resourcePath : null;
+  }
+
+  private getDroppedTextureResource(event: DragEvent): string | null {
+    const transfer = event.dataTransfer;
+    if (!transfer) {
+      return null;
+    }
+
+    const fromResource = transfer.getData(ASSET_RESOURCE_MIME);
+    const normalizedResource = this.normalizeDroppedResource(fromResource);
+    if (normalizedResource) {
+      return normalizedResource;
+    }
+
+    const fromPath = transfer.getData(ASSET_PATH_MIME);
+    const normalizedPath = this.normalizeDroppedResource(fromPath);
+    if (normalizedPath) {
+      return normalizedPath;
+    }
+
+    const fromUriList = transfer.getData('text/uri-list');
+    const normalizedUriList = this.normalizeDroppedResource(fromUriList);
+    if (normalizedUriList) {
+      return normalizedUriList;
+    }
+
+    const plain = transfer.getData('text/plain');
+    return this.normalizeDroppedResource(plain);
+  }
+
+  private onTextureResourceDrop(propertyName: string, event: DragEvent): void {
+    const textureUrl = this.getDroppedTextureResource(event);
+    if (!textureUrl) {
+      return;
+    }
+
+    void this.applyPropertyChange(propertyName, { type: 'texture', url: textureUrl });
   }
 
   private async handlePropertyInput(propName: string, e: Event) {
@@ -1284,6 +1433,149 @@ export class InspectorPanel extends ComponentBase {
     return '';
   }
 
+  private renderSizeGroup(label: string, props: PropertyDefinition[]) {
+    if (!this.primaryNode) {
+      return '';
+    }
+
+    const widthProp = props.find(p => p.name === 'width');
+    const heightProp = props.find(p => p.name === 'height');
+
+    if (!widthProp || !heightProp) {
+      // Fallback to default rendering if missing props
+      return html`
+        <div class="property-group-section">
+          <h4 class="group-title">${label}</h4>
+          ${props.map(prop => this.renderPropertyInput(prop))}
+        </div>
+      `;
+    }
+
+    const widthState = this.propertyValues[widthProp.name];
+    const heightState = this.propertyValues[heightProp.name];
+    const readOnly = widthProp.ui?.readOnly;
+
+    const width = widthState ? parseFloat(widthState.value) : 64;
+    const height = heightState ? parseFloat(heightState.value) : 64;
+
+    // For sprite nodes, get aspect ratio lock and texture aspect ratio
+    const node = this.primaryNode;
+    let aspectRatioLocked = false;
+    let textureAspectRatio: number | null = null;
+
+    if ('aspectRatioLocked' in node) {
+      aspectRatioLocked = (node as any).aspectRatioLocked ?? false;
+    }
+    if ('textureAspectRatio' in node) {
+      textureAspectRatio = (node as any).textureAspectRatio ?? null;
+    }
+
+    const hasOriginalRatio = textureAspectRatio !== null && textureAspectRatio > 0;
+
+    const handleWidthChange = (newWidth: number) => {
+      if (aspectRatioLocked && hasOriginalRatio) {
+        const newHeight = newWidth / textureAspectRatio!;
+        void Promise.all([
+          this.applyPropertyChange(widthProp.name, newWidth),
+          this.applyPropertyChange(heightProp.name, newHeight),
+        ]);
+      } else {
+        void this.applyPropertyChange(widthProp.name, newWidth);
+      }
+    };
+
+    const handleHeightChange = (newHeight: number) => {
+      if (aspectRatioLocked && hasOriginalRatio) {
+        const newWidth = newHeight * textureAspectRatio!;
+        void Promise.all([
+          this.applyPropertyChange(widthProp.name, newWidth),
+          this.applyPropertyChange(heightProp.name, newHeight),
+        ]);
+      } else {
+        void this.applyPropertyChange(heightProp.name, newHeight);
+      }
+    };
+
+    const handleResetToOriginal = () => {
+      if (hasOriginalRatio) {
+        // Reset to original texture size (keeping aspect ratio with width = 64 as default)
+        const defaultWidth = 64;
+        const defaultHeight = defaultWidth / textureAspectRatio!;
+        void Promise.all([
+          this.applyPropertyChange(widthProp.name, defaultWidth),
+          this.applyPropertyChange(heightProp.name, defaultHeight),
+        ]);
+      }
+    };
+
+    const handleToggleAspectRatio = () => {
+      if ('aspectRatioLocked' in node) {
+        const newLocked = !aspectRatioLocked;
+        void this.applyPropertyChange('aspectRatioLocked', newLocked);
+      }
+    };
+
+    return html`
+      <div class="property-group-section size-section">
+        <div class="size-group-header">
+          <h4 class="group-title">${label}</h4>
+          <div class="size-group-actions">
+            ${hasOriginalRatio
+        ? html`
+                <button
+                  class="size-reset-button"
+                  title="Reset to original texture size (64px × ${(64 / textureAspectRatio!).toFixed(1)}px)"
+                  @click=${handleResetToOriginal}
+                >
+                  🔗
+                </button>
+              `
+        : ''}
+            ${hasOriginalRatio
+        ? html`
+                <button
+                  class="size-lock-button ${aspectRatioLocked ? 'locked' : ''}"
+                  title=${aspectRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
+                  @click=${handleToggleAspectRatio}
+                >
+                  ${aspectRatioLocked ? '🔒' : '🔓'}
+                </button>
+              `
+        : ''}
+          </div>
+        </div>
+
+        <div class="size-fields">
+          <div class="size-field">
+            <label class="size-field-label">Width</label>
+            <input
+              type="number"
+              class="size-field-input"
+              step=${widthProp.ui?.step ?? 1}
+              .value=${width.toFixed(widthProp.ui?.precision ?? 0)}
+              ?disabled=${readOnly}
+              @change=${(e: Event) => handleWidthChange(parseFloat((e.target as HTMLInputElement).value))}
+            />
+            ${widthProp.ui?.unit ? html`<span class="size-field-unit">${widthProp.ui.unit}</span>` : ''}
+          </div>
+
+          <div class="size-field">
+            <label class="size-field-label">Height</label>
+            <input
+              type="number"
+              class="size-field-input"
+              step=${heightProp.ui?.step ?? 1}
+              .value=${height.toFixed(heightProp.ui?.precision ?? 0)}
+              ?disabled=${readOnly}
+              @change=${(e: Event) => handleHeightChange(parseFloat((e.target as HTMLInputElement).value))}
+            />
+            ${heightProp.ui?.unit ? html`<span class="size-field-unit">${heightProp.ui.unit}</span>` : ''}
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
   private getSelectOptions(prop: PropertyDefinition): SelectOption[] {
     const options = prop.ui?.options;
     if (!options) {
@@ -1508,6 +1800,29 @@ export class InspectorPanel extends ComponentBase {
     const label = prop.ui?.label || prop.name;
     const readOnly = prop.ui?.readOnly;
 
+    if (prop.type === 'object' && prop.ui?.editor === 'texture-resource') {
+      const textureValue = this.toTextureResourceValue(state.value);
+      const previewUrl = this.getTexturePreviewUrl(textureValue.url);
+
+      return html`
+        <div class="property-group">
+          <span class="property-label">${label}</span>
+          <pix3-texture-resource-editor
+            .resourceUrl=${textureValue.url}
+            .previewUrl=${previewUrl}
+            ?disabled=${readOnly}
+            @change=${(event: CustomEvent<{ url: string }>) =>
+              this.applyPropertyChange(prop.name, {
+                type: 'texture',
+                url: event.detail.url.trim(),
+              })}
+            @texture-drop=${(event: CustomEvent<{ event: DragEvent }>) =>
+              this.onTextureResourceDrop(prop.name, event.detail.event)}
+          ></pix3-texture-resource-editor>
+        </div>
+      `;
+    }
+
     if (prop.type === 'boolean') {
       return html`
         <div class="property-group">
@@ -1590,6 +1905,46 @@ export class InspectorPanel extends ComponentBase {
             ?disabled=${readOnly}
             @change=${(e: CustomEvent) => this.applyPropertyChange(prop.name, e.detail)}
           ></pix3-euler-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'number' && (prop.ui as any)?.editor === 'sprite-size') {
+      // Only render size editor for width property to avoid duplicates
+      if (prop.name !== 'width') {
+        return '';
+      }
+
+      // Handle sprite size editor (combines width and height)
+      const heightState = this.propertyValues['height'];
+      const widthVal = state.value;
+      const heightVal = heightState?.value ?? 64;
+
+      const node = this.primaryNode;
+      const originalWidth = (node as any)?.originalWidth ?? null;
+      const originalHeight = (node as any)?.originalHeight ?? null;
+      const aspectRatioLocked = (node as any)?.aspectRatioLocked ?? false;
+      const hasOriginalSize = originalWidth && originalHeight;
+
+      return html`
+        <div class="property-group">
+          <span class="property-label">Size</span>
+          <pix3-size-editor
+            .width=${widthVal}
+            .height=${heightVal}
+            .aspectRatioLocked=${aspectRatioLocked}
+            .hasOriginalSize=${hasOriginalSize}
+            .originalWidth=${originalWidth}
+            .originalHeight=${originalHeight}
+            ?disabled=${readOnly}
+            @change=${(e: CustomEvent<{ width: number; height: number; aspectRatioLocked: boolean }>) => {
+              const { width, height, aspectRatioLocked } = e.detail;
+              this.applyPropertyChange('width', width);
+              this.applyPropertyChange('height', height);
+              this.applyPropertyChange('aspectRatioLocked', aspectRatioLocked);
+            }}
+            @reset-size=${() => this.handleSizeReset()}
+          ></pix3-size-editor>
         </div>
       `;
     }
@@ -1693,6 +2048,31 @@ export class InspectorPanel extends ComponentBase {
         </label>
       </div>
     `;
+  }
+
+  private async handleSizeReset() {
+    if (!this.primaryNode) {
+      return;
+    }
+
+    const originalWidth = (this.primaryNode as any).originalWidth ?? null;
+    const originalHeight = (this.primaryNode as any).originalHeight ?? null;
+
+    console.log(`[Inspector] Attempting size reset for "${this.primaryNode.name}"`, {
+      originalWidth,
+      originalHeight,
+      nodeWidth: (this.primaryNode as any).width,
+      nodeHeight: (this.primaryNode as any).height,
+    });
+
+    if (originalWidth && originalHeight) {
+      console.log(`[Inspector] Applying reset: ${originalWidth}x${originalHeight}`);
+      // Apply width first, then height. Sequential awaits to ensure they don't fight.
+      await this.applyPropertyChange('width', originalWidth);
+      await this.applyPropertyChange('height', originalHeight);
+    } else {
+      console.warn(`[Inspector] Cannot reset size: original dimensions unknown or invalid`, { originalWidth, originalHeight });
+    }
   }
 }
 

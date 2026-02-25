@@ -80,7 +80,7 @@ root:
             type: Sprite2D
             name: Logo Sprite
             properties:
-              texturePath: templ://pix3-logo.png
+              texture: { type: 'texture', url: 'templ://pix3-logo.png' }
               width: 64
               height: 64
               transform:

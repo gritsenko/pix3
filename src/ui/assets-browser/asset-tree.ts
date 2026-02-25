@@ -682,8 +682,18 @@ export class AssetTree extends ComponentBase {
     this.draggedPath = node.path;
     this.isExternalDrag = false;
     if (e.dataTransfer) {
-      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.effectAllowed = node.kind === 'file' ? 'copyMove' : 'move';
       e.dataTransfer.setData('text/plain', node.path);
+
+      if (node.kind === 'file') {
+        const normalizedPath = this.normalizeTreePath(node.path);
+        if (normalizedPath) {
+          const resourcePath = this.buildResourcePath(normalizedPath);
+          e.dataTransfer.setData('application/x-pix3-asset-path', node.path);
+          e.dataTransfer.setData('application/x-pix3-asset-resource', resourcePath);
+          e.dataTransfer.setData('text/uri-list', resourcePath);
+        }
+      }
     }
   }
 

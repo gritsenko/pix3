@@ -67,6 +67,12 @@ export interface PropertyUIHints {
 
   /** For 'node' type - array of allowed node types (e.g. ['MeshInstance', 'Node3D']) */
   nodeTypes?: string[];
+
+  /** Optional specialized editor kind for object-like values */
+  editor?: 'texture-resource' | 'sprite-size';
+
+  /** Optional resource subtype for object-like values */
+  resourceType?: 'texture';
 }
 
 /** Validation rule for a property */

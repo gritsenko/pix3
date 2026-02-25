@@ -114,7 +114,7 @@ root:
             type: Sprite2D
             name: Logo Sprite
             properties:
-              texturePath: res://images/64x64.png
+              texture: { type: 'texture', url: 'res://images/64x64.png' }
               width: 64
               height: 64
               transform:

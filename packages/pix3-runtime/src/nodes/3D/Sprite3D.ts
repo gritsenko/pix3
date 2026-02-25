@@ -10,23 +10,38 @@ import {
 } from 'three';
 import { Node3D, type Node3DProps } from '../Node3D';
 import type { PropertySchema } from '../../fw/property-schema';
+import {
+  coerceTextureResource,
+  type TextureResourceRef,
+} from '../../core/TextureResource';
 
 export interface Sprite3DProps extends Omit<Node3DProps, 'type'> {
+  texture?: TextureResourceRef | null;
   texturePath?: string | null;
   width?: number;
   height?: number;
   color?: string;
   billboard?: boolean;
   billboardRoll?: number;
+  textureAspectRatio?: number | null;
+  aspectRatioLocked?: boolean;
 }
 
 export class Sprite3D extends Node3D {
-  texturePath: string | null;
+  texture: TextureResourceRef | null;
   width: number;
   height: number;
   color: string;
   billboard: boolean;
   billboardRoll: number;
+  /** Stored aspect ratio of the original texture (width / height), null if unknown. */
+  textureAspectRatio: number | null;
+  /** If true, height changes proportionally when width is modified and vice versa. */
+  aspectRatioLocked: boolean;
+  /** Original width (from texture). Used to reset to natural size. */
+  originalWidth: number | null;
+  /** Original height (from texture). Used to reset to natural size. */
+  originalHeight: number | null;
 
   private mesh: Mesh;
   private geometry: PlaneGeometry;
@@ -39,12 +54,16 @@ export class Sprite3D extends Node3D {
   constructor(props: Sprite3DProps) {
     super(props, 'Sprite3D');
 
-    this.texturePath = props.texturePath ?? null;
+    this.texture = coerceTextureResource(props.texture ?? props.texturePath ?? null);
     this.width = typeof props.width === 'number' && props.width > 0 ? props.width : 1;
     this.height = typeof props.height === 'number' && props.height > 0 ? props.height : 1;
     this.color = props.color ?? '#ffffff';
     this.billboard = props.billboard ?? false;
     this.billboardRoll = props.billboardRoll ?? 0;
+    this.textureAspectRatio = props.textureAspectRatio ?? null;
+    this.aspectRatioLocked = props.aspectRatioLocked ?? false;
+    this.originalWidth = null;
+    this.originalHeight = null;
 
     this.geometry = new PlaneGeometry(this.width, this.height);
     this.material = new MeshBasicMaterial({
@@ -62,12 +81,39 @@ export class Sprite3D extends Node3D {
     this.add(this.billboardPivot);
   }
 
+  get texturePath(): string | null {
+    return this.texture?.url ?? null;
+  }
+
+  set texturePath(value: string | null) {
+    this.texture = coerceTextureResource(value);
+  }
+
+  setTextureResource(value: unknown): void {
+    this.texture = coerceTextureResource(value);
+  }
+
   setTexture(texture: Texture): void {
     texture.colorSpace = SRGBColorSpace;
     this.material.map = texture;
     this.material.color.set('#ffffff');
     this.material.transparent = true;
     this.material.needsUpdate = true;
+
+    // Capture the texture aspect ratio and original dimensions
+    if (texture.image) {
+      const img = texture.image as any;
+      const w = img.naturalWidth ?? img.width;
+      const h = img.naturalHeight ?? img.height;
+
+      console.log(`[Sprite3D] Texture loaded: ${w}x${h} for node "${this.name}" (natural=${img.naturalWidth}x${img.naturalHeight})`);
+
+      if (w && h) {
+        this.textureAspectRatio = w / h;
+        this.originalWidth = w;
+        this.originalHeight = h;
+      }
+    }
   }
 
   clearTexture(): void {
@@ -89,6 +135,18 @@ export class Sprite3D extends Node3D {
     this.geometry.dispose();
     this.geometry = new PlaneGeometry(this.width, this.height);
     this.mesh.geometry = this.geometry;
+  }
+
+  /**
+   * Reset sprite size to its original texture dimensions.
+   * If no original dimensions are known, does nothing.
+   */
+  resetToOriginalSize(): void {
+    if (!this.originalWidth || !this.originalHeight) {
+      return;
+    }
+
+    this.setSize(this.originalWidth, this.originalHeight);
   }
 
   applyBillboard(cameraQuaternion: Quaternion): void {
@@ -117,18 +175,22 @@ export class Sprite3D extends Node3D {
       properties: [
         ...baseSchema.properties,
         {
-          name: 'texturePath',
-          type: 'string',
+          name: 'texture',
+          type: 'object',
           ui: {
             label: 'Texture',
             description: 'Path to the sprite texture',
             group: 'Sprite',
+            editor: 'texture-resource',
+            resourceType: 'texture',
           },
-          getValue: (node: unknown) => (node as Sprite3D).texturePath ?? '',
+          getValue: (node: unknown) =>
+            (node as Sprite3D).texture ?? {
+              type: 'texture',
+              url: '',
+            },
           setValue: (node: unknown, value: unknown) => {
-            const n = node as Sprite3D;
-            const next = typeof value === 'string' ? value.trim() : '';
-            n.texturePath = next.length > 0 ? next : null;
+            (node as Sprite3D).setTextureResource(value);
           },
         },
         {
@@ -138,6 +200,7 @@ export class Sprite3D extends Node3D {
             label: 'Width',
             description: 'Sprite width in world units',
             group: 'Sprite',
+            editor: 'sprite-size',
             step: 0.01,
             precision: 2,
             min: 0.01,
@@ -155,6 +218,7 @@ export class Sprite3D extends Node3D {
             label: 'Height',
             description: 'Sprite height in world units',
             group: 'Sprite',
+            editor: 'sprite-size',
             step: 0.01,
             precision: 2,
             min: 0.01,
@@ -192,6 +256,28 @@ export class Sprite3D extends Node3D {
           getValue: (node: unknown) => (node as Sprite3D).billboardRoll,
           setValue: (node: unknown, value: unknown) => {
             (node as Sprite3D).billboardRoll = Number(value);
+          },
+        },
+        {
+          name: 'textureAspectRatio',
+          type: 'number',
+          ui: {
+            hidden: true,
+          },
+          getValue: (node: unknown) => (node as Sprite3D).textureAspectRatio ?? null,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Sprite3D).textureAspectRatio = value === null ? null : Number(value);
+          },
+        },
+        {
+          name: 'aspectRatioLocked',
+          type: 'boolean',
+          ui: {
+            hidden: true,
+          },
+          getValue: (node: unknown) => (node as Sprite3D).aspectRatioLocked,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Sprite3D).aspectRatioLocked = Boolean(value);
           },
         },
       ],

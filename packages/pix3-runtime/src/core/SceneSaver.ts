@@ -285,8 +285,8 @@ export class SceneSaver {
 
     // Serialize specific node type properties
     if (node instanceof Sprite2D) {
-      if (node.texturePath) {
-        props.texturePath = node.texturePath;
+      if (node.texture) {
+        props.texture = { ...node.texture };
       }
       // Save width/height in pixels
       props.width = node.width;
@@ -408,8 +408,8 @@ export class SceneSaver {
       props.castShadow = inst.castShadow;
       props.receiveShadow = inst.receiveShadow;
     } else if (node instanceof Sprite3D) {
-      if (node.texturePath) {
-        props.texturePath = node.texturePath;
+      if (node.texture) {
+        props.texture = { ...node.texture };
       }
       props.width = node.width;
       props.height = node.height;
