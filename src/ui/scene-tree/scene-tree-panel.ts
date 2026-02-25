@@ -11,6 +11,7 @@ import { KeybindingService } from '@/services/KeybindingService';
 import { NodeRegistry } from '@/services/NodeRegistry';
 import { ReparentNodeCommand } from '@/features/scene/ReparentNodeCommand';
 import { CreatePrefabInstanceCommand } from '@/features/scene/CreatePrefabInstanceCommand';
+import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
 import { SaveAsPrefabCommand } from '@/features/scene/SaveAsPrefabCommand';
 import { SceneManager } from '@pix3/runtime';
 import { ServiceContainer } from '@/fw/di';
@@ -38,6 +39,19 @@ interface NodeAssetDropDetail {
   position: 'before' | 'inside' | 'after';
   resourcePath: string;
 }
+
+const IMAGE_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'svg',
+  'tif',
+  'tiff',
+  'avif',
+]);
 
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {
@@ -538,12 +552,45 @@ export class SceneTreePanel extends ComponentBase {
       }
     }
 
-    const command = new CreatePrefabInstanceCommand({
-      prefabPath: resourcePath,
-      parentNodeId,
-      insertIndex,
-    });
-    await this.commandDispatcher.execute(command);
+    if (this.isPrefabResource(resourcePath)) {
+      const command = new CreatePrefabInstanceCommand({
+        prefabPath: resourcePath,
+        parentNodeId,
+        insertIndex,
+      });
+      await this.commandDispatcher.execute(command);
+      return;
+    }
+
+    if (this.isImageResource(resourcePath)) {
+      const command = new CreateSprite2DCommand({
+        texturePath: resourcePath,
+        spriteName: this.deriveSpriteName(resourcePath),
+        parentNodeId,
+        insertIndex,
+      });
+      await this.commandDispatcher.execute(command);
+    }
+  }
+
+  private isPrefabResource(resourcePath: string): boolean {
+    return resourcePath.toLowerCase().endsWith('.pix3scene');
+  }
+
+  private isImageResource(resourcePath: string): boolean {
+    const normalized = resourcePath.toLowerCase().split('?')[0].split('#')[0];
+    const extension = normalized.includes('.') ? normalized.split('.').pop() ?? '' : '';
+    return IMAGE_EXTENSIONS.has(extension);
+  }
+
+  private deriveSpriteName(resourcePath: string): string {
+    const normalized = resourcePath.replace(/\\/g, '/');
+    const fileName = normalized.split('/').pop() ?? 'Sprite2D';
+    const dotIndex = fileName.lastIndexOf('.');
+    if (dotIndex <= 0) {
+      return fileName || 'Sprite2D';
+    }
+    return fileName.slice(0, dotIndex) || 'Sprite2D';
   }
 
   private onNodeDragStart(event: CustomEvent): void {

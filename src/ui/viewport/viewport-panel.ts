@@ -7,6 +7,7 @@ import { IconService } from '@/services/IconService';
 import { Navigation2DController } from '@/services/Navigation2DController';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
 import { CreatePrefabInstanceCommand } from '@/features/scene/CreatePrefabInstanceCommand';
+import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
 import renderTransformToolbar from './transform-toolbar';
 
 @customElement('pix3-viewport-panel')
@@ -60,6 +61,18 @@ export class ViewportPanel extends ComponentBase {
   private isAssetDragOver = false;
   private static readonly ASSET_RESOURCE_MIME = 'application/x-pix3-asset-resource';
   private static readonly ASSET_PATH_MIME = 'application/x-pix3-asset-path';
+  private static readonly IMAGE_EXTENSIONS = new Set([
+    'png',
+    'jpg',
+    'jpeg',
+    'gif',
+    'webp',
+    'bmp',
+    'svg',
+    'tif',
+    'tiff',
+    'avif',
+  ]);
 
   // Gesture tracking for 2D navigation
   // Note: We handle wheel events directly without accumulation to ensure responsive
@@ -260,10 +273,21 @@ export class ViewportPanel extends ComponentBase {
     }
 
     event.preventDefault();
-    const command = new CreatePrefabInstanceCommand({
-      prefabPath: resourcePath,
-    });
-    void this.commandDispatcher.execute(command);
+    if (this.isPrefabResource(resourcePath)) {
+      const command = new CreatePrefabInstanceCommand({
+        prefabPath: resourcePath,
+      });
+      void this.commandDispatcher.execute(command);
+      return;
+    }
+
+    if (this.isImageResource(resourcePath)) {
+      const command = new CreateSprite2DCommand({
+        texturePath: resourcePath,
+        spriteName: this.deriveSpriteName(resourcePath),
+      });
+      void this.commandDispatcher.execute(command);
+    }
   };
 
   private getDroppedResourcePath(dataTransfer: DataTransfer | null): string | null {
@@ -284,11 +308,31 @@ export class ViewportPanel extends ComponentBase {
       ? normalized
       : `res://${normalized.replace(/^\/+/, '')}`;
 
-    if (!resourcePath.toLowerCase().endsWith('.pix3scene')) {
+    if (!this.isPrefabResource(resourcePath) && !this.isImageResource(resourcePath)) {
       return null;
     }
 
     return resourcePath;
+  }
+
+  private isPrefabResource(resourcePath: string): boolean {
+    return resourcePath.toLowerCase().endsWith('.pix3scene');
+  }
+
+  private isImageResource(resourcePath: string): boolean {
+    const normalized = resourcePath.toLowerCase().split('?')[0].split('#')[0];
+    const extension = normalized.includes('.') ? normalized.split('.').pop() ?? '' : '';
+    return ViewportPanel.IMAGE_EXTENSIONS.has(extension);
+  }
+
+  private deriveSpriteName(resourcePath: string): string {
+    const normalized = resourcePath.replace(/\\/g, '/');
+    const fileName = normalized.split('/').pop() ?? 'Sprite2D';
+    const dotIndex = fileName.lastIndexOf('.');
+    if (dotIndex <= 0) {
+      return fileName || 'Sprite2D';
+    }
+    return fileName.slice(0, dotIndex) || 'Sprite2D';
   }
 
   private syncViewportScene(): void {

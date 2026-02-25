@@ -7,12 +7,14 @@ import {
   LAYOUT_PRESETS,
   type LayoutPreset,
   MeshInstance,
+  Sprite2D,
 } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { appState } from '@/state';
 import type { NodeBase, ScriptComponent } from '@pix3/runtime';
 import type { PropertySchema, PropertyDefinition } from '@/fw';
 import { UpdateObjectPropertyCommand } from '@/features/properties/UpdateObjectPropertyCommand';
+import { UpdateSprite2DSizeCommand } from '@/features/properties/UpdateSprite2DSizeCommand';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { BehaviorPickerService } from '@/services/BehaviorPickerService';
 import { ScriptCreatorService } from '@/services/ScriptCreatorService';
@@ -610,6 +612,31 @@ export class InspectorPanel extends ComponentBase {
         ...this.propertyValues,
         [propertyName]: { value: displayValue, isValid: true },
       };
+    }
+  }
+
+  private async applySpriteSizeChange(
+    width: number,
+    height: number,
+    aspectRatioLocked?: boolean
+  ): Promise<void> {
+    if (!(this.primaryNode instanceof Sprite2D)) {
+      return;
+    }
+
+    const command = new UpdateSprite2DSizeCommand({
+      nodeId: this.primaryNode.nodeId,
+      width,
+      height,
+      aspectRatioLocked,
+    });
+
+    try {
+      await this.commandDispatcher.execute(command);
+    } catch (error) {
+      console.error('[InspectorPanel] Failed to update Sprite2D size', error);
+      this.syncValuesFromNode();
+      this.requestUpdate();
     }
   }
 
@@ -1468,61 +1495,60 @@ export class InspectorPanel extends ComponentBase {
     const width = widthState ? parseFloat(widthState.value) : 64;
     const height = heightState ? parseFloat(heightState.value) : 64;
 
-    // For sprite nodes, get aspect ratio lock and texture aspect ratio
+    if (!(this.primaryNode instanceof Sprite2D)) {
+      return html`
+        <div class="property-group-section">
+          <h4 class="group-title">${label}</h4>
+          ${props.map(prop => this.renderPropertyInput(prop))}
+        </div>
+      `;
+    }
+
     const node = this.primaryNode;
-    let aspectRatioLocked = false;
-    let textureAspectRatio: number | null = null;
-
-    if ('aspectRatioLocked' in node) {
-      aspectRatioLocked = (node as any).aspectRatioLocked ?? false;
-    }
-    if ('textureAspectRatio' in node) {
-      textureAspectRatio = (node as any).textureAspectRatio ?? null;
-    }
-
+    const aspectRatioLocked = node.aspectRatioLocked;
+    const textureAspectRatio = node.textureAspectRatio;
+    const originalWidth = node.originalWidth;
+    const originalHeight = node.originalHeight;
     const hasOriginalRatio = textureAspectRatio !== null && textureAspectRatio > 0;
+    const hasOriginalSize =
+      typeof originalWidth === 'number' &&
+      originalWidth > 0 &&
+      typeof originalHeight === 'number' &&
+      originalHeight > 0;
 
     const handleWidthChange = (newWidth: number) => {
+      if (!Number.isFinite(newWidth) || newWidth <= 0) {
+        return;
+      }
       if (aspectRatioLocked && hasOriginalRatio) {
         const newHeight = newWidth / textureAspectRatio!;
-        void Promise.all([
-          this.applyPropertyChange(widthProp.name, newWidth),
-          this.applyPropertyChange(heightProp.name, newHeight),
-        ]);
+        void this.applySpriteSizeChange(newWidth, newHeight, aspectRatioLocked);
       } else {
-        void this.applyPropertyChange(widthProp.name, newWidth);
+        void this.applySpriteSizeChange(newWidth, height, aspectRatioLocked);
       }
     };
 
     const handleHeightChange = (newHeight: number) => {
+      if (!Number.isFinite(newHeight) || newHeight <= 0) {
+        return;
+      }
       if (aspectRatioLocked && hasOriginalRatio) {
         const newWidth = newHeight * textureAspectRatio!;
-        void Promise.all([
-          this.applyPropertyChange(widthProp.name, newWidth),
-          this.applyPropertyChange(heightProp.name, newHeight),
-        ]);
+        void this.applySpriteSizeChange(newWidth, newHeight, aspectRatioLocked);
       } else {
-        void this.applyPropertyChange(heightProp.name, newHeight);
+        void this.applySpriteSizeChange(width, newHeight, aspectRatioLocked);
       }
     };
 
     const handleResetToOriginal = () => {
-      if (hasOriginalRatio) {
-        // Reset to original texture size (keeping aspect ratio with width = 64 as default)
-        const defaultWidth = 64;
-        const defaultHeight = defaultWidth / textureAspectRatio!;
-        void Promise.all([
-          this.applyPropertyChange(widthProp.name, defaultWidth),
-          this.applyPropertyChange(heightProp.name, defaultHeight),
-        ]);
+      if (hasOriginalSize) {
+        void this.applySpriteSizeChange(originalWidth, originalHeight, aspectRatioLocked);
       }
     };
 
     const handleToggleAspectRatio = () => {
-      if ('aspectRatioLocked' in node) {
-        const newLocked = !aspectRatioLocked;
-        void this.applyPropertyChange('aspectRatioLocked', newLocked);
-      }
+      const newLocked = !aspectRatioLocked;
+      void this.applyPropertyChange('aspectRatioLocked', newLocked);
     };
 
     return html`
@@ -1530,14 +1556,14 @@ export class InspectorPanel extends ComponentBase {
         <div class="size-group-header">
           <h4 class="group-title">${label}</h4>
           <div class="size-group-actions">
-            ${hasOriginalRatio
+            ${hasOriginalSize
         ? html`
                 <button
                   class="size-reset-button"
-                  title="Reset to original texture size (64px × ${(64 / textureAspectRatio!).toFixed(1)}px)"
+                  title=${`Reset to original texture size (${originalWidth} x ${originalHeight})`}
                   @click=${handleResetToOriginal}
                 >
-                  🔗
+                  ${this.iconService.getIcon('refresh-cw', 14)}
                 </button>
               `
         : ''}
@@ -1548,7 +1574,7 @@ export class InspectorPanel extends ComponentBase {
                   title=${aspectRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
                   @click=${handleToggleAspectRatio}
                 >
-                  ${aspectRatioLocked ? '🔒' : '🔓'}
+                  ${this.iconService.getIcon(aspectRatioLocked ? 'lock' : 'unlock', 14)}
                 </button>
               `
         : ''}
@@ -1941,21 +1967,26 @@ export class InspectorPanel extends ComponentBase {
 
       // Handle sprite size editor (combines width and height)
       const heightState = this.propertyValues['height'];
-      const widthVal = state.value;
-      const heightVal = heightState?.value ?? 64;
+      const widthVal = Number.parseFloat(state.value);
+      const heightVal = Number.parseFloat(heightState?.value ?? '64');
 
-      const node = this.primaryNode;
-      const originalWidth = (node as any)?.originalWidth ?? null;
-      const originalHeight = (node as any)?.originalHeight ?? null;
-      const aspectRatioLocked = (node as any)?.aspectRatioLocked ?? false;
-      const hasOriginalSize = originalWidth && originalHeight;
+      const node = this.primaryNode instanceof Sprite2D ? this.primaryNode : null;
+      const originalWidth = node?.originalWidth ?? null;
+      const originalHeight = node?.originalHeight ?? null;
+      const aspectRatioLocked = node?.aspectRatioLocked ?? false;
+      const hasOriginalSize = Boolean(
+        typeof originalWidth === 'number' &&
+          originalWidth > 0 &&
+          typeof originalHeight === 'number' &&
+          originalHeight > 0
+      );
 
       return html`
         <div class="property-group">
           ${this.renderPropertyLabel(prop, 'Size', isOverridden)}
           <pix3-size-editor
-            .width=${widthVal}
-            .height=${heightVal}
+            .width=${Number.isFinite(widthVal) && widthVal > 0 ? widthVal : 64}
+            .height=${Number.isFinite(heightVal) && heightVal > 0 ? heightVal : 64}
             .aspectRatioLocked=${aspectRatioLocked}
             .hasOriginalSize=${hasOriginalSize}
             .originalWidth=${originalWidth}
@@ -1963,9 +1994,7 @@ export class InspectorPanel extends ComponentBase {
             ?disabled=${readOnly}
             @change=${(e: CustomEvent<{ width: number; height: number; aspectRatioLocked: boolean }>) => {
               const { width, height, aspectRatioLocked } = e.detail;
-              this.applyPropertyChange('width', width);
-              this.applyPropertyChange('height', height);
-              this.applyPropertyChange('aspectRatioLocked', aspectRatioLocked);
+              this.applySpriteSizeChange(width, height, aspectRatioLocked);
             }}
             @reset-size=${() => this.handleSizeReset()}
           ></pix3-size-editor>
@@ -2170,27 +2199,23 @@ export class InspectorPanel extends ComponentBase {
   }
 
   private async handleSizeReset() {
-    if (!this.primaryNode) {
+    if (!(this.primaryNode instanceof Sprite2D)) {
       return;
     }
 
-    const originalWidth = (this.primaryNode as any).originalWidth ?? null;
-    const originalHeight = (this.primaryNode as any).originalHeight ?? null;
-
-    console.log(`[Inspector] Attempting size reset for "${this.primaryNode.name}"`, {
-      originalWidth,
-      originalHeight,
-      nodeWidth: (this.primaryNode as any).width,
-      nodeHeight: (this.primaryNode as any).height,
-    });
-
-    if (originalWidth && originalHeight) {
-      console.log(`[Inspector] Applying reset: ${originalWidth}x${originalHeight}`);
-      // Apply width first, then height. Sequential awaits to ensure they don't fight.
-      await this.applyPropertyChange('width', originalWidth);
-      await this.applyPropertyChange('height', originalHeight);
-    } else {
-      console.warn(`[Inspector] Cannot reset size: original dimensions unknown or invalid`, { originalWidth, originalHeight });
+    const originalWidth = this.primaryNode.originalWidth;
+    const originalHeight = this.primaryNode.originalHeight;
+    if (
+      typeof originalWidth === 'number' &&
+      originalWidth > 0 &&
+      typeof originalHeight === 'number' &&
+      originalHeight > 0
+    ) {
+      await this.applySpriteSizeChange(
+        originalWidth,
+        originalHeight,
+        this.primaryNode.aspectRatioLocked
+      );
     }
   }
 }

@@ -58,6 +58,18 @@ interface NodeAssetDropDetail {
 
 const ASSET_RESOURCE_MIME = 'application/x-pix3-asset-resource';
 const ASSET_PATH_MIME = 'application/x-pix3-asset-path';
+const IMAGE_EXTENSIONS = new Set([
+  'png',
+  'jpg',
+  'jpeg',
+  'gif',
+  'webp',
+  'bmp',
+  'svg',
+  'tif',
+  'tiff',
+  'avif',
+]);
 
 @customElement('pix3-scene-tree-node')
 export class SceneTreeNodeComponent extends ComponentBase {
@@ -594,8 +606,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
     event.preventDefault();
     event.stopPropagation();
 
+    const hasAssetResource = this.getDroppedResourcePath(event.dataTransfer ?? null) !== null;
     if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'move';
+      event.dataTransfer.dropEffect = hasAssetResource ? 'copy' : 'move';
     }
 
     const element = event.currentTarget as HTMLElement;
@@ -623,7 +636,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
       // Set isValidDropTarget: true = valid/bright, false = invalid/faded
       this.isValidDropTarget = isValid;
       if (event.dataTransfer) {
-        event.dataTransfer.dropEffect = isValid ? 'move' : 'none';
+        event.dataTransfer.dropEffect = isValid ? (hasAssetResource ? 'copy' : 'move') : 'none';
       }
     }
 
@@ -721,11 +734,21 @@ export class SceneTreeNodeComponent extends ComponentBase {
       ? normalized
       : `res://${normalized.replace(/^\/+/, '')}`;
 
-    if (!resourcePath.toLowerCase().endsWith('.pix3scene')) {
+    if (!this.isPrefabResource(resourcePath) && !this.isImageResource(resourcePath)) {
       return null;
     }
 
     return resourcePath;
+  }
+
+  private isPrefabResource(resourcePath: string): boolean {
+    return resourcePath.toLowerCase().endsWith('.pix3scene');
+  }
+
+  private isImageResource(resourcePath: string): boolean {
+    const normalized = resourcePath.toLowerCase().split('?')[0].split('#')[0];
+    const extension = normalized.includes('.') ? normalized.split('.').pop() ?? '' : '';
+    return IMAGE_EXTENSIONS.has(extension);
   }
 
   private async performReparent(
