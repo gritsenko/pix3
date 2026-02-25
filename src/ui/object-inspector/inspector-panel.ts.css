@@ -92,6 +92,26 @@ pix3-panel {
   gap: 0.5rem;
 }
 
+.property-label--overridden {
+  color: var(--pix3-accent-color, #ffcf33);
+  font-weight: 700;
+}
+
+.property-revert-button {
+  border: 1px solid rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.45);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.1);
+  color: var(--pix3-accent-color, #ffcf33);
+  border-radius: 3px;
+  padding: 0 4px;
+  line-height: 1.2;
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.property-revert-button:hover {
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.2);
+}
+
 .property-label--checkbox {
   min-width: auto;
 }

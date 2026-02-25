@@ -7,6 +7,7 @@ import type {
 import { SceneManager } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { NodeBase } from '@pix3/runtime';
+import { isPrefabChildNode } from '@/features/scene/prefab-utils';
 
 export interface DeletedNodeInfo {
   node: NodeBase;
@@ -61,6 +62,13 @@ export class DeleteObjectOperation implements Operation<OperationInvokeResult> {
       const node = sceneGraph.nodeMap.get(nodeId);
       if (!node) {
         console.log('[DeleteObjectOperation] Node not found:', nodeId);
+        continue;
+      }
+
+      if (isPrefabChildNode(node)) {
+        console.warn(
+          `[DeleteObjectOperation] Skip delete for prefab child node "${node.nodeId}" (instance-locked).`
+        );
         continue;
       }
 

@@ -33,6 +33,9 @@ export interface SceneTreeNode {
   children: SceneTreeNode[];
   isContainer: boolean;
   scripts: string[];
+  isPrefabNode?: boolean;
+  isPrefabRoot?: boolean;
+  isPrefabChild?: boolean;
 }
 
 interface ScriptRevealRequestDetail {
@@ -46,6 +49,15 @@ interface NodeContextMenuDetail {
   clientX: number;
   clientY: number;
 }
+
+interface NodeAssetDropDetail {
+  targetNodeId: string;
+  position: 'before' | 'inside' | 'after';
+  resourcePath: string;
+}
+
+const ASSET_RESOURCE_MIME = 'application/x-pix3-asset-resource';
+const ASSET_PATH_MIME = 'application/x-pix3-asset-path';
 
 @customElement('pix3-scene-tree-node')
 export class SceneTreeNodeComponent extends ComponentBase {
@@ -135,6 +147,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
         this.dragOverPosition === 'bottom' && !this.isDragging,
       'tree-node__content--drop-disabled':
         this.dragOverPosition !== null && !this.isValidDropTarget && !this.isDragging,
+      'tree-node__content--prefab': !!this.node.isPrefabNode,
+      'tree-node__content--prefab-root': !!this.node.isPrefabRoot,
+      'tree-node__content--prefab-child': !!this.node.isPrefabChild,
     });
 
     const expanderClasses = classMap({
@@ -199,6 +214,12 @@ export class SceneTreeNodeComponent extends ComponentBase {
           <span class="tree-node__label">
             <span class="tree-node__header">
               <span class="tree-node__name"> ${this.node.name} </span>
+              ${this.node.instancePath
+        ? html`<span class="tree-node__instance-inline">${this.getInstanceFileName(this.node.instancePath)}</span>`
+        : null}
+              ${this.node.isPrefabNode
+        ? html`<span class="tree-node__prefab-badge" title="Prefab-linked node">🔗</span>`
+        : null}
               ${this.node.scripts.length > 0
         ? html`
                     <button
@@ -217,9 +238,6 @@ export class SceneTreeNodeComponent extends ComponentBase {
                   `
         : null}
             </span>
-            ${this.node.instancePath
-        ? html`<span class="tree-node__instance">${this.node.instancePath}</span>`
-        : null}
           </span>
           <div class="tree-node__buttons">
             <button
@@ -496,6 +514,15 @@ export class SceneTreeNodeComponent extends ComponentBase {
     }
   }
 
+  private getInstanceFileName(instancePath: string): string {
+    const normalized = instancePath.replace(/\\/g, '/');
+    const slashIndex = normalized.lastIndexOf('/');
+    if (slashIndex < 0) {
+      return normalized;
+    }
+    return normalized.slice(slashIndex + 1);
+  }
+
   private async onContextMenu(event: MouseEvent): Promise<void> {
     event.preventDefault();
     event.stopPropagation();
@@ -617,16 +644,17 @@ export class SceneTreeNodeComponent extends ComponentBase {
     event.stopPropagation();
 
     const draggedNodeId = event.dataTransfer?.getData('application/x-scene-tree-node');
+    const droppedResourcePath = this.getDroppedResourcePath(event.dataTransfer ?? null);
 
     const dropPosition = this.dragOverPosition;
     this.dragOverPosition = null;
     this.isValidDropTarget = true;
 
-    if (!draggedNodeId) {
+    if (!draggedNodeId && !droppedResourcePath) {
       return;
     }
 
-    if (draggedNodeId === this.node.id) {
+    if (draggedNodeId && draggedNodeId === this.node.id) {
       return;
     }
 
@@ -636,20 +664,68 @@ export class SceneTreeNodeComponent extends ComponentBase {
     }
 
     try {
+      if (droppedResourcePath) {
+        const normalizedPosition: 'before' | 'inside' | 'after' =
+          dropPosition === 'top' ? 'before' : dropPosition === 'bottom' ? 'after' : 'inside';
+        const detail: NodeAssetDropDetail = {
+          targetNodeId: this.node.id,
+          position: normalizedPosition,
+          resourcePath: droppedResourcePath,
+        };
+        this.dispatchEvent(
+          new CustomEvent<NodeAssetDropDetail>('node-asset-drop', {
+            detail,
+            bubbles: true,
+            composed: true,
+          })
+        );
+        return;
+      }
+
+      const draggedId = draggedNodeId ?? '';
+      if (!draggedId) {
+        return;
+      }
+
       if (dropPosition === 'inside' || dropPosition === null) {
         if (this.node.isContainer) {
-          await this.performReparent(draggedNodeId, this.node.id, -1);
+          await this.performReparent(draggedId, this.node.id, -1);
         } else {
-          await this.performReparent(draggedNodeId, this.node.id, 'after');
+          await this.performReparent(draggedId, this.node.id, 'after');
         }
       } else if (dropPosition === 'top') {
-        await this.performReparent(draggedNodeId, this.node.id, 'before');
+        await this.performReparent(draggedId, this.node.id, 'before');
       } else if (dropPosition === 'bottom') {
-        await this.performReparent(draggedNodeId, this.node.id, 'after');
+        await this.performReparent(draggedId, this.node.id, 'after');
       }
     } catch (error) {
       console.error('[SceneTreeNode] Failed to reparent node:', error);
     }
+  }
+
+  private getDroppedResourcePath(dataTransfer: DataTransfer | null): string | null {
+    if (!dataTransfer) {
+      return null;
+    }
+
+    const fromResource = dataTransfer.getData(ASSET_RESOURCE_MIME);
+    const fromPath = dataTransfer.getData(ASSET_PATH_MIME);
+    const plain = dataTransfer.getData('text/plain');
+    const raw = fromResource || fromPath || plain;
+    if (!raw) {
+      return null;
+    }
+
+    const normalized = raw.trim().replace(/\\/g, '/');
+    const resourcePath = normalized.startsWith('res://')
+      ? normalized
+      : `res://${normalized.replace(/^\/+/, '')}`;
+
+    if (!resourcePath.toLowerCase().endsWith('.pix3scene')) {
+      return null;
+    }
+
+    return resourcePath;
   }
 
   private async performReparent(

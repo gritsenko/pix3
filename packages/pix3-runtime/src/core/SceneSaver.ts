@@ -23,13 +23,22 @@ import { Camera3D } from '../nodes/3D/Camera3D';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import type { SceneGraph } from './SceneManager';
-import type { SceneNodeDefinition } from './SceneLoader';
+import type { SceneNodeDefinition, InstanceOverrides } from './SceneLoader';
+import { getNodePropertySchema } from '../fw/property-schema-utils';
 
 interface SceneDocument {
   version: string;
   description?: string;
   metadata?: Record<string, unknown>;
   root: SceneNodeDefinition[];
+}
+
+interface PrefabMarkerMetadata {
+  localId: string;
+  effectiveLocalId: string;
+  instanceRootId: string;
+  sourcePath: string;
+  basePropertiesByLocalId?: Record<string, Record<string, unknown>>;
 }
 
 export class SceneSaver {
@@ -118,6 +127,10 @@ export class SceneSaver {
   }
 
   private serializeNode(node: NodeBase): SceneNodeDefinition {
+    if (node.instancePath) {
+      return this.serializeInstanceNode(node);
+    }
+
     // First, get the properties (this might modify the type for DirectionalLightNode)
     const properties = this.serializeNodeProperties(node);
 
@@ -127,7 +140,7 @@ export class SceneSaver {
       name: node.name,
       groups: node.groups.size > 0 ? Array.from(node.groups.values()) : undefined,
       properties: properties,
-      metadata: node.metadata && Object.keys(node.metadata).length > 0 ? node.metadata : undefined,
+      metadata: this.serializeMetadata(node.metadata),
     };
 
     // Ensure correct type for DirectionalLightNode
@@ -137,10 +150,6 @@ export class SceneSaver {
       definition.type = 'PointLightNode';
     } else if (node instanceof SpotLightNode) {
       definition.type = 'SpotLightNode';
-    }
-
-    if (node.instancePath) {
-      definition.instance = node.instancePath;
     }
 
     // Serialize components
@@ -168,6 +177,68 @@ export class SceneSaver {
     });
 
     return definition;
+  }
+
+  private serializeInstanceNode(node: NodeBase): SceneNodeDefinition {
+    const definition: SceneNodeDefinition = {
+      id: node.nodeId,
+      type: node.type !== 'Group' ? node.type : undefined,
+      name: node.name,
+      instance: node.instancePath ?? undefined,
+      groups: node.groups.size > 0 ? Array.from(node.groups.values()) : undefined,
+      metadata: this.serializeMetadata(node.metadata),
+    };
+
+    const marker = this.getPrefabMarker(node);
+    const baseMap = marker?.basePropertiesByLocalId ?? {};
+    const currentMap = this.captureInstanceComparableMap(node);
+    const normalizedRootKey = marker ? marker.effectiveLocalId : this.normalizeLocalId(node.nodeId);
+    const currentRoot = currentMap[normalizedRootKey] ?? {};
+    const baseRoot = baseMap[normalizedRootKey] ?? {};
+    const rootDiff = this.diffRecord(baseRoot, currentRoot);
+
+    if (Object.keys(rootDiff).length > 0) {
+      definition.properties = rootDiff;
+    }
+
+    const byLocalId: Record<string, { properties?: Record<string, unknown> }> = {};
+    for (const [effectiveLocalId, currentValues] of Object.entries(currentMap)) {
+      if (effectiveLocalId === normalizedRootKey) {
+        continue;
+      }
+
+      const baseValues = baseMap[effectiveLocalId] ?? {};
+      const diff = this.diffRecord(baseValues, currentValues);
+      if (Object.keys(diff).length === 0) {
+        continue;
+      }
+
+      const outputKey = effectiveLocalId.startsWith(`${normalizedRootKey}/`)
+        ? effectiveLocalId.slice(normalizedRootKey.length + 1)
+        : effectiveLocalId;
+      byLocalId[outputKey] = { properties: diff };
+    }
+
+    if (Object.keys(byLocalId).length > 0) {
+      const overrides: InstanceOverrides = { byLocalId };
+      definition.overrides = overrides;
+    }
+
+    Object.keys(definition).forEach(key => {
+      if (definition[key as keyof SceneNodeDefinition] === undefined) {
+        delete definition[key as keyof SceneNodeDefinition];
+      }
+    });
+
+    return definition;
+  }
+
+  private serializeMetadata(metadata: Record<string, unknown>): Record<string, unknown> | undefined {
+    const entries = Object.entries(metadata).filter(([key]) => key !== '__pix3Prefab');
+    if (entries.length === 0) {
+      return undefined;
+    }
+    return Object.fromEntries(entries);
   }
 
   private serializeNodeProperties(node: NodeBase): Record<string, unknown> {
@@ -419,6 +490,102 @@ export class SceneSaver {
     }
 
     return props;
+  }
+
+  private captureInstanceComparableMap(root: NodeBase): Record<string, Record<string, unknown>> {
+    const result: Record<string, Record<string, unknown>> = {};
+    const stack: NodeBase[] = [root];
+
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node) {
+        continue;
+      }
+
+      const marker = this.getPrefabMarker(node);
+      if (marker) {
+        result[marker.effectiveLocalId] = this.captureComparableProperties(node);
+      }
+
+      for (const child of node.children) {
+        if (child instanceof NodeBase) {
+          stack.push(child);
+        }
+      }
+    }
+
+    return result;
+  }
+
+  private captureComparableProperties(node: NodeBase): Record<string, unknown> {
+    const schema = getNodePropertySchema(node);
+    const values: Record<string, unknown> = {};
+
+    for (const prop of schema.properties) {
+      if (prop.ui?.hidden || prop.ui?.readOnly) {
+        continue;
+      }
+      values[prop.name] = this.cloneValue(prop.getValue(node));
+    }
+
+    return values;
+  }
+
+  private diffRecord(
+    baseValues: Record<string, unknown>,
+    currentValues: Record<string, unknown>
+  ): Record<string, unknown> {
+    const diff: Record<string, unknown> = {};
+    const keys = new Set<string>([...Object.keys(baseValues), ...Object.keys(currentValues)]);
+
+    for (const key of keys) {
+      const baseValue = baseValues[key];
+      const currentValue = currentValues[key];
+      if (!this.isEqualValue(baseValue, currentValue)) {
+        diff[key] = this.cloneValue(currentValue);
+      }
+    }
+
+    return diff;
+  }
+
+  private isEqualValue(left: unknown, right: unknown): boolean {
+    return JSON.stringify(left) === JSON.stringify(right);
+  }
+
+  private getPrefabMarker(node: NodeBase): PrefabMarkerMetadata | null {
+    const metadata = node.metadata as Record<string, unknown>;
+    const candidate = metadata.__pix3Prefab;
+
+    if (!candidate || typeof candidate !== 'object') {
+      return null;
+    }
+
+    const marker = candidate as Partial<PrefabMarkerMetadata>;
+    if (
+      typeof marker.localId !== 'string' ||
+      typeof marker.effectiveLocalId !== 'string' ||
+      typeof marker.instanceRootId !== 'string' ||
+      typeof marker.sourcePath !== 'string'
+    ) {
+      return null;
+    }
+
+    return marker as PrefabMarkerMetadata;
+  }
+
+  private normalizeLocalId(value: string): string {
+    return value.replace(/\\/g, '/').replace(/^\/+/, '').trim();
+  }
+
+  private cloneValue<T>(value: T): T {
+    if (value === null || value === undefined) {
+      return value;
+    }
+    if (typeof value !== 'object') {
+      return value;
+    }
+    return JSON.parse(JSON.stringify(value)) as T;
   }
 
   private serializeCommonUIControlProps(node: UIControl2D, props: Record<string, unknown>): void {

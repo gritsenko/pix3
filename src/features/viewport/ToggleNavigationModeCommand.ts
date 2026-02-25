@@ -8,7 +8,7 @@ export interface ToggleNavigationModeParams {
   mode?: NavigationMode;
 }
 
-export class ToggleNavigationModeCommand extends CommandBase<object, void> {
+export class ToggleNavigationModeCommand extends CommandBase<void, void> {
   readonly metadata = {
     id: 'viewport.toggle-navigation-mode',
     title: 'Toggle Navigation Mode',
@@ -28,14 +28,13 @@ export class ToggleNavigationModeCommand extends CommandBase<object, void> {
     this.params = params;
   }
 
-  async execute(context: CommandContext): Promise<CommandExecutionResult<object>> {
+  async execute(context: CommandContext): Promise<CommandExecutionResult<void>> {
     const { snapshot, state, container } = context;
     const currentMode: NavigationMode = snapshot.ui.navigationMode ?? '3d';
-    const nextMode: NavigationMode =
-      this.params.mode ?? (currentMode === '3d' ? '2d' : '3d');
+    const nextMode: NavigationMode = this.params.mode ?? (currentMode === '3d' ? '2d' : '3d');
 
     if (currentMode === nextMode) {
-      return { didMutate: false, payload: {} };
+      return { didMutate: false, payload: undefined };
     }
 
     state.ui.navigationMode = nextMode;
@@ -60,7 +59,7 @@ export class ToggleNavigationModeCommand extends CommandBase<object, void> {
       }
     }
 
-    return { didMutate: true, payload: {} };
+    return { didMutate: true, payload: undefined };
   }
 }
 

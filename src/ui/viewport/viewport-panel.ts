@@ -6,6 +6,7 @@ import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { IconService } from '@/services/IconService';
 import { Navigation2DController } from '@/services/Navigation2DController';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
+import { CreatePrefabInstanceCommand } from '@/features/scene/CreatePrefabInstanceCommand';
 import renderTransformToolbar from './transform-toolbar';
 
 @customElement('pix3-viewport-panel')
@@ -56,6 +57,9 @@ export class ViewportPanel extends ComponentBase {
   private pointerDownTime?: number;
   private isDragging = false;
   private readonly dragThreshold = 5; // pixels
+  private isAssetDragOver = false;
+  private static readonly ASSET_RESOURCE_MIME = 'application/x-pix3-asset-resource';
+  private static readonly ASSET_PATH_MIME = 'application/x-pix3-asset-path';
 
   // Gesture tracking for 2D navigation
   // Note: We handle wheel events directly without accumulation to ensure responsive
@@ -90,6 +94,9 @@ export class ViewportPanel extends ComponentBase {
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
     this.addEventListener('pointerup', this.handleCanvasPointerUp);
     this.addEventListener('pointerleave', this.handleCanvasPointerLeave);
+    this.addEventListener('dragover', this.handleDragOver);
+    this.addEventListener('drop', this.handleDrop);
+    this.addEventListener('dragleave', this.handleDragLeave);
   }
 
   disconnectedCallback() {
@@ -102,6 +109,9 @@ export class ViewportPanel extends ComponentBase {
     this.removeEventListener('pointermove', this.handleCanvasPointerMove);
     this.removeEventListener('pointerup', this.handleCanvasPointerUp);
     this.removeEventListener('pointerleave', this.handleCanvasPointerLeave);
+    this.removeEventListener('dragover', this.handleDragOver);
+    this.removeEventListener('drop', this.handleDrop);
+    this.removeEventListener('dragleave', this.handleDragLeave);
     this.pointerDownPos = undefined;
     this.pointerDownTime = undefined;
     this.isDragging = false;
@@ -136,7 +146,12 @@ export class ViewportPanel extends ComponentBase {
 
   protected render() {
     return html`
-      <section class="panel" role="region" aria-label="Scene viewport" tabindex="0">
+      <section
+        class="panel ${this.isAssetDragOver ? 'panel--asset-dragover' : ''}"
+        role="region"
+        aria-label="Scene viewport"
+        tabindex="0"
+      >
         <div
           class="top-toolbar"
           @click=${(e: Event) => e.stopPropagation()}
@@ -219,6 +234,61 @@ export class ViewportPanel extends ComponentBase {
         <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>
       </section>
     `;
+  }
+
+  private handleDragOver = (event: DragEvent): void => {
+    const resourcePath = this.getDroppedResourcePath(event.dataTransfer ?? null);
+    if (!resourcePath) {
+      return;
+    }
+    event.preventDefault();
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+    this.isAssetDragOver = true;
+  };
+
+  private handleDragLeave = (_event: DragEvent): void => {
+    this.isAssetDragOver = false;
+  };
+
+  private handleDrop = (event: DragEvent): void => {
+    const resourcePath = this.getDroppedResourcePath(event.dataTransfer ?? null);
+    this.isAssetDragOver = false;
+    if (!resourcePath) {
+      return;
+    }
+
+    event.preventDefault();
+    const command = new CreatePrefabInstanceCommand({
+      prefabPath: resourcePath,
+    });
+    void this.commandDispatcher.execute(command);
+  };
+
+  private getDroppedResourcePath(dataTransfer: DataTransfer | null): string | null {
+    if (!dataTransfer) {
+      return null;
+    }
+
+    const fromResource = dataTransfer.getData(ViewportPanel.ASSET_RESOURCE_MIME);
+    const fromPath = dataTransfer.getData(ViewportPanel.ASSET_PATH_MIME);
+    const plain = dataTransfer.getData('text/plain');
+    const raw = fromResource || fromPath || plain;
+    if (!raw) {
+      return null;
+    }
+
+    const normalized = raw.trim().replace(/\\/g, '/');
+    const resourcePath = normalized.startsWith('res://')
+      ? normalized
+      : `res://${normalized.replace(/^\/+/, '')}`;
+
+    if (!resourcePath.toLowerCase().endsWith('.pix3scene')) {
+      return null;
+    }
+
+    return resourcePath;
   }
 
   private syncViewportScene(): void {

@@ -28,6 +28,11 @@ import { ToggleScriptEnabledCommand } from '@/features/scripts/ToggleScriptEnabl
 import { UpdateComponentPropertyCommand } from '@/features/scripts/UpdateComponentPropertyCommand';
 import { AddNodeToGroupCommand } from '@/features/scene/AddNodeToGroupCommand';
 import { RemoveNodeFromGroupCommand } from '@/features/scene/RemoveNodeFromGroupCommand';
+import {
+  findPrefabInstanceRoot,
+  getPrefabMetadata,
+  type PrefabMetadata,
+} from '@/features/scene/prefab-utils';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
@@ -1804,6 +1809,8 @@ export class InspectorPanel extends ComponentBase {
     const state = this.propertyValues[prop.name];
     const label = prop.ui?.label || prop.name;
     const readOnly = prop.ui?.readOnly;
+    const isOverridden = this.isPropertyOverriddenForPrimaryNode(prop);
+    const labelTemplate = this.renderPropertyLabel(prop, label, isOverridden);
 
     if (prop.type === 'object' && prop.ui?.editor === 'texture-resource') {
       const textureValue = this.toTextureResourceValue(state.value);
@@ -1811,7 +1818,7 @@ export class InspectorPanel extends ComponentBase {
 
       return html`
         <div class="property-group">
-          <span class="property-label">${label}</span>
+          ${labelTemplate}
           <pix3-texture-resource-editor
             .resourceUrl=${textureValue.url}
             .previewUrl=${previewUrl}
@@ -1840,7 +1847,19 @@ export class InspectorPanel extends ComponentBase {
               @change=${(e: Event) =>
           this.applyPropertyChange(prop.name, (e.target as HTMLInputElement).checked)}
             />
-            ${label}
+            <span class=${isOverridden ? 'property-label--overridden' : ''}>${label}</span>
+            ${isOverridden
+        ? html`
+                  <button
+                    class="property-revert-button"
+                    type="button"
+                    title="Revert prefab override"
+                    @click=${(e: Event) => this.onRevertPropertyClick(e, prop)}
+                  >
+                    ↺
+                  </button>
+                `
+        : null}
           </label>
         </div>
       `;
@@ -1855,7 +1874,7 @@ export class InspectorPanel extends ComponentBase {
       }
       return html`
         <div class="property-group">
-          <span class="property-label">${label}</span>
+          ${labelTemplate}
           <pix3-vector2-editor
             .x=${value.x}
             .y=${value.y}
@@ -1877,7 +1896,7 @@ export class InspectorPanel extends ComponentBase {
       }
       return html`
         <div class="property-group">
-          <span class="property-label">${label}</span>
+          ${labelTemplate}
           <pix3-vector3-editor
             .x=${value.x}
             .y=${value.y}
@@ -1900,7 +1919,7 @@ export class InspectorPanel extends ComponentBase {
       }
       return html`
         <div class="property-group">
-          <span class="property-label">${label}</span>
+          ${labelTemplate}
           <pix3-euler-editor
             .x=${value.x}
             .y=${value.y}
@@ -1933,7 +1952,7 @@ export class InspectorPanel extends ComponentBase {
 
       return html`
         <div class="property-group">
-          <span class="property-label">Size</span>
+          ${this.renderPropertyLabel(prop, 'Size', isOverridden)}
           <pix3-size-editor
             .width=${widthVal}
             .height=${heightVal}
@@ -1968,7 +1987,7 @@ export class InspectorPanel extends ComponentBase {
 
       return html`
         <div class="property-group">
-          <span class="property-label">${label}</span>
+          ${labelTemplate}
           <select
             class="property-select"
             .value=${state.value || ''}
@@ -1987,7 +2006,7 @@ export class InspectorPanel extends ComponentBase {
       const options = this.getSelectOptions(prop);
       return html`
         <div class="property-group">
-          <span class="property-label">${label}</span>
+          ${labelTemplate}
           <select
             class="property-select"
             .value=${state.value}
@@ -2004,7 +2023,11 @@ export class InspectorPanel extends ComponentBase {
     if (prop.type === 'number') {
       return html`
         <div class="property-group">
-          <span class="property-label">${label}${prop.ui?.unit ? ` (${prop.ui.unit})` : ''}</span>
+          ${this.renderPropertyLabel(
+        prop,
+        `${label}${prop.ui?.unit ? ` (${prop.ui.unit})` : ''}`,
+        isOverridden
+      )}
           <input
             type="number"
             step=${prop.ui?.step ?? 0.01}
@@ -2024,7 +2047,19 @@ export class InspectorPanel extends ComponentBase {
       return html`
         <div class="property-group">
           <label class="property-label">
-            ${label}:
+            <span class=${isOverridden ? 'property-label--overridden' : ''}>${label}:</span>
+            ${isOverridden
+        ? html`
+                  <button
+                    class="property-revert-button"
+                    type="button"
+                    title="Revert prefab override"
+                    @click=${(e: Event) => this.onRevertPropertyClick(e, prop)}
+                  >
+                    ↺
+                  </button>
+                `
+        : null}
             <input
               type="text"
               class="property-input property-input--text"
@@ -2042,7 +2077,19 @@ export class InspectorPanel extends ComponentBase {
     return html`
       <div class="property-group">
         <label class="property-label">
-          ${label}:
+          <span class=${isOverridden ? 'property-label--overridden' : ''}>${label}:</span>
+          ${isOverridden
+      ? html`
+                <button
+                  class="property-revert-button"
+                  type="button"
+                  title="Revert prefab override"
+                  @click=${(e: Event) => this.onRevertPropertyClick(e, prop)}
+                >
+                  ↺
+                </button>
+              `
+      : null}
           <input
             type="text"
             class="property-input property-input--text"
@@ -2053,6 +2100,73 @@ export class InspectorPanel extends ComponentBase {
         </label>
       </div>
     `;
+  }
+
+  private renderPropertyLabel(prop: PropertyDefinition, label: string, isOverridden: boolean) {
+    return html`
+      <span class="property-label ${isOverridden ? 'property-label--overridden' : ''}">
+        ${label}
+        ${isOverridden
+          ? html`
+              <button
+                class="property-revert-button"
+                type="button"
+                title="Revert prefab override"
+                @click=${(e: Event) => this.onRevertPropertyClick(e, prop)}
+              >
+                ↺
+              </button>
+            `
+          : null}
+      </span>
+    `;
+  }
+
+  private onRevertPropertyClick(event: Event, prop: PropertyDefinition): void {
+    event.stopPropagation();
+    event.preventDefault();
+    const baseValue = this.getPrefabBaseValueForProperty(prop);
+    if (baseValue === undefined) {
+      return;
+    }
+    void this.applyPropertyChange(prop.name, baseValue);
+  }
+
+  private isPropertyOverriddenForPrimaryNode(prop: PropertyDefinition): boolean {
+    if (!this.primaryNode) {
+      return false;
+    }
+    const baseValue = this.getPrefabBaseValueForProperty(prop);
+    if (baseValue === undefined) {
+      return false;
+    }
+    const currentValue = prop.getValue(this.primaryNode);
+    return JSON.stringify(currentValue) !== JSON.stringify(baseValue);
+  }
+
+  private getPrefabBaseValueForProperty(prop: PropertyDefinition): unknown {
+    if (!this.primaryNode) {
+      return undefined;
+    }
+
+    const nodeMarker = getPrefabMetadata(this.primaryNode);
+    if (!nodeMarker) {
+      return undefined;
+    }
+
+    const instanceRoot = findPrefabInstanceRoot(this.primaryNode);
+    if (!instanceRoot) {
+      return undefined;
+    }
+
+    const rootMarker: PrefabMetadata | null = getPrefabMetadata(instanceRoot);
+    const baseMap = rootMarker?.basePropertiesByLocalId;
+    if (!baseMap) {
+      return undefined;
+    }
+
+    const baseValue = baseMap[nodeMarker.effectiveLocalId]?.[prop.name];
+    return baseValue === undefined ? undefined : JSON.parse(JSON.stringify(baseValue));
   }
 
   private async handleSizeReset() {

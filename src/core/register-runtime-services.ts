@@ -23,21 +23,15 @@ class EditorAssetLoader extends AssetLoader {
 
 class EditorSceneLoader extends SceneLoader {
   constructor() {
-    // Resolve dependencies manually
     const container = ServiceContainer.getInstance();
-    
-    // We cannot use await here as constructor is synchronous.
-    // DI services must be available.
-    
-    // We get ScriptRegistry token from class
     const scriptRegistryToken = container.getOrCreateToken(ScriptRegistry);
     const scriptRegistry = container.getService<ScriptRegistry>(scriptRegistryToken);
-    
-    // We get AssetLoader token from class - resolving to EditorAssetLoader
     const assetLoaderToken = container.getOrCreateToken(AssetLoader);
     const assetLoader = container.getService<AssetLoader>(assetLoaderToken);
-    
-    super(assetLoader, scriptRegistry);
+    const resourceManagerToken = container.getOrCreateToken(ResourceManager);
+    const resourceManager = container.getService<ResourceManager>(resourceManagerToken);
+
+    super(assetLoader, scriptRegistry, resourceManager);
   }
 }
 

@@ -140,15 +140,15 @@ export class Layout2D extends Node2D {
    * @param canvasHeight - Actual canvas height in pixels
    * @returns Transform parameters { scaleX, scaleY, offsetX, offsetY }
    */
-  calculateScaleTransform(canvasWidth: number, canvasHeight: number): {
+  calculateScaleTransform(
+    canvasWidth: number,
+    canvasHeight: number
+  ): {
     scaleX: number;
     scaleY: number;
     offsetX: number;
     offsetY: number;
   } {
-    const aspectRatioCanvas = canvasWidth / canvasHeight;
-    const aspectRatioLayout = this._width / this._height;
-
     let scaleX: number;
     let scaleY: number;
 
@@ -271,7 +271,7 @@ export class Layout2D extends Node2D {
             options: {
               'Scale Outer (Fill)': ScaleMode.ScaleOuter,
               'Scale Inner (Fit)': ScaleMode.ScaleInner,
-              'Stretch': ScaleMode.Stretch,
+              Stretch: ScaleMode.Stretch,
             },
           },
           getValue: (node: unknown) => (node as Layout2D).scaleMode,

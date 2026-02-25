@@ -27,7 +27,7 @@ async function bootstrap(): Promise<void> {
   registerProjectScripts(scriptRegistry);
 
   const assetLoader = new AssetLoader(resourceManager);
-  const sceneLoader = new SceneLoader(assetLoader, scriptRegistry);
+  const sceneLoader = new SceneLoader(assetLoader, scriptRegistry, resourceManager);
   const sceneSaver = new SceneSaver();
   const sceneManager = new SceneManager(sceneLoader, sceneSaver);
 

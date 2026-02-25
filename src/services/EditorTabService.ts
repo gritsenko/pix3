@@ -5,6 +5,7 @@ import { DialogService } from '@/services/DialogService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
+import { RefreshPrefabInstancesCommand } from '@/features/scene/RefreshPrefabInstancesCommand';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { OperationService } from '@/services/OperationService';
 import { SetPlayModeOperation } from '@/features/scripts/SetPlayModeOperation';
@@ -313,6 +314,15 @@ export class EditorTabService {
       await this.commandDispatcher.execute(command);
     } else {
       appState.scenes.activeSceneId = sceneId;
+      const refreshCommand = new RefreshPrefabInstancesCommand({ sceneId });
+      try {
+        await this.commandDispatcher.execute(refreshCommand);
+      } catch (error) {
+        console.error('[EditorTabService] Failed to refresh prefab instances on tab activation', {
+          sceneId,
+          error,
+        });
+      }
     }
 
     // Restore selection (per-tab) into global selection state.

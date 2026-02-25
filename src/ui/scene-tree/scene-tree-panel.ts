@@ -7,13 +7,19 @@ import { NodeBase } from '@pix3/runtime';
 import { getNodeVisuals } from './node-visuals.helper';
 import type { SceneTreeNode } from './scene-tree-node';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
-import { CommandRegistry } from '@/services/CommandRegistry';
 import { KeybindingService } from '@/services/KeybindingService';
 import { NodeRegistry } from '@/services/NodeRegistry';
 import { ReparentNodeCommand } from '@/features/scene/ReparentNodeCommand';
+import { CreatePrefabInstanceCommand } from '@/features/scene/CreatePrefabInstanceCommand';
+import { SaveAsPrefabCommand } from '@/features/scene/SaveAsPrefabCommand';
 import { SceneManager } from '@pix3/runtime';
 import { ServiceContainer } from '@/fw/di';
 import { DropdownPortal } from '../shared/dropdown-portal';
+import {
+  isPrefabChildNode,
+  isPrefabInstanceRoot,
+  isPrefabNode,
+} from '@/features/scene/prefab-utils';
 
 import '../shared/pix3-panel';
 import '../shared/pix3-toolbar';
@@ -27,13 +33,16 @@ interface NodeContextMenuDetail {
   clientY: number;
 }
 
+interface NodeAssetDropDetail {
+  targetNodeId: string;
+  position: 'before' | 'inside' | 'after';
+  resourcePath: string;
+}
+
 @customElement('pix3-scene-tree-panel')
 export class SceneTreePanel extends ComponentBase {
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
-
-  @inject(CommandRegistry)
-  private readonly commandRegistry!: CommandRegistry;
 
   @inject(KeybindingService)
   private readonly keybindingService!: KeybindingService;
@@ -84,13 +93,11 @@ export class SceneTreePanel extends ComponentBase {
   }> = [];
 
   @state()
-  private contextMenu:
-    | {
-        nodeId: string;
-        x: number;
-        y: number;
-      }
-    | null = null;
+  private contextMenu: {
+    nodeId: string;
+    x: number;
+    y: number;
+  } | null = null;
 
   private portal = new DropdownPortal({ minWidth: '12rem' });
   private lastHierarchyRef: NodeBase[] | null = null;
@@ -171,6 +178,7 @@ export class SceneTreePanel extends ComponentBase {
           @node-drag-start=${this.onNodeDragStart.bind(this)}
           @node-drag-end=${this.onNodeDragEnd.bind(this)}
           @node-context-menu=${this.onNodeContextMenu.bind(this)}
+          @node-asset-drop=${this.onNodeAssetDrop.bind(this)}
         >
           ${hasHierarchy
             ? html`<ul
@@ -217,6 +225,7 @@ export class SceneTreePanel extends ComponentBase {
 
   private renderContextMenu() {
     if (!this.contextMenu) {
+      this.portal.close();
       return null;
     }
 
@@ -224,15 +233,29 @@ export class SceneTreePanel extends ComponentBase {
       <div class="scene-tree-context-menu" role="menu" @click=${(e: Event) => e.stopPropagation()}>
         <button type="button" role="menuitem" @click=${() => this.onContextMenuAction('duplicate')}>
           <span>Duplicate</span>
-          <span class="context-menu-shortcut">${this.getCommandShortcut('scene.duplicate-nodes')}</span>
+          <span class="context-menu-shortcut"
+            >${this.getCommandShortcut('scene.duplicate-nodes')}</span
+          >
         </button>
         <button type="button" role="menuitem" @click=${() => this.onContextMenuAction('group')}>
           <span>Group Selection</span>
-          <span class="context-menu-shortcut">${this.getCommandShortcut('scene.group-selected-nodes')}</span>
+          <span class="context-menu-shortcut"
+            >${this.getCommandShortcut('scene.group-selected-nodes')}</span
+          >
         </button>
         <button type="button" role="menuitem" @click=${() => this.onContextMenuAction('delete')}>
           <span>Delete</span>
-          <span class="context-menu-shortcut">${this.getCommandShortcut('scene.delete-object')}</span>
+          <span class="context-menu-shortcut"
+            >${this.getCommandShortcut('scene.delete-object')}</span
+          >
+        </button>
+        <button
+          type="button"
+          role="menuitem"
+          @click=${() => this.onContextMenuAction('saveAsPrefab')}
+        >
+          <span>Save Branch as Prefab</span>
+          <span class="context-menu-shortcut"></span>
         </button>
       </div>
     `;
@@ -334,6 +357,9 @@ export class SceneTreePanel extends ComponentBase {
         properties: node.properties,
         isContainer: node.isContainer,
         scripts: node.components.map(c => c.type),
+        isPrefabNode: isPrefabNode(node),
+        isPrefabRoot: isPrefabInstanceRoot(node),
+        isPrefabChild: isPrefabChildNode(node),
         // Only include NodeBase children, filter out Three.js objects like Mesh, Light, etc.
         children: this.buildTreeNodes(node.children.filter(child => child instanceof NodeBase)),
       };
@@ -465,6 +491,61 @@ export class SceneTreePanel extends ComponentBase {
     }
   }
 
+  private async onNodeAssetDrop(event: CustomEvent<NodeAssetDropDetail>): Promise<void> {
+    const { targetNodeId, position, resourcePath } = event.detail;
+    const sceneId = appState.scenes.activeSceneId;
+    if (!sceneId) {
+      return;
+    }
+
+    const container = ServiceContainer.getInstance();
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
+    );
+    const sceneGraph = sceneManager.getSceneGraph(sceneId);
+    if (!sceneGraph) {
+      return;
+    }
+
+    const targetNode = sceneGraph.nodeMap.get(targetNodeId);
+    if (!targetNode) {
+      return;
+    }
+
+    let parentNodeId: string | null = null;
+    let insertIndex = -1;
+
+    if (position === 'inside' && targetNode.isContainer) {
+      parentNodeId = targetNodeId;
+      insertIndex = -1;
+    } else if (position === 'before' || position === 'after') {
+      if (targetNode.parentNode) {
+        parentNodeId = targetNode.parentNode.nodeId;
+        const targetIndex = targetNode.parentNode.children.indexOf(targetNode);
+        insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+      } else {
+        const rootIndex = sceneGraph.rootNodes.indexOf(targetNode);
+        parentNodeId = null;
+        insertIndex = position === 'before' ? rootIndex : rootIndex + 1;
+      }
+    } else {
+      if (targetNode.parentNode) {
+        parentNodeId = targetNode.parentNode.nodeId;
+        insertIndex = targetNode.parentNode.children.indexOf(targetNode) + 1;
+      } else {
+        parentNodeId = null;
+        insertIndex = sceneGraph.rootNodes.indexOf(targetNode) + 1;
+      }
+    }
+
+    const command = new CreatePrefabInstanceCommand({
+      prefabPath: resourcePath,
+      parentNodeId,
+      insertIndex,
+    });
+    await this.commandDispatcher.execute(command);
+  }
+
   private onNodeDragStart(event: CustomEvent): void {
     const { nodeId, nodeType } = event.detail;
     this.draggedNodeId = nodeId;
@@ -487,14 +568,25 @@ export class SceneTreePanel extends ComponentBase {
     };
   }
 
-  private async onContextMenuAction(action: 'duplicate' | 'group' | 'delete'): Promise<void> {
+  private async onContextMenuAction(
+    action: 'duplicate' | 'group' | 'delete' | 'saveAsPrefab'
+  ): Promise<void> {
     this.contextMenu = null;
 
-    const commandIdByAction: Record<typeof action, string> = {
+    const commandIdByAction: Record<'duplicate' | 'group' | 'delete', string> = {
       duplicate: 'scene.duplicate-nodes',
       group: 'scene.group-selected-nodes',
       delete: 'scene.delete-object',
     };
+
+    if (action === 'saveAsPrefab') {
+      try {
+        await this.commandDispatcher.execute(new SaveAsPrefabCommand());
+      } catch (error) {
+        console.error('[SceneTreePanel] Failed to execute "Save Branch as Prefab"', error);
+      }
+      return;
+    }
 
     const commandId = commandIdByAction[action];
     try {

@@ -26,8 +26,11 @@ import { Camera3D } from '../nodes/3D/Camera3D';
 
 import { Node2D } from '../nodes/Node2D';
 import { AssetLoader } from './AssetLoader';
+import { ResourceManager } from './ResourceManager';
 import { ScriptRegistry } from './ScriptRegistry';
 import { coerceTextureResource, type TextureResourceRef } from './TextureResource';
+import { getNodePropertySchema } from '../fw/property-schema-utils';
+import type { PropertyDefinition } from '../fw/property-schema';
 
 const ZERO_VECTOR3 = new Vector3(0, 0, 0);
 const UNIT_VECTOR3 = new Vector3(1, 1, 1);
@@ -56,11 +59,21 @@ export interface SceneNodeDefinition {
   type?: string;
   name?: string;
   instance?: string;
+  instancePath?: string;
   groups?: string[];
   properties?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   children?: SceneNodeDefinition[];
   components?: ComponentDefinition[];
+  overrides?: InstanceOverrides;
+}
+
+export interface InstanceOverrideEntry {
+  properties?: Record<string, unknown>;
+}
+
+export interface InstanceOverrides {
+  byLocalId: Record<string, InstanceOverrideEntry>;
 }
 
 export interface SceneDocument {
@@ -137,15 +150,26 @@ export interface Group2DProperties extends Node2DProperties {
 
 export interface ParseSceneOptions {
   filePath?: string;
+  instanceStack?: string[];
+}
+
+interface PrefabMarkerMetadata {
+  localId: string;
+  effectiveLocalId: string;
+  instanceRootId: string;
+  sourcePath: string;
+  basePropertiesByLocalId?: Record<string, Record<string, unknown>>;
 }
 
 export class SceneLoader {
   private readonly assetLoader: AssetLoader;
   private readonly scriptRegistry: ScriptRegistry;
+  private readonly resourceManager: ResourceManager;
 
-  constructor(assetLoader: AssetLoader, scriptRegistry: ScriptRegistry) {
+  constructor(assetLoader: AssetLoader, scriptRegistry: ScriptRegistry, resourceManager: ResourceManager) {
     this.assetLoader = assetLoader;
     this.scriptRegistry = scriptRegistry;
+    this.resourceManager = resourceManager;
   }
 
   async parseScene(sceneText: string, options: ParseSceneOptions = {}): Promise<SceneGraph> {
@@ -181,13 +205,15 @@ export class SceneLoader {
 
     const nodeIndex = new Map<string, NodeBase>();
     const rootNodes: NodeBase[] = [];
+    const instanceStack = [...(options.instanceStack ?? [])];
 
     for (const definition of document.root ?? []) {
       const rootNode = await this.instantiateNode(
         definition,
         null,
         nodeIndex,
-        options.filePath ?? 'unknown'
+        options.filePath ?? 'unknown',
+        instanceStack
       );
       rootNodes.push(rootNode);
     }
@@ -205,8 +231,19 @@ export class SceneLoader {
     definition: SceneNodeDefinition,
     parent: NodeBase | null,
     index: Map<string, NodeBase>,
-    sceneIdentifier: string
+    sceneIdentifier: string,
+    instanceStack: string[]
   ): Promise<NodeBase> {
+    if (definition.instance) {
+      return await this.instantiateInstanceNode(
+        definition,
+        parent,
+        index,
+        sceneIdentifier,
+        instanceStack
+      );
+    }
+
     if (index.has(definition.id)) {
       throw new SceneValidationError(`Duplicate node id "${definition.id}" detected.`, [
         sceneIdentifier,
@@ -261,27 +298,503 @@ export class SceneLoader {
 
     const childDefinitions = definition.children ?? [];
     for (const childDef of childDefinitions) {
-      await this.instantiateNode(childDef, node, index, sceneIdentifier);
+      await this.instantiateNode(childDef, node, index, sceneIdentifier, instanceStack);
     }
 
     return node;
+  }
+
+  private async instantiateInstanceNode(
+    definition: SceneNodeDefinition,
+    parent: NodeBase | null,
+    index: Map<string, NodeBase>,
+    sceneIdentifier: string,
+    instanceStack: string[]
+  ): Promise<NodeBase> {
+    if (index.has(definition.id)) {
+      throw new SceneValidationError(`Duplicate node id "${definition.id}" detected.`, [
+        sceneIdentifier,
+      ]);
+    }
+
+    const instancePath = definition.instance;
+    if (!instancePath) {
+      throw new SceneValidationError('Instance node is missing an instance path.', [sceneIdentifier]);
+    }
+
+    const normalizedInstancePath = this.normalizeInstancePath(instancePath);
+    if (instanceStack.includes(normalizedInstancePath)) {
+      const cycle = [...instanceStack, normalizedInstancePath].join(' -> ');
+      throw new SceneValidationError(`Instance cycle detected for "${normalizedInstancePath}".`, [cycle]);
+    }
+
+    const nestedStack = [...instanceStack, normalizedInstancePath];
+    const prefabText = await this.resourceManager.readText(normalizedInstancePath);
+    const prefabGraph = await this.parseScene(prefabText, {
+      filePath: normalizedInstancePath,
+      instanceStack: nestedStack,
+    });
+
+    if (!prefabGraph.rootNodes.length) {
+      throw new SceneValidationError(`Instance "${normalizedInstancePath}" has no root nodes.`, [
+        sceneIdentifier,
+      ]);
+    }
+
+    if (prefabGraph.rootNodes.length > 1) {
+      throw new SceneValidationError(
+        `Instance "${normalizedInstancePath}" must contain exactly one root node.`,
+        [sceneIdentifier]
+      );
+    }
+
+    const sourceRoot = prefabGraph.rootNodes[0];
+    const clonedRoot = await this.cloneNodeWithRuntimeIds(
+      sourceRoot,
+      definition.id,
+      index,
+      definition.id,
+      normalizedInstancePath,
+      this.normalizeLocalId(sourceRoot.nodeId),
+      normalizedInstancePath
+    );
+
+    clonedRoot.name = definition.name ?? clonedRoot.name;
+    this.addGroupsFromDefinition(clonedRoot, definition);
+    this.mergeMetadata(clonedRoot, definition.metadata ?? {});
+    this.remapNodeReferences(clonedRoot);
+    this.snapshotPrefabBaseProperties(clonedRoot);
+    this.applyLegacyInstanceRootProperties(clonedRoot, definition.properties ?? {});
+    this.applyInstanceOverrides(clonedRoot, definition.overrides ?? null);
+
+    if (parent) {
+      parent.adoptChild(clonedRoot);
+    }
+
+    this.registerSubtree(index, clonedRoot, sceneIdentifier);
+    return clonedRoot;
+  }
+
+  private normalizeInstancePath(path: string): string {
+    return path.replace(/\\/g, '/').trim();
+  }
+
+  private normalizeLocalId(value: string): string {
+    return value.replace(/\\/g, '/').replace(/^\/+/, '').trim();
+  }
+
+  private addGroupsFromDefinition(node: NodeBase, definition: SceneNodeDefinition): void {
+    if (!Array.isArray(definition.groups)) {
+      return;
+    }
+
+    for (const group of definition.groups) {
+      if (typeof group === 'string' && group.trim().length > 0) {
+        node.addToGroup(group);
+      }
+    }
+  }
+
+  private mergeMetadata(node: NodeBase, metadata: Record<string, unknown>): void {
+    Object.assign(node.metadata, metadata);
+  }
+
+  private registerSubtree(index: Map<string, NodeBase>, root: NodeBase, sceneIdentifier: string): void {
+    const stack: NodeBase[] = [root];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node) {
+        continue;
+      }
+
+      if (index.has(node.nodeId)) {
+        throw new SceneValidationError(`Duplicate node id "${node.nodeId}" detected.`, [
+          sceneIdentifier,
+        ]);
+      }
+
+      index.set(node.nodeId, node);
+      for (const child of node.children) {
+        if (child instanceof NodeBase) {
+          stack.push(child);
+        }
+      }
+    }
+  }
+
+  private async cloneNodeWithRuntimeIds(
+    sourceNode: NodeBase,
+    runtimeId: string,
+    globalIndex: Map<string, NodeBase>,
+    instanceRootId: string,
+    sourcePath: string,
+    effectiveLocalId: string,
+    rootInstancePath: string | null
+  ): Promise<NodeBase> {
+    const sourceMarker = this.getPrefabMarker(sourceNode);
+    const localId = this.normalizeLocalId(sourceMarker?.localId ?? sourceNode.nodeId);
+    const sourcePathForNode = sourceMarker?.sourcePath ?? sourcePath;
+
+    const definition: SceneNodeDefinition = {
+      id: runtimeId,
+      type: sourceNode.type,
+      name: sourceNode.name,
+      instancePath:
+        runtimeId === instanceRootId
+          ? (rootInstancePath ?? sourceNode.instancePath ?? undefined)
+          : (sourceNode.instancePath ?? undefined),
+      groups: Array.from(sourceNode.groups),
+      properties: this.captureNodeComparableProperties(sourceNode),
+      metadata: {
+        ...sourceNode.metadata,
+      },
+      components: sourceNode.components.map(component => ({
+        id: component.id,
+        type: component.type,
+        enabled: component.enabled,
+        config: { ...(component.config ?? {}) },
+      })),
+    };
+
+    const marker = this.createPrefabMarker({
+      localId,
+      effectiveLocalId,
+      instanceRootId,
+      sourcePath: sourcePathForNode,
+    });
+    const metadataWithMarker = definition.metadata ?? {};
+    metadataWithMarker.__pix3Prefab = marker;
+    definition.metadata = metadataWithMarker;
+
+    const node = await this.createNodeFromDefinition(definition);
+    this.populateNodeComponents(node, definition.components ?? []);
+
+    for (const child of sourceNode.children) {
+      if (!(child instanceof NodeBase)) {
+        continue;
+      }
+
+      const childRuntimeId = this.generateUniqueRuntimeNodeId(
+        this.normalizeLocalId(child.nodeId),
+        globalIndex
+      );
+      const childSourceMarker = this.getPrefabMarker(child);
+      const childLocalId = this.normalizeLocalId(childSourceMarker?.localId ?? child.nodeId);
+      const childEffectiveLocalId = `${effectiveLocalId}/${childLocalId}`;
+      const clonedChild = await this.cloneNodeWithRuntimeIds(
+        child,
+        childRuntimeId,
+        globalIndex,
+        instanceRootId,
+        sourcePathForNode,
+        childEffectiveLocalId,
+        null
+      );
+      node.adoptChild(clonedChild);
+    }
+
+    return node;
+  }
+
+  private createPrefabMarker(input: {
+    localId: string;
+    effectiveLocalId: string;
+    instanceRootId: string;
+    sourcePath: string;
+  }): PrefabMarkerMetadata {
+    return {
+      localId: this.normalizeLocalId(input.localId),
+      effectiveLocalId: this.normalizeLocalId(input.effectiveLocalId),
+      instanceRootId: input.instanceRootId,
+      sourcePath: input.sourcePath,
+    };
+  }
+
+  private populateNodeComponents(node: NodeBase, componentDefinitions: ComponentDefinition[]): void {
+    for (const componentDef of componentDefinitions) {
+      const componentId = componentDef.id || `${node.nodeId}-${componentDef.type}-${Date.now()}`;
+      const component = this.scriptRegistry.createComponent(componentDef.type, componentId);
+      if (!component) {
+        continue;
+      }
+
+      component.enabled = componentDef.enabled ?? true;
+      const configData = componentDef.config ?? {};
+      component.config = { ...configData };
+
+      const schema = this.scriptRegistry.getComponentPropertySchema(componentDef.type);
+      if (schema && configData) {
+        for (const prop of schema.properties) {
+          if (configData[prop.name] !== undefined) {
+            prop.setValue(component, configData[prop.name]);
+          }
+        }
+      }
+
+      node.addComponent(component);
+    }
+  }
+
+  private generateUniqueRuntimeNodeId(seed: string, globalIndex: Map<string, NodeBase>): string {
+    const base = seed.replace(/[^a-zA-Z0-9_-]/g, '-').toLowerCase() || 'node';
+    let nextId = base;
+    let counter = 1;
+
+    while (globalIndex.has(nextId)) {
+      nextId = `${base}-${counter}`;
+      counter += 1;
+    }
+
+    return nextId;
+  }
+
+  private remapNodeReferences(root: NodeBase): void {
+    const remapBySourcePath = new Map<string, Map<string, string>>();
+    const remapByEffective = new Map<string, string>();
+
+    this.walkSubtree(root, node => {
+      const marker = this.getPrefabMarker(node);
+      if (!marker) {
+        return;
+      }
+
+      if (!remapBySourcePath.has(marker.sourcePath)) {
+        remapBySourcePath.set(marker.sourcePath, new Map<string, string>());
+      }
+      remapBySourcePath.get(marker.sourcePath)?.set(marker.localId, node.nodeId);
+      remapByEffective.set(marker.effectiveLocalId, node.nodeId);
+    });
+
+    this.walkSubtree(root, node => {
+      const marker = this.getPrefabMarker(node);
+      const sourceMap = marker ? remapBySourcePath.get(marker.sourcePath) ?? null : null;
+
+      const schema = getNodePropertySchema(node);
+      this.remapPropertiesBySchema(node, schema.properties, sourceMap, remapByEffective);
+
+      for (const component of node.components) {
+        const componentSchema = this.scriptRegistry.getComponentPropertySchema(component.type);
+        if (!componentSchema) {
+          continue;
+        }
+        this.remapPropertiesBySchema(component, componentSchema.properties, sourceMap, remapByEffective);
+      }
+    });
+  }
+
+  private remapPropertiesBySchema(
+    target: unknown,
+    properties: PropertyDefinition[],
+    sourceMap: Map<string, string> | null,
+    effectiveMap: Map<string, string>
+  ): void {
+    for (const prop of properties) {
+      if (prop.type !== 'node') {
+        continue;
+      }
+
+      const currentValue = prop.getValue(target);
+      if (typeof currentValue !== 'string' || !currentValue.trim()) {
+        continue;
+      }
+
+      const mappedValue =
+        (sourceMap ? sourceMap.get(this.normalizeLocalId(currentValue)) : undefined) ??
+        effectiveMap.get(this.normalizeLocalId(currentValue));
+
+      if (mappedValue && mappedValue !== currentValue) {
+        prop.setValue(target, mappedValue);
+      }
+    }
+  }
+
+  private snapshotPrefabBaseProperties(root: NodeBase): void {
+    const basePropertiesByLocalId: Record<string, Record<string, unknown>> = {};
+    this.walkSubtree(root, node => {
+      const marker = this.getPrefabMarker(node);
+      if (!marker) {
+        return;
+      }
+      basePropertiesByLocalId[marker.effectiveLocalId] = this.captureNodeComparableProperties(node);
+    });
+
+    const rootMarker = this.getPrefabMarker(root);
+    if (!rootMarker) {
+      return;
+    }
+
+    const nextMarker: PrefabMarkerMetadata = {
+      ...rootMarker,
+      basePropertiesByLocalId,
+    };
+    (root.metadata as Record<string, unknown>).__pix3Prefab = nextMarker;
+  }
+
+  private captureNodeComparableProperties(node: NodeBase): Record<string, unknown> {
+    const schema = getNodePropertySchema(node);
+    const result: Record<string, unknown> = {};
+    for (const prop of schema.properties) {
+      if (prop.ui?.hidden || prop.ui?.readOnly) {
+        continue;
+      }
+      result[prop.name] = this.cloneValue(prop.getValue(node));
+    }
+    return result;
+  }
+
+  private applyInstanceOverrides(root: NodeBase, overrides: InstanceOverrides | null): void {
+    if (!overrides || !overrides.byLocalId) {
+      return;
+    }
+
+    const map = new Map<string, NodeBase>();
+    this.walkSubtree(root, node => {
+      const marker = this.getPrefabMarker(node);
+      if (marker) {
+        map.set(marker.effectiveLocalId, node);
+      }
+    });
+
+    const rootMarker = this.getPrefabMarker(root);
+    const rootPrefix = rootMarker?.effectiveLocalId ?? '';
+
+    for (const [effectiveLocalId, entry] of Object.entries(overrides.byLocalId)) {
+      const normalizedKey = this.normalizeLocalId(effectiveLocalId);
+      const candidateKey =
+        rootPrefix && !normalizedKey.startsWith(`${rootPrefix}/`) && normalizedKey !== rootPrefix
+          ? `${rootPrefix}/${normalizedKey}`
+          : normalizedKey;
+      const target = map.get(normalizedKey) ?? map.get(candidateKey);
+      if (!target) {
+        console.warn(`[SceneLoader] Override target "${effectiveLocalId}" not found in instance.`);
+        continue;
+      }
+      this.applyLegacyInstanceRootProperties(target, entry.properties ?? {});
+    }
+  }
+
+  private applyLegacyInstanceRootProperties(node: NodeBase, properties: Record<string, unknown>): void {
+    if (!properties || Object.keys(properties).length === 0) {
+      return;
+    }
+
+    const schema = getNodePropertySchema(node);
+    const byName = new Map(schema.properties.map(prop => [prop.name, prop] as const));
+
+    for (const [key, rawValue] of Object.entries(properties)) {
+      if (key === 'transform') {
+        this.applyTransformOverride(node, byName, rawValue);
+        continue;
+      }
+
+      const prop = byName.get(key);
+      if (!prop) {
+        node.properties[key] = this.cloneValue(rawValue);
+        continue;
+      }
+
+      prop.setValue(node, this.normalizePropertyValue(rawValue, prop));
+    }
+  }
+
+  private applyTransformOverride(
+    node: NodeBase,
+    byName: Map<string, PropertyDefinition>,
+    transformValue: unknown
+  ): void {
+    const transform = this.asRecord(transformValue);
+    if (!transform) {
+      return;
+    }
+
+    const position = transform.position ?? transform.translate;
+    const rotation = transform.rotationEuler ?? transform.rotation ?? transform.euler;
+    const scale = transform.scale;
+
+    const positionProp = byName.get('position');
+    if (positionProp && position !== undefined) {
+      positionProp.setValue(node, this.normalizePropertyValue(position, positionProp));
+    }
+
+    const rotationProp = byName.get('rotation');
+    if (rotationProp && rotation !== undefined) {
+      rotationProp.setValue(node, this.normalizePropertyValue(rotation, rotationProp));
+    }
+
+    const scaleProp = byName.get('scale');
+    if (scaleProp && scale !== undefined) {
+      scaleProp.setValue(node, this.normalizePropertyValue(scale, scaleProp));
+    }
+  }
+
+  private normalizePropertyValue(value: unknown, prop: PropertyDefinition): unknown {
+    if (prop.type === 'vector2') {
+      const vector = this.readVector2(value, ZERO_VECTOR2);
+      return { x: vector.x, y: vector.y };
+    }
+
+    if (prop.type === 'vector3' || prop.type === 'euler') {
+      const vector = this.readVector3(value, ZERO_VECTOR3);
+      return { x: vector.x, y: vector.y, z: vector.z };
+    }
+
+    return value;
+  }
+
+  private walkSubtree(root: NodeBase, visitor: (node: NodeBase) => void): void {
+    const stack: NodeBase[] = [root];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node) {
+        continue;
+      }
+      visitor(node);
+      for (const child of node.children) {
+        if (child instanceof NodeBase) {
+          stack.push(child);
+        }
+      }
+    }
+  }
+
+  private getPrefabMarker(node: NodeBase): PrefabMarkerMetadata | null {
+    const metadata = node.metadata as Record<string, unknown>;
+    const markerCandidate = metadata.__pix3Prefab;
+    if (!markerCandidate || typeof markerCandidate !== 'object') {
+      return null;
+    }
+    const marker = markerCandidate as Partial<PrefabMarkerMetadata>;
+    if (
+      typeof marker.localId !== 'string' ||
+      typeof marker.effectiveLocalId !== 'string' ||
+      typeof marker.instanceRootId !== 'string' ||
+      typeof marker.sourcePath !== 'string'
+    ) {
+      return null;
+    }
+    return marker as PrefabMarkerMetadata;
+  }
+
+  private cloneValue<T>(value: T): T {
+    if (value === null || value === undefined) {
+      return value;
+    }
+
+    if (typeof value !== 'object') {
+      return value;
+    }
+
+    return JSON.parse(JSON.stringify(value)) as T;
   }
 
   private async createNodeFromDefinition(definition: SceneNodeDefinition): Promise<NodeBase> {
     const baseProps: NodeBaseProps = {
       id: definition.id,
       name: definition.name,
+      instancePath: definition.instancePath ?? null,
       properties: { ...(definition.properties ?? {}) },
       metadata: definition.metadata ?? {},
     };
-
-    if (definition.instance) {
-      return new NodeBase({
-        ...baseProps,
-        type: definition.type ?? 'Instance',
-        instancePath: definition.instance,
-      });
-    }
 
     switch (definition.type) {
       case 'Sprite2D': {

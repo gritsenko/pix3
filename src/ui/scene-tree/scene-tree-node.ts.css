@@ -217,9 +217,12 @@ pix3-scene-tree-node {
   align-self: flex-start;
 }
 
-.tree-node__instance {
+.tree-node__instance-inline {
   font-size: 0.7rem;
   color: rgba(236, 239, 243, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .tree-children {
@@ -277,6 +280,20 @@ pix3-scene-tree-node {
 
 .tree-node__content--drop-disabled {
   opacity: 0.4;
+}
+
+.tree-node__content--prefab-root .tree-node__name {
+  color: rgba(var(--pix3-accent-rgb), 0.95);
+}
+
+.tree-node__content--prefab-child .tree-node__name {
+  color: rgba(var(--pix3-accent-rgb), 0.78);
+}
+
+.tree-node__prefab-badge {
+  font-size: 0.7rem;
+  opacity: 0.85;
+  line-height: 1;
 }
 
 .tree-node__buttons {

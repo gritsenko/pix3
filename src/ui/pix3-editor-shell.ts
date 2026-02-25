@@ -28,9 +28,11 @@ import { ScriptCompilerService } from '@/services/ScriptCompilerService';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
 import { ReloadSceneCommand } from '@/features/scene/ReloadSceneCommand';
+import { RefreshPrefabInstancesCommand } from '@/features/scene/RefreshPrefabInstancesCommand';
 import { DeleteObjectCommand } from '@/features/scene/DeleteObjectCommand';
 import { DuplicateNodesCommand } from '@/features/scene/DuplicateNodesCommand';
 import { GroupSelectedNodesCommand } from '@/features/scene/GroupSelectedNodesCommand';
+import { SaveAsPrefabCommand } from '@/features/scene/SaveAsPrefabCommand';
 import { UndoCommand } from '@/features/history/UndoCommand';
 import { RedoCommand } from '@/features/history/RedoCommand';
 import { PlaySceneCommand } from '@/features/scripts/PlaySceneCommand';
@@ -167,6 +169,7 @@ export class Pix3EditorShell extends ComponentBase {
     const deleteCommand = new DeleteObjectCommand();
     const duplicateCommand = new DuplicateNodesCommand();
     const groupSelectedCommand = new GroupSelectedNodesCommand();
+    const saveAsPrefabCommand = new SaveAsPrefabCommand();
     const undoCommand = new UndoCommand(this.operationService);
     const redoCommand = new RedoCommand(this.operationService);
     const playCommand = new PlaySceneCommand(this.scriptExecutionService);
@@ -199,6 +202,7 @@ export class Pix3EditorShell extends ComponentBase {
       deleteCommand,
       duplicateCommand,
       groupSelectedCommand,
+      saveAsPrefabCommand,
       playCommand,
       stopCommand,
       startGameCommand,
@@ -469,6 +473,17 @@ export class Pix3EditorShell extends ComponentBase {
     void this.commandDispatcher.execute(reloadCommand).catch(error => {
       console.error('[Pix3EditorShell] Failed to reload scene from external change:', error);
     });
+
+    const activeSceneId = appState.scenes.activeSceneId;
+    if (activeSceneId && activeSceneId !== sceneId) {
+      const refreshCommand = new RefreshPrefabInstancesCommand({
+        sceneId: activeSceneId,
+        changedPrefabPath: filePath,
+      });
+      void this.commandDispatcher.execute(refreshCommand).catch(error => {
+        console.error('[Pix3EditorShell] Failed to refresh active scene prefab instances:', error);
+      });
+    }
   }
 
   protected async firstUpdated(): Promise<void> {
