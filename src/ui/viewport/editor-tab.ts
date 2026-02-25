@@ -5,6 +5,7 @@ import styles from './editor-tab.ts.css?raw';
 import { ViewportRendererService, type TransformMode } from '@/services/ViewportRenderService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { IconService } from '@/services/IconService';
+import { Navigation2DController } from '@/services/Navigation2DController';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
 import { toggleNavigationMode } from '@/features/viewport/ToggleNavigationModeCommand';
 import renderTransformToolbar from './transform-toolbar';
@@ -21,6 +22,9 @@ export class EditorTabComponent extends ComponentBase {
 
   @inject(IconService)
   private readonly iconService!: IconService;
+
+  @inject(Navigation2DController)
+  private readonly navigation2D!: Navigation2DController;
 
   @property({ type: String, reflect: true, attribute: 'tab-id' })
   tabId: string = '';
@@ -329,36 +333,10 @@ export class EditorTabComponent extends ComponentBase {
   }
 
   private handleWheel = (event: WheelEvent): void => {
-    if (appState.tabs.activeTabId !== this.tabId) return;
-
-    // Only handle gestures in 2D mode
-    if (appState.ui.navigationMode !== '2d') {
+    if (appState.tabs.activeTabId !== this.tabId) {
       return;
     }
-
-    // Prevent default scrolling (do not stop propagation)
-    event.preventDefault();
-
-    const target = event.target as HTMLElement;
-    if (target.closest('.top-toolbar')) {
-      return;
-    }
-
-    // Detect pinch zoom: non-zero deltaZ (macOS pinch gesture)
-    // Some browsers emit wheel with ctrlKey=true for pinch.
-    if (event.deltaZ !== 0 || event.ctrlKey) {
-      const zoomDelta = event.deltaZ !== 0 ? event.deltaZ : event.deltaY;
-      const zoomFactor = 1 - zoomDelta * 0.01;
-      this.viewportRenderer.zoom2D(zoomFactor);
-      return;
-    }
-
-    // Trackpad pan (pixel deltas)
-    if (event.deltaMode === 0) {
-      if (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) > 0) {
-        this.viewportRenderer.pan2D(event.deltaX, event.deltaY);
-      }
-    }
+    this.navigation2D.handleWheel(event);
   };
 
   private handleCanvasPointerDown = (event: PointerEvent): void => {
@@ -372,6 +350,17 @@ export class EditorTabComponent extends ComponentBase {
           (el.classList.contains('top-toolbar') || el.classList.contains('toolbar-button'))
       );
     if (isToolbar) return;
+
+    // Handle right-click pan in 2D mode
+    if (event.button === 2 && appState.ui.navigationMode === '2d') {
+      const canvas = this.viewportRenderer.getCanvasElement();
+      const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
+      const screenX = event.clientX - rect.left;
+      const screenY = event.clientY - rect.top;
+      this.navigation2D.startPan(event.pointerId, screenX, screenY);
+      this.isDragging = true;
+      return;
+    }
 
     const canvas = this.viewportRenderer.getCanvasElement();
     const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
@@ -394,6 +383,18 @@ export class EditorTabComponent extends ComponentBase {
 
   private handleCanvasPointerMove = (event: PointerEvent): void => {
     if (appState.tabs.activeTabId !== this.tabId) return;
+
+    // Handle right-click pan in 2D mode
+    if (event.buttons === 2 && appState.ui.navigationMode === '2d') {
+      const canvas = this.viewportRenderer.getCanvasElement();
+      const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
+      const screenX = event.clientX - rect.left;
+      const screenY = event.clientY - rect.top;
+      this.navigation2D.updatePan(screenX, screenY);
+      this.isDragging = true;
+      return;
+    }
+
     if (!this.pointerDownPos || !this.pointerDownTime) return;
 
     const has2DTransform = this.viewportRenderer.has2DTransform?.();
@@ -417,6 +418,11 @@ export class EditorTabComponent extends ComponentBase {
 
   private handleCanvasPointerUp = (event: PointerEvent): void => {
     if (appState.tabs.activeTabId !== this.tabId) return;
+
+    // End right-click pan if active
+    if (event.button === 2 && appState.ui.navigationMode === '2d') {
+      this.navigation2D.endPan();
+    }
 
     const isToolbar = event
       .composedPath()

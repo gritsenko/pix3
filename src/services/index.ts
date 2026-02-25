@@ -53,3 +53,4 @@ export {
   type CompilationError,
 } from './ScriptCompilerService';
 export { ProjectBuildService, type ProjectBuildResult } from './ProjectBuildService';
+export { Navigation2DController } from './Navigation2DController';

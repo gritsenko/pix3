@@ -152,6 +152,13 @@ export interface PanelVisibilityState {
 
 export type NavigationMode = '2d' | '3d';
 
+export interface Navigation2DSettings {
+  /** Pan sensitivity for mouse/trackpad scrolling in 2D mode */
+  panSensitivity: number;
+  /** Zoom sensitivity for mouse wheel/trackpad pinch in 2D mode */
+  zoomSensitivity: number;
+}
+
 export interface UIState {
   theme: ThemeName;
   isLayoutReady: boolean;
@@ -159,6 +166,8 @@ export interface UIState {
   commandPaletteOpen: boolean;
   panelVisibility: PanelVisibilityState;
   navigationMode: NavigationMode;
+  /** 2D navigation settings (pan/zoom sensitivity) */
+  navigation2D: Navigation2DSettings;
   /** Toggle for showing the 2D orthographic layer overlay */
   showLayer2D: boolean;
   /** Toggle for showing the 3D perspective layer */
@@ -202,7 +211,6 @@ export interface AppState {
   operations: OperationState;
   telemetry: TelemetryState;
 }
-
 
 export const createInitialAppState = (): AppState => ({
   project: {
@@ -261,6 +269,10 @@ export const createInitialAppState = (): AppState => ({
       logs: true,
     },
     navigationMode: '3d',
+    navigation2D: {
+      panSensitivity: 0.75,
+      zoomSensitivity: 0.001,
+    },
     showLayer2D: true,
     showLayer3D: true,
     showGrid: true,

@@ -4,6 +4,7 @@ import styles from './viewport-panel.ts.css?raw';
 import { ViewportRendererService, type TransformMode } from '@/services/ViewportRenderService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { IconService } from '@/services/IconService';
+import { Navigation2DController } from '@/services/Navigation2DController';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
 import renderTransformToolbar from './transform-toolbar';
 
@@ -19,6 +20,9 @@ export class ViewportPanel extends ComponentBase {
 
   @inject(IconService)
   private readonly iconService!: IconService;
+
+  @inject(Navigation2DController)
+  private readonly navigation2D!: Navigation2DController;
 
   @state()
   private transformMode: TransformMode = 'select';
@@ -81,16 +85,6 @@ export class ViewportPanel extends ComponentBase {
       appState.editorContext.focusedArea = 'viewport';
     });
 
-    // Add wheel listener for gesture control - use capture to ensure we get it before children
-    this.addEventListener('wheel', this.handleWheel as EventListener, {
-      passive: false,
-      capture: true,
-    });
-    // Temporary: capture wheel at window level to confirm event delivery in Golden Layout
-    window.addEventListener('wheel', this.handleWheel as EventListener, {
-      passive: false,
-      capture: true,
-    });
     // Add pointer handlers for object selection (only on tap/click, not drag)
     this.addEventListener('pointerdown', this.handleCanvasPointerDown);
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
@@ -104,10 +98,6 @@ export class ViewportPanel extends ComponentBase {
     this.resizeObserver.disconnect();
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
-    this.removeEventListener('wheel', this.handleWheel as EventListener, true);
-    window.removeEventListener('wheel', this.handleWheel as EventListener, true);
-    this.renderRoot.removeEventListener('wheel', this.handleWheel as EventListener, true);
-    this.canvas?.removeEventListener('wheel', this.handleWheel as EventListener, true);
     this.removeEventListener('pointerdown', this.handleCanvasPointerDown);
     this.removeEventListener('pointermove', this.handleCanvasPointerMove);
     this.removeEventListener('pointerup', this.handleCanvasPointerUp);
@@ -123,17 +113,6 @@ export class ViewportPanel extends ComponentBase {
       console.warn('[ViewportPanel] Missing canvas element for renderer initialization.');
       return;
     }
-
-    // Ensure wheel events are captured inside the shadow root and on the canvas.
-    // Some browsers may not compose wheel events across shadow boundaries.
-    this.renderRoot.addEventListener('wheel', this.handleWheel as EventListener, {
-      passive: false,
-      capture: true,
-    });
-    this.canvas.addEventListener('wheel', this.handleWheel as EventListener, {
-      passive: false,
-      capture: true,
-    });
 
     // Observe the component host (the element itself) instead of the canvas. When the
     // surrounding layout (Golden Layout splitters or window resizes) changes the host
@@ -289,6 +268,16 @@ export class ViewportPanel extends ComponentBase {
       return;
     }
 
+    // Handle right-click pan in 2D mode
+    if (event.button === 2 && appState.ui.navigationMode === '2d') {
+      const rect = this.canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
+      const screenX = event.clientX - rect.left;
+      const screenY = event.clientY - rect.top;
+      this.navigation2D.startPan(event.pointerId, screenX, screenY);
+      this.isDragging = true;
+      return;
+    }
+
     // Use canvas rect, not panel rect, since canvas is offset by toolbar
     const rect = this.canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
@@ -315,6 +304,13 @@ export class ViewportPanel extends ComponentBase {
     const rect = this.canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
     const screenX = event.clientX - rect.left;
     const screenY = event.clientY - rect.top;
+
+    // Handle right-click pan in 2D mode
+    if (event.buttons === 2 && appState.ui.navigationMode === '2d') {
+      this.navigation2D.updatePan(screenX, screenY);
+      this.isDragging = true;
+      return;
+    }
 
     // Always update hover states for visual feedback (even without pointer down)
     if (!this.pointerDownPos || !this.pointerDownTime) {
@@ -345,6 +341,11 @@ export class ViewportPanel extends ComponentBase {
   };
 
   private handleCanvasPointerUp = (event: PointerEvent): void => {
+    // End right-click pan if active
+    if (event.button === 2 && appState.ui.navigationMode === '2d') {
+      this.navigation2D.endPan();
+    }
+
     // Ignore pointer events from toolbar
     const isToolbar = event
       .composedPath()
@@ -422,43 +423,6 @@ export class ViewportPanel extends ComponentBase {
     this.viewportRenderer.clearHandleHover?.();
     // Clear 2D hover preview
     this.viewportRenderer.clear2DHoverPreview?.();
-  };
-
-  private handleWheel = (event: WheelEvent): void => {
-    // Only handle gestures in 2D mode
-    if (appState.ui.navigationMode !== '2d') {
-      return;
-    }
-
-    // Prevent default scrolling
-    event.preventDefault();
-
-    // Ignore events on toolbar to allow toolbar interactions
-    const target = event.target as HTMLElement;
-    if (target.closest('.top-toolbar')) {
-      return;
-    }
-
-    // Detect pinch zoom: non-zero deltaZ (macOS pinch gesture)
-    // On macOS trackpads, pinch zoom sends deltaZ directly
-    if (event.deltaZ !== 0 || event.ctrlKey) {
-      // deltaZ is positive for pinch-in (zoom in), negative for pinch-out (zoom out)
-      const zoomDelta = event.deltaZ !== 0 ? event.deltaZ : event.deltaY;
-      const zoomFactor = 1 - zoomDelta * 0.01; // Scale deltaZ to reasonable zoom factor (inverted)
-      this.viewportRenderer.zoom2D(zoomFactor);
-      return;
-    }
-
-    // Detect two-finger pan: smooth deltaX/deltaY (trackpad) vs discrete (mouse wheel)
-    // Trackpad events have deltaMode=0 (pixels) with smooth continuous deltas
-    // Mouse wheel events have deltaMode=1 (lines) with discrete steps
-
-    // For trackpad gestures (pixels), apply pan immediately
-    if (event.deltaMode === 0) {
-      if (Math.abs(event.deltaX) > 0 || Math.abs(event.deltaY) > 0) {
-        this.viewportRenderer.pan2D(event.deltaX, event.deltaY);
-      }
-    }
   };
 
   static styles = css`
