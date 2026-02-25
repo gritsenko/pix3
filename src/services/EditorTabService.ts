@@ -38,6 +38,7 @@ export class EditorTabService {
   private disposeLayoutSubscription?: () => void;
   private disposeTabsSubscription?: () => void;
   private handleBeforeUnload?: (e: BeforeUnloadEvent) => void;
+  private readonly sceneLoadInFlight = new Map<string, Promise<void>>();
 
   initialize(): void {
     if (this.disposeSceneSubscription) return;
@@ -310,8 +311,19 @@ export class EditorTabService {
     // Load if needed.
     const alreadyLoaded = Boolean(appState.scenes.descriptors[sceneId]);
     if (!alreadyLoaded) {
-      const command = new LoadSceneCommand({ filePath: tab.resourceId, sceneId });
-      await this.commandDispatcher.execute(command);
+      let loadPromise = this.sceneLoadInFlight.get(sceneId);
+      if (!loadPromise) {
+        const command = new LoadSceneCommand({ filePath: tab.resourceId, sceneId });
+        loadPromise = this.commandDispatcher
+          .execute(command)
+          .then(() => undefined)
+          .finally(() => {
+            this.sceneLoadInFlight.delete(sceneId);
+          });
+        this.sceneLoadInFlight.set(sceneId, loadPromise);
+      }
+
+      await loadPromise;
     } else {
       appState.scenes.activeSceneId = sceneId;
       const refreshCommand = new RefreshPrefabInstancesCommand({ sceneId });
