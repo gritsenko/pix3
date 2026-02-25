@@ -21,16 +21,25 @@ export class PinToNodeBehavior extends Script {
                 defineProperty('targetNodeId', 'node', {
                     ui: { label: 'Target Model', nodeTypes: ['MeshInstance', 'Node3D', 'Sprite3D'] },
                     getValue: (c: unknown) => (c as PinToNodeBehavior).targetNodeId,
-                    setValue: (c: unknown, v: unknown) => { (c as PinToNodeBehavior).targetNodeId = String(v); },
+                    setValue: (c: unknown, v: unknown) => { 
+                        (c as PinToNodeBehavior).setTargetNodeId(String(v));
+                    },
                 }),
                 defineProperty('yOffset', 'number', {
                     ui: { label: 'Y Offset', step: 0.1 },
                     getValue: (c: unknown) => (c as PinToNodeBehavior).yOffset,
-                    setValue: (c: unknown, v: unknown) => { (c as PinToNodeBehavior).yOffset = Number(v); },
+                    setValue: (c: unknown, v: unknown) => { 
+                        (c as PinToNodeBehavior).yOffset = Number(v); 
+                    },
                 }),
             ],
             groups: {}
         };
+    }
+
+    setTargetNodeId(id: string) {
+        this.targetNodeId = id;
+        this.targetNode = null;
     }
 
     override onStart() {
