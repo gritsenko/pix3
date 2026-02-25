@@ -19,6 +19,8 @@ export * from './nodes/Node3D';
 
 // 2D Nodes
 export * from './nodes/2D/Sprite2D';
+export * from './nodes/2D/AnimatedSprite2D';
+export * from './nodes/2D/ColorRect2D';
 export * from './nodes/2D/Group2D';
 export * from './nodes/2D/Layout2D';
 export * from './nodes/2D/UI/UIControl2D';
@@ -36,6 +38,7 @@ export * from './nodes/3D/DirectionalLightNode';
 export * from './nodes/3D/GeometryMesh';
 export * from './nodes/3D/MeshInstance';
 export * from './nodes/3D/Sprite3D';
+export * from './nodes/3D/AnimatedSprite3D';
 export * from './nodes/3D/PointLightNode';
 export * from './nodes/3D/SpotLightNode';
 

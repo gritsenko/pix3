@@ -15,6 +15,9 @@ import { CreateBar2DCommand } from '@/features/scene/CreateBar2DCommand';
 import { CreateCheckbox2DCommand } from '@/features/scene/CreateCheckbox2DCommand';
 import { CreateInventorySlot2DCommand } from '@/features/scene/CreateInventorySlot2DCommand';
 import { CreateLabel2DCommand } from '@/features/scene/CreateLabel2DCommand';
+import { CreateColorRect2DCommand } from '@/features/scene/CreateColorRect2DCommand';
+import { CreateAnimatedSprite2DCommand } from '@/features/scene/CreateAnimatedSprite2DCommand';
+import { CreateAnimatedSprite3DCommand } from '@/features/scene/CreateAnimatedSprite3DCommand';
 import { CreateNode3DCommand } from '@/features/scene/CreateNode3DCommand';
 import type { Command } from '@/core/command';
 import { injectable } from '@/fw';
@@ -84,6 +87,28 @@ export class NodeRegistry {
       icon: 'image',
       keywords: ['create', 'sprite', '2d', 'image', 'texture'],
       order: 2,
+    });
+    this.registerNodeType({
+      id: 'animatedsprite2d',
+      displayName: 'AnimatedSprite2D',
+      description: '2D animated sprite',
+      category: '2D',
+      commandClass: CreateAnimatedSprite2DCommand,
+      color: '#96cbf6ff',
+      icon: 'image',
+      keywords: ['create', 'animated', 'sprite', '2d', 'image', 'texture'],
+      order: 2.1,
+    });
+    this.registerNodeType({
+      id: 'colorrect2d',
+      displayName: 'ColorRect2D',
+      description: '2D color rectangle',
+      category: '2D',
+      commandClass: CreateColorRect2DCommand,
+      color: '#96cbf6ff',
+      icon: 'layout',
+      keywords: ['create', 'color', 'rect', '2d', 'ui'],
+      order: 2.2,
     });
     this.registerNodeType({
       id: 'joystick2d',
@@ -263,6 +288,18 @@ export class NodeRegistry {
       icon: 'image',
       keywords: ['create', 'sprite', '3d', 'image', 'texture', 'billboard', 'marker'],
       order: 5,
+    });
+
+    this.registerNodeType({
+      id: 'animatedsprite3d',
+      displayName: 'AnimatedSprite3D',
+      description: 'Animated textured quad in 3D space',
+      category: '3D',
+      commandClass: CreateAnimatedSprite3DCommand,
+      color: '#fe9ebeff',
+      icon: 'image',
+      keywords: ['create', 'animated', 'sprite', '3d', 'image', 'texture', 'billboard'],
+      order: 5.1,
     });
   }
 
