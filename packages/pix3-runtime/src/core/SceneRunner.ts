@@ -172,6 +172,11 @@ export class SceneRunner {
         for (const node of this.runtimeGraph.rootNodes) {
           if (node instanceof Layout2D) {
             node.updateLayout(width, height);
+            
+            // Apply scale mode transformation
+            const transform = node.calculateScaleTransform(width, height);
+            node.scale.set(transform.scaleX, transform.scaleY, 1);
+            node.position.set(transform.offsetX, transform.offsetY, 0);
           }
         }
       }

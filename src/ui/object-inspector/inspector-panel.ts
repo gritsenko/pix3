@@ -1151,6 +1151,11 @@ export class InspectorPanel extends ComponentBase {
       return this.renderLayoutGroup(label, visibleProps);
     }
 
+    // Special handling for Size group - render with reset/aspect ratio buttons
+    if (groupName === 'Size') {
+      return this.renderSizeGroup(label, visibleProps);
+    }
+
     return html`
       <div class="property-group-section">
         <h4 class="group-title">${label}</h4>

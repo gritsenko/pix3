@@ -7,6 +7,7 @@ export interface Layout2DProps extends Omit<Node2DProps, 'type'> {
   height?: number;
   resolutionPreset?: ResolutionPreset;
   showViewportOutline?: boolean;
+  scaleMode?: ScaleMode;
 }
 
 export enum ResolutionPreset {
@@ -15,6 +16,12 @@ export enum ResolutionPreset {
   HD = '1280x720',
   MobilePortrait = '1080x1920',
   Tablet = '1024x768',
+}
+
+export enum ScaleMode {
+  ScaleOuter = 'scale-outer',
+  ScaleInner = 'scale-inner',
+  Stretch = 'stretch',
 }
 
 export const RESOLUTION_PRESETS: Record<
@@ -37,6 +44,7 @@ export class Layout2D extends Node2D {
   private _height: number;
   private _resolutionPreset: ResolutionPreset;
   private _showViewportOutline: boolean;
+  private _scaleMode: ScaleMode;
 
   constructor(props: Layout2DProps) {
     super(props, 'Layout2D');
@@ -45,6 +53,7 @@ export class Layout2D extends Node2D {
     this._height = props.height ?? 1080;
     this._resolutionPreset = props.resolutionPreset ?? ResolutionPreset.FullHD;
     this._showViewportOutline = props.showViewportOutline ?? true;
+    this._scaleMode = props.scaleMode ?? ScaleMode.ScaleInner;
 
     this.isContainer = true;
   }
@@ -97,6 +106,14 @@ export class Layout2D extends Node2D {
     this._showViewportOutline = value;
   }
 
+  get scaleMode(): ScaleMode {
+    return this._scaleMode;
+  }
+
+  set scaleMode(value: ScaleMode) {
+    this._scaleMode = value;
+  }
+
   setSize(width: number, height: number): void {
     this._width = width;
     this._height = height;
@@ -115,6 +132,58 @@ export class Layout2D extends Node2D {
         child.updateLayout(this._width, this._height);
       }
     }
+  }
+
+  /**
+   * Calculate scale transform to fit Layout2D content to canvas based on scale mode
+   * @param canvasWidth - Actual canvas width in pixels
+   * @param canvasHeight - Actual canvas height in pixels
+   * @returns Transform parameters { scaleX, scaleY, offsetX, offsetY }
+   */
+  calculateScaleTransform(canvasWidth: number, canvasHeight: number): {
+    scaleX: number;
+    scaleY: number;
+    offsetX: number;
+    offsetY: number;
+  } {
+    const aspectRatioCanvas = canvasWidth / canvasHeight;
+    const aspectRatioLayout = this._width / this._height;
+
+    let scaleX: number;
+    let scaleY: number;
+
+    switch (this._scaleMode) {
+      case ScaleMode.ScaleOuter: {
+        // Scale to fill entire canvas (might crop content)
+        const scale = Math.max(canvasWidth / this._width, canvasHeight / this._height);
+        scaleX = scale;
+        scaleY = scale;
+        break;
+      }
+      case ScaleMode.ScaleInner: {
+        // Scale to fit inside canvas (might letterbox/pillarbox)
+        const scale = Math.min(canvasWidth / this._width, canvasHeight / this._height);
+        scaleX = scale;
+        scaleY = scale;
+        break;
+      }
+      case ScaleMode.Stretch: {
+        // Non-uniform scaling to exactly fill canvas (distorts content)
+        scaleX = canvasWidth / this._width;
+        scaleY = canvasHeight / this._height;
+        break;
+      }
+      default:
+        scaleX = 1;
+        scaleY = 1;
+    }
+
+    // Calculate offsets to center content
+    // The Layout2D is already centered at (0, 0), so offsets are always 0
+    const offsetX = 0;
+    const offsetY = 0;
+
+    return { scaleX, scaleY, offsetX, offsetY };
   }
 
   static getPropertySchema(): PropertySchema {
@@ -190,6 +259,24 @@ export class Layout2D extends Node2D {
           getValue: (node: unknown) => (node as Layout2D).showViewportOutline,
           setValue: (node: unknown, value: unknown) => {
             (node as Layout2D).showViewportOutline = Boolean(value);
+          },
+        },
+        {
+          name: 'scaleMode',
+          type: 'select',
+          ui: {
+            label: 'Scale Mode',
+            description: 'How the layout scales to fit the viewport during play mode',
+            group: 'Viewport',
+            options: {
+              'Scale Outer (Fill)': ScaleMode.ScaleOuter,
+              'Scale Inner (Fit)': ScaleMode.ScaleInner,
+              'Stretch': ScaleMode.Stretch,
+            },
+          },
+          getValue: (node: unknown) => (node as Layout2D).scaleMode,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Layout2D).scaleMode = value as ScaleMode;
           },
         },
       ],

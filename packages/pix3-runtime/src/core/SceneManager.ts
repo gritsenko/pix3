@@ -74,6 +74,11 @@ export class SceneManager {
     const layout2dNode = this.findLayout2D(graph);
     if (layout2dNode && !skipLayout2D) {
       layout2dNode.updateLayout(width, height);
+      
+      // Apply scale mode transformation
+      const transform = layout2dNode.calculateScaleTransform(width, height);
+      layout2dNode.scale.set(transform.scaleX, transform.scaleY, 1);
+      layout2dNode.position.set(transform.offsetX, transform.offsetY, 0);
     }
 
     for (const node of graph.rootNodes) {

@@ -1920,7 +1920,7 @@ export class ViewportRendererService {
     geometry.computeBoundingBox();
 
     const material = new THREE.LineBasicMaterial({
-      color: 0x9b59b6,
+      color: 0x00ffff,
       linewidth: 2,
     });
 
@@ -2113,8 +2113,8 @@ export class ViewportRendererService {
       rawDirection.lengthSq() > 1e-8
         ? rawDirection.normalize()
         : new THREE.Vector3(0, 0, -1).applyQuaternion(
-          node.getWorldQuaternion(new THREE.Quaternion())
-        );
+            node.getWorldQuaternion(new THREE.Quaternion())
+          );
     const farPos = nodeWorldPos.clone().add(direction.multiplyScalar(TARGET_DIRECTION_RAY_LENGTH));
     const gizmo = new THREE.Group();
     gizmo.userData.isTargetGizmo = true;
@@ -2170,8 +2170,8 @@ export class ViewportRendererService {
       rawDirection.lengthSq() > 1e-8
         ? rawDirection.normalize()
         : new THREE.Vector3(0, 0, 1).applyQuaternion(
-          node.getWorldQuaternion(new THREE.Quaternion())
-        );
+            node.getWorldQuaternion(new THREE.Quaternion())
+          );
     const farPos = nodeWorldPos.clone().add(direction.multiplyScalar(TARGET_DIRECTION_RAY_LENGTH));
     const gizmo = new THREE.Group();
     gizmo.userData.isTargetGizmo = true;
@@ -2243,8 +2243,8 @@ export class ViewportRendererService {
       rawDirection.lengthSq() > 1e-8
         ? rawDirection.normalize()
         : new THREE.Vector3(0, 0, fallbackAxisZ).applyQuaternion(
-          node.getWorldQuaternion(new THREE.Quaternion())
-        );
+            node.getWorldQuaternion(new THREE.Quaternion())
+          );
 
     gizmo.traverse(child => {
       if (child.userData.isTargetSphere || child.userData.isTargetOutline) {
@@ -2343,7 +2343,7 @@ export class ViewportRendererService {
 
     const sizeGroup = new THREE.Group();
     const w = node.width ?? (node as any).originalWidth ?? 64;
-    const h = node.height ?? (node as any).originalHeight ?? 96 / 217 * 64; // arbitrary but consistent
+    const h = node.height ?? (node as any).originalHeight ?? (96 / 217) * 64; // arbitrary but consistent
     sizeGroup.scale.set(w, h, 1);
     sizeGroup.layers.set(LAYER_2D);
     sizeGroup.add(mesh);
@@ -2473,7 +2473,10 @@ export class ViewportRendererService {
         }
       }
 
-      console.warn('[ViewportRenderer] Skipping Sprite3D texture load for scheme', currentTexturePath);
+      console.warn(
+        '[ViewportRenderer] Skipping Sprite3D texture load for scheme',
+        currentTexturePath
+      );
     })();
   }
 
