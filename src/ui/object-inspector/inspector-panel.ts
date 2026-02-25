@@ -1755,7 +1755,6 @@ export class InspectorPanel extends ComponentBase {
           <span class="property-label">${label}</span>
           <select
             class="property-select"
-            .value=${state.value || ''}
             ?disabled=${readOnly}
             @change=${(e: Event) =>
           this.applyComponentPropertyChange(
@@ -1764,8 +1763,8 @@ export class InspectorPanel extends ComponentBase {
             (e.target as HTMLSelectElement).value
           )}
           >
-            <option value="">[None]</option>
-            ${nodes.map(n => html`<option value=${n.nodeId}>${n.name} (${n.type})</option>`)}
+            <option value="" ?selected=${!state.value}>[None]</option>
+            ${nodes.map(n => html`<option value=${n.nodeId} ?selected=${n.nodeId === state.value}>${n.name} (${n.type})</option>`)}
           </select>
         </div>
       `;
@@ -1778,7 +1777,6 @@ export class InspectorPanel extends ComponentBase {
           <span class="property-label">${label}</span>
           <select
             class="property-select"
-            .value=${state.value}
             ?disabled=${readOnly}
             @change=${(e: Event) =>
           this.applyComponentPropertyChange(
@@ -1787,7 +1785,7 @@ export class InspectorPanel extends ComponentBase {
             (e.target as HTMLSelectElement).value
           )}
           >
-            ${options.map(option => html`<option value=${option.value}>${option.label}</option>`)}
+            ${options.map(option => html`<option value=${option.value} ?selected=${option.value === state.value}>${option.label}</option>`)}
           </select>
         </div>
       `;
@@ -2019,13 +2017,12 @@ export class InspectorPanel extends ComponentBase {
           ${labelTemplate}
           <select
             class="property-select"
-            .value=${state.value || ''}
             ?disabled=${readOnly}
             @change=${(e: Event) =>
           this.applyPropertyChange(prop.name, (e.target as HTMLSelectElement).value)}
           >
-            <option value="">[None]</option>
-            ${nodes.map(n => html`<option value=${n.nodeId}>${n.name} (${n.type})</option>`)}
+            <option value="" ?selected=${!state.value}>[None]</option>
+            ${nodes.map(n => html`<option value=${n.nodeId} ?selected=${n.nodeId === state.value}>${n.name} (${n.type})</option>`)}
           </select>
         </div>
       `;
@@ -2038,12 +2035,11 @@ export class InspectorPanel extends ComponentBase {
           ${labelTemplate}
           <select
             class="property-select"
-            .value=${state.value}
             ?disabled=${readOnly}
             @change=${(e: Event) =>
           this.applyPropertyChange(prop.name, (e.target as HTMLSelectElement).value)}
           >
-            ${options.map(option => html`<option value=${option.value}>${option.label}</option>`)}
+            ${options.map(option => html`<option value=${option.value} ?selected=${option.value === state.value}>${option.label}</option>`)}
           </select>
         </div>
       `;

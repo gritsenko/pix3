@@ -48,29 +48,38 @@ export class PinToNodeBehavior extends Script {
 
         if (!this.node || !this.targetNodeId) return;
 
-        // Traverse up to find root
-        let root = this.node;
-        while (root.parentNode) {
-            root = root.parentNode;
+        // Traverse up to find the THREE.Scene root
+        let root: Object3D = this.node;
+        while (root.parent) {
+            root = root.parent;
         }
 
         // Resolve target node
-        this.targetNode = root.findById(this.targetNodeId);
+        this.targetNode = this.findNodeById(root, this.targetNodeId);
 
         // Find the active Camera3D
         this.findCamera(root);
     }
 
-    private findCamera(node: NodeBase) {
+    private findNodeById(root: Object3D, id: string): NodeBase | null {
+        if (root instanceof NodeBase && root.nodeId === id) {
+            return root;
+        }
+        for (const child of root.children) {
+            const match = this.findNodeById(child, id);
+            if (match) return match;
+        }
+        return null;
+    }
+
+    private findCamera(node: Object3D) {
         if (node instanceof Camera3D) {
             this.cameraNode = node;
             return;
         }
         for (const child of node.children) {
-            if (child instanceof NodeBase) {
-                this.findCamera(child);
-                if (this.cameraNode) return;
-            }
+            this.findCamera(child);
+            if (this.cameraNode) return;
         }
     }
 
@@ -78,10 +87,10 @@ export class PinToNodeBehavior extends Script {
         if (!this.targetNode || !this.node || !this.cameraNode || !(this.node instanceof Node2D)) {
             // Re-try finding the target and camera if they were missing or added later
             if (!this.targetNode || !this.cameraNode) {
-                let root = this.node;
-                while (root?.parentNode) root = root.parentNode;
+                let root: Object3D | null = this.node;
+                while (root?.parent) root = root.parent;
                 if (root) {
-                    if (!this.targetNode && this.targetNodeId) this.targetNode = root.findById(this.targetNodeId);
+                    if (!this.targetNode && this.targetNodeId) this.targetNode = this.findNodeById(root, this.targetNodeId);
                     if (!this.cameraNode) this.findCamera(root);
                 }
             }
@@ -101,14 +110,47 @@ export class PinToNodeBehavior extends Script {
         // Project 3D vector to 2D screen space using the camera
         this._tempVec.project(cameraObj);
 
-        // Convert from normalized device coordinates (-1 to +1) to screen coordinates.
-        // Assuming UI space mapping here. For Pix3, the root layout container handles layout sizing.
-        // If the 2D layout matches window innerWidth / innerHeight, we map it directly:
-        const width = window.innerWidth;
-        const height = window.innerHeight;
+        // Find Layout2D to get the correct resolution
+        let layoutWidth = window.innerWidth;
+        let layoutHeight = window.innerHeight;
+        
+        let current = this.node.parent;
+        let layoutNode: any = null;
+        
+        // First try to find Layout2D in ancestors
+        while (current) {
+            if ((current as any).type === 'Layout2D') {
+                layoutNode = current;
+                break;
+            }
+            current = current.parent;
+        }
+        
+        // If not found in ancestors, search the whole scene
+        if (!layoutNode && this.node) {
+            let root: Object3D = this.node;
+            while (root.parent) root = root.parent;
+            
+            const findLayout = (node: Object3D): any => {
+                if ((node as any).type === 'Layout2D') return node;
+                for (const child of node.children) {
+                    const found = findLayout(child);
+                    if (found) return found;
+                }
+                return null;
+            };
+            layoutNode = findLayout(root);
+        }
+        
+        if (layoutNode) {
+            layoutWidth = layoutNode.width;
+            layoutHeight = layoutNode.height;
+        }
 
-        const screenX = (this._tempVec.x * 0.5 + 0.5) * width;
-        const screenY = (-(this._tempVec.y * 0.5) + 0.5) * height;
+        // Convert from normalized device coordinates (-1 to +1) to Layout2D coordinates.
+        // Layout2D origin (0,0) is at the center.
+        const screenX = this._tempVec.x * (layoutWidth * 0.5);
+        const screenY = this._tempVec.y * (layoutHeight * 0.5);
 
         // Update the position of this 2D node
         this.node.position.set(screenX, screenY, 0);
