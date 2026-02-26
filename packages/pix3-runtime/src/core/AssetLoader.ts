@@ -20,6 +20,8 @@ export interface AssetLoaderResult {
 export class AssetLoader {
   private readonly resources: ResourceManager;
   private textureLoader: TextureLoader;
+  private readonly textureCache = new Map<string, Texture>();
+  private readonly textureLoadInFlight = new Map<string, Promise<Texture>>();
 
   constructor(resources: ResourceManager) {
     this.resources = resources;
@@ -66,49 +68,66 @@ export class AssetLoader {
   /**
    * Load an image as a THREE.Texture.
    */
-  /**
-   * Load an image as a THREE.Texture.
-   */
   async loadTexture(resourcePath: string): Promise<Texture> {
-    console.log(`[AssetLoader] Loading texture: ${resourcePath}`);
-
-    let url: string;
-    let isObjectURL = false;
-
-    if (resourcePath.startsWith('res://')) {
-      try {
-        const blob = await this.resources.readBlob(resourcePath);
-        url = URL.createObjectURL(blob);
-        isObjectURL = true;
-        console.log(`[AssetLoader] Created ObjectURL for ${resourcePath}`);
-      } catch (err) {
-        console.error(`[AssetLoader] Failed to read blob for ${resourcePath}:`, err);
-        throw err;
-      }
-    } else {
-      url = this.resources.normalize(resourcePath);
+    const cached = this.textureCache.get(resourcePath);
+    if (cached) {
+      return cached;
     }
 
-    return new Promise((resolve, reject) => {
-      this.textureLoader.load(
-        url,
-        texture => {
-          console.log(`[AssetLoader] Successfully loaded texture: ${resourcePath}`);
-          if (isObjectURL) {
-            URL.revokeObjectURL(url);
-          }
-          resolve(texture);
-        },
-        undefined,
-        error => {
-          console.error(`[AssetLoader] Failed to load texture: ${url}`, error);
-          if (isObjectURL) {
-            URL.revokeObjectURL(url);
-          }
-          reject(error);
+    const inFlight = this.textureLoadInFlight.get(resourcePath);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    console.log(`[AssetLoader] Loading texture: ${resourcePath}`);
+
+    const loadPromise = (async (): Promise<Texture> => {
+      let url: string;
+      let isObjectURL = false;
+
+      if (resourcePath.startsWith('res://')) {
+        try {
+          const blob = await this.resources.readBlob(resourcePath);
+          url = URL.createObjectURL(blob);
+          isObjectURL = true;
+          console.log(`[AssetLoader] Created ObjectURL for ${resourcePath}`);
+        } catch (err) {
+          console.error(`[AssetLoader] Failed to read blob for ${resourcePath}:`, err);
+          throw err;
         }
-      );
+      } else {
+        url = this.resources.normalize(resourcePath);
+      }
+
+      return new Promise<Texture>((resolve, reject) => {
+        this.textureLoader.load(
+          url,
+          texture => {
+            console.log(`[AssetLoader] Successfully loaded texture: ${resourcePath}`);
+            if (isObjectURL) {
+              URL.revokeObjectURL(url);
+            }
+            this.textureCache.set(resourcePath, texture);
+            resolve(texture);
+          },
+          undefined,
+          error => {
+            console.error(`[AssetLoader] Failed to load texture: ${url}`, error);
+            if (isObjectURL) {
+              URL.revokeObjectURL(url);
+            }
+            reject(error);
+          }
+        );
+      });
+    })();
+
+    this.textureLoadInFlight.set(resourcePath, loadPromise);
+    loadPromise.finally(() => {
+      this.textureLoadInFlight.delete(resourcePath);
     });
+
+    return loadPromise;
   }
 
   /**

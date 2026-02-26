@@ -105,7 +105,7 @@ export class ScriptCompilerService {
         format: 'esm',
         platform: 'browser',
         target: 'es2022',
-        external: ['@pix3/runtime'],
+        external: ['@pix3/runtime', 'three'],
         write: false,
         logLevel: 'silent',
         plugins: [this.createVirtualFileSystemPlugin(files)],
@@ -169,7 +169,7 @@ export class ScriptCompilerService {
         // Resolve file paths
         build.onResolve({ filter: /.*/ }, args => {
           // Skip external modules
-          if (args.path.startsWith('@pix3/')) {
+          if (args.path.startsWith('@pix3/') || args.path === 'three') {
             return { path: args.path, external: true };
           }
 

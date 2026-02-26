@@ -74,6 +74,7 @@ export class UpdateComponentPropertyOperation implements Operation<OperationInvo
     }
 
     propDef.setValue(component, this.params.value);
+    component.config[this.params.propertyName] = this.params.value;
 
     const activeSceneId = state.scenes.activeSceneId;
     this.markSceneDirty(state, activeSceneId);
@@ -85,10 +86,12 @@ export class UpdateComponentPropertyOperation implements Operation<OperationInvo
         beforeSnapshot: context.snapshot,
         undo: async () => {
           propDef.setValue(component, previousValue);
+          component.config[this.params.propertyName] = previousValue;
           this.markSceneDirty(state, activeSceneId);
         },
         redo: async () => {
           propDef.setValue(component, this.params.value);
+          component.config[this.params.propertyName] = this.params.value;
           this.markSceneDirty(state, activeSceneId);
         },
       },

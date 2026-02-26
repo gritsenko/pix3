@@ -5,12 +5,15 @@ import { NodeBase, type NodeBaseProps } from '../nodes/NodeBase';
 import { Node3D } from '../nodes/Node3D';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { Sprite2D } from '../nodes/2D/Sprite2D';
+import { AnimatedSprite2D } from '../nodes/2D/AnimatedSprite2D';
+import { ColorRect2D } from '../nodes/2D/ColorRect2D';
 import { Group2D } from '../nodes/2D/Group2D';
 import { Layout2D } from '../nodes/2D/Layout2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
+import { AnimatedSprite3D } from '../nodes/3D/AnimatedSprite3D';
 import { Joystick2D } from '../nodes/2D/UI/Joystick2D';
 import { Button2D } from '../nodes/2D/UI/Button2D';
 import { Slider2D } from '../nodes/2D/UI/Slider2D';
@@ -797,6 +800,55 @@ export class SceneLoader {
     };
 
     switch (definition.type) {
+      case 'ColorRect2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        return new ColorRect2D({
+          ...baseProps,
+          properties: props,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? ((transform?.rotation ?? props.rotation) as number) : 0,
+          width: this.asNumber(props.width, undefined),
+          height: this.asNumber(props.height, undefined),
+          color: typeof props.color === 'string' ? props.color : undefined,
+          opacity: typeof props.opacity === 'number' ? props.opacity : undefined,
+        });
+      }
+      case 'AnimatedSprite2D': {
+        const props = baseProps.properties as Record<string, unknown>;
+        const transform = this.asRecord(props.transform);
+        const frames = Array.isArray(props.frames) ? props.frames.map(coerceTextureResource) : [];
+        
+        const sprite = new AnimatedSprite2D({
+          ...baseProps,
+          properties: props,
+          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
+          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
+          rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? ((transform?.rotation ?? props.rotation) as number) : 0,
+          frames,
+          width: this.asNumber(props.width, undefined),
+          height: this.asNumber(props.height, undefined),
+          color: typeof props.color === 'string' ? props.color : undefined,
+          fps: typeof props.fps === 'number' ? props.fps : undefined,
+          playing: typeof props.playing === 'boolean' ? props.playing : undefined,
+          loop: typeof props.loop === 'boolean' ? props.loop : undefined,
+        });
+
+        // Load textures
+        frames.forEach(async (frame, index) => {
+          if (frame?.url) {
+            try {
+              const texture = await this.assetLoader.loadTexture(frame.url);
+              sprite.setTextureForFrame(index, texture);
+            } catch (error) {
+              console.warn(`[SceneLoader] Error loading texture for AnimatedSprite2D "${sprite.nodeId}":`, error);
+            }
+          }
+        });
+
+        return sprite;
+      }
       case 'Sprite2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
@@ -1220,6 +1272,42 @@ export class SceneLoader {
         }
 
         return meshInstance;
+      }
+      case 'AnimatedSprite3D': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as Record<string, unknown>;
+        const frames = Array.isArray(props.frames) ? props.frames.map(coerceTextureResource) : [];
+        
+        const sprite = new AnimatedSprite3D({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          frames,
+          width: this.asNumber(props.width, 1),
+          height: this.asNumber(props.height, 1),
+          color: this.asString(props.color) ?? '#ffffff',
+          fps: typeof props.fps === 'number' ? props.fps : undefined,
+          playing: typeof props.playing === 'boolean' ? props.playing : undefined,
+          loop: typeof props.loop === 'boolean' ? props.loop : undefined,
+          billboard: typeof props.billboard === 'boolean' ? props.billboard : false,
+        });
+
+        // Load textures
+        frames.forEach(async (frame, index) => {
+          if (frame?.url) {
+            try {
+              const texture = await this.assetLoader.loadTexture(frame.url);
+              sprite.setTextureForFrame(index, texture);
+            } catch (error) {
+              console.warn(`[SceneLoader] Error loading texture for AnimatedSprite3D "${sprite.nodeId}":`, error);
+            }
+          }
+        });
+
+        return sprite;
       }
       case 'Sprite3D': {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
