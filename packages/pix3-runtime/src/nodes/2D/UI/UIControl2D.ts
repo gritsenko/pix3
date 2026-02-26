@@ -77,6 +77,7 @@ export abstract class UIControl2D extends Node2D {
     }
 
     protected registerSkinMaterial(material: MeshBasicMaterial): void {
+        this.registerOpacityMaterial(material);
         this.skinMaterials.add(material);
         if (this.skinTexture) {
             material.map = this.skinTexture;
@@ -262,6 +263,7 @@ export abstract class UIControl2D extends Node2D {
                 transparent: true,
                 depthTest: false,
             });
+            this.registerOpacityMaterial(material, 1);
             // Create a plane for label
             const geometry = new PlaneGeometry(1, 1);
             this.labelMesh = new Mesh(geometry, material);

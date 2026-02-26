@@ -844,6 +844,7 @@ export class ViewportRendererService {
               borderGroup.visible = node.showViewportOutline;
               borderGroup.scale.set(node.width, node.height, 1);
             }
+            this.apply2DVisualOpacity(node, visualRoot);
           }
         } else if (node instanceof Group2D) {
           const visualRoot = this.group2DVisuals.get(node.nodeId);
@@ -856,6 +857,7 @@ export class ViewportRendererService {
               sizeGroup.scale.set(node.width, node.height, 1);
             }
             visualRoot.visible = node.visible;
+            this.apply2DVisualOpacity(node, visualRoot);
           }
         } else if (node instanceof Sprite2D) {
           const visualRoot = this.sprite2DVisuals.get(node.nodeId);
@@ -868,6 +870,7 @@ export class ViewportRendererService {
               sizeGroup.scale.set(node.width ?? 64, node.height ?? 64, 1);
             }
             visualRoot.visible = node.visible;
+            this.apply2DVisualOpacity(node, visualRoot);
           }
         } else if (node instanceof UIControl2D) {
           const visualRoot = this.uiControl2DVisuals.get(node.nodeId);
@@ -881,6 +884,7 @@ export class ViewportRendererService {
               sizeGroup.scale.set(width, height, 1);
             }
             visualRoot.visible = node.visible;
+            this.apply2DVisualOpacity(node, visualRoot);
           }
         }
         updateNode2DVisuals(node.children);
@@ -1352,6 +1356,7 @@ export class ViewportRendererService {
           borderGroup.visible = node.showViewportOutline;
           borderGroup.scale.set(node.width, node.height, 1);
         }
+        this.apply2DVisualOpacity(node, visualRoot);
       }
     } else if (node instanceof Group2D) {
       const visualRoot = this.group2DVisuals.get(node.nodeId);
@@ -1364,6 +1369,7 @@ export class ViewportRendererService {
           sizeGroup.scale.set(node.width, node.height, 1);
         }
         visualRoot.visible = node.visible;
+        this.apply2DVisualOpacity(node, visualRoot);
       }
     } else if (node instanceof Sprite2D) {
       const visualRoot = this.sprite2DVisuals.get(node.nodeId);
@@ -1392,6 +1398,7 @@ export class ViewportRendererService {
         }
 
         visualRoot.visible = node.visible;
+        this.apply2DVisualOpacity(node, visualRoot);
       }
     } else if (node instanceof UIControl2D) {
       const visualRoot = this.uiControl2DVisuals.get(node.nodeId);
@@ -1408,7 +1415,7 @@ export class ViewportRendererService {
 
         const mesh = visualRoot.userData.controlMesh as THREE.Mesh | undefined;
         if (mesh && mesh.material instanceof THREE.MeshBasicMaterial) {
-          mesh.material.opacity = node instanceof Label2D ? 0 : 1;
+          mesh.material.userData.baseOpacity = node instanceof Label2D ? 0 : 1;
           mesh.material.color.setHex(this.getUIControlDefaultColor(node));
 
           const currentTexturePath =
@@ -1423,6 +1430,7 @@ export class ViewportRendererService {
         }
 
         this.updateUIControlLabelVisual(visualRoot, node);
+        this.apply2DVisualOpacity(node, visualRoot);
 
         visualRoot.visible = node.visible;
       }
@@ -1874,7 +1882,10 @@ export class ViewportRendererService {
     const material = new THREE.LineBasicMaterial({
       color: 0x96cbf6,
       linewidth: 2,
+      transparent: true,
+      opacity: 1,
     });
+    material.userData.baseOpacity = 1;
 
     const root = new THREE.Group();
     root.position.copy(node.position);
@@ -1900,6 +1911,7 @@ export class ViewportRendererService {
     root.userData.isGroup2DVisualRoot = true;
     root.userData.nodeId = node.nodeId;
     root.userData.sizeGroup = sizeGroup;
+    this.apply2DVisualOpacity(node, root);
 
     return root;
   }
@@ -1922,7 +1934,10 @@ export class ViewportRendererService {
     const material = new THREE.LineBasicMaterial({
       color: 0x00ffff,
       linewidth: 2,
+      transparent: true,
+      opacity: 1,
     });
+    material.userData.baseOpacity = 1;
 
     const root = new THREE.Group();
     root.position.copy(node.position);
@@ -1947,6 +1962,7 @@ export class ViewportRendererService {
     root.userData.isLayout2DVisualRoot = true;
     root.userData.nodeId = node.nodeId;
     root.userData.borderGroup = borderGroup;
+    this.apply2DVisualOpacity(node, root);
 
     return root;
   }
@@ -2325,7 +2341,13 @@ export class ViewportRendererService {
     const geometry = new THREE.PlaneGeometry(1, 1);
     geometry.computeBoundingBox();
 
-    const material = new THREE.MeshBasicMaterial({ color: 0xcccccc, side: THREE.DoubleSide });
+    const material = new THREE.MeshBasicMaterial({
+      color: 0xcccccc,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 1,
+    });
+    material.userData.baseOpacity = 1;
     this.applyTextureToSprite2DMaterial(node, material);
 
     const mesh = new THREE.Mesh(geometry, material);
@@ -2354,6 +2376,7 @@ export class ViewportRendererService {
     root.userData.sizeGroup = sizeGroup;
     root.userData.spriteMesh = mesh;
     root.userData.texturePath = node.texturePath ?? null;
+    this.apply2DVisualOpacity(node, root);
 
     return root;
   }
@@ -2488,9 +2511,10 @@ export class ViewportRendererService {
       color: this.getUIControlDefaultColor(node),
       side: THREE.DoubleSide,
       transparent: true,
-      opacity: node instanceof Label2D ? 0 : 1,
+      opacity: 1,
       depthTest: false,
     });
+    material.userData.baseOpacity = node instanceof Label2D ? 0 : 1;
 
     this.applyTextureTo2DMaterial(node, material);
 
@@ -2525,6 +2549,7 @@ export class ViewportRendererService {
     root.userData.controlMesh = mesh;
     root.userData.texturePath =
       (node as UIControl2D & { texturePath?: string | null }).texturePath ?? null;
+    this.apply2DVisualOpacity(node, root);
 
     return root;
   }
@@ -2642,6 +2667,7 @@ export class ViewportRendererService {
     if (!measureCtx) {
       const fallbackGeometry = new THREE.PlaneGeometry(0.1, 0.1);
       const fallbackMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+      fallbackMaterial.userData.baseOpacity = 0;
       return new THREE.Mesh(fallbackGeometry, fallbackMaterial);
     }
     measureCtx.font = `${fontSize}px ${node.labelFontFamily}`;
@@ -2657,6 +2683,7 @@ export class ViewportRendererService {
     if (!ctx) {
       const fallbackGeometry = new THREE.PlaneGeometry(0.1, 0.1);
       const fallbackMaterial = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 });
+      fallbackMaterial.userData.baseOpacity = 0;
       return new THREE.Mesh(fallbackGeometry, fallbackMaterial);
     }
 
@@ -2688,9 +2715,11 @@ export class ViewportRendererService {
     const material = new THREE.MeshBasicMaterial({
       map: texture,
       transparent: true,
+      opacity: 1,
       depthTest: false,
       side: THREE.DoubleSide,
     });
+    material.userData.baseOpacity = 1;
     const mesh = new THREE.Mesh(geometry, material);
     mesh.userData.isUIControlLabel = true;
     mesh.renderOrder = 1002;
@@ -2719,6 +2748,48 @@ export class ViewportRendererService {
 
     const labelMesh = this.createUIControlLabelMesh(node);
     visualRoot.add(labelMesh);
+  }
+
+  private getEffective2DOpacity(node: Node2D): number {
+    const effective = node.computedOpacity;
+    if (!Number.isFinite(effective)) {
+      return 1;
+    }
+    return Math.max(0, Math.min(1, effective));
+  }
+
+  private apply2DVisualOpacity(node: Node2D, visualRoot: THREE.Object3D): void {
+    const nodeOpacity = this.getEffective2DOpacity(node);
+
+    visualRoot.traverse(obj => {
+      const applyToMaterial = (material: THREE.Material): void => {
+        if (
+          !(material instanceof THREE.MeshBasicMaterial) &&
+          !(material instanceof THREE.LineBasicMaterial)
+        ) {
+          return;
+        }
+
+        const baseOpacityRaw = material.userData.baseOpacity;
+        const baseOpacity =
+          typeof baseOpacityRaw === 'number' && Number.isFinite(baseOpacityRaw)
+            ? Math.max(0, Math.min(1, baseOpacityRaw))
+            : 1;
+        material.opacity = baseOpacity * nodeOpacity;
+        material.transparent = material.opacity < 1 || baseOpacity < 1;
+        material.needsUpdate = true;
+      };
+
+      if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.LineSegments) {
+        if (obj.material instanceof THREE.Material) {
+          applyToMaterial(obj.material);
+        } else if (Array.isArray(obj.material)) {
+          for (const material of obj.material) {
+            applyToMaterial(material);
+          }
+        }
+      }
+    });
   }
 
   private findNodeById(nodeId: string, nodes: NodeBase[]): NodeBase | null {

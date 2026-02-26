@@ -65,6 +65,7 @@ export class Joystick2D extends Node2D {
             opacity: Joystick2D.BASE_OPACITY,
             depthTest: false,
         });
+        this.registerOpacityMaterial(this.baseMaterial, Joystick2D.BASE_OPACITY);
         this.baseMesh = new Mesh(baseGeo, this.baseMaterial);
         this.baseMesh.renderOrder = 999;
         this.add(this.baseMesh);
@@ -76,6 +77,7 @@ export class Joystick2D extends Node2D {
             opacity: Joystick2D.HANDLE_OPACITY,
             depthTest: false,
         });
+        this.registerOpacityMaterial(this.handleMaterial, Joystick2D.HANDLE_OPACITY);
         this.handleMesh = new Mesh(handleGeo, this.handleMaterial);
         // Render handle on top of base
         this.handleMesh.position.z = 1;
@@ -205,8 +207,8 @@ export class Joystick2D extends Node2D {
     }
 
     private applyVisibility(): void {
-        this.baseMaterial.opacity = Joystick2D.BASE_OPACITY * this.visibilityAlpha;
-        this.handleMaterial.opacity = Joystick2D.HANDLE_OPACITY * this.visibilityAlpha;
+        this.setOpacityMaterialBase(this.baseMaterial, Joystick2D.BASE_OPACITY * this.visibilityAlpha);
+        this.setOpacityMaterialBase(this.handleMaterial, Joystick2D.HANDLE_OPACITY * this.visibilityAlpha);
     }
 
     private setCenterFromWorld(worldX: number, worldY: number): void {

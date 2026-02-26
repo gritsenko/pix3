@@ -82,6 +82,7 @@ export class Slider2D extends UIControl2D {
             opacity: 1.0,
             depthTest: false,
         });
+        this.registerOpacityMaterial(this.filledTrackMaterial, 1);
         this.filledTrackMesh = new Mesh(this.filledTrackGeometry, this.filledTrackMaterial);
         this.filledTrackMesh.renderOrder = 1000;
         this.filledTrackMesh.position.z = 0.1;
@@ -95,6 +96,7 @@ export class Slider2D extends UIControl2D {
             opacity: 1.0,
             depthTest: false,
         });
+        this.registerOpacityMaterial(this.handleMaterial, 1);
         this.handleMesh = new Mesh(this.handleGeometry, this.handleMaterial);
         this.handleMesh.renderOrder = 1001;
         this.handleMesh.position.z = 0.2;

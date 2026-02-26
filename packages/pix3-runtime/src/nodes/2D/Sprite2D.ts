@@ -51,6 +51,7 @@ export class Sprite2D extends Node2D {
       transparent: true,
       depthTest: false,
     });
+    this.registerOpacityMaterial(this.material, 1);
 
     this.mesh = new Mesh(this.geometry, this.material);
     this.mesh.name = `${this.name}-Mesh`;

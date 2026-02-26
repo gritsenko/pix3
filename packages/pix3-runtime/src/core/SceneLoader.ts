@@ -137,6 +137,7 @@ export interface Node2DProperties {
   position?: Vector2 | [number, number];
   scale?: Vector2 | [number, number];
   rotation?: number;
+  opacity?: number;
 }
 
 export interface Layout2DProperties {
@@ -826,6 +827,7 @@ export class SceneLoader {
           position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
           scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
           rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? ((transform?.rotation ?? props.rotation) as number) : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           frames,
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
@@ -864,6 +866,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           texture,
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
@@ -902,6 +905,7 @@ export class SceneLoader {
           position: this.readVector2(props.position, ZERO_VECTOR2),
           scale: this.readVector2(props.scale, UNIT_VECTOR2),
           rotation: props.rotation ?? 0,
+          opacity: this.asNumber(props.opacity, undefined),
         });
       }
       case 'Layout2D': {
@@ -915,6 +919,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, 1920),
           height: this.asNumber(props.height, 1080),
           resolutionPreset:
@@ -938,6 +943,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, 100),
           height: this.asNumber(props.height, 100),
           anchorMin: layout?.anchorMin
@@ -965,6 +971,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           radius: this.asNumber(props.radius, undefined),
           handleRadius: this.asNumber(props.handleRadius, undefined),
           axisHorizontal: this.asString(props.axisHorizontal),
@@ -985,6 +992,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
           backgroundColor: this.asString(props.backgroundColor),
@@ -1011,6 +1019,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           label: this.asString(props.label),
           labelFontFamily: this.asString(props.labelFontFamily),
           labelFontSize: this.asNumber(props.labelFontSize, undefined),
@@ -1030,6 +1039,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
           handleSize: this.asNumber(props.handleSize, undefined),
@@ -1060,6 +1070,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
           backBackgroundColor: this.asString(props.backBackgroundColor),
@@ -1090,6 +1101,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           size: this.asNumber(props.size, undefined),
           checked: typeof props.checked === 'boolean' ? props.checked : undefined,
           uncheckedColor: this.asString(props.uncheckedColor),
@@ -1116,6 +1128,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
           backdropColor: this.asString(props.backdropColor),

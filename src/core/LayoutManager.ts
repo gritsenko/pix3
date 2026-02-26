@@ -252,7 +252,7 @@ export class LayoutManagerService {
     return () => this.editorTabCloseRequestedListeners.delete(listener);
   }
 
-  ensureEditorTab(tab: EditorTab): void {
+  ensureEditorTab(tab: EditorTab, shouldAutoFocus = true): void {
     if (!this.layout) return;
     this.ensureEditorStack();
     if (!this.editorStack) return;
@@ -284,6 +284,7 @@ export class LayoutManagerService {
       console.log('[LayoutManager] Adding tab to editor stack:', {
         tabId: tab.id,
         title: tab.title,
+        shouldAutoFocus,
       });
 
       // Use 'as any' to bypass strict ComponentItemConfig type definition 
@@ -341,10 +342,12 @@ export class LayoutManagerService {
 
       // Use a small timeout to ensure the component factory has run
       // Golden Layout renders asynchronously and the component instance needs time to be created
-      setTimeout(() => {
-        console.log('[LayoutManager] Attempting async focus for tab:', tab.id);
-        this.focusEditorTab(tab.id);
-      }, 50);
+      if (shouldAutoFocus) {
+        setTimeout(() => {
+          console.log('[LayoutManager] Attempting async focus for tab:', tab.id);
+          this.focusEditorTab(tab.id);
+        }, 50);
+      }
     } catch (error) {
       console.error('[LayoutManager] Failed to add editor tab', error);
     }

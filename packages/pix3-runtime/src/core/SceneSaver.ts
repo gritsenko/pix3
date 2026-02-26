@@ -352,6 +352,13 @@ export class SceneSaver {
       };
 
       props.transform = transform;
+
+      // Persist authored local opacity when non-default.
+      if (node.opacity !== 1) {
+        props.opacity = node.opacity;
+      } else {
+        delete props.opacity;
+      }
     }
 
     // Serialize specific node type properties

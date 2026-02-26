@@ -81,6 +81,7 @@ export class Bar2D extends UIControl2D {
             opacity: 1.0,
             depthTest: false,
         });
+        this.registerOpacityMaterial(this.barMaterial, 1);
         this.barMesh = new Mesh(this.barGeometry, this.barMaterial);
         this.barMesh.renderOrder = 1000;
         this.barMesh.position.z = 0.1;
@@ -104,6 +105,7 @@ export class Bar2D extends UIControl2D {
             depthTest: false,
             wireframe: false,
         });
+        this.registerOpacityMaterial(this.borderMaterial, 1);
         this.borderMesh = new Mesh(this.borderGeometry, this.borderMaterial);
         this.borderMesh.renderOrder = 1001;
         this.borderMesh.position.z = 0.2;

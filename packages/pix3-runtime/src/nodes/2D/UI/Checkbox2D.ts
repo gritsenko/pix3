@@ -73,6 +73,7 @@ export class Checkbox2D extends UIControl2D {
             opacity: 1.0,
             depthTest: false,
         });
+        this.registerOpacityMaterial(this.checkMaterial, 1);
         this.checkMesh = new Mesh(this.checkGeometry, this.checkMaterial);
         this.checkMesh.renderOrder = 1000;
         this.checkMesh.position.z = 0.1;

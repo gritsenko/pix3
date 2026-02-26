@@ -92,6 +92,7 @@ export class InventorySlot2D extends UIControl2D {
             depthTest: false,
             wireframe: false,
         });
+        this.registerOpacityMaterial(this.borderMaterial, 1);
         this.borderMesh = new Mesh(this.borderGeometry, this.borderMaterial);
         this.borderMesh.renderOrder = 1000;
         this.borderMesh.position.z = 0.1;
@@ -142,6 +143,7 @@ export class InventorySlot2D extends UIControl2D {
                 transparent: true,
                 depthTest: false,
             });
+            this.registerOpacityMaterial(material, 1);
             const geometry = new PlaneGeometry(this.width * 0.8, this.height * 0.8);
             this.quantityMesh = new Mesh(geometry, material);
             this.quantityMesh.renderOrder = 1001;

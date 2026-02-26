@@ -39,6 +39,8 @@ export class EditorTabService {
   private disposeTabsSubscription?: () => void;
   private handleBeforeUnload?: (e: BeforeUnloadEvent) => void;
   private readonly sceneLoadInFlight = new Map<string, Promise<void>>();
+  private previousActiveTabIdBeforeGame: string | null = null; // Track tab active before game tab
+  private isRestoringProjectSession = false;
 
   initialize(): void {
     if (this.disposeSceneSubscription) return;
@@ -124,15 +126,26 @@ export class EditorTabService {
 
     const tabId = this.deriveTabId(type, resourceId);
     const existing = appState.tabs.tabs.find(t => t.id === tabId);
+    console.log('[EditorTabService] openResourceTab:', { type, resourceId, tabId, activate, existing: !!existing });
+
     if (existing) {
       if (activate) {
-        this.layoutManager.ensureEditorTab(existing);
+        this.layoutManager.ensureEditorTab(existing, true);
         await this.focusTab(existing.id);
       } else {
         // Even if not activating, ensure GL component exists if it's already in state
-        this.layoutManager.ensureEditorTab(existing);
+        this.layoutManager.ensureEditorTab(existing, false);
       }
       return existing;
+    }
+
+    // Before opening a game tab, save the current active scene tab to restore later.
+    // Use active scene as source of truth because layout focus events can temporarily
+    // desync appState.tabs.activeTabId from the scene currently being edited.
+    if (type === 'game' && !existing && activate) {
+      const activeSceneTabId = this.findSceneTabIdBySceneId(appState.scenes.activeSceneId);
+      this.previousActiveTabIdBeforeGame = activeSceneTabId ?? appState.tabs.activeTabId;
+      console.log('[EditorTabService] Saving previous active tab before game:', this.previousActiveTabIdBeforeGame);
     }
 
     const tab: EditorTab = {
@@ -146,8 +159,9 @@ export class EditorTabService {
 
     appState.tabs.tabs = [...appState.tabs.tabs, tab];
 
-    this.layoutManager.ensureEditorTab(tab);
-    // focusEditorTab is now called asynchronously inside ensureEditorTab after the component factory runs
+    // When activating, allow auto-focus; when not activating, prevent auto-focus to avoid interfering with explicit focus later
+    this.layoutManager.ensureEditorTab(tab, activate);
+    // focusEditorTab is now called asynchronously inside ensureEditorTab after the component factory runs (if shouldAutoFocus=true)
 
     if (activate) {
       await this.activateTab(tab.id);
@@ -168,6 +182,12 @@ export class EditorTabService {
       const session = JSON.parse(raw);
       if (!session || !Array.isArray(session.tabs)) return false;
 
+      console.log('[EditorTabService] Restoring session:', {
+        savedTabCount: session.tabs.length,
+        savedActiveTabId: session.activeTabId,
+        tabs: session.tabs.map((t: { type: string; resourceId: string }) => `${t.type}:${t.resourceId}`),
+      });
+
       // Skip template tabs (templ://) — they should not be restored.
       const tabsToRestore = (
         session.tabs as Array<{
@@ -180,23 +200,38 @@ export class EditorTabService {
         if (t.type === 'game') return false;
         return true;
       });
-      for (const tabData of tabsToRestore) {
-        await this.openResourceTab(
-          tabData.type as EditorTabType,
-          tabData.resourceId,
-          tabData.contextState,
-          false // don't activate yet
-        );
-      }
 
-      if (session.activeTabId) {
-        await this.focusTab(session.activeTabId);
-      } else if (tabsToRestore.length > 0) {
-        const firstTabId = this.deriveTabId(
-          tabsToRestore[0].type as EditorTabType,
-          tabsToRestore[0].resourceId
-        );
-        await this.focusTab(firstTabId);
+      console.log('[EditorTabService] Tabs to restore (after filter):', {
+        count: tabsToRestore.length,
+        tabs: tabsToRestore.map(t => `${t.type}:${t.resourceId}`),
+      });
+
+      this.isRestoringProjectSession = true;
+      try {
+        for (const tabData of tabsToRestore) {
+          console.log('[EditorTabService] Opening tab without activation:', `${tabData.type}:${tabData.resourceId}`);
+          await this.openResourceTab(
+            tabData.type as EditorTabType,
+            tabData.resourceId,
+            tabData.contextState,
+            false // don't activate yet
+          );
+        }
+
+        console.log('[EditorTabService] All tabs opened, now focusing active tab:', session.activeTabId);
+        if (session.activeTabId) {
+          console.log('[EditorTabService] Restoring saved active tab:', session.activeTabId);
+          await this.focusTab(session.activeTabId);
+        } else if (tabsToRestore.length > 0) {
+          const firstTabId = this.deriveTabId(
+            tabsToRestore[0].type as EditorTabType,
+            tabsToRestore[0].resourceId
+          );
+          console.log('[EditorTabService] No saved active tab, focusing first tab:', firstTabId);
+          await this.focusTab(firstTabId);
+        }
+      } finally {
+        this.isRestoringProjectSession = false;
       }
 
       return tabsToRestore.length > 0;
@@ -211,6 +246,13 @@ export class EditorTabService {
     if (!tab) {
       return;
     }
+
+    console.log('[EditorTabService] closeTab:', {
+      tabId,
+      currentActiveTabId: appState.tabs.activeTabId,
+      tabType: tab.type,
+      allTabs: appState.tabs.tabs.map(t => ({ id: t.id, type: t.type })),
+    });
 
     if (tab.isDirty) {
       const decision = await this.promptDirtyClose(tab);
@@ -265,7 +307,28 @@ export class EditorTabService {
 
     // Select a next tab if needed.
     if (appState.tabs.activeTabId === tabId) {
-      const next = appState.tabs.tabs[appState.tabs.tabs.length - 1] ?? null;
+      // If closing a game tab, try to restore the previously active tab
+      let next: EditorTab | undefined;
+      if (tab.type === 'game' && this.previousActiveTabIdBeforeGame) {
+        next = appState.tabs.tabs.find(t => t.id === this.previousActiveTabIdBeforeGame);
+        console.log('[EditorTabService] Game tab closed, restoring previous active tab:', {
+          closedTabId: tabId,
+          restoringTabId: this.previousActiveTabIdBeforeGame,
+          found: !!next,
+        });
+        this.previousActiveTabIdBeforeGame = null;
+      }
+
+      // If no previous tab found or not a game tab, just pick the last remaining tab
+      if (!next) {
+        next = appState.tabs.tabs[appState.tabs.tabs.length - 1] ?? null;
+        console.log('[EditorTabService] Active tab was closed, finding next tab:', {
+          closedTabId: tabId,
+          nextTab: next ? { id: next.id, type: next.type } : null,
+          remainingTabs: appState.tabs.tabs.map(t => ({ id: t.id, type: t.type })),
+        });
+      }
+      
       appState.tabs.activeTabId = null;
       if (next) {
         await this.activateTab(next.id);
@@ -284,6 +347,10 @@ export class EditorTabService {
   }
 
   async handleGoldenLayoutTabFocused(tabId: string): Promise<void> {
+    if (this.isRestoringProjectSession) {
+      console.log('[EditorTabService] Ignoring layout focus during session restore:', tabId);
+      return;
+    }
     await this.activateTab(tabId);
   }
 
@@ -292,6 +359,7 @@ export class EditorTabService {
     if (!next) return;
 
     const previousId = appState.tabs.activeTabId;
+    console.log('[EditorTabService] activateTab:', { activeTabId: tabId, previousId, tabType: next.type });
 
     // Capture state from previous active tab before switching.
     if (previousId && previousId !== tabId) {
@@ -461,5 +529,13 @@ export class EditorTabService {
       .replace(/^-+|-+$/g, '')
       .toLowerCase();
     return normalized || 'scene';
+  }
+
+  private findSceneTabIdBySceneId(sceneId: string | null): string | null {
+    if (!sceneId) return null;
+    const tab = appState.tabs.tabs.find(
+      t => t.type === 'scene' && this.deriveSceneIdFromResource(t.resourceId) === sceneId
+    );
+    return tab?.id ?? null;
   }
 }

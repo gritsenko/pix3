@@ -10,6 +10,7 @@ import { RotateBehavior } from './RotateBehavior';
 import { SimpleMoveBehavior } from './SimpleMoveBehavior';
 import { SineBehavior } from './SineBehavior';
 import { PinToNodeBehavior } from './PinToNodeBehavior';
+import { FollowBehavior } from './FollowBehavior';
 
 /**
  * Register all built-in script components
@@ -50,6 +51,15 @@ export function registerBuiltInScripts(registry: ScriptRegistry): void {
     category: 'UI',
     componentClass: PinToNodeBehavior,
     keywords: ['ui', 'tracking', 'pin'],
+  });
+
+  registry.registerComponent({
+    id: 'core:Follow',
+    displayName: 'Follow',
+    description: 'Smoothly follows a target node position and/or rotation',
+    category: 'Transform',
+    componentClass: FollowBehavior,
+    keywords: ['follow', 'camera', 'tracking', 'smooth'],
   });
 
   console.log('[ScriptRegistry] Registered built-in script components');

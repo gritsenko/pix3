@@ -56,6 +56,55 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     const schema = getNodePropertySchema(node);
     const propDef = schema.properties.find(p => p.name === propertyPath);
     if (!propDef) {
+      // Defensive fallback for runtime/editor schema drift.
+      if (propertyPath === 'opacity' && node instanceof Node2D) {
+        const previousValue = node.opacity;
+        const nextValueRaw = Number(value);
+        if (!Number.isFinite(nextValueRaw)) {
+          return { didMutate: false };
+        }
+        const nextValue = Math.max(0, Math.min(1, nextValueRaw));
+        if (previousValue === nextValue) {
+          return { didMutate: false };
+        }
+
+        node.opacity = nextValue;
+
+        const activeSceneId = state.scenes.activeSceneId;
+        if (activeSceneId) {
+          state.scenes.lastLoadedAt = Date.now();
+          const descriptor = state.scenes.descriptors[activeSceneId];
+          if (descriptor) descriptor.isDirty = true;
+        }
+
+        this.updateViewport(container, propertyPath, node);
+
+        return {
+          didMutate: true,
+          commit: {
+            label: 'Update Opacity',
+            beforeSnapshot: context.snapshot,
+            undo: async () => {
+              node.opacity = previousValue;
+              if (activeSceneId) {
+                state.scenes.lastLoadedAt = Date.now();
+                const descriptor = state.scenes.descriptors[activeSceneId];
+                if (descriptor) descriptor.isDirty = true;
+              }
+              this.updateViewport(container, propertyPath, node);
+            },
+            redo: async () => {
+              node.opacity = nextValue;
+              if (activeSceneId) {
+                state.scenes.lastLoadedAt = Date.now();
+                const descriptor = state.scenes.descriptors[activeSceneId];
+                if (descriptor) descriptor.isDirty = true;
+              }
+              this.updateViewport(container, propertyPath, node);
+            },
+          },
+        };
+      }
       return { didMutate: false };
     }
 
@@ -176,6 +225,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       'showQuantity',
       'quantityFontSize',
       'enabled',
+      'opacity',
       'checked',
       'value',
       'minValue',

@@ -13,7 +13,6 @@ export class ColorRect2D extends Node2D {
   width: number;
   height: number;
   color: string;
-  opacity: number;
 
   private mesh: Mesh;
   private geometry: PlaneGeometry;
@@ -31,9 +30,10 @@ export class ColorRect2D extends Node2D {
     this.material = new MeshBasicMaterial({
       color: this.color,
       transparent: true,
-      opacity: this.opacity,
+      opacity: 1,
       depthTest: false,
     });
+    this.registerOpacityMaterial(this.material, 1);
 
     this.mesh = new Mesh(this.geometry, this.material);
     this.mesh.name = `${this.name}-Mesh`;
@@ -78,17 +78,6 @@ export class ColorRect2D extends Node2D {
             const n = node as ColorRect2D;
             n.color = String(value);
             n.material.color.set(n.color);
-          },
-        },
-        {
-          name: 'opacity',
-          type: 'number',
-          ui: { label: 'Opacity', group: 'Style', min: 0, max: 1, step: 0.01 },
-          getValue: (node: unknown) => (node as ColorRect2D).opacity,
-          setValue: (node: unknown, value: unknown) => {
-            const n = node as ColorRect2D;
-            n.opacity = Number(value);
-            n.material.opacity = n.opacity;
           },
         },
       ],
