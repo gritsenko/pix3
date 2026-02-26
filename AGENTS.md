@@ -106,6 +106,24 @@ Examples:
 - **Layout2D Integration**: 2D mode is optimized for interacting with `Layout2D` root nodes and 2D elements.
 - **Command**: Use `ToggleNavigationModeCommand` to switch modes.
 
+### Node Prefabs System
+
+- **Prefab Files**: `.pix3scene` files that can be instanced in other scenes via `instance:` YAML key
+- **Prefab Metadata**: Stored in node `metadata.__pix3Prefab` with fields: `localId`, `effectiveLocalId`, `instanceRootId`, `sourcePath`, `basePropertiesByLocalId`
+- **Prefab Utilities** (`prefab-utils.ts`):
+  - `getPrefabMetadata(node)` - retrieves prefab metadata or null
+  - `isPrefabNode(node)` - true if node is linked to a prefab
+  - `isPrefabInstanceRoot(node)` - true if node is the root of a prefab instance
+  - `isPrefabChildNode(node)` - true if node is a child of a prefab instance
+  - `findPrefabInstanceRoot(node)` - walks up to find the instance root
+- **Prefab Operations**:
+  - `CreatePrefabInstanceOperation` - instantiates a prefab file as nodes
+  - `SaveAsPrefabOperation` - saves selected node branch as prefab file, replaces with instance
+  - `RefreshPrefabInstancesOperation` - rebuilds instance hierarchy from source prefab
+- **Prefab Commands**: `CreatePrefabInstanceCommand`, `SaveAsPrefabCommand`, `RefreshPrefabInstancesCommand`
+- **Inspector Integration**: Shows base prefab values, allows reverting property overrides
+- **Auto-refresh**: FileWatchService triggers `RefreshPrefabInstancesCommand` when prefab files change
+
 ## File Structure Conventions
 
 ```
@@ -134,6 +152,13 @@ src/
       CreateNodeBaseCommand.ts    # Shared base for all Create*Command wrappers
       scene-command-utils.ts      # Shared create-scene command helpers
       LoadSceneCommand.ts
+      prefab-utils.ts             # Prefab metadata helpers and type definitions
+      CreatePrefabInstanceCommand.ts
+      CreatePrefabInstanceOperation.ts
+      SaveAsPrefabCommand.ts
+      SaveAsPrefabOperation.ts
+      RefreshPrefabInstancesCommand.ts
+      RefreshPrefabInstancesOperation.ts
     scripts/
       AttachBehaviorCommand.ts
       AttachBehaviorOperation.ts
@@ -299,6 +324,7 @@ src/
 17. **Script lifecycle teardown must be explicit** — stop/scene-switch paths must call component `onDetach()` and reset started state so `onStart()` runs on the next play session.
 18. **Create-operation selection updates must include primary selection** — set both `nodeIds` and `primaryNodeId` on create and keep undo/redo selection cleanup symmetric.
 19. **Portal-based UI for floating elements** — Always use `DropdownPortal` or similar portal pattern for floating UI elements like dropdowns, context menus, and tooltips. Never render these elements inline inside panel containers with `overflow: hidden/auto`, as they will be clipped. Render them at the `document.body` level via portals with `position: fixed` to ensure they appear on top of all other panels.
+20. **Prefab override detection in inspector** — When rendering properties for nodes with prefab metadata, show base prefab values and allow users to revert overrides. Use `getPrefabMetadata()` and `findPrefabInstanceRoot()` to determine if a node is part of a prefab instance.
 
 Always verify architectural decisions against the specification before implementing features.
 

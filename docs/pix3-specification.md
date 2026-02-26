@@ -1,8 +1,8 @@
 # Pix3 — Technical Specification
 
-Version: 1.14
+Version: 1.15
 
-Date: 2026-02-23
+Date: 2026-02-26
 
 ## 1. Introduction
 
@@ -555,6 +555,100 @@ root:
     groups: [actors, player]
 ```
 
+## 6.15 Node Prefabs System
+
+### 6.15.1 Overview
+
+Pix3 supports a prefab system for reusing node hierarchies across scenes. Prefabs are standard `.pix3scene` files that can be instantiated (instanced) in other scenes. When a node branch is saved as a prefab, it becomes a reusable asset that can be placed multiple times in any scene. Changes to the source prefab can be propagated to all instances.
+
+### 6.15.2 Prefab Metadata
+
+Each prefab instance stores metadata in `node.metadata.__pix3Prefab`:
+
+```typescript
+interface PrefabMetadata {
+  localId: string; // Node's original ID in the prefab file
+  effectiveLocalId: string; // Current effective local ID
+  instanceRootId: string; // ID of the root node of this instance
+  sourcePath: string; // Path to the source prefab file (res://...)
+  basePropertiesByLocalId?: Record<string, Record<string, unknown>>; // Original property values
+}
+```
+
+### 6.15.3 Prefab Utilities
+
+The `prefab-utils.ts` module provides helper functions:
+
+- `getPrefabMetadata(node)` - Returns prefab metadata or null if not a prefab node
+- `isPrefabNode(node)` - True if node is linked to a prefab
+- `isPrefabInstanceRoot(node)` - True if node is the root of a prefab instance
+- `isPrefabChildNode(node)` - True if node is a child within a prefab instance
+- `findPrefabInstanceRoot(node)` - Walks up the parent chain to find the instance root
+
+### 6.15.4 Instance Creation
+
+Creating a prefab instance uses the `instance:` YAML key:
+
+```yaml
+root:
+  - id: scene_root
+    type: Node3D
+    children:
+      - id: player_instance_1
+        instance: res://prefabs/player.pix3scene
+        name: Player1
+        properties:
+          position: { x: 0, y: 0, z: 0 }
+```
+
+The `properties` block allows overriding base prefab values. Overrides are tracked separately from the base values.
+
+### 6.15.5 Prefab Operations
+
+Three operations manage prefab lifecycle:
+
+1. **CreatePrefabInstanceOperation** - Instantiates a prefab file as nodes in the active scene
+   - Parses the prefab file
+   - Creates nodes with prefab metadata
+   - Registers nodes in scene graph
+   - Updates hierarchy state and selection
+
+2. **SaveAsPrefabOperation** - Saves a selected node branch as a prefab file
+   - Serializes the selected node and its children to YAML
+   - Writes to the specified prefab path
+   - Replaces the original nodes with a single instance reference
+   - Preserves undo/redo for the replacement
+
+3. **RefreshPrefabInstancesOperation** - Rebuilds instance hierarchy from source prefab
+   - Triggered when source prefab files change (via FileWatchService)
+   - Can target a specific prefab path or refresh all instances
+   - Preserves property overrides while updating base structure
+
+### 6.15.6 Inspector Integration
+
+When inspecting a node that is part of a prefab instance:
+
+- Base prefab values are displayed alongside current values
+- A "Revert" button allows resetting overridden properties to base values
+- Visual indicators distinguish between base values and overrides
+- `getPrefabBaseValueForProperty()` retrieves original values for comparison
+
+### 6.15.7 Scene Tree Integration
+
+The scene tree displays visual badges for prefab nodes:
+
+- **Prefab root** (🔗) - Marks the root of a prefab instance
+- **Prefab child** - Children within a prefab instance shown with linked indicator
+- Context menu includes "Save Branch as Prefab" action
+
+### 6.15.8 Auto-Refresh Workflow
+
+1. User modifies and saves a prefab file externally (e.g., in VS Code)
+2. FileWatchService detects the file change
+3. EditorShell's `handleFileChanged()` triggers `RefreshPrefabInstancesCommand`
+4. All instances referencing that prefab are rebuilt
+5. Property overrides are preserved during refresh
+
 ## 7. Scene File Format (\*.pix3scene)
 
 The scene file uses the YAML format to ensure readability for both humans and machines (including AI agents).
@@ -672,10 +766,17 @@ root:
       │   │   │   ├── CreatePointLightCommand.ts
       │   │   │   ├── CreateSpotLightCommand.ts
       │   │   │   ├── CreateSprite2DCommand.ts
+      │   │   │   ├── CreatePrefabInstanceCommand.ts
+      │   │   │   ├── CreatePrefabInstanceOperation.ts
       │   │   │   ├── DeleteObjectCommand.ts
       │   │   │   ├── LoadSceneCommand.ts
+      │   │   │   ├── prefab-utils.ts
+      │   │   │   ├── RefreshPrefabInstancesCommand.ts
+      │   │   │   ├── RefreshPrefabInstancesOperation.ts
       │   │   │   ├── ReloadSceneCommand.ts
       │   │   │   ├── ReparentNodeCommand.ts
+      │   │   │   ├── SaveAsPrefabCommand.ts
+      │   │   │   ├── SaveAsPrefabOperation.ts
       │   │   │   ├── SaveAsSceneCommand.ts
       │   │   │   ├── SaveSceneCommand.ts
       │   │   │   └── UpdateLayout2DSizeCommand.ts
@@ -786,3 +887,4 @@ root:
 - **1.12 (2026-01-01):** Added Script Component System section (6.0-6.11). Implemented behaviors and controller scripts attachments in inspector. Nodes now support `behaviors` array and optional `controller`. Added ScriptRegistry service for registering script types. Added BehaviorPickerService for modal dialog. Added ScriptExecutionService for game loop and script lifecycle management. Added commands for Attach/DetachBehavior, Set/ClearController, ToggleScriptEnabled, PlayScene, StopScene. Updated inspector panel to display "Scripts & Behaviors" section. Updated scene tree to show script indicators. Updated project structure to include `behaviors/` directory and `features/scripts/`. Added example RotateBehavior implementation. Updated node lifecycle with `tick(dt)` method for script updates.
 - **1.13 (2026-02-03):** Added Layout2D Node System section (6.5). Implemented Layout2D node class in `packages/pix3-runtime/src/nodes/2D/Layout2D.ts` with properties for width, height, resolutionPreset, and showViewportOutline. Added Layout2D YAML parsing support in SceneLoader with Layout2DProperties interface. Modified SceneManager to add `skipLayout2D` parameter to `resizeRoot()` and `findLayout2D()` helper method. Created CreateLayout2DCommand/Operation and UpdateLayout2DSizeCommand/Operation for mutation support. Updated ViewportRenderService with `layout2dVisuals` map, `createLayout2DVisual()` method (purple dashed border), and Layout2D handling in processNodeForRendering, syncAll2DVisuals, updateNodeTransform, and updateNodeVisibility. Removed isViewportContainer property from Group2D and all related logic. Updated startup scene template to use Layout2D root instead of Group2D. Layout2D size is now independent of editor viewport and only changeable via inspector properties.
 - **1.14 (2026-02-23):** Added project autoload manifest support (`pix3project.yaml`) with editor commands/operations for add/remove/toggle/reorder. Added node-local signal and group APIs, scene group serialization, and inspector group editing UI. Added Asset Browser create action `Create autoload script` that scaffolds a template script in `scripts/`, compiles scripts, and auto-registers the singleton in project autoloads.
+- **1.15 (2026-02-26):** Added Node Prefabs System section (6.15). Prefabs are `.pix3scene` files instanced via `instance:` YAML key. Added PrefabMetadata interface stored in node metadata with localId, effectiveLocalId, instanceRootId, sourcePath, and basePropertiesByLocalId. Added prefab-utils.ts with getPrefabMetadata, isPrefabNode, isPrefabInstanceRoot, isPrefabChildNode, and findPrefabInstanceRoot helpers. Implemented CreatePrefabInstanceOperation, SaveAsPrefabOperation, and RefreshPrefabInstancesOperation. Added corresponding commands. Inspector shows base prefab values with revert override capability. Scene tree displays prefab badges. FileWatchService triggers auto-refresh when prefab files change.
