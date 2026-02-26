@@ -484,6 +484,8 @@ export class SceneSaver {
       if (inst.initialAnimation) {
         props.initialAnimation = inst.initialAnimation;
       }
+      props.isPlaying = inst.isPlaying;
+      props.isLoop = inst.isLoop;
       props.castShadow = inst.castShadow;
       props.receiveShadow = inst.receiveShadow;
     } else if (node instanceof Sprite3D) {

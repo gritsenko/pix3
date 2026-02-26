@@ -1,4 +1,4 @@
-import { Mesh, Object3D, AnimationClip, AnimationMixer, AnimationAction } from 'three';
+import { Mesh, Object3D, AnimationClip, AnimationMixer, AnimationAction, LoopOnce, LoopRepeat } from 'three';
 import { Node3D, type Node3DProps } from '../Node3D';
 import type { PropertySchema } from '../../fw/property-schema';
 
@@ -8,6 +8,8 @@ export interface MeshInstanceProps extends Omit<Node3DProps, 'type'> {
   receiveShadow?: boolean;
   /** Optional clip name to auto-play on first runtime tick. Falls back to first available clip. */
   initialAnimation?: string | null;
+  isPlaying?: boolean;
+  isLoop?: boolean;
 }
 
 export class MeshInstance extends Node3D {
@@ -20,6 +22,8 @@ export class MeshInstance extends Node3D {
   /** The name of the animation clip currently selected for preview. Editor-only, not serialized. */
   activeAnimation: string | null = null;
   initialAnimation: string | null;
+  private _isPlaying: boolean;
+  private _isLoop: boolean;
   private hasAttemptedInitialAnimation = false;
 
   constructor(props: MeshInstanceProps) {
@@ -28,10 +32,51 @@ export class MeshInstance extends Node3D {
     this.castShadow = props.castShadow ?? true;
     this.receiveShadow = props.receiveShadow ?? true;
     this.initialAnimation = props.initialAnimation ?? null;
+    this._isPlaying = props.isPlaying ?? true;
+    this._isLoop = props.isLoop ?? true;
 
     // Apply shadow properties to self
     this.castShadow = this.castShadow;
     this.receiveShadow = this.receiveShadow;
+  }
+
+  get isPlaying(): boolean {
+    return this._isPlaying;
+  }
+
+  set isPlaying(value: boolean) {
+    const nextValue = !!value;
+    if (this._isPlaying === nextValue) {
+      return;
+    }
+
+    this._isPlaying = nextValue;
+    if (this.currentAction) {
+      this.currentAction.paused = !nextValue;
+      if (nextValue) {
+        this.currentAction.play();
+      }
+    }
+
+    if (nextValue && !this.currentAction) {
+      this.hasAttemptedInitialAnimation = false;
+    }
+  }
+
+  get isLoop(): boolean {
+    return this._isLoop;
+  }
+
+  set isLoop(value: boolean) {
+    const nextValue = !!value;
+    if (this._isLoop === nextValue) {
+      return;
+    }
+
+    this._isLoop = nextValue;
+    if (this.currentAction) {
+      this.applyLoopMode(this.currentAction);
+    }
   }
 
   /**
@@ -54,7 +99,9 @@ export class MeshInstance extends Node3D {
     }
 
     this.currentAction = this.mixer.clipAction(clip);
+    this.applyLoopMode(this.currentAction);
     this.currentAction.reset().play();
+    this.currentAction.paused = !this._isPlaying;
     this.activeAnimation = name;
     this.hasAttemptedInitialAnimation = true;
   }
@@ -106,13 +153,18 @@ export class MeshInstance extends Node3D {
   override tick(dt: number): void {
     super.tick(dt);
     this.playInitialAnimationIfNeeded();
-    if (this.mixer) {
+    if (this.mixer && this._isPlaying) {
       this.mixer.update(dt);
     }
   }
 
   private playInitialAnimationIfNeeded(): void {
     if (this.hasAttemptedInitialAnimation) {
+      return;
+    }
+
+    if (!this._isPlaying) {
+      this.hasAttemptedInitialAnimation = true;
       return;
     }
 
@@ -133,6 +185,17 @@ export class MeshInstance extends Node3D {
     this.playAnimation(clipToPlay.name);
   }
 
+  private applyLoopMode(action: AnimationAction): void {
+    if (this._isLoop) {
+      action.setLoop(LoopRepeat, Infinity);
+      action.clampWhenFinished = false;
+      return;
+    }
+
+    action.setLoop(LoopOnce, 1);
+    action.clampWhenFinished = true;
+  }
+
   /**
    * Get the property schema for MeshInstance.
    * Extends Node3D schema with shadow rendering properties.
@@ -145,6 +208,40 @@ export class MeshInstance extends Node3D {
       extends: 'Node3D',
       properties: [
         ...baseSchema.properties,
+        {
+          name: 'isPlaying',
+          type: 'boolean',
+          ui: {
+            label: 'IsPlaying',
+            description: 'Whether animation starts and keeps advancing at runtime',
+            group: 'Animation',
+          },
+          getValue: (node: unknown) => {
+            const n = node as MeshInstance;
+            return n.isPlaying;
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as MeshInstance;
+            n.isPlaying = !!value;
+          },
+        },
+        {
+          name: 'isLoop',
+          type: 'boolean',
+          ui: {
+            label: 'IsLoop',
+            description: 'Whether animation repeats after reaching the end',
+            group: 'Animation',
+          },
+          getValue: (node: unknown) => {
+            const n = node as MeshInstance;
+            return n.isLoop;
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as MeshInstance;
+            n.isLoop = !!value;
+          },
+        },
         {
           name: 'initialAnimation',
           type: 'string',
