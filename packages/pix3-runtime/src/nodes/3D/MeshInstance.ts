@@ -80,10 +80,22 @@ export class MeshInstance extends Node3D {
   }
 
   /**
-   * Play an animation by name.
+   * Play an animation by name. Forces `isPlaying` to true.
    * @param name - The name of the animation clip to play
+   * @param loop - Optional override for looping
    */
-  playAnimation(name: string): void {
+  playAnimation(name: string, loop?: boolean): void {
+    this.isPlaying = true;
+    this.setAnimation(name, loop);
+  }
+
+  /**
+   * Select an animation by name without forcing `isPlaying`.
+   * Respects current `isPlaying` state for whether the clip actually advances.
+   * @param name - The name of the animation clip to set
+   * @param loop - Optional override for looping
+   */
+  setAnimation(name: string, loop?: boolean): void {
     const clip = this.animations.find(a => a.name === name);
     if (!clip) {
       console.warn(`[MeshInstance] Animation '${name}' not found on node ${this.nodeId}`);
@@ -99,8 +111,9 @@ export class MeshInstance extends Node3D {
     }
 
     this.currentAction = this.mixer.clipAction(clip);
-    this.applyLoopMode(this.currentAction);
+    this.applyLoopMode(this.currentAction, loop);
     this.currentAction.reset().play();
+    this.mixer.update(0); // Force evaluation at t=0 to apply the pose immediately
     this.currentAction.paused = !this._isPlaying;
     this.activeAnimation = name;
     this.hasAttemptedInitialAnimation = true;
@@ -163,11 +176,6 @@ export class MeshInstance extends Node3D {
       return;
     }
 
-    if (!this._isPlaying) {
-      this.hasAttemptedInitialAnimation = true;
-      return;
-    }
-
     if (this.animations.length === 0) {
       return;
     }
@@ -182,11 +190,12 @@ export class MeshInstance extends Node3D {
     }
 
     const clipToPlay = preferredClip ?? this.animations[0];
-    this.playAnimation(clipToPlay.name);
+    this.setAnimation(clipToPlay.name);
   }
 
-  private applyLoopMode(action: AnimationAction): void {
-    if (this._isLoop) {
+  private applyLoopMode(action: AnimationAction, loop?: boolean): void {
+    const isLoop = loop !== undefined ? loop : this._isLoop;
+    if (isLoop) {
       action.setLoop(LoopRepeat, Infinity);
       action.clampWhenFinished = false;
       return;
