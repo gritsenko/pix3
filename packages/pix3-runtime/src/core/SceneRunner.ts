@@ -172,12 +172,7 @@ export class SceneRunner {
       if (this.runtimeGraph) {
         for (const node of this.runtimeGraph.rootNodes) {
           if (node instanceof Layout2D) {
-            node.updateLayout(width, height);
-            
-            // Apply scale mode transformation
-            const transform = node.calculateScaleTransform(width, height);
-            node.scale.set(transform.scaleX, transform.scaleY, 1);
-            node.position.set(transform.offsetX, transform.offsetY, 0);
+            this.applyLayout2DViewportScaling(node, width, height);
           }
         }
       }
@@ -285,5 +280,76 @@ export class SceneRunner {
         this.updateBillboardSprites(node.children, camera);
       }
     }
+  }
+
+  private applyLayout2DViewportScaling(
+    layout: Layout2D,
+    viewportWidth: number,
+    viewportHeight: number
+  ): void {
+    layout.updateLayout();
+
+    const transform = layout.calculateScaleTransform(viewportWidth, viewportHeight);
+    const authoredTransform = this.getLayout2DAuthoredTransform(layout);
+
+    layout.scale.set(
+      authoredTransform.scaleX * transform.scaleX,
+      authoredTransform.scaleY * transform.scaleY,
+      layout.scale.z
+    );
+    layout.position.set(
+      authoredTransform.positionX + transform.offsetX,
+      authoredTransform.positionY + transform.offsetY,
+      layout.position.z
+    );
+  }
+
+  private getLayout2DAuthoredTransform(layout: Layout2D): {
+    positionX: number;
+    positionY: number;
+    scaleX: number;
+    scaleY: number;
+  } {
+    const transform = this.asRecord(layout.properties.transform);
+    const position = this.readVector2(transform?.position, 0, 0);
+    const scale = this.readVector2(transform?.scale, 1, 1);
+
+    return {
+      positionX: position.x,
+      positionY: position.y,
+      scaleX: scale.x,
+      scaleY: scale.y,
+    };
+  }
+
+  private readVector2(
+    value: unknown,
+    fallbackX: number,
+    fallbackY: number
+  ): { x: number; y: number } {
+    if (Array.isArray(value)) {
+      const x = typeof value[0] === 'number' && Number.isFinite(value[0]) ? value[0] : fallbackX;
+      const y = typeof value[1] === 'number' && Number.isFinite(value[1]) ? value[1] : fallbackY;
+      return { x, y };
+    }
+
+    if (value && typeof value === 'object') {
+      const record = value as Record<string, unknown>;
+      const x =
+        typeof record.x === 'number' && Number.isFinite(record.x) ? record.x : fallbackX;
+      const y =
+        typeof record.y === 'number' && Number.isFinite(record.y) ? record.y : fallbackY;
+      return { x, y };
+    }
+
+    return { x: fallbackX, y: fallbackY };
+  }
+
+  private asRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+
+    return value as Record<string, unknown>;
   }
 }

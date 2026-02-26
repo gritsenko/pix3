@@ -145,6 +145,7 @@ export interface Layout2DProperties {
   height?: number;
   resolutionPreset?: string;
   showViewportOutline?: boolean;
+  scaleMode?: string;
 }
 
 export interface Group2DProperties extends Node2DProperties {
@@ -928,6 +929,7 @@ export class SceneLoader {
               : undefined,
           showViewportOutline:
             typeof props.showViewportOutline === 'boolean' ? props.showViewportOutline : true,
+          scaleMode: typeof props.scaleMode === 'string' ? props.scaleMode : undefined,
         });
       }
       case 'Group2D': {

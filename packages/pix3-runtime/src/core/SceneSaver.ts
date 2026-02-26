@@ -278,6 +278,7 @@ export class SceneSaver {
       props.height = node.height;
       props.resolutionPreset = node.resolutionPreset;
       props.showViewportOutline = node.showViewportOutline;
+      props.scaleMode = node.scaleMode;
 
       // Add 2D transform
       const transform: Record<string, unknown> = {
