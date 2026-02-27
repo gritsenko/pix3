@@ -12,7 +12,9 @@ export class PinToNodeBehavior extends Script {
 
     private targetNode: NodeBase | null = null;
     private cameraNode: Camera3D | null = null;
-    private _tempVec = new Vector3();
+    private _tempWorldPos = new Vector3();
+    private _tempPinnedWorldPos = new Vector3();
+    private _tempPinnedLocalPos = new Vector3();
 
     static override getPropertySchema() {
         return {
@@ -104,55 +106,40 @@ export class PinToNodeBehavior extends Script {
 
         // Get world position of the target and apply Y offset
         targetObj.updateMatrixWorld(true);
-        this._tempVec.setFromMatrixPosition(targetObj.matrixWorld);
-        this._tempVec.y += this.yOffset;
+        this._tempWorldPos.setFromMatrixPosition(targetObj.matrixWorld);
+        this._tempWorldPos.y += this.yOffset;
 
         // Project 3D vector to 2D screen space using the camera
-        this._tempVec.project(cameraObj);
+        this._tempWorldPos.project(cameraObj);
 
-        // Find Layout2D to get the correct resolution
-        let layoutWidth = window.innerWidth;
-        let layoutHeight = window.innerHeight;
-        
-        let current = this.node.parent;
-        let layoutNode: any = null;
-        
-        // First try to find Layout2D in ancestors
-        while (current) {
-            if ((current as any).type === 'Layout2D') {
-                layoutNode = current;
-                break;
-            }
-            current = current.parent;
-        }
-        
-        // If not found in ancestors, search the whole scene
-        if (!layoutNode && this.node) {
-            let root: Object3D = this.node;
-            while (root.parent) root = root.parent;
-            
-            const findLayout = (node: Object3D): any => {
-                if ((node as any).type === 'Layout2D') return node;
-                for (const child of node.children) {
-                    const found = findLayout(child);
-                    if (found) return found;
-                }
-                return null;
-            };
-            layoutNode = findLayout(root);
-        }
-        
-        if (layoutNode) {
-            layoutWidth = layoutNode.width;
-            layoutHeight = layoutNode.height;
+        const viewport = this.getViewportSize();
+        if (viewport.width <= 0 || viewport.height <= 0) return;
+
+        // Convert NDC (-1..1) to the 2D world space used by SceneRunner's orthographic camera.
+        this._tempPinnedWorldPos.set(
+            this._tempWorldPos.x * (viewport.width * 0.5),
+            this._tempWorldPos.y * (viewport.height * 0.5),
+            0
+        );
+
+        const parent = this.node.parent;
+        if (!parent) return;
+
+        parent.updateMatrixWorld(true);
+        this._tempPinnedLocalPos.copy(this._tempPinnedWorldPos);
+        parent.worldToLocal(this._tempPinnedLocalPos);
+
+        // Write local coordinates so pinning remains correct under scaled/moved parents (e.g. Layout2D).
+        this.node.position.set(this._tempPinnedLocalPos.x, this._tempPinnedLocalPos.y, this.node.position.z);
+    }
+
+    private getViewportSize(): { width: number; height: number } {
+        if (this.input && this.input.width > 0 && this.input.height > 0) {
+            return { width: this.input.width, height: this.input.height };
         }
 
-        // Convert from normalized device coordinates (-1 to +1) to Layout2D coordinates.
-        // Layout2D origin (0,0) is at the center.
-        const screenX = this._tempVec.x * (layoutWidth * 0.5);
-        const screenY = this._tempVec.y * (layoutHeight * 0.5);
-
-        // Update the position of this 2D node
-        this.node.position.set(screenX, screenY, 0);
+        const fallbackWidth = Math.max(1, Math.round(window.innerWidth * window.devicePixelRatio));
+        const fallbackHeight = Math.max(1, Math.round(window.innerHeight * window.devicePixelRatio));
+        return { width: fallbackWidth, height: fallbackHeight };
     }
 }
