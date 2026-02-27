@@ -12,4 +12,27 @@ export default defineConfig({
       '@pix3/runtime': resolve(__dirname, 'packages/pix3-runtime/src'),
     },
   },
+  optimizeDeps: {
+    include: ['three', 'lit', 'valtio', 'yaml', 'golden-layout'],
+    exclude: ['@pix3/runtime'],
+    esbuildOptions: {
+      target: 'es2022',
+    },
+  },
+  build: {
+    target: 'es2022',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'pix3-runtime': ['@pix3/runtime'],
+          three: ['three'],
+        },
+      },
+    },
+  },
+  server: {
+    fs: {
+      allow: ['..'],
+    },
+  },
 });
