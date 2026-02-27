@@ -398,7 +398,7 @@ export class NodeBase extends Object3D {
           ui: {
             label: 'Visible',
             description: 'Whether the node is visible in the viewport',
-            group: 'Base',
+            group: 'Editor',
           },
           getValue: (node: unknown) => (node as NodeBase).visible,
           setValue: (node: unknown, value: unknown) => {
@@ -409,12 +409,31 @@ export class NodeBase extends Object3D {
           },
         },
         {
+          name: 'initiallyVisible',
+          type: 'boolean',
+          ui: {
+            label: 'Initially Visible',
+            description: 'Whether the node starts visible when entering play mode',
+            group: 'Base',
+          },
+          getValue: (node: unknown) => {
+            const n = node as NodeBase;
+            return typeof n.properties.initiallyVisible === 'boolean'
+              ? n.properties.initiallyVisible
+              : n.visible;
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const n = node as NodeBase;
+            n.properties.initiallyVisible = !!value;
+          },
+        },
+        {
           name: 'locked',
           type: 'boolean',
           ui: {
             label: 'Locked',
             description: 'Whether the node is locked and cannot be selected in the viewport',
-            group: 'Base',
+            group: 'Editor',
           },
           getValue: (node: unknown) => !!(node as NodeBase).userData.locked,
           setValue: (node: unknown, value: unknown) => {
@@ -429,6 +448,11 @@ export class NodeBase extends Object3D {
         Base: {
           label: 'Base Properties',
           description: 'Core node properties',
+          expanded: true,
+        },
+        Editor: {
+          label: 'Editor',
+          description: 'Editor and play-mode defaults',
           expanded: true,
         },
       },

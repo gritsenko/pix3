@@ -64,12 +64,21 @@ export class Node2D extends NodeBase {
       material.userData.__pix3BaseOpacity = Node2D.clampOpacity(material.opacity);
     }
 
+    if (material.userData.__pix3OriginalTransparent === undefined) {
+      material.userData.__pix3OriginalTransparent = material.transparent;
+    }
+
     this.opacityMaterials.add(material);
     this.applyOpacityToMaterial(material);
   }
 
   protected setOpacityMaterialBase(material: Material, baseOpacity: number): void {
     material.userData.__pix3BaseOpacity = Node2D.clampOpacity(baseOpacity);
+    
+    if (material.userData.__pix3OriginalTransparent === undefined) {
+      material.userData.__pix3OriginalTransparent = material.transparent;
+    }
+
     this.opacityMaterials.add(material);
     this.applyOpacityToMaterial(material);
   }
@@ -81,8 +90,14 @@ export class Node2D extends NodeBase {
         ? Node2D.clampOpacity(baseOpacityRaw)
         : Node2D.clampOpacity(material.opacity);
     material.opacity = baseOpacity * this._computedOpacity;
-    material.transparent = material.opacity < 1;
+    
+    const originalTransparent = material.userData.__pix3OriginalTransparent;
+    material.transparent = originalTransparent || material.opacity < 1;
     material.needsUpdate = true;
+  }
+
+  public refreshOpacity(): void {
+    this.refreshComputedOpacityRecursive();
   }
 
   private getParentComputedOpacity(): number {

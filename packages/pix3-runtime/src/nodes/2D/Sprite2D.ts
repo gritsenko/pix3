@@ -116,6 +116,11 @@ export class Sprite2D extends Node2D {
     this.geometry.dispose();
     this.geometry = new PlaneGeometry(w, h);
     this.mesh.geometry = this.geometry;
+    
+    // Re-apply opacity to the new geometry/material if needed
+    // The material is reused, but we need to ensure it updates
+    this.material.needsUpdate = true;
+    this.refreshOpacity();
   }
 
   /**
@@ -175,7 +180,8 @@ export class Sprite2D extends Node2D {
           },
           getValue: (node: unknown) => (node as Sprite2D).width ?? 64,
           setValue: (node: unknown, value: unknown) => {
-            (node as Sprite2D).width = Number(value);
+            const sprite = node as Sprite2D;
+            sprite.updateSize(Number(value), sprite.height ?? 64);
           },
         },
         {
@@ -192,7 +198,8 @@ export class Sprite2D extends Node2D {
           },
           getValue: (node: unknown) => (node as Sprite2D).height ?? 64,
           setValue: (node: unknown, value: unknown) => {
-            (node as Sprite2D).height = Number(value);
+            const sprite = node as Sprite2D;
+            sprite.updateSize(sprite.width ?? 64, Number(value));
           },
         },
       ],

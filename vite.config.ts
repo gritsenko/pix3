@@ -21,6 +21,7 @@ export default defineConfig({
   },
   build: {
     target: 'es2022',
+    sourcemap: 'hidden',
     rollupOptions: {
       output: {
         manualChunks: {
@@ -34,5 +35,8 @@ export default defineConfig({
     fs: {
       allow: ['..'],
     },
+  },
+  esbuild: {
+    sourcemap: false,
   },
 });

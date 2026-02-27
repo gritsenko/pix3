@@ -1116,7 +1116,7 @@ export class ViewportRendererService {
       this.setActiveTargetSelection(targetNodeId);
       const sceneGraph = this.sceneManager.getActiveSceneGraph();
       const node = sceneGraph?.nodeMap.get(targetNodeId);
-      if (node instanceof NodeBase && !node.properties.locked) {
+      if (node instanceof NodeBase && node.visible && !node.properties.locked) {
         return node;
       }
       return null;
@@ -1128,7 +1128,7 @@ export class ViewportRendererService {
     if (iconNodeId) {
       const sceneGraph = this.sceneManager.getActiveSceneGraph();
       const node = sceneGraph?.nodeMap.get(iconNodeId);
-      if (node instanceof NodeBase && !node.properties.locked) {
+      if (node instanceof NodeBase && node.visible && !node.properties.locked) {
         return node;
       }
     }
@@ -1165,6 +1165,10 @@ export class ViewportRendererService {
     // Start from the closest intersection and traverse up to find the deepest NodeBase ancestor
     // Skip locked nodes
     for (const intersection of intersects) {
+      if (!this.isVisibleInHierarchy(intersection.object)) {
+        continue;
+      }
+
       let current: THREE.Object3D | null = intersection.object;
 
       // Traverse up the hierarchy to find the deepest NodeBase
@@ -1172,7 +1176,7 @@ export class ViewportRendererService {
         if (current instanceof NodeBase) {
           // Skip locked nodes - they cannot be selected by pointer
           const isLocked = Boolean((current as NodeBase).properties.locked);
-          if (!isLocked) {
+          if (!isLocked && this.isVisibleInHierarchy(current)) {
             return current;
           }
         }
@@ -1272,7 +1276,9 @@ export class ViewportRendererService {
       mouse,
     });
 
-    const intersects = raycaster.intersectObjects(candidates, true);
+    const intersects = raycaster
+      .intersectObjects(candidates, true)
+      .filter(intersection => this.isVisibleInHierarchy(intersection.object));
     console.debug(
       '[ViewportRenderer] 2D raycast intersects',
       intersects.map(i => ({
@@ -1312,6 +1318,17 @@ export class ViewportRendererService {
     }
 
     return null;
+  }
+
+  private isVisibleInHierarchy(object: THREE.Object3D): boolean {
+    let current: THREE.Object3D | null = object;
+    while (current) {
+      if (!current.visible) {
+        return false;
+      }
+      current = current.parent;
+    }
+    return true;
   }
 
   updateNodeTransform(node: NodeBase): void {
@@ -1464,6 +1481,8 @@ export class ViewportRendererService {
         visualRoot.visible = node.visible;
       }
     }
+
+    this.updateSelection();
   }
 
   updateSelection(): void {
@@ -1573,6 +1592,10 @@ export class ViewportRendererService {
     for (const nodeId of nodeIds) {
       const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
       if (node && node instanceof Node3D) {
+        if (!this.isVisibleInHierarchy(node)) {
+          continue;
+        }
+
         this.selectedObjects.add(node);
 
         if (!firstSelectedNode) {
@@ -1625,7 +1648,9 @@ export class ViewportRendererService {
           this.scene?.add(targetGizmo);
         }
       } else if (node && node instanceof Node2D) {
-        selected2DNodeIds.push(nodeId);
+        if (this.isVisibleInHierarchy(node)) {
+          selected2DNodeIds.push(nodeId);
+        }
       }
     }
 
@@ -1658,7 +1683,7 @@ export class ViewportRendererService {
       }
 
       const selectedNode = this.findNodeById(nodeIds[0], sceneGraph.rootNodes);
-      if (selectedNode instanceof Node3D) {
+      if (selectedNode instanceof Node3D && this.isVisibleInHierarchy(selectedNode)) {
         nodeToAttach = selectedNode;
       }
     }
@@ -2775,12 +2800,22 @@ export class ViewportRendererService {
           typeof baseOpacityRaw === 'number' && Number.isFinite(baseOpacityRaw)
             ? Math.max(0, Math.min(1, baseOpacityRaw))
             : 1;
+
+        if (material.userData.originalTransparent === undefined) {
+          material.userData.originalTransparent = material.transparent;
+        }
+
         material.opacity = baseOpacity * nodeOpacity;
-        material.transparent = material.opacity < 1 || baseOpacity < 1;
+        material.transparent =
+          material.userData.originalTransparent || material.opacity < 1 || baseOpacity < 1;
         material.needsUpdate = true;
       };
 
-      if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.LineSegments) {
+      if (
+        obj instanceof THREE.Mesh ||
+        obj instanceof THREE.Line ||
+        obj instanceof THREE.LineSegments
+      ) {
         if (obj.material instanceof THREE.Material) {
           applyToMaterial(obj.material);
         } else if (Array.isArray(obj.material)) {
@@ -2930,6 +2965,10 @@ export class ViewportRendererService {
         continue;
       }
 
+      if (!this.isVisibleInHierarchy(node)) {
+        continue;
+      }
+
       const visual = this.get2DVisual(node);
       if (!visual) {
         console.debug('[ViewportRenderer] update2DOverlay: no visual for', nodeId);
@@ -2990,12 +3029,18 @@ export class ViewportRendererService {
     for (const nodeId of this.selection2DOverlay.nodeIds) {
       const node = sceneGraph.nodeMap.get(nodeId);
       if (!node || !(node instanceof Node2D)) continue;
+      if (!this.isVisibleInHierarchy(node)) {
+        continue;
+      }
       // Use node-only bounds (not including descendants)
       const nodeBounds = this.getNodeOnlyBounds(node);
       combinedBounds.union(nodeBounds);
     }
 
-    if (combinedBounds.isEmpty()) return;
+    if (combinedBounds.isEmpty()) {
+      this.clear2DSelectionOverlay();
+      return;
+    }
 
     const min = combinedBounds.min;
     const max = combinedBounds.max;

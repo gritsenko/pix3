@@ -82,6 +82,8 @@ export class SceneRunner {
       this.scene.add(node);
     }
 
+    this.applyInitialVisibility(this.runtimeGraph.rootNodes);
+
     // Attach InputService to renderer
     this.inputService.attach(this.renderer.domElement);
 
@@ -225,8 +227,6 @@ export class SceneRunner {
         this.orthographicCamera.updateProjectionMatrix();
       }
     }
-
-
     // 2. Render Passes
 
     // Pass 1: 3D
@@ -282,6 +282,56 @@ export class SceneRunner {
     }
   }
 
+  private applyInitialVisibility(nodes: NodeBase[]): void {
+    for (const node of nodes) {
+      const initialVisibility = this.readInitialVisibility(node);
+      if (initialVisibility !== undefined) {
+        node.visible = initialVisibility;
+        node.properties.visible = initialVisibility;
+      }
+
+      const childNodes = node.children.filter(
+        (child): child is NodeBase => child instanceof NodeBase
+      );
+      if (childNodes.length > 0) {
+        this.applyInitialVisibility(childNodes);
+      }
+    }
+  }
+
+  private readInitialVisibility(node: NodeBase): boolean | undefined {
+    const properties = node.properties as Record<string, unknown> | undefined;
+    const direct = properties?.initiallyVisible;
+    const legacySnakeCase = properties?.initially_visible;
+    const userDataProps = (node.userData.properties as Record<string, unknown> | undefined)
+      ?.initiallyVisible;
+
+    return (
+      this.toBooleanLike(direct) ??
+      this.toBooleanLike(legacySnakeCase) ??
+      this.toBooleanLike(userDataProps)
+    );
+  }
+
+  private toBooleanLike(value: unknown): boolean | undefined {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+
+    if (typeof value === 'string') {
+      const normalized = value.trim().toLowerCase();
+      if (normalized === 'true') {
+        return true;
+      }
+      if (normalized === 'false') {
+        return false;
+      }
+      return undefined;
+    }
+
+    return undefined;
+  }
+
   private applyLayout2DViewportScaling(
     layout: Layout2D,
     viewportWidth: number,
@@ -335,10 +385,8 @@ export class SceneRunner {
 
     if (value && typeof value === 'object') {
       const record = value as Record<string, unknown>;
-      const x =
-        typeof record.x === 'number' && Number.isFinite(record.x) ? record.x : fallbackX;
-      const y =
-        typeof record.y === 'number' && Number.isFinite(record.y) ? record.y : fallbackY;
+      const x = typeof record.x === 'number' && Number.isFinite(record.x) ? record.x : fallbackX;
+      const y = typeof record.y === 'number' && Number.isFinite(record.y) ? record.y : fallbackY;
       return { x, y };
     }
 
