@@ -22,6 +22,7 @@ export enum ScaleMode {
   ScaleOuter = 'scale-outer',
   ScaleInner = 'scale-inner',
   Stretch = 'stretch',
+  Scale = 'scale',
 }
 
 export const RESOLUTION_PRESETS: Record<
@@ -53,7 +54,7 @@ export class Layout2D extends Node2D {
     this._height = props.height ?? 1080;
     this._resolutionPreset = props.resolutionPreset ?? ResolutionPreset.FullHD;
     this._showViewportOutline = props.showViewportOutline ?? true;
-    this._scaleMode = props.scaleMode ?? ScaleMode.ScaleInner;
+    this._scaleMode = this.isScaleMode(props.scaleMode) ? props.scaleMode : ScaleMode.ScaleInner;
 
     this.isContainer = true;
   }
@@ -111,7 +112,7 @@ export class Layout2D extends Node2D {
   }
 
   set scaleMode(value: ScaleMode) {
-    this._scaleMode = value;
+    this._scaleMode = this.isScaleMode(value) ? value : ScaleMode.ScaleInner;
   }
 
   setSize(width: number, height: number): void {
@@ -126,10 +127,10 @@ export class Layout2D extends Node2D {
     this.recalculateChildLayouts();
   }
 
-  recalculateChildLayouts(): void {
+  recalculateChildLayouts(width: number = this._width, height: number = this._height): void {
     for (const child of this.children) {
       if (child instanceof Group2D) {
-        child.updateLayout(this._width, this._height);
+        child.updateLayout(width, height);
       }
     }
   }
@@ -171,6 +172,12 @@ export class Layout2D extends Node2D {
         // Non-uniform scaling to exactly fill canvas (distorts content)
         scaleX = canvasWidth / this._width;
         scaleY = canvasHeight / this._height;
+        break;
+      }
+      case ScaleMode.Scale: {
+        // Keep authored transform scale; layout bounds are handled by viewport dimensions.
+        scaleX = 1;
+        scaleY = 1;
         break;
       }
       default:
@@ -272,6 +279,7 @@ export class Layout2D extends Node2D {
               'Scale Outer (Fill)': ScaleMode.ScaleOuter,
               'Scale Inner (Fit)': ScaleMode.ScaleInner,
               Stretch: ScaleMode.Stretch,
+              Scale: ScaleMode.Scale,
             },
           },
           getValue: (node: unknown) => (node as Layout2D).scaleMode,
@@ -289,5 +297,14 @@ export class Layout2D extends Node2D {
         },
       },
     };
+  }
+
+  private isScaleMode(value: unknown): value is ScaleMode {
+    return (
+      value === ScaleMode.ScaleOuter ||
+      value === ScaleMode.ScaleInner ||
+      value === ScaleMode.Stretch ||
+      value === ScaleMode.Scale
+    );
   }
 }

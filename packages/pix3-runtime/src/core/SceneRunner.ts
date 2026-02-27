@@ -12,7 +12,7 @@ import { RuntimeRenderer } from './RuntimeRenderer';
 import { InputService } from './InputService';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
-import { Layout2D } from '../nodes/2D/Layout2D';
+import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { AnimatedSprite3D } from '../nodes/3D/AnimatedSprite3D';
 import { LAYER_3D, LAYER_2D } from '../constants';
@@ -337,7 +337,12 @@ export class SceneRunner {
     viewportWidth: number,
     viewportHeight: number
   ): void {
-    layout.updateLayout();
+    const usesViewportLayoutBounds = layout.scaleMode === ScaleMode.Scale;
+    if (usesViewportLayoutBounds) {
+      layout.recalculateChildLayouts(viewportWidth, viewportHeight);
+    } else {
+      layout.updateLayout();
+    }
 
     const transform = layout.calculateScaleTransform(viewportWidth, viewportHeight);
     const authoredTransform = this.getLayout2DAuthoredTransform(layout);

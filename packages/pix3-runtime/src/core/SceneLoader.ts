@@ -8,7 +8,7 @@ import { Sprite2D } from '../nodes/2D/Sprite2D';
 import { AnimatedSprite2D } from '../nodes/2D/AnimatedSprite2D';
 import { ColorRect2D } from '../nodes/2D/ColorRect2D';
 import { Group2D } from '../nodes/2D/Group2D';
-import { Layout2D } from '../nodes/2D/Layout2D';
+import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
@@ -929,7 +929,7 @@ export class SceneLoader {
               : undefined,
           showViewportOutline:
             typeof props.showViewportOutline === 'boolean' ? props.showViewportOutline : true,
-          scaleMode: typeof props.scaleMode === 'string' ? props.scaleMode : undefined,
+          scaleMode: this.parseScaleMode(props.scaleMode),
         });
       }
       case 'Group2D': {
@@ -1507,5 +1507,22 @@ export class SceneLoader {
 
   private asString(value: unknown): string | undefined {
     return typeof value === 'string' ? value : undefined;
+  }
+
+  private parseScaleMode(value: unknown): ScaleMode | undefined {
+    if (typeof value !== 'string') {
+      return undefined;
+    }
+
+    if (
+      value === ScaleMode.ScaleInner ||
+      value === ScaleMode.ScaleOuter ||
+      value === ScaleMode.Stretch ||
+      value === ScaleMode.Scale
+    ) {
+      return value;
+    }
+
+    return undefined;
   }
 }

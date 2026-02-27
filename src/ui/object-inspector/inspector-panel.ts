@@ -846,6 +846,7 @@ export class InspectorPanel extends ComponentBase {
       <div class="property-section">
         <div class="section-header">
           <h3 class="section-title">Object Inspector</h3>
+          <p class="node-id">ID: ${this.primaryNode.nodeId}</p>
           ${this.selectedNodes.length > 1
         ? html`<p class="selection-info">${this.selectedNodes.length} objects selected</p>`
         : ''}

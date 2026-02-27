@@ -34,6 +34,13 @@ pix3-panel {
   color: var(--color-text-primary, #eee);
 }
 
+.node-id {
+  font-size: 0.72rem;
+  color: var(--color-text-subtle, #777);
+  margin: 0;
+  font-weight: 600;
+}
+
 .selection-info {
   font-size: 0.75rem;
   color: var(--color-text-subtle, #aaa);
