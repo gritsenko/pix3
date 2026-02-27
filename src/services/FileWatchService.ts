@@ -21,7 +21,16 @@ export class FileWatchService {
   /** Polling interval in milliseconds (default 500ms). */
   private readonly pollInterval: number = 500;
 
-  constructor() {}
+  private readonly handleWindowFocus = () => {
+    // When window regains focus, immediately check all watched files
+    for (const [filePath, fileHandle] of this.fileHandles.entries()) {
+      void this.checkFileChange(filePath, fileHandle);
+    }
+  };
+
+  constructor() {
+    window.addEventListener('focus', this.handleWindowFocus);
+  }
 
   /**
    * Update the last-known modification time for a watched file.
@@ -145,13 +154,15 @@ export class FileWatchService {
     try {
       const file = await fileHandle.getFile();
       const currentModifiedTime = file.lastModified;
-      const lastKnownTime = this.lastModifiedTimes.get(filePath);
+      let lastKnownTime = this.lastModifiedTimes.get(filePath);
 
-      if (
-        lastKnownTime !== undefined &&
-        lastKnownTime !== null &&
-        currentModifiedTime > lastKnownTime
-      ) {
+      if (lastKnownTime === undefined || lastKnownTime === null) {
+        // Initialize the last known time on the first check if it wasn't provided
+        this.lastModifiedTimes.set(filePath, currentModifiedTime);
+        lastKnownTime = currentModifiedTime;
+      }
+
+      if (currentModifiedTime > lastKnownTime) {
         // File was modified externally
         this.lastModifiedTimes.set(filePath, currentModifiedTime);
 
@@ -182,6 +193,7 @@ export class FileWatchService {
   }
 
   dispose(): void {
+    window.removeEventListener('focus', this.handleWindowFocus);
     this.unwatchAll();
   }
 }

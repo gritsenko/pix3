@@ -66,16 +66,27 @@ export class EditorTabService {
         const projectId = appState.project.id;
         if (!projectId) return;
 
+        const filteredTabs = appState.tabs.tabs.filter(
+          t => !t.resourceId.startsWith('templ://') && t.type !== 'game'
+        );
+
+        let savedActiveTabId = appState.tabs.activeTabId;
+        const activeTab = appState.tabs.tabs.find(t => t.id === savedActiveTabId);
+        
+        // If the active tab is excluded (like game tab), use the previous active tab
+        if (activeTab && (activeTab.resourceId.startsWith('templ://') || activeTab.type === 'game')) {
+          savedActiveTabId = this.previousActiveTabIdBeforeGame ?? 
+            (filteredTabs.length > 0 ? filteredTabs[0].id : null);
+        }
+
         const session = {
-          tabs: appState.tabs.tabs
-            .filter(t => !t.resourceId.startsWith('templ://') && t.type !== 'game')
-            .map(t => ({
-              resourceId: t.resourceId,
-              type: t.type,
-              title: t.title,
-              contextState: t.contextState,
-            })),
-          activeTabId: appState.tabs.activeTabId,
+          tabs: filteredTabs.map(t => ({
+            resourceId: t.resourceId,
+            type: t.type,
+            title: t.title,
+            contextState: t.contextState,
+          })),
+          activeTabId: savedActiveTabId,
         };
 
         try {
@@ -219,10 +230,14 @@ export class EditorTabService {
         }
 
         console.log('[EditorTabService] All tabs opened, now focusing active tab:', session.activeTabId);
+        let tabFocused = false;
         if (session.activeTabId) {
           console.log('[EditorTabService] Restoring saved active tab:', session.activeTabId);
           await this.focusTab(session.activeTabId);
-        } else if (tabsToRestore.length > 0) {
+          tabFocused = appState.tabs.tabs.some(t => t.id === session.activeTabId);
+        }
+        
+        if (!tabFocused && tabsToRestore.length > 0) {
           const firstTabId = this.deriveTabId(
             tabsToRestore[0].type as EditorTabType,
             tabsToRestore[0].resourceId

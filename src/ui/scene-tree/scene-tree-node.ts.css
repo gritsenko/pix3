@@ -31,7 +31,8 @@ pix3-scene-tree-node {
 }
 
 .tree-node__content--selected {
-  background: rgba(48, 113, 255, 0.13);
+  background: rgba(var(--pix3-accent-rgb), 0.25);
+  outline: 1px solid rgba(var(--pix3-accent-rgb), 0.4);
 }
 
 .tree-node__content--primary {

@@ -189,9 +189,14 @@ export class AssetTree extends ComponentBase {
       console.warn('[AssetTree] Path not found in tree:', targetPath);
       // Force refresh and try again
       await this.loadRoot();
-      return findAndSelectNode(this.tree, pathSegments);
+      const retryFound = await findAndSelectNode(this.tree, pathSegments);
+      if (retryFound) {
+        this.saveState();
+      }
+      return retryFound;
     }
 
+    this.saveState();
     return true;
   }
 
@@ -280,8 +285,6 @@ export class AssetTree extends ComponentBase {
   }
 
   protected async firstUpdated(): Promise<void> {
-    await this.loadRoot();
-
     // Restore asset browser state (expanded folders and selected path) from localStorage
     await this.restoreState();
 
@@ -368,47 +371,17 @@ export class AssetTree extends ComponentBase {
     // First, load state from localStorage
     const loadedState = this.projectService.loadAssetBrowserState();
 
-    if (!loadedState) {
-      return;
+    if (loadedState) {
+      // Update appState with loaded state
+      appState.project.assetBrowserExpandedPaths = loadedState.expandedPaths;
+      appState.project.assetBrowserSelectedPath = loadedState.selectedPath;
     }
 
-    // Update appState with loaded state
-    appState.project.assetBrowserExpandedPaths = loadedState.expandedPaths;
-    appState.project.assetBrowserSelectedPath = loadedState.selectedPath;
+    await this.loadRoot();
 
-    const expandedPaths = loadedState.expandedPaths;
-    const selectedPath = loadedState.selectedPath;
-
-    if (!expandedPaths || expandedPaths.length === 0) {
-      return;
-    }
-
-    // Build a map of path -> node for quick lookup
-    const pathToNode = new Map<string, Node>();
-    const buildPathMap = (nodes: Node[]) => {
-      for (const node of nodes) {
-        const normalizedPath = this.normalizePath(node.path);
-        pathToNode.set(normalizedPath, node);
-        if (node.children) {
-          buildPathMap(node.children);
-        }
-      }
-    };
-    buildPathMap(this.tree);
-
-    // Expand folders in order (parent before child)
-    const sortedPaths = [...expandedPaths].sort((a, b) => a.split('/').length - b.split('/').length);
-
-    for (const path of sortedPaths) {
-      const node = pathToNode.get(path);
-      if (node && node.kind === 'directory' && !node.expanded) {
-        await this.expandNode(node);
-      }
-    }
-
-    // Restore selected path if it exists
-    if (selectedPath) {
-      await this.selectPath(selectedPath);
+    if (loadedState && loadedState.selectedPath) {
+      this.selectedPath = loadedState.selectedPath;
+      await this.selectPath(loadedState.selectedPath);
     }
   }
 
@@ -446,7 +419,7 @@ export class AssetTree extends ComponentBase {
 
   private async loadRoot(): Promise<void> {
     await this.runSerializedTreeRefresh(async () => {
-      const expandedPaths = new Set<string>();
+      const expandedPaths = new Set<string>(appState.project.assetBrowserExpandedPaths || []);
       this.collectExpandedPaths(this.tree, expandedPaths);
 
       const nextTree = await this.buildTreeFromExpandedPaths(this.rootPath || '.', expandedPaths);

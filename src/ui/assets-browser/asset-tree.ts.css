@@ -69,8 +69,8 @@ asset-tree {
 }
 
 .node-row.selected {
-  background: rgba(var(--pix3-accent-rgb), 0.14);
-  outline: 1px solid rgba(var(--pix3-accent-rgb), 0.18);
+  background: rgba(var(--pix3-accent-rgb), 0.25);
+  outline: 1px solid rgba(var(--pix3-accent-rgb), 0.4);
 }
 
 .node-row.drag-over {
