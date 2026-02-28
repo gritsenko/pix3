@@ -47,6 +47,9 @@ export * from './behaviors/register-behaviors';
 export * from './behaviors/RotateBehavior';
 export * from './behaviors/SimpleMoveBehavior';
 export * from './behaviors/SineBehavior';
+export * from './behaviors/RadialProgressBehavior';
+export * from './behaviors/PinToNodeBehavior';
+export * from './behaviors/FadeBehavior';
 
 // Framework
 export * from './fw/property-schema';
