@@ -52,6 +52,11 @@ export class TemplateService {
     }
     return match[1] || 'default';
   }
+
+  public dispose(): void {
+    this.sceneTemplateMap.clear();
+    this.binaryTemplateMap.clear();
+  }
 }
 
 export const DEFAULT_TEMPLATE_SCENE_ID = 'startup-scene';

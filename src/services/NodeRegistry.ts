@@ -449,4 +449,8 @@ export class NodeRegistry {
 
     return groups;
   }
+
+  public dispose(): void {
+    this.nodeTypes.clear();
+  }
 }

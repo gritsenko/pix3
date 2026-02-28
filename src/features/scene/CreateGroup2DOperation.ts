@@ -6,7 +6,6 @@ import type {
 } from '@/core/Operation';
 import { Group2D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
-import { ref } from 'valtio/vanilla';
 import { Vector2 } from 'three';
 import {
   attachNode,
@@ -15,6 +14,7 @@ import {
   resolveDefault2DParent,
   restoreAutoCreatedLayout,
 } from '@/features/scene/node-placement';
+import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateGroup2DOperationParams {
   groupName?: string;
@@ -73,27 +73,9 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
     const { parent: targetParent, createdLayout } = resolveDefault2DParent(sceneGraph);
     attachNode(sceneGraph, node, targetParent);
 
-    // Update the state hierarchy - REPLACE the entire object to trigger reactivity
-    const hierarchy = state.scenes.hierarchies[activeSceneId];
-    if (hierarchy) {
-      // Create a new hierarchy state object to trigger Valtio subscribers
-      state.scenes.hierarchies[activeSceneId] = {
-        version: hierarchy.version,
-        description: hierarchy.description,
-        rootNodes: ref([...sceneGraph.rootNodes]), // Create new array reference
-        metadata: hierarchy.metadata,
-      };
-    }
-
-    // Mark scene as dirty
-    const descriptor = state.scenes.descriptors[activeSceneId];
-    if (descriptor) {
-      descriptor.isDirty = true;
-    }
-
-    // Select the newly created node
-    state.selection.nodeIds = [nodeId];
-    state.selection.primaryNodeId = nodeId;
+    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+    SceneStateUpdater.markSceneDirty(state, activeSceneId);
+    SceneStateUpdater.selectNode(state, nodeId);
 
     return {
       didMutate: true,
@@ -102,54 +84,16 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
           removeAutoCreatedLayoutIfUnused(sceneGraph, createdLayout);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark scene as dirty
-          const descriptor = state.scenes.descriptors[activeSceneId];
-          if (descriptor) {
-            descriptor.isDirty = true;
-          }
-
-          // Clear selection if this node was selected
-          if (state.selection.nodeIds.includes(nodeId)) {
-            state.selection.nodeIds = [];
-            state.selection.primaryNodeId = null;
-          }
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
         },
         redo: () => {
           restoreAutoCreatedLayout(sceneGraph, createdLayout);
           attachNode(sceneGraph, node, targetParent);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark scene as dirty
-          const descriptor = state.scenes.descriptors[activeSceneId];
-          if (descriptor) {
-            descriptor.isDirty = true;
-          }
-
-          // Select the node
-          state.selection.nodeIds = [nodeId];
-          state.selection.primaryNodeId = nodeId;
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.selectNode(state, nodeId);
         },
       },
     };

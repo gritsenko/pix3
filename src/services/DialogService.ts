@@ -1,4 +1,4 @@
-import { injectable } from '@/fw/di';
+import { injectable, ServiceContainer } from '@/fw/di';
 
 export interface DialogOptions {
   title: string;
@@ -159,5 +159,8 @@ export class DialogService {
 }
 
 export function resolveDialogService(): DialogService {
-  return new DialogService();
+  const container = ServiceContainer.getInstance();
+  return container.getService(
+    container.getOrCreateToken(DialogService)
+  ) as DialogService;
 }

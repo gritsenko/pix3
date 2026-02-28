@@ -6,9 +6,9 @@ import type {
 } from '@/core/Operation';
 import { PointLightNode } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
-import { ref } from 'valtio/vanilla';
 import { Vector3 } from 'three';
 import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
+import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreatePointLightOperationParams {
   lightName?: string;
@@ -76,26 +76,9 @@ export class CreatePointLightOperation implements Operation<OperationInvokeResul
     const targetParent = resolveDefault3DParent(sceneGraph);
     attachNode(sceneGraph, node, targetParent);
 
-    // Update the state hierarchy
-    const hierarchy = state.scenes.hierarchies[activeSceneId];
-    if (hierarchy) {
-      state.scenes.hierarchies[activeSceneId] = {
-        version: hierarchy.version,
-        description: hierarchy.description,
-        rootNodes: ref([...sceneGraph.rootNodes]),
-        metadata: hierarchy.metadata,
-      };
-    }
-
-    // Mark scene as dirty
-    const descriptor = state.scenes.descriptors[activeSceneId];
-    if (descriptor) {
-      descriptor.isDirty = true;
-    }
-
-    // Select the newly created node
-    state.selection.nodeIds = [nodeId];
-    state.selection.primaryNodeId = nodeId;
+    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+    SceneStateUpdater.markSceneDirty(state, activeSceneId);
+    SceneStateUpdater.selectNode(state, nodeId);
 
     return {
       didMutate: true,
@@ -103,33 +86,15 @@ export class CreatePointLightOperation implements Operation<OperationInvokeResul
         label: `Create ${lightName}`,
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
-
-          const currentHierarchy = state.scenes.hierarchies[activeSceneId];
-          if (currentHierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              ...currentHierarchy,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-            };
-          }
-
-          if (state.selection.primaryNodeId === nodeId) {
-            state.selection.primaryNodeId = null;
-          }
-          state.selection.nodeIds = state.selection.nodeIds.filter(id => id !== nodeId);
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
         },
         redo: () => {
           attachNode(sceneGraph, node, targetParent);
-
-          const currentHierarchy = state.scenes.hierarchies[activeSceneId];
-          if (currentHierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              ...currentHierarchy,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-            };
-          }
-
-          state.selection.nodeIds = [nodeId];
-          state.selection.primaryNodeId = nodeId;
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.selectNode(state, nodeId);
         },
       },
     };

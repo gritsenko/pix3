@@ -7,9 +7,8 @@ import type {
 import { MeshInstance } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { AssetLoader } from '@pix3/runtime';
-import { getAppStateSnapshot } from '@/state';
-import { ref } from 'valtio/vanilla';
 import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
+import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface AddModelOperationParams {
   modelPath: string; // res:// path to .glb/.gltf file
@@ -67,72 +66,25 @@ export class AddModelOperation implements Operation<OperationInvokeResult> {
     const targetParent = resolveDefault3DParent(sceneGraph);
     attachNode(sceneGraph, node, targetParent);
 
-    // Update the state hierarchy - REPLACE the entire object to trigger reactivity
-    const hierarchy = state.scenes.hierarchies[activeSceneId];
-    if (hierarchy) {
-      // Create a new hierarchy state object to trigger Valtio subscribers
-      state.scenes.hierarchies[activeSceneId] = {
-        version: hierarchy.version,
-        description: hierarchy.description,
-        rootNodes: ref([...sceneGraph.rootNodes]), // Create new array reference
-        metadata: hierarchy.metadata,
-      };
-    }
-
-    // Mark scene as dirty
-    const descriptor = state.scenes.descriptors[activeSceneId];
-    if (descriptor) {
-      descriptor.isDirty = true;
-      state.scenes.lastLoadedAt = Date.now();
-    }
-
-    // Create undo/redo closures
-    const beforeSnapshot = context.snapshot;
-    const afterSnapshot = getAppStateSnapshot();
+    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+    SceneStateUpdater.markSceneDirty(state, activeSceneId);
+    state.scenes.lastLoadedAt = Date.now();
 
     return {
       didMutate: true,
       commit: {
         label: `Add model: ${modelName}`,
-        beforeSnapshot,
-        afterSnapshot,
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
-
-          // Update state hierarchy - replace to trigger reactivity
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark as dirty
-          if (descriptor) {
-            descriptor.isDirty = true;
-            state.scenes.lastLoadedAt = Date.now();
-          }
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          state.scenes.lastLoadedAt = Date.now();
         },
         redo: () => {
           attachNode(sceneGraph, node, targetParent);
-
-          // Update state hierarchy - replace to trigger reactivity
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark as dirty
-          if (descriptor) {
-            descriptor.isDirty = true;
-            state.scenes.lastLoadedAt = Date.now();
-          }
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          state.scenes.lastLoadedAt = Date.now();
         },
       },
     };

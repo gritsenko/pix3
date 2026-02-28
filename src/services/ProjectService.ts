@@ -470,6 +470,10 @@ Happy creating! 🎨
     await this.fs.writeTextFile(PROJECT_MANIFEST_PATH, yaml);
     appState.project.manifest = normalized;
   }
+
+  public dispose(): void {
+    // ProjectService holds no subscriptions or event listeners
+  }
 }
 
 export const resolveProjectService = (): ProjectService => {

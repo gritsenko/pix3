@@ -7,7 +7,6 @@ import type {
 import type { Layout2D } from '@pix3/runtime';
 import { Checkbox2D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
-import { ref } from 'valtio/vanilla';
 import { Vector2 } from 'three';
 import {
   attachNode,
@@ -16,6 +15,7 @@ import {
   resolveDefault2DParent,
   restoreAutoCreatedLayout,
 } from '@/features/scene/node-placement';
+import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateCheckbox2DOperationParams {
   checkboxName?: string;
@@ -76,32 +76,10 @@ export class CreateCheckbox2DOperation implements Operation<OperationInvokeResul
         return result.parent;
       })();
 
-    const updateHierarchyState = () => {
-      const hierarchy = state.scenes.hierarchies[activeSceneId];
-      if (hierarchy) {
-        state.scenes.hierarchies[activeSceneId] = {
-          version: hierarchy.version,
-          description: hierarchy.description,
-          rootNodes: ref([...sceneGraph.rootNodes]),
-          metadata: hierarchy.metadata,
-        };
-      }
-    };
-
-    const markSceneDirty = () => {
-      const descriptor = state.scenes.descriptors[activeSceneId];
-      if (descriptor) {
-        descriptor.isDirty = true;
-      }
-    };
-
     attachNode(sceneGraph, node, targetParent);
-    updateHierarchyState();
-    markSceneDirty();
-
-    // Update selection to the new node for payload extraction
-    state.selection.nodeIds = [nodeId];
-    state.selection.primaryNodeId = nodeId;
+    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+    SceneStateUpdater.markSceneDirty(state, activeSceneId);
+    SceneStateUpdater.selectNode(state, nodeId);
 
     return {
       didMutate: true,
@@ -110,20 +88,16 @@ export class CreateCheckbox2DOperation implements Operation<OperationInvokeResul
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
           removeAutoCreatedLayoutIfUnused(sceneGraph, autoCreatedLayout);
-          updateHierarchyState();
-          markSceneDirty();
-          if (state.selection.primaryNodeId === nodeId) {
-            state.selection.primaryNodeId = null;
-          }
-          state.selection.nodeIds = state.selection.nodeIds.filter(id => id !== nodeId);
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
         },
         redo: () => {
-          attachNode(sceneGraph, node, targetParent);
           restoreAutoCreatedLayout(sceneGraph, autoCreatedLayout);
-          updateHierarchyState();
-          markSceneDirty();
-          state.selection.nodeIds = [nodeId];
-          state.selection.primaryNodeId = nodeId;
+          attachNode(sceneGraph, node, targetParent);
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.selectNode(state, nodeId);
         },
       },
     };

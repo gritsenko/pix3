@@ -7,6 +7,7 @@ import {
   type CommandExecutionResult,
   type CommandMetadata,
   type CommandContext,
+  type CommandPreconditionResult,
 } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
 import { RemoveComponentOperation, type RemoveComponentParams } from './RemoveComponentOperation';
@@ -24,6 +25,16 @@ export class RemoveComponentCommand extends CommandBase<object, void> {
   constructor(params: RemoveComponentParams) {
     super();
     this.params = params;
+  }
+
+  preconditions(context: CommandContext): CommandPreconditionResult {
+    if (!context.snapshot.scenes.activeSceneId) {
+      return { canExecute: false, reason: 'No active scene', scope: 'scene' };
+    }
+    if (!this.params.nodeId) {
+      return { canExecute: false, reason: 'No target node specified', scope: 'selection' };
+    }
+    return { canExecute: true };
   }
 
   async execute(context: CommandContext): Promise<CommandExecutionResult<object>> {

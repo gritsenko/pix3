@@ -52,4 +52,9 @@ export class ProjectSettingsService {
   private notifyListeners(): void {
     this.listeners.forEach((listener) => listener(this.activeDialog));
   }
+
+  public dispose(): void {
+    this.activeDialog = null;
+    this.listeners.clear();
+  }
 }

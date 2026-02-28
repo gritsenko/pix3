@@ -157,13 +157,15 @@ export class ScriptExecutionService {
     // Get active scene
     const scene = this.sceneManager.getActiveSceneGraph();
     if (scene) {
-      // Tick all root nodes (which will recursively tick children)
       for (const rootNode of scene.rootNodes) {
-        // Ensure nodes have access to input in editor mode
         if (!rootNode.input) {
           rootNode.input = this.input;
         }
-        rootNode.tick(dt);
+        try {
+          rootNode.tick(dt);
+        } catch (err) {
+          console.error(`[ScriptExecutionService] Error ticking node "${rootNode.name}":`, err);
+        }
       }
     }
 

@@ -6,8 +6,8 @@ import type {
 } from '@/core/Operation';
 import { MeshInstance } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
-import { ref } from 'valtio/vanilla';
 import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
+import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateMeshInstanceOperationParams {
   meshName?: string;
@@ -61,27 +61,9 @@ export class CreateMeshInstanceOperation implements Operation<OperationInvokeRes
     const targetParent = resolveDefault3DParent(sceneGraph);
     attachNode(sceneGraph, node, targetParent);
 
-    // Update the state hierarchy - REPLACE the entire object to trigger reactivity
-    const hierarchy = state.scenes.hierarchies[activeSceneId];
-    if (hierarchy) {
-      // Create a new hierarchy state object to trigger Valtio subscribers
-      state.scenes.hierarchies[activeSceneId] = {
-        version: hierarchy.version,
-        description: hierarchy.description,
-        rootNodes: ref([...sceneGraph.rootNodes]), // Create new array reference
-        metadata: hierarchy.metadata,
-      };
-    }
-
-    // Mark scene as dirty
-    const descriptor = state.scenes.descriptors[activeSceneId];
-    if (descriptor) {
-      descriptor.isDirty = true;
-    }
-
-    // Select the newly created node
-    state.selection.nodeIds = [nodeId];
-    state.selection.primaryNodeId = nodeId;
+    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+    SceneStateUpdater.markSceneDirty(state, activeSceneId);
+    SceneStateUpdater.selectNode(state, nodeId);
 
     return {
       didMutate: true,
@@ -89,53 +71,15 @@ export class CreateMeshInstanceOperation implements Operation<OperationInvokeRes
         label: `Create ${meshName}`,
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark scene as dirty
-          const descriptor = state.scenes.descriptors[activeSceneId];
-          if (descriptor) {
-            descriptor.isDirty = true;
-          }
-
-          // Clear selection if this node was selected
-          if (state.selection.nodeIds.includes(nodeId)) {
-            state.selection.nodeIds = [];
-            state.selection.primaryNodeId = null;
-          }
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
         },
         redo: () => {
           attachNode(sceneGraph, node, targetParent);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark scene as dirty
-          const descriptor = state.scenes.descriptors[activeSceneId];
-          if (descriptor) {
-            descriptor.isDirty = true;
-          }
-
-          // Select the node
-          state.selection.nodeIds = [nodeId];
-          state.selection.primaryNodeId = nodeId;
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.selectNode(state, nodeId);
         },
       },
     };

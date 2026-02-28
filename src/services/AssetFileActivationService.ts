@@ -23,7 +23,7 @@ export interface AssetActivation {
  * It dispatches appropriate commands based on file type (e.g., LoadSceneCommand for .pix3scene files).
  */
 export class AssetFileActivationService {
-  private static readonly SUPPORTED_IMAGE_EXTENSIONS = new Set([
+  static readonly SUPPORTED_IMAGE_EXTENSIONS = new Set([
     'png',
     'jpg',
     'jpeg',

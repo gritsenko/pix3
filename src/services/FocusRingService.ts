@@ -241,6 +241,10 @@ export class FocusRingService {
       host.removeEventListener('focusin', onFocusIn);
     };
   }
+
+  dispose(): void {
+    // FocusRingService is stateless — cleanup is per-host via the returned teardown fn
+  }
 }
 
 export type FocusRingServiceOptions = RovingFocusOptions;

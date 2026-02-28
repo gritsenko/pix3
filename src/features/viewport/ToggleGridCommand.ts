@@ -5,11 +5,9 @@ import {
   type CommandContext,
   type CommandPreconditionResult,
 } from '@/core/command';
-import { appState } from '@/state';
+import { OperationService } from '@/services/OperationService';
+import { ToggleUIFlagOperation } from './ToggleUIFlagOperation';
 
-/**
- * Command to toggle grid visibility in the viewport.
- */
 export class ToggleGridCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
     id: 'view.toggle-grid',
@@ -27,8 +25,11 @@ export class ToggleGridCommand extends CommandBase<void, void> {
     return { canExecute: true };
   }
 
-  async execute(_context: CommandContext): Promise<CommandExecutionResult<void>> {
-    appState.ui.showGrid = !appState.ui.showGrid;
+  async execute(context: CommandContext): Promise<CommandExecutionResult<void>> {
+    const operations = context.container.getService<OperationService>(
+      context.container.getOrCreateToken(OperationService)
+    );
+    await operations.invoke(new ToggleUIFlagOperation('showGrid', 'Toggle Grid'));
 
     return {
       didMutate: true,

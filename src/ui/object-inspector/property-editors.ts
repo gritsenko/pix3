@@ -5,8 +5,8 @@
  * multiple components (x, y, z) in a single row.
  */
 
-import { html, css, LitElement } from 'lit';
-import { customElement, property, state } from 'lit/decorators.js';
+import { html, css, customElement, property, state } from '@/fw';
+import { ComponentBase } from '@/fw/component-base';
 
 export interface Vector2Value {
   x: number;
@@ -23,7 +23,8 @@ export interface Vector3Value {
  * Vector2 Editor - Displays x, y fields in one row
  */
 @customElement('pix3-vector2-editor')
-export class Vector2Editor extends LitElement {
+export class Vector2Editor extends ComponentBase {
+  protected static useShadowDom = true;
   @property({ type: Number })
   x: number = 0;
 
@@ -123,7 +124,8 @@ export class Vector2Editor extends LitElement {
  * Vector3 Editor - Displays x, y, z fields in one row
  */
 @customElement('pix3-vector3-editor')
-export class Vector3Editor extends LitElement {
+export class Vector3Editor extends ComponentBase {
+  protected static useShadowDom = true;
   @property({ type: Number })
   x: number = 0;
 
@@ -252,7 +254,8 @@ export class Vector3Editor extends LitElement {
  * Euler Rotation Editor - Displays pitch, yaw, roll (x, y, z) in degrees
  */
 @customElement('pix3-euler-editor')
-export class EulerEditor extends LitElement {
+export class EulerEditor extends ComponentBase {
+  protected static useShadowDom = true;
   @property({ type: Number })
   x: number = 0; // pitch
 
@@ -385,7 +388,8 @@ export class EulerEditor extends LitElement {
 }
 
 @customElement('pix3-texture-resource-editor')
-export class TextureResourceEditor extends LitElement {
+export class TextureResourceEditor extends ComponentBase {
+  protected static useShadowDom = true;
   @property({ type: String })
   resourceUrl: string = '';
 
@@ -566,7 +570,8 @@ export interface SizeValue {
  * Size Editor - Displays width and height fields with aspect ratio lock and reset button
  */
 @customElement('pix3-size-editor')
-export class SizeEditor extends LitElement {
+export class SizeEditor extends ComponentBase {
+  protected static useShadowDom = true;
   @property({ type: Number })
   width: number = 64;
 

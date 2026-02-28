@@ -7,6 +7,7 @@ import type {
 import { Layout2D } from '@pix3/runtime';
 import { NodeBase } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
+import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateLayout2DOperationParams {
   width?: number;
@@ -68,22 +69,8 @@ export class CreateLayout2DOperation implements Operation<OperationInvokeResult>
     sceneGraph.rootNodes.push(node);
     sceneGraph.nodeMap.set(nodeId, node);
 
-    // Update state hierarchy
-    const hierarchy = state.scenes.hierarchies[activeSceneId];
-    if (hierarchy) {
-      state.scenes.hierarchies[activeSceneId] = {
-        version: hierarchy.version,
-        description: hierarchy.description,
-        rootNodes: [...sceneGraph.rootNodes],
-        metadata: hierarchy.metadata,
-      };
-    }
-
-    // Mark scene as dirty
-    const descriptor = state.scenes.descriptors[activeSceneId];
-    if (descriptor) {
-      descriptor.isDirty = true;
-    }
+    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+    SceneStateUpdater.markSceneDirty(state, activeSceneId);
 
     // Move existing Group2D root nodes as children of Layout2D
     const nodesToMove: NodeBase[] = [];
@@ -99,65 +86,25 @@ export class CreateLayout2DOperation implements Operation<OperationInvokeResult>
       node.adoptChild(childNode);
     }
 
-    // Select newly created Layout2D node
-    state.selection.nodeIds = [nodeId];
-    state.selection.primaryNodeId = nodeId;
+    SceneStateUpdater.selectNode(state, nodeId);
 
     return {
       didMutate: true,
       commit: {
         label: 'Create Layout2D',
         undo: () => {
-          // Remove from scene graph
           sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n !== node);
           sceneGraph.nodeMap.delete(nodeId);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: [...sceneGraph.rootNodes],
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark scene as dirty
-          const descriptor = state.scenes.descriptors[activeSceneId];
-          if (descriptor) {
-            descriptor.isDirty = true;
-          }
-
-          // Clear selection
-          state.selection.nodeIds = [];
-          state.selection.primaryNodeId = null;
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
         },
         redo: () => {
-          // Re-add to scene graph
           sceneGraph.rootNodes.push(node);
           sceneGraph.nodeMap.set(nodeId, node);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: [...sceneGraph.rootNodes],
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Mark scene as dirty
-          const descriptor = state.scenes.descriptors[activeSceneId];
-          if (descriptor) {
-            descriptor.isDirty = true;
-          }
-
-          // Select node
-          state.selection.nodeIds = [nodeId];
-          state.selection.primaryNodeId = nodeId;
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.selectNode(state, nodeId);
         },
       },
     };

@@ -5,11 +5,9 @@ import {
   type CommandContext,
   type CommandPreconditionResult,
 } from '@/core/command';
-import { appState } from '@/state';
+import { OperationService } from '@/services/OperationService';
+import { ToggleUIFlagOperation } from './ToggleUIFlagOperation';
 
-/**
- * Command to toggle 3D layer visibility in the viewport.
- */
 export class ToggleLayer3DCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
     id: 'view.toggle-layer-3d',
@@ -27,8 +25,11 @@ export class ToggleLayer3DCommand extends CommandBase<void, void> {
     return { canExecute: true };
   }
 
-  async execute(_context: CommandContext): Promise<CommandExecutionResult<void>> {
-    appState.ui.showLayer3D = !appState.ui.showLayer3D;
+  async execute(context: CommandContext): Promise<CommandExecutionResult<void>> {
+    const operations = context.container.getService<OperationService>(
+      context.container.getOrCreateToken(OperationService)
+    );
+    await operations.invoke(new ToggleUIFlagOperation('showLayer3D', 'Toggle 3D Layer'));
 
     return {
       didMutate: true,

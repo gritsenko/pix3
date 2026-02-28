@@ -6,8 +6,8 @@ import type {
 } from '@/core/Operation';
 import { Node3D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
-import { ref } from 'valtio/vanilla';
 import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
+import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateNode3DOperationParams {
   nodeName?: string;
@@ -58,27 +58,9 @@ export class CreateNode3DOperation implements Operation<OperationInvokeResult> {
     const targetParent = resolveDefault3DParent(sceneGraph);
     attachNode(sceneGraph, node, targetParent);
 
-    // Update the state hierarchy - REPLACE the entire object to trigger reactivity
-    const hierarchy = state.scenes.hierarchies[activeSceneId];
-    if (hierarchy) {
-      // Create a new hierarchy state object to trigger Valtio subscribers
-      state.scenes.hierarchies[activeSceneId] = {
-        version: hierarchy.version,
-        description: hierarchy.description,
-        rootNodes: ref([...sceneGraph.rootNodes]), // Create new array reference
-        metadata: hierarchy.metadata,
-      };
-    }
-
-    // Mark scene as dirty
-    const descriptor = state.scenes.descriptors[activeSceneId];
-    if (descriptor) {
-      descriptor.isDirty = true;
-    }
-
-    // Select the newly created node
-    state.selection.nodeIds = [nodeId];
-    state.selection.primaryNodeId = nodeId;
+    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+    SceneStateUpdater.markSceneDirty(state, activeSceneId);
+    SceneStateUpdater.selectNode(state, nodeId);
 
     return {
       didMutate: true,
@@ -86,39 +68,15 @@ export class CreateNode3DOperation implements Operation<OperationInvokeResult> {
         label: `Create ${nodeName}`,
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Select nothing or reset
-          state.selection.nodeIds = [];
-          state.selection.primaryNodeId = null;
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
         },
-        redo: async () => {
+        redo: () => {
           attachNode(sceneGraph, node, targetParent);
-
-          // Update state hierarchy
-          const hierarchy = state.scenes.hierarchies[activeSceneId];
-          if (hierarchy) {
-            state.scenes.hierarchies[activeSceneId] = {
-              version: hierarchy.version,
-              description: hierarchy.description,
-              rootNodes: ref([...sceneGraph.rootNodes]),
-              metadata: hierarchy.metadata,
-            };
-          }
-
-          // Select the created node
-          state.selection.nodeIds = [nodeId];
-          state.selection.primaryNodeId = nodeId;
+          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
+          SceneStateUpdater.markSceneDirty(state, activeSceneId);
+          SceneStateUpdater.selectNode(state, nodeId);
         },
       },
     };

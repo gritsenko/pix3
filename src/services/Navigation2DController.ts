@@ -110,4 +110,8 @@ export class Navigation2DController {
     }
     this.viewportRenderer.pan2D(deltaX, 0);
   }
+
+  dispose(): void {
+    this.activePan = null;
+  }
 }
