@@ -60,15 +60,20 @@ describe('TransformTool2d', () => {
 
       // 8 scale handles + 1 rotate handle + 1 rotation connector line = 10
       expect(handles.length).toBe(10);
+
+      // ensure each mesh handle uses ShapeGeometry (rounded corners)
+      handles.forEach(h => {
+        if (h instanceof THREE.Mesh) {
+          expect(h.geometry).toBeInstanceOf(THREE.ShapeGeometry);
+        }
+      });
     });
 
     it('places rotation handle at fixed distance', () => {
       const bounds = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(100, 100, 0));
 
       const handles = tool.createHandles(bounds);
-      const rotateHandle = handles.find(
-        h => h.userData?.handleType === 'rotate' && h instanceof THREE.Mesh
-      );
+      const rotateHandle = handles.find(h => h.userData?.handleType === 'rotate');
 
       expect(rotateHandle).toBeDefined();
       // Top edge is at y=100, rotation offset is 30px (DPR=1)
@@ -85,12 +90,8 @@ describe('TransformTool2d', () => {
       const smallHandles = tool.createHandles(smallBounds);
       const largeHandles = tool.createHandles(largeBounds);
 
-      const smallRotate = smallHandles.find(
-        h => h.userData?.handleType === 'rotate' && h instanceof THREE.Mesh
-      );
-      const largeRotate = largeHandles.find(
-        h => h.userData?.handleType === 'rotate' && h instanceof THREE.Mesh
-      );
+      const smallRotate = smallHandles.find(h => h.userData?.handleType === 'rotate');
+      const largeRotate = largeHandles.find(h => h.userData?.handleType === 'rotate');
 
       // Distance from top edge should be the same (30px)
       const smallOffset = smallRotate!.position.y - 50; // 50 is top of small bounds
@@ -171,9 +172,17 @@ describe('TransformTool2d', () => {
     });
 
     it('changes handle color when active', () => {
-      const scaleHandle = overlay.handles.find(
-        h => h.userData?.handleType === 'scale-ne' && h instanceof THREE.Mesh
-      ) as THREE.Mesh | undefined;
+      const scaleGroup = overlay.handles.find(h => h.userData?.handleType === 'scale-ne');
+      expect(scaleGroup).toBeDefined();
+      let scaleHandle: THREE.Mesh | undefined;
+      if (scaleGroup instanceof THREE.Group) {
+        // use fill child as the actual mesh to inspect
+        scaleHandle = scaleGroup.children.find(
+          c => (c as any).userData?.isFill
+        ) as THREE.Mesh | undefined;
+      } else if (scaleGroup instanceof THREE.Mesh) {
+        scaleHandle = scaleGroup;
+      }
 
       expect(scaleHandle).toBeDefined();
       const material = scaleHandle!.material as THREE.MeshBasicMaterial;

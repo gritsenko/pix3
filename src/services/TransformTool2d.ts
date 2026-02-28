@@ -65,12 +65,18 @@ export interface Active2DTransform {
 export class TransformTool2d {
   private readonly min2DSizeCssPx = 4;
   private readonly handleSizeCssPx = 10;
+  /** Extra CSS-pixel margin around handles for pointer hit testing */
+  private readonly handleHitMarginCssPx = 4;
+  /** Radius of handle corners in CSS pixels */
+  private readonly handleCornerRadiusCssPx = 3;
 
   // Handle colors
   private readonly scaleHandleColor = 0x4e8df5;
+  private readonly scaleHandleBorderColor = 0xffffff; // White contrast border
   private readonly scaleHandleHoverColor = 0xffffff; // White for obvious hover
   private readonly scaleHandleActiveColor = 0xffcf33; // Accent color for active drag
   private readonly rotateHandleColor = 0xf5b64e;
+  private readonly rotateHandleBorderColor = 0xffffff; // White contrast border
   private readonly rotateHandleHoverColor = 0xffffff; // White for obvious hover
   private readonly rotateHandleActiveColor = 0xffcf33; // Accent color for active drag
 
@@ -158,6 +164,28 @@ export class TransformTool2d {
   }
 
   /**
+   * Helper to generate a rounded-rectangle geometry in pixel space. Size and radius
+   * are expressed in the same units (world/physical pixels). The shape is centered
+   * at the origin.
+   */
+  private createRoundedRectGeometry(size: number, radius: number): THREE.ShapeGeometry {
+    const half = size / 2;
+    const shape = new THREE.Shape();
+    shape.moveTo(-half + radius, -half);
+    shape.lineTo(half - radius, -half);
+    shape.quadraticCurveTo(half, -half, half, -half + radius);
+    shape.lineTo(half, half - radius);
+    shape.quadraticCurveTo(half, half, half - radius, half);
+    shape.lineTo(-half + radius, half);
+    shape.quadraticCurveTo(-half, half, -half, half - radius);
+    shape.lineTo(-half, -half + radius);
+    shape.quadraticCurveTo(-half, -half, -half + radius, -half);
+    const geom = new THREE.ShapeGeometry(shape);
+    geom.computeBoundingBox();
+    return geom;
+  }
+
+  /**
    * Get the fixed rotation handle offset (public for consistency in ViewportRenderService)
    */
   getRotationHandleOffset(): number {
@@ -199,7 +227,65 @@ export class TransformTool2d {
   }
 
   /**
-   * Create transformation handles (squares) around the selection bounds
+   * Create a single handle group: filled square with a contrast border outline.
+   */
+  private createHandleGroup(
+    handleSize: number,
+    fillColor: number,
+    borderColor: number,
+    type: string,
+    position: THREE.Vector3,
+    cornerRadius: number
+  ): THREE.Group {
+    const group = new THREE.Group();
+    group.position.copy(position);
+    group.userData.handleType = type;
+    group.renderOrder = 1100;
+    group.layers.set(1);
+
+    // use provided corner radius
+    const radius = cornerRadius;
+
+    // Fill
+    const fillGeom = this.createRoundedRectGeometry(handleSize, radius);
+    const fillMat = new THREE.MeshBasicMaterial({
+      color: fillColor,
+      side: THREE.DoubleSide,
+      depthTest: false,
+      transparent: true,
+      opacity: 0.95,
+    });
+    const fill = new THREE.Mesh(fillGeom, fillMat);
+    fill.userData.handleType = type;
+    fill.userData.isFill = true;
+    fill.renderOrder = 1101;
+    fill.layers.set(1);
+    group.add(fill);
+
+    // Border outline (slightly larger)
+    const borderMargin = this.getDpr();
+    const borderSize = handleSize + 2 * borderMargin;
+    const borderRadius = radius + borderMargin;
+    const borderGeom = this.createRoundedRectGeometry(borderSize, borderRadius);
+    const borderMat = new THREE.MeshBasicMaterial({
+      color: borderColor,
+      side: THREE.DoubleSide,
+      depthTest: false,
+      transparent: true,
+      opacity: 0.9,
+    });
+    const border = new THREE.Mesh(borderGeom, borderMat);
+    border.userData.handleType = type;
+    border.userData.isBorder = true;
+    border.renderOrder = 1099;
+    border.layers.set(1);
+    group.add(border);
+
+    return group;
+  }
+
+  /**
+   * Create transformation handles (rounded squares with contrast borders) around the selection bounds
    */
   createHandles(bounds: THREE.Box3): THREE.Object3D[] {
     const min = bounds.min;
@@ -223,39 +309,28 @@ export class TransformTool2d {
       rotate: new THREE.Vector3(midX, max.y + rotationOffset, z),
     };
 
-    // Ortho camera uses physical pixels as world units (see ViewportRendererService.resize).
-    // Keep handles a stable size in CSS pixels by multiplying by DPR.
     const handleSize = this.getHandleSizeWorldPx();
-    const handleGeometry = new THREE.PlaneGeometry(handleSize, handleSize);
-    const handleMaterial = new THREE.MeshBasicMaterial({
-      color: this.scaleHandleColor,
-      side: THREE.DoubleSide,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.9,
-    });
 
-    const rotationMaterial = new THREE.MeshBasicMaterial({
-      color: this.rotateHandleColor,
-      side: THREE.DoubleSide,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.9,
-    });
+    // calculate clamped corner radius in world pixels
+    const cornerRadius = Math.min(
+      this.handleCornerRadiusCssPx * this.getDpr(),
+      handleSize / 2
+    );
 
     const handles: THREE.Object3D[] = [];
     (
       Object.entries(positions) as Array<[Exclude<TwoDHandle, 'idle' | 'move'>, THREE.Vector3]>
     ).forEach(([type, pos]) => {
-      const mesh = new THREE.Mesh(
-        handleGeometry.clone(),
-        type === 'rotate' ? rotationMaterial.clone() : handleMaterial.clone()
+      const isRotate = type === 'rotate';
+      const group = this.createHandleGroup(
+        handleSize,
+        isRotate ? this.rotateHandleColor : this.scaleHandleColor,
+        isRotate ? this.rotateHandleBorderColor : this.scaleHandleBorderColor,
+        type,
+        pos,
+        cornerRadius
       );
-      mesh.position.copy(pos);
-      mesh.userData.handleType = type;
-      mesh.renderOrder = 1100;
-      mesh.layers.set(1);
-      handles.push(mesh);
+      handles.push(group);
     });
 
     // Connect rotation handle with a thin line for affordance
@@ -336,7 +411,8 @@ export class TransformTool2d {
   }
 
   /**
-   * Detect which handle is under the cursor at the given screen position
+   * Detect which handle is under the cursor at the given screen position.
+   * Uses world-space distance check that correctly accounts for zoom-compensated handle sizes.
    */
   getHandleAt(
     screenX: number,
@@ -345,34 +421,52 @@ export class TransformTool2d {
     orthographicCamera: THREE.OrthographicCamera,
     viewportSize: { width: number; height: number }
   ): TwoDHandle {
-    const mouse = this.toNdc(screenX, screenY, viewportSize);
-    if (!mouse) {
+    const point = this.screenToWorld2D(screenX, screenY, orthographicCamera, viewportSize);
+    if (!point) {
       return 'idle';
     }
 
-    // Ensure matrices are current before raycasting.
-    // Raycaster does not guarantee fresh matrixWorld after we mutate handle positions.
-    overlay.group.updateMatrixWorld(true);
+    // Handle effective half-size in world units, accounting for zoom.
+    // Handles are counter-scaled by 1/zoom, so their world extent is handleSize/zoom.
+    const zoom = orthographicCamera.zoom || 1;
+    const hitHalfSize =
+      ((this.handleSizeCssPx + this.handleHitMarginCssPx) * this.getDpr()) / zoom / 2;
 
-    const raycaster = new THREE.Raycaster();
-    // Handles live on layer 1; Raycaster defaults to layer 0.
-    raycaster.layers.set(1);
-    // Make thin connector line easier to hit.
-    raycaster.params.Line.threshold = 6 * this.getDpr();
-    raycaster.setFromCamera(mouse, orthographicCamera);
+    // Test each handle position (prefer specific handles over 'move')
+    let bestHandle: TwoDHandle = 'idle';
+    let bestDist = Infinity;
 
-    const hits = raycaster.intersectObjects(overlay.handles, true);
-    if (hits.length) {
-      // Prefer actual handle meshes over the rotation connector line.
-      const meshHit = hits.find(h => h.object instanceof THREE.Mesh);
-      const bestHit = meshHit ?? hits[0];
-      const handleType = bestHit.object.userData?.handleType as TwoDHandle | undefined;
-      return handleType ?? 'idle';
+    for (const handle of overlay.handles) {
+      const type = handle.userData?.handleType as TwoDHandle | undefined;
+      if (!type) continue;
+
+      // Skip connector lines — they are affordance only
+      if (handle instanceof THREE.Line) continue;
+
+      // Get the handle's world position
+      handle.updateWorldMatrix(true, false);
+      const handleWorldPos = new THREE.Vector3();
+      handle.getWorldPosition(handleWorldPos);
+
+      // Square hit test (axis-aligned in world space)
+      const dx = Math.abs(point.x - handleWorldPos.x);
+      const dy = Math.abs(point.y - handleWorldPos.y);
+
+      if (dx <= hitHalfSize && dy <= hitHalfSize) {
+        const dist = dx + dy; // Manhattan distance for tie-breaking
+        if (dist < bestDist) {
+          bestDist = dist;
+          bestHandle = type as TwoDHandle;
+        }
+      }
     }
 
-    const point = this.screenToWorld2D(screenX, screenY, orthographicCamera, viewportSize);
-    const bounds = overlay.combinedBounds;
+    if (bestHandle !== 'idle') {
+      return bestHandle;
+    }
 
+    // Fall back to 'move' if pointer is inside the selection bounds
+    const bounds = overlay.combinedBounds;
     if (point) {
       const inX = point.x >= bounds.min.x && point.x <= bounds.max.x;
       const inY = point.y >= bounds.min.y && point.y <= bounds.max.y;
@@ -747,6 +841,26 @@ export class TransformTool2d {
   }
 
   /**
+   * Apply a color to all fill meshes inside a handle (Group or direct Mesh).
+   */
+  private setHandleFillColor(handle: THREE.Object3D, color: number): void {
+    if (handle instanceof THREE.Group) {
+      for (const child of handle.children) {
+        if (child instanceof THREE.Mesh && child.userData.isFill) {
+          (child.material as THREE.MeshBasicMaterial).color.setHex(color);
+          (child.material as THREE.MeshBasicMaterial).needsUpdate = true;
+        }
+      }
+    } else if (handle instanceof THREE.Mesh) {
+      (handle.material as THREE.MeshBasicMaterial).color.setHex(color);
+      (handle.material as THREE.MeshBasicMaterial).needsUpdate = true;
+    } else if (handle instanceof THREE.Line) {
+      (handle.material as THREE.LineBasicMaterial).color.setHex(color);
+      (handle.material as THREE.LineBasicMaterial).needsUpdate = true;
+    }
+  }
+
+  /**
    * Set hover visual state for a specific handle
    */
   private setHandleHoverState(
@@ -769,20 +883,10 @@ export class TransformTool2d {
         continue;
       }
 
-      if (obj instanceof THREE.Mesh) {
-        const material = obj.material as THREE.MeshBasicMaterial;
-        if (handleType === 'rotate') {
-          material.color.setHex(isHovered ? this.rotateHandleHoverColor : this.rotateHandleColor);
-        } else {
-          material.color.setHex(isHovered ? this.scaleHandleHoverColor : this.scaleHandleColor);
-        }
-        material.needsUpdate = true;
-      } else if (obj instanceof THREE.Line) {
-        // Rotation connector line
-        const material = obj.material as THREE.LineBasicMaterial;
-        material.color.setHex(isHovered ? this.rotateHandleHoverColor : this.rotateHandleColor);
-        material.needsUpdate = true;
-      }
+      const isRotate = handleType === 'rotate';
+      const defaultColor = isRotate ? this.rotateHandleColor : this.scaleHandleColor;
+      const hoverColor = isRotate ? this.rotateHandleHoverColor : this.scaleHandleHoverColor;
+      this.setHandleFillColor(obj, isHovered ? hoverColor : defaultColor);
     }
   }
 
@@ -805,25 +909,10 @@ export class TransformTool2d {
         continue;
       }
 
-      if (obj instanceof THREE.Mesh) {
-        const material = obj.material as THREE.MeshBasicMaterial;
-        if (isActive) {
-          material.color.setHex(
-            handleType === 'rotate' ? this.rotateHandleActiveColor : this.scaleHandleActiveColor
-          );
-        } else {
-          // Restore default color
-          material.color.setHex(
-            handleType === 'rotate' ? this.rotateHandleColor : this.scaleHandleColor
-          );
-        }
-        material.needsUpdate = true;
-      } else if (obj instanceof THREE.Line) {
-        // Rotation connector line
-        const material = obj.material as THREE.LineBasicMaterial;
-        material.color.setHex(isActive ? this.rotateHandleActiveColor : this.rotateHandleColor);
-        material.needsUpdate = true;
-      }
+      const isRotate = handleType === 'rotate';
+      const defaultColor = isRotate ? this.rotateHandleColor : this.scaleHandleColor;
+      const activeColor = isRotate ? this.rotateHandleActiveColor : this.scaleHandleActiveColor;
+      this.setHandleFillColor(obj, isActive ? activeColor : defaultColor);
     }
   }
 }

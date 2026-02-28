@@ -81,6 +81,14 @@ export class SceneManager {
       layout2dNode.position.set(transform.offsetX, transform.offsetY, 0);
     }
 
+    // When skipLayout2D is true (editor mode), still propagate layout to
+    // Layout2D's Group2D children using the Layout2D's own authored resolution.
+    // This ensures _parentWidth/_parentHeight are cached so anchor-based
+    // layout recalculations work after interactive edits (move, resize, etc.).
+    if (layout2dNode && skipLayout2D) {
+      layout2dNode.recalculateChildLayouts();
+    }
+
     for (const node of graph.rootNodes) {
       if (node instanceof Group2D) {
         const layout2dWidth = layout2dNode?.width ?? width;

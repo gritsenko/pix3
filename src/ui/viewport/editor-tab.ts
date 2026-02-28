@@ -395,7 +395,15 @@ export class EditorTabComponent extends ComponentBase {
       return;
     }
 
-    if (!this.pointerDownPos || !this.pointerDownTime) return;
+    if (!this.pointerDownPos || !this.pointerDownTime) {
+      const canvas = this.viewportRenderer.getCanvasElement();
+      const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
+      const screenX = event.clientX - rect.left;
+      const screenY = event.clientY - rect.top;
+      this.viewportRenderer.updateHandleHover?.(screenX, screenY);
+      this.viewportRenderer.update2DHoverPreview?.(screenX, screenY);
+      return;
+    }
 
     const has2DTransform = this.viewportRenderer.has2DTransform?.();
     if (has2DTransform) {

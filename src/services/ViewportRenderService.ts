@@ -1302,7 +1302,34 @@ export class ViewportRendererService {
       return null;
     }
 
-    const nodeId = (intersects[0].object.userData?.nodeId as string | undefined) ?? null;
+    // In orthographic 2D, all objects share the same Z so raycaster distance is
+    // meaningless for depth ordering. Pick the topmost node by choosing the one
+    // whose visual appears last in the flat candidates list (later = drawn on top).
+    // Build an index map for O(1) order lookup.
+    const orderMap = new Map<string, number>();
+    let order = 0;
+    for (const c of candidates) {
+      const nid = c.userData?.nodeId as string | undefined;
+      if (nid) {
+        orderMap.set(nid, order++);
+      }
+    }
+
+    let bestIntersect = intersects[0];
+    let bestOrder = orderMap.get(
+      (bestIntersect.object.userData?.nodeId as string | undefined) ?? ''
+    ) ?? -1;
+
+    for (let i = 1; i < intersects.length; i++) {
+      const nid = (intersects[i].object.userData?.nodeId as string | undefined) ?? '';
+      const o = orderMap.get(nid) ?? -1;
+      if (o > bestOrder) {
+        bestOrder = o;
+        bestIntersect = intersects[i];
+      }
+    }
+
+    const nodeId = (bestIntersect.object.userData?.nodeId as string | undefined) ?? null;
     if (!nodeId) {
       return null;
     }
@@ -2927,29 +2954,43 @@ export class ViewportRendererService {
     node.updateWorldMatrix(true, false);
     const worldMatrix = node.matrixWorld;
 
-    // Determine node size
-    let halfWidth = 50; // Default
-    let halfHeight = 50;
+    let corners: THREE.Vector3[];
 
-    if (node instanceof Group2D) {
-      halfWidth = node.width / 2;
-      halfHeight = node.height / 2;
-    } else if (node instanceof Sprite2D) {
-      halfWidth = (node.width ?? 64) / 2;
-      halfHeight = (node.height ?? 64) / 2;
-    } else if (node instanceof UIControl2D) {
-      const { width, height } = this.getUIControlDimensions(node);
-      halfWidth = width / 2;
-      halfHeight = height / 2;
+    if (node instanceof Sprite2D) {
+      // Account for sprite anchor offset: the visual mesh is shifted from the
+      // node origin by (0.5 - anchor) * size.  In node-local space the sprite
+      // occupies  [-ax*w .. (1-ax)*w]  x  [-ay*h .. (1-ay)*h].
+      const w = node.width ?? 64;
+      const h = node.height ?? 64;
+      const ax = node.anchor?.x ?? 0.5;
+      const ay = node.anchor?.y ?? 0.5;
+      corners = [
+        new THREE.Vector3(-ax * w, -ay * h, 0),
+        new THREE.Vector3((1 - ax) * w, -ay * h, 0),
+        new THREE.Vector3((1 - ax) * w, (1 - ay) * h, 0),
+        new THREE.Vector3(-ax * w, (1 - ay) * h, 0),
+      ];
+    } else {
+      // Determine node size for other node types (center-origin)
+      let halfWidth = 50; // Default
+      let halfHeight = 50;
+
+      if (node instanceof Group2D) {
+        halfWidth = node.width / 2;
+        halfHeight = node.height / 2;
+      } else if (node instanceof UIControl2D) {
+        const { width, height } = this.getUIControlDimensions(node);
+        halfWidth = width / 2;
+        halfHeight = height / 2;
+      }
+
+      corners = [
+        new THREE.Vector3(-halfWidth, -halfHeight, 0),
+        new THREE.Vector3(halfWidth, -halfHeight, 0),
+        new THREE.Vector3(halfWidth, halfHeight, 0),
+        new THREE.Vector3(-halfWidth, halfHeight, 0),
+      ];
     }
-
-    // Create local corners (center-origin)
-    const corners = [
-      new THREE.Vector3(-halfWidth, -halfHeight, 0),
-      new THREE.Vector3(halfWidth, -halfHeight, 0),
-      new THREE.Vector3(halfWidth, halfHeight, 0),
-      new THREE.Vector3(-halfWidth, halfHeight, 0),
-    ];
 
     // Transform corners to world space and expand bounds
     for (const corner of corners) {
@@ -3124,8 +3165,8 @@ export class ViewportRendererService {
         handle.geometry = lineGeom;
         handle.position.set(0, 0, 0);
       }
-      // Counter-scale mesh handles so they remain a constant size in screen-space pixels.
-      if (handle instanceof THREE.Mesh) {
+      // Counter-scale handle groups/meshes so they remain a constant size in screen-space pixels.
+      if (handle instanceof THREE.Group || handle instanceof THREE.Mesh) {
         handle.scale.setScalar(1 / zoom);
       }
     }
