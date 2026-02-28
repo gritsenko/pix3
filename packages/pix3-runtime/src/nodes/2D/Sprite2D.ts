@@ -6,12 +6,18 @@ import {
   type TextureResourceRef,
 } from '../../core/TextureResource';
 
+export interface SpriteAnchor2D {
+  x: number;
+  y: number;
+}
+
 export interface Sprite2DProps extends Omit<Node2DProps, 'type'> {
   texture?: TextureResourceRef | null;
   texturePath?: string | null;
   width?: number;
   height?: number;
   color?: string;
+  anchor?: SpriteAnchor2D | [number, number];
 }
 
 export class Sprite2D extends Node2D {
@@ -28,6 +34,8 @@ export class Sprite2D extends Node2D {
   originalWidth: number | null;
   /** Original height (from texture). Used to reset to natural size. */
   originalHeight: number | null;
+  /** Normalized anchor point in local sprite space: (0,0)=bottom-left, (0.5,0.5)=center, (1,1)=top-right. */
+  anchor: SpriteAnchor2D;
 
   private mesh: Mesh;
   private geometry: PlaneGeometry;
@@ -42,6 +50,7 @@ export class Sprite2D extends Node2D {
     this.aspectRatioLocked = (props as any).aspectRatioLocked ?? false;
     this.originalWidth = null;
     this.originalHeight = null;
+    this.anchor = Sprite2D.normalizeAnchor(props.anchor);
     this.isContainer = false;
 
     // Create visuals
@@ -55,7 +64,41 @@ export class Sprite2D extends Node2D {
 
     this.mesh = new Mesh(this.geometry, this.material);
     this.mesh.name = `${this.name}-Mesh`;
+    this.applyAnchorOffset();
     this.add(this.mesh);
+  }
+
+  private static normalizeAnchor(anchor: SpriteAnchor2D | [number, number] | undefined): SpriteAnchor2D {
+    if (!anchor) {
+      return { x: 0.5, y: 0.5 };
+    }
+
+    if (Array.isArray(anchor)) {
+      const x = Number(anchor[0]);
+      const y = Number(anchor[1]);
+      return {
+        x: Number.isFinite(x) ? x : 0.5,
+        y: Number.isFinite(y) ? y : 0.5,
+      };
+    }
+
+    const x = Number(anchor.x);
+    const y = Number(anchor.y);
+    return {
+      x: Number.isFinite(x) ? x : 0.5,
+      y: Number.isFinite(y) ? y : 0.5,
+    };
+  }
+
+  private applyAnchorOffset(): void {
+    const width = this.width ?? 64;
+    const height = this.height ?? 64;
+    this.mesh.position.set((0.5 - this.anchor.x) * width, (0.5 - this.anchor.y) * height, 0);
+  }
+
+  setAnchor(value: SpriteAnchor2D | [number, number]): void {
+    this.anchor = Sprite2D.normalizeAnchor(value);
+    this.applyAnchorOffset();
   }
 
   get texturePath(): string | null {
@@ -116,6 +159,7 @@ export class Sprite2D extends Node2D {
     this.geometry.dispose();
     this.geometry = new PlaneGeometry(w, h);
     this.mesh.geometry = this.geometry;
+    this.applyAnchorOffset();
     
     // Re-apply opacity to the new geometry/material if needed
     // The material is reused, but we need to ensure it updates
@@ -164,6 +208,26 @@ export class Sprite2D extends Node2D {
             },
           setValue: (node: unknown, value: unknown) => {
             (node as Sprite2D).setTextureResource(value);
+          },
+        },
+        {
+          name: 'anchor',
+          type: 'vector2',
+          ui: {
+            label: 'Anchor',
+            description: 'Normalized pivot point used to position the sprite image',
+            group: 'Sprite',
+            step: 0.01,
+            precision: 2,
+          },
+          getValue: (node: unknown) => {
+            const anchor = (node as Sprite2D).anchor;
+            return { x: anchor.x, y: anchor.y };
+          },
+          setValue: (node: unknown, value: unknown) => {
+            const sprite = node as Sprite2D;
+            const anchor = value as { x: number; y: number };
+            sprite.setAnchor({ x: anchor.x, y: anchor.y });
           },
         },
         {

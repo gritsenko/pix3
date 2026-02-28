@@ -4,6 +4,28 @@ import { ViewportRendererService } from './ViewportRenderService';
 import { Sprite2D } from '@pix3/runtime';
 
 describe('ViewportRendererService', () => {
+  it('should offset Sprite2D mesh by anchor point', () => {
+    const service = new ViewportRendererService();
+
+    const svc = service as unknown as {
+      createSprite2DVisual?: (s: Sprite2D) => THREE.Group;
+    };
+
+    const sprite = new Sprite2D({
+      id: 'sprite-anchor-test',
+      width: 100,
+      height: 50,
+      anchor: { x: 0, y: 1 },
+    });
+
+    const visualRoot = svc.createSprite2DVisual?.(sprite);
+    expect(visualRoot).toBeDefined();
+
+    const mesh = visualRoot?.userData.spriteMesh as THREE.Mesh;
+    expect(mesh.position.x).toBe(0.5);
+    expect(mesh.position.y).toBe(-0.5);
+  });
+
   it('should use ResourceManager.readBlob for templ:// sprite textures', async () => {
     const service = new ViewportRendererService();
 

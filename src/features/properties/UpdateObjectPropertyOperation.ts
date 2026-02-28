@@ -192,6 +192,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
 
   private is2DVisualProperty(propertyPath: string): boolean {
     return [
+      'anchor',
       'width',
       'height',
       'size',

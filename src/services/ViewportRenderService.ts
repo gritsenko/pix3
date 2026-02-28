@@ -1403,6 +1403,11 @@ export class ViewportRendererService {
         }
 
         const mesh = visualRoot.userData.spriteMesh as THREE.Mesh | undefined;
+        if (mesh) {
+          const anchor = this.getSprite2DAnchor(node);
+          mesh.position.set(0.5 - anchor.x, 0.5 - anchor.y, 0);
+        }
+
         if (mesh && mesh.material instanceof THREE.MeshBasicMaterial) {
           const currentTexturePath = node.texturePath ?? null;
           const previousTexturePath = (visualRoot.userData.texturePath as string | null) ?? null;
@@ -2377,6 +2382,9 @@ export class ViewportRendererService {
 
     const mesh = new THREE.Mesh(geometry, material);
 
+    const anchor = this.getSprite2DAnchor(node);
+    mesh.position.set(0.5 - anchor.x, 0.5 - anchor.y, 0);
+
     mesh.layers.set(LAYER_2D);
     mesh.userData.isSprite2DVisual = true;
     mesh.userData.nodeId = node.nodeId;
@@ -2404,6 +2412,16 @@ export class ViewportRendererService {
     this.apply2DVisualOpacity(node, root);
 
     return root;
+  }
+
+  private getSprite2DAnchor(node: Sprite2D): { x: number; y: number } {
+    const rawAnchor = (node as unknown as { anchor?: { x?: number; y?: number } }).anchor;
+    const x = Number(rawAnchor?.x);
+    const y = Number(rawAnchor?.y);
+    return {
+      x: Number.isFinite(x) ? x : 0.5,
+      y: Number.isFinite(y) ? y : 0.5,
+    };
   }
 
   private applyTextureToSprite2DMaterial(node: Sprite2D, material: THREE.MeshBasicMaterial): void {

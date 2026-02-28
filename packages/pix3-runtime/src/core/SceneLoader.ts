@@ -871,6 +871,7 @@ export class SceneLoader {
           texture,
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
+          anchor: this.readVector2(props.anchor, new Vector2(0.5, 0.5)),
           color: typeof props.color === 'string' ? props.color : undefined,
         });
 

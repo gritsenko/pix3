@@ -1478,6 +1478,7 @@ export class InspectorPanel extends ComponentBase {
 
     const widthProp = props.find(p => p.name === 'width');
     const heightProp = props.find(p => p.name === 'height');
+    const remainingProps = props.filter(p => p.name !== 'width' && p.name !== 'height');
 
     if (!widthProp || !heightProp) {
       // Fallback to default rendering if missing props
@@ -1609,6 +1610,7 @@ export class InspectorPanel extends ComponentBase {
             ${heightProp.ui?.unit ? html`<span class="size-field-unit">${heightProp.ui.unit}</span>` : ''}
           </div>
         </div>
+        ${remainingProps.map(prop => this.renderPropertyInput(prop))}
       </div>
     `;
   }

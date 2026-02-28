@@ -370,6 +370,12 @@ export class SceneSaver {
       // Save width/height in pixels
       props.width = node.width;
       props.height = node.height;
+      if (node.anchor.x !== 0.5 || node.anchor.y !== 0.5) {
+        props.anchor = [
+          Math.round(node.anchor.x * 1000) / 1000,
+          Math.round(node.anchor.y * 1000) / 1000,
+        ];
+      }
     } else if (node instanceof Joystick2D) {
       if (node.radius !== 50) props.radius = node.radius;
       if (node.handleRadius !== 20) props.handleRadius = node.handleRadius;
