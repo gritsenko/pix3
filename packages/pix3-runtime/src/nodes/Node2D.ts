@@ -22,6 +22,7 @@ export class Node2D extends NodeBase {
     duration: number;
     elapsed: number;
     hideAfterComplete: boolean;
+    onComplete?: () => void;
   } | null = null;
 
   constructor(props: Node2DProps, nodeType: string = 'Node2D') {
@@ -73,7 +74,7 @@ export class Node2D extends NodeBase {
    * Hides this node with optional fade-out time in seconds.
    * When fade completes, the node visibility is set to false.
    */
-  hide(fadeTime: number = 0): void {
+  hide(fadeTime: number = 0, onComplete?: () => void): void {
     const duration = Node2D.toNonNegativeSeconds(fadeTime);
     if (this.opacity > 0) {
       this.visibleOpacity = this.opacity;
@@ -83,6 +84,7 @@ export class Node2D extends NodeBase {
       this.visibilityFade = null;
       this.opacity = 0;
       this.setVisibleState(false);
+      onComplete?.();
       return;
     }
 
@@ -93,13 +95,14 @@ export class Node2D extends NodeBase {
       duration,
       elapsed: 0,
       hideAfterComplete: true,
+      onComplete,
     };
   }
 
   /**
    * Shows this node with optional fade-in time in seconds.
    */
-  show(fadeTime: number = 0): void {
+  show(fadeTime: number = 0, onComplete?: () => void): void {
     const duration = Node2D.toNonNegativeSeconds(fadeTime);
     const targetOpacity = this.visibleOpacity > 0 ? this.visibleOpacity : 1;
 
@@ -108,6 +111,7 @@ export class Node2D extends NodeBase {
     if (duration === 0) {
       this.visibilityFade = null;
       this.opacity = targetOpacity;
+      onComplete?.();
       return;
     }
 
@@ -117,6 +121,7 @@ export class Node2D extends NodeBase {
       duration,
       elapsed: 0,
       hideAfterComplete: false,
+      onComplete,
     };
   }
 
@@ -141,10 +146,12 @@ export class Node2D extends NodeBase {
     this.visibilityFade = null;
     if (fade.hideAfterComplete) {
       this.setVisibleState(false);
+      fade.onComplete?.();
       return;
     }
 
     this.setVisibleState(true);
+    fade.onComplete?.();
   }
 
   protected registerOpacityMaterial(material: Material, baseOpacity?: number): void {

@@ -6,13 +6,9 @@ type FadeDirection = 'in' | 'out';
 
 export class FadeBehavior extends Script {
   private fadeDirection: FadeDirection | null = null;
-  private phase: 'idle' | 'delay' | 'fade' = 'idle';
+  private phase: 'idle' | 'delay' = 'idle';
   private pendingDestroy: boolean = false;
   private delayRemaining = 0;
-  private fadeElapsed = 0;
-  private fadeDuration = 0;
-  private fadeFrom = 1;
-  private fadeTo = 1;
   private sequenceStarted = false;
 
   constructor(id: string, type: string) {
@@ -140,7 +136,6 @@ export class FadeBehavior extends Script {
     }
 
     this.sequenceStarted = true;
-
     this.node.opacity = 0;
     this.startFade('in');
   }
@@ -159,25 +154,10 @@ export class FadeBehavior extends Script {
     if (this.phase === 'delay') {
       this.delayRemaining = Math.max(0, this.delayRemaining - dt);
       if (this.delayRemaining === 0) {
-        this.phase = 'fade';
+        this.phase = 'idle';
+        this.executeFade();
       }
     }
-
-    if (this.phase === 'fade') {
-      if (this.fadeDuration <= 0) {
-        this.applyOpacity(this.fadeTo);
-        this.finishFade();
-      } else {
-        this.fadeElapsed = Math.min(this.fadeDuration, this.fadeElapsed + dt);
-        const t = this.fadeElapsed / this.fadeDuration;
-        const nextOpacity = this.fadeFrom + (this.fadeTo - this.fadeFrom) * t;
-        this.applyOpacity(nextOpacity);
-        if (this.fadeElapsed >= this.fadeDuration) {
-          this.finishFade();
-        }
-      }
-    }
-
   }
 
   onDetach(): void {
@@ -204,33 +184,34 @@ export class FadeBehavior extends Script {
 
     this.pendingDestroy = false;
     this.fadeDirection = direction;
-    this.fadeElapsed = 0;
-    this.fadeFrom = this.node.opacity;
-    this.fadeTo = direction === 'in' ? 1 : 0;
-    this.fadeDuration = direction === 'in' ? this.getFadeInTime() : this.getFadeOutTime();
-
     const delay = direction === 'in' ? this.getFadeInDelay() : this.getFadeOutDelay();
+
     if (delay > 0) {
       this.phase = 'delay';
       this.delayRemaining = delay;
       return;
     }
 
-    this.phase = 'fade';
-    this.delayRemaining = 0;
+    this.executeFade();
   }
 
-  private stopFade(): void {
-    this.fadeDirection = null;
-    this.phase = 'idle';
-    this.delayRemaining = 0;
-    this.fadeElapsed = 0;
-    this.fadeDuration = 0;
-    this.fadeFrom = 1;
-    this.fadeTo = 1;
+  private executeFade(): void {
+    if (!this.isNode2D() || !this.fadeDirection) {
+      return;
+    }
+
+    const duration =
+      this.fadeDirection === 'in' ? this.getFadeInTime() : this.getFadeOutTime();
+    const onComplete = () => this.onFadeComplete();
+
+    if (this.fadeDirection === 'in') {
+      this.node.show(duration, onComplete);
+    } else {
+      this.node.hide(duration, onComplete);
+    }
   }
 
-  private finishFade(): void {
+  private onFadeComplete(): void {
     const direction = this.fadeDirection;
     this.stopFade();
 
@@ -244,6 +225,12 @@ export class FadeBehavior extends Script {
     }
   }
 
+  private stopFade(): void {
+    this.fadeDirection = null;
+    this.phase = 'idle';
+    this.delayRemaining = 0;
+  }
+
   private destroyNode(): void {
     if (!this.node) {
       return;
@@ -253,13 +240,6 @@ export class FadeBehavior extends Script {
       return;
     }
     parentNode.disownChild(this.node);
-  }
-
-  private applyOpacity(value: number): void {
-    if (!this.isNode2D()) {
-      return;
-    }
-    this.node.opacity = FadeBehavior.clamp01(value);
   }
 
   private isNode2D(): this is this & { node: Node2D } {
@@ -320,12 +300,5 @@ export class FadeBehavior extends Script {
       return fallback;
     }
     return Math.max(0, parsed);
-  }
-
-  private static clamp01(value: number): number {
-    if (!Number.isFinite(value)) {
-      return 1;
-    }
-    return Math.min(1, Math.max(0, value));
   }
 }
