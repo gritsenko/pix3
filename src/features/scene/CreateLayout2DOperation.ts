@@ -5,7 +5,6 @@ import type {
   OperationMetadata,
 } from '@/core/Operation';
 import { Layout2D } from '@pix3/runtime';
-import { NodeBase } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
@@ -44,14 +43,6 @@ export class CreateLayout2DOperation implements Operation<OperationInvokeResult>
       return { didMutate: false };
     }
 
-    // Check if Layout2D already exists
-    for (const node of sceneGraph.rootNodes) {
-      if (node instanceof Layout2D) {
-        console.warn('[CreateLayout2DOperation] Layout2D already exists');
-        return { didMutate: false };
-      }
-    }
-
     // Generate a unique node ID
     const nodeId = `layout2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 
@@ -71,20 +62,6 @@ export class CreateLayout2DOperation implements Operation<OperationInvokeResult>
 
     SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
     SceneStateUpdater.markSceneDirty(state, activeSceneId);
-
-    // Move existing Group2D root nodes as children of Layout2D
-    const nodesToMove: NodeBase[] = [];
-    for (let i = 0; i < sceneGraph.rootNodes.length - 1; i++) {
-      const n = sceneGraph.rootNodes[i];
-      if (n && n.type === 'Group2D') {
-        nodesToMove.push(n);
-      }
-    }
-
-    for (const childNode of nodesToMove) {
-      sceneGraph.rootNodes = sceneGraph.rootNodes.filter(n => n !== childNode);
-      node.adoptChild(childNode);
-    }
 
     SceneStateUpdater.selectNode(state, nodeId);
 

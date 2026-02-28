@@ -948,6 +948,11 @@ export class ViewportRendererService {
     const newZoom = Math.max(0.1, this.orthographicCamera.zoom * factor);
     this.orthographicCamera.zoom = newZoom;
     this.orthographicCamera.updateProjectionMatrix();
+
+    // Rescale overlay handles to maintain constant screen-space size.
+    if (this.selection2DOverlay) {
+      this.refreshGizmoPositions();
+    }
   }
 
   /**
@@ -967,6 +972,11 @@ export class ViewportRendererService {
     const clampedZoom = Math.max(0.1, zoom);
     this.orthographicCamera.zoom = clampedZoom;
     this.orthographicCamera.updateProjectionMatrix();
+
+    // Rescale overlay handles to maintain constant screen-space size.
+    if (this.selection2DOverlay) {
+      this.refreshGizmoPositions();
+    }
   }
 
   /**
@@ -3032,6 +3042,9 @@ export class ViewportRendererService {
       centerWorld: center,
       rotationHandle: handles.find(h => h.userData?.handleType === 'rotate'),
     };
+
+    // Apply zoom compensation immediately so handles have the correct screen-space size.
+    this.refreshGizmoPositions();
   }
 
   private refreshGizmoPositions(): void {
@@ -3079,8 +3092,10 @@ export class ViewportRendererService {
     ];
     this.selection2DOverlay.frame.geometry.setFromPoints(framePoints);
 
-    // Use fixed rotation handle offset from TransformTool2d for consistency
-    const rotationOffset = this.transformTool2d.getRotationHandleOffset();
+    // Use fixed rotation handle offset from TransformTool2d for consistency.
+    // Divide by current zoom so the offset stays constant in screen-space pixels.
+    const zoom = this.orthographicCamera?.zoom ?? 1;
+    const rotationOffset = this.transformTool2d.getRotationHandleOffset() / zoom;
 
     const handlePositions: Record<string, THREE.Vector3> = {
       'scale-nw': new THREE.Vector3(min.x, max.y, z),
@@ -3108,6 +3123,10 @@ export class ViewportRendererService {
         handle.geometry.dispose();
         handle.geometry = lineGeom;
         handle.position.set(0, 0, 0);
+      }
+      // Counter-scale mesh handles so they remain a constant size in screen-space pixels.
+      if (handle instanceof THREE.Mesh) {
+        handle.scale.setScalar(1 / zoom);
       }
     }
 

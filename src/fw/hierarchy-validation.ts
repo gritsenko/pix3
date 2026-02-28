@@ -1,3 +1,4 @@
+import { Node2D, Node3D } from '@pix3/runtime';
 import type { NodeBase } from '@pix3/runtime';
 import type { SceneGraph } from '@pix3/runtime';
 
@@ -5,22 +6,14 @@ import type { SceneGraph } from '@pix3/runtime';
  * Determines if a node is a 2D node (Node2D or its subclasses)
  */
 export function is2DNode(node: NodeBase): boolean {
-  return node.type === 'Node2D' || node.type === 'Sprite2D' || node.type === 'Group2D';
+  return node instanceof Node2D;
 }
 
 /**
  * Determines if a node is a 3D node (Node3D or its subclasses)
  */
 export function is3DNode(node: NodeBase): boolean {
-  return (
-    node.type === 'Node3D' ||
-    node.type === 'Camera3D' ||
-    node.type === 'DirectionalLight' ||
-    node.type === 'PointLight' ||
-    node.type === 'SpotLight' ||
-    node.type === 'MeshInstance' ||
-    node.type === 'GeometryMesh'
-  );
+  return node instanceof Node3D;
 }
 
 /**
