@@ -12,6 +12,7 @@ import { SineBehavior } from './SineBehavior';
 import { PinToNodeBehavior } from './PinToNodeBehavior';
 import { FollowBehavior } from './FollowBehavior';
 import { FadeBehavior } from './FadeBehavior';
+import { RadialProgressBehavior } from './RadialProgressBehavior';
 
 /**
  * Register all built-in script components
@@ -70,6 +71,15 @@ export function registerBuiltInScripts(registry: ScriptRegistry): void {
     category: 'Animation',
     componentClass: FadeBehavior,
     keywords: ['fade', 'opacity', 'animation'],
+  });
+
+  registry.registerComponent({
+    id: 'core:RadialProgress',
+    displayName: 'Radial Progress',
+    description: 'Masks a Sprite2D texture as a circular progress bar',
+    category: 'UI',
+    componentClass: RadialProgressBehavior,
+    keywords: ['radial', 'progress', 'bar', 'circle', 'mask', 'ui'],
   });
 
   console.log('[ScriptRegistry] Registered built-in script components');
