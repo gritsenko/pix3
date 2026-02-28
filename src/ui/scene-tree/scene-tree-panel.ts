@@ -115,6 +115,7 @@ export class SceneTreePanel extends ComponentBase {
 
   private portal = new DropdownPortal({ minWidth: '12rem' });
   private lastHierarchyRef: NodeBase[] | null = null;
+  private pendingScrollNodeId: string | null = null;
   private disposeSceneSubscription?: () => void;
   private disposeSelectionSubscription?: () => void;
   private readonly onWindowClick = (event: MouseEvent): void => {
@@ -235,6 +236,19 @@ export class SceneTreePanel extends ComponentBase {
         this.portal.close();
       }
     }
+
+    const shouldAttemptSelectionScroll =
+      this.pendingScrollNodeId !== null &&
+      (changed.has('selectedNodeIds') ||
+        changed.has('primaryNodeId') ||
+        changed.has('collapsedNodeIds') ||
+        changed.has('hierarchy'));
+
+    if (shouldAttemptSelectionScroll && this.pendingScrollNodeId) {
+      if (this.scrollNodeIntoView(this.pendingScrollNodeId)) {
+        this.pendingScrollNodeId = null;
+      }
+    }
   }
 
   private renderContextMenu() {
@@ -333,6 +347,15 @@ export class SceneTreePanel extends ComponentBase {
   private syncSelectionState(): void {
     this.selectedNodeIds = [...appState.selection.nodeIds];
     this.primaryNodeId = appState.selection.primaryNodeId;
+
+    const selectedNodeId = this.primaryNodeId ?? this.selectedNodeIds[0] ?? null;
+    if (!selectedNodeId) {
+      this.pendingScrollNodeId = null;
+      return;
+    }
+
+    this.expandAncestorsForNode(selectedNodeId);
+    this.pendingScrollNodeId = selectedNodeId;
   }
 
   private resolveActiveSceneDescriptor(): SceneDescriptor | null {
@@ -387,6 +410,62 @@ export class SceneTreePanel extends ComponentBase {
         this.collectNodeIds(node.children, target);
       }
     }
+  }
+
+  private expandAncestorsForNode(nodeId: string): void {
+    const ancestorIds = this.findAncestorNodeIds(this.hierarchy, nodeId);
+    if (!ancestorIds || ancestorIds.length === 0) {
+      return;
+    }
+
+    const nextCollapsedNodeIds = new Set(this.collapsedNodeIds);
+    let changed = false;
+    for (const ancestorId of ancestorIds) {
+      if (nextCollapsedNodeIds.delete(ancestorId)) {
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      this.collapsedNodeIds = nextCollapsedNodeIds;
+    }
+  }
+
+  private findAncestorNodeIds(
+    nodes: SceneTreeNode[],
+    targetNodeId: string,
+    ancestors: string[] = []
+  ): string[] | null {
+    for (const node of nodes) {
+      if (node.id === targetNodeId) {
+        return ancestors;
+      }
+      if (node.children.length === 0) {
+        continue;
+      }
+      const foundAncestors = this.findAncestorNodeIds(node.children, targetNodeId, [
+        ...ancestors,
+        node.id,
+      ]);
+      if (foundAncestors) {
+        return foundAncestors;
+      }
+    }
+
+    return null;
+  }
+
+  private scrollNodeIntoView(nodeId: string): boolean {
+    const treeNodeElements = this.querySelectorAll<HTMLElement>('.tree-node__content[data-node-id]');
+    for (const treeNodeElement of treeNodeElements) {
+      if (treeNodeElement.dataset.nodeId !== nodeId) {
+        continue;
+      }
+      treeNodeElement.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      return true;
+    }
+
+    return false;
   }
 
   private getTreeAriaLabel(activeSceneName: string | null): string {
