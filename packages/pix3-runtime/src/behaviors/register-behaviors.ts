@@ -11,6 +11,7 @@ import { SimpleMoveBehavior } from './SimpleMoveBehavior';
 import { SineBehavior } from './SineBehavior';
 import { PinToNodeBehavior } from './PinToNodeBehavior';
 import { FollowBehavior } from './FollowBehavior';
+import { FadeBehavior } from './FadeBehavior';
 
 /**
  * Register all built-in script components
@@ -60,6 +61,15 @@ export function registerBuiltInScripts(registry: ScriptRegistry): void {
     category: 'Transform',
     componentClass: FollowBehavior,
     keywords: ['follow', 'camera', 'tracking', 'smooth'],
+  });
+
+  registry.registerComponent({
+    id: 'core:Fade',
+    displayName: 'Fade',
+    description: 'Fades 2D node opacity in and out with optional auto-destroy',
+    category: 'Animation',
+    componentClass: FadeBehavior,
+    keywords: ['fade', 'opacity', 'animation'],
   });
 
   console.log('[ScriptRegistry] Registered built-in script components');

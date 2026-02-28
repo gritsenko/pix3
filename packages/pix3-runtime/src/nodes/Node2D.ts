@@ -15,6 +15,14 @@ export class Node2D extends NodeBase {
   private _opacity: number;
   private _computedOpacity: number;
   private readonly opacityMaterials: Set<Material> = new Set();
+  private visibleOpacity: number;
+  private visibilityFade: {
+    from: number;
+    to: number;
+    duration: number;
+    elapsed: number;
+    hideAfterComplete: boolean;
+  } | null = null;
 
   constructor(props: Node2DProps, nodeType: string = 'Node2D') {
     super({ ...props, type: nodeType });
@@ -33,6 +41,7 @@ export class Node2D extends NodeBase {
 
     this._opacity = Node2D.clampOpacity(props.opacity ?? 1);
     this._computedOpacity = this._opacity;
+    this.visibleOpacity = this._opacity > 0 ? this._opacity : 1;
     if (props.opacity !== undefined || typeof this.properties.opacity === 'number') {
       this.properties.opacity = this._opacity;
     }
@@ -50,11 +59,92 @@ export class Node2D extends NodeBase {
 
     this._opacity = nextOpacity;
     this.properties.opacity = nextOpacity;
+    if (!this.visibilityFade && nextOpacity > 0) {
+      this.visibleOpacity = nextOpacity;
+    }
     this.refreshComputedOpacityRecursive();
   }
 
   get computedOpacity(): number {
     return this._computedOpacity;
+  }
+
+  /**
+   * Hides this node with optional fade-out time in seconds.
+   * When fade completes, the node visibility is set to false.
+   */
+  hide(fadeTime: number = 0): void {
+    const duration = Node2D.toNonNegativeSeconds(fadeTime);
+    if (this.opacity > 0) {
+      this.visibleOpacity = this.opacity;
+    }
+
+    if (duration === 0) {
+      this.visibilityFade = null;
+      this.opacity = 0;
+      this.setVisibleState(false);
+      return;
+    }
+
+    this.setVisibleState(true);
+    this.visibilityFade = {
+      from: this.opacity,
+      to: 0,
+      duration,
+      elapsed: 0,
+      hideAfterComplete: true,
+    };
+  }
+
+  /**
+   * Shows this node with optional fade-in time in seconds.
+   */
+  show(fadeTime: number = 0): void {
+    const duration = Node2D.toNonNegativeSeconds(fadeTime);
+    const targetOpacity = this.visibleOpacity > 0 ? this.visibleOpacity : 1;
+
+    this.setVisibleState(true);
+
+    if (duration === 0) {
+      this.visibilityFade = null;
+      this.opacity = targetOpacity;
+      return;
+    }
+
+    this.visibilityFade = {
+      from: this.opacity,
+      to: targetOpacity,
+      duration,
+      elapsed: 0,
+      hideAfterComplete: false,
+    };
+  }
+
+  override tick(dt: number): void {
+    super.tick(dt);
+
+    if (!this.visibilityFade) {
+      return;
+    }
+
+    const fade = this.visibilityFade;
+    fade.elapsed = Math.min(fade.duration, fade.elapsed + Math.max(0, dt));
+    const t = fade.duration > 0 ? fade.elapsed / fade.duration : 1;
+    const nextOpacity = fade.from + (fade.to - fade.from) * t;
+    this.opacity = nextOpacity;
+
+    if (fade.elapsed < fade.duration) {
+      return;
+    }
+
+    this.opacity = fade.to;
+    this.visibilityFade = null;
+    if (fade.hideAfterComplete) {
+      this.setVisibleState(false);
+      return;
+    }
+
+    this.setVisibleState(true);
   }
 
   protected registerOpacityMaterial(material: Material, baseOpacity?: number): void {
@@ -121,6 +211,18 @@ export class Node2D extends NodeBase {
   private static clampOpacity(value: number): number {
     const safe = Number.isFinite(value) ? value : 1;
     return Math.max(0, Math.min(1, safe));
+  }
+
+  private static toNonNegativeSeconds(value: number): number {
+    if (!Number.isFinite(value)) {
+      return 0;
+    }
+    return Math.max(0, value);
+  }
+
+  private setVisibleState(value: boolean): void {
+    this.visible = value;
+    this.properties.visible = value;
   }
 
   /**
