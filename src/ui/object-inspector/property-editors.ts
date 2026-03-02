@@ -396,6 +396,15 @@ export class TextureResourceEditor extends ComponentBase {
   @property({ type: String })
   previewUrl: string = '';
 
+  @property({ type: Number })
+  originalWidth: number = 0;
+
+  @property({ type: Number })
+  originalHeight: number = 0;
+
+  @property({ type: Number })
+  fileSize: number = 0;
+
   @property({ type: Boolean })
   disabled: boolean = false;
 
@@ -421,7 +430,38 @@ export class TextureResourceEditor extends ComponentBase {
       align-items: center;
       justify-content: center;
       overflow: hidden;
-      transition: border-color 0.15s ease, background 0.15s ease;
+      transition:
+        border-color 0.15s ease,
+        background 0.15s ease;
+      flex-shrink: 0;
+    }
+
+    .editor-row {
+      display: flex;
+      gap: 0.75rem;
+      align-items: center;
+    }
+
+    .info-column {
+      display: flex;
+      flex-direction: column;
+      gap: 0.2rem;
+      font-size: 0.7rem;
+      color: var(--color-text-dim, #888);
+      line-height: 1.25;
+      overflow: hidden;
+    }
+
+    .info-item {
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .info-label {
+      font-weight: 600;
+      color: var(--color-text, #ccc);
+      margin-right: 2px;
     }
 
     .preview.is-dragover {
@@ -531,16 +571,44 @@ export class TextureResourceEditor extends ComponentBase {
   }
 
   protected render() {
+    const fileSizeStr = this.fileSize > 0
+      ? this.fileSize < 1024 * 1024
+        ? `${(this.fileSize / 1024).toFixed(1)} KB`
+        : `${(this.fileSize / (1024 * 1024)).toFixed(1)} MB`
+      : '';
+
     return html`
-      <div
-        class="preview ${this.isDragOver ? 'is-dragover' : ''}"
-        @dragover=${(event: DragEvent) => this.onDragOver(event)}
-        @dragleave=${() => this.onDragLeave()}
-        @drop=${(event: DragEvent) => this.onDrop(event)}
-      >
-        ${this.previewUrl
-          ? html`<img src=${this.previewUrl} alt="Texture preview" />`
-          : html`<span class="preview-empty">Drop image from Assets here</span>`}
+      <div class="editor-row">
+        <div
+          class="preview ${this.isDragOver ? 'is-dragover' : ''}"
+          @dragover=${(event: DragEvent) => this.onDragOver(event)}
+          @dragleave=${() => this.onDragLeave()}
+          @drop=${(event: DragEvent) => this.onDrop(event)}
+        >
+          ${this.previewUrl
+            ? html`<img src=${this.previewUrl} alt="Texture preview" />`
+            : html`<span class="preview-empty">Drop image from Assets here</span>`}
+        </div>
+
+        ${this.previewUrl && (this.originalWidth > 0 || this.fileSize > 0)
+          ? html`
+            <div class="info-column">
+              ${this.originalWidth > 0
+                ? html`
+                  <div class="info-item">
+                    <span class="info-label">Dim:</span>
+                    ${this.originalWidth} × ${this.originalHeight}
+                  </div>`
+                : ''}
+              ${this.fileSize > 0
+                ? html`
+                  <div class="info-item">
+                    <span class="info-label">Size:</span>
+                    ${fileSizeStr}
+                  </div>`
+                : ''}
+            </div>`
+          : ''}
       </div>
 
       <div class="url-row">
@@ -721,7 +789,7 @@ export class SizeEditor extends ComponentBase {
       flex-shrink: 0;
     }
 
-    button:hover:not(:disabled) {
+    button.reset-btn:hover:not(:disabled) {
       border-color: var(--pix3-accent-color, #ffcf33);
       color: var(--color-text-primary, #eee);
     }
@@ -743,22 +811,34 @@ export class SizeEditor extends ComponentBase {
       gap: 0.25rem;
     }
 
-    input[type='checkbox'] {
-      cursor: pointer;
-      width: 1rem;
-      height: 1rem;
-      accent-color: var(--pix3-accent-color, #ffcf33);
-    }
-
-    input[type='checkbox']:disabled {
-      cursor: not-allowed;
-      opacity: 0.6;
-    }
-
-    .lock-label {
-      font-size: 0.7rem;
+    .lock-btn {
+      background: transparent;
+      border: 1px solid var(--color-border, #333);
       color: var(--color-text-secondary, #aaa);
-      user-select: none;
+      border-radius: 0.25rem;
+      padding: 0.2rem 0.4rem;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 22px;
+      min-width: 28px;
+    }
+
+    .lock-btn:hover:not(:disabled) {
+      border-color: var(--pix3-accent-color, #ffcf33);
+    }
+
+    .lock-btn.locked {
+      color: var(--pix3-accent-color, #ffcf33);
+      border-color: var(--pix3-accent-color, #ffcf33);
+      background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.1);
+    }
+
+    .lock-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
     }
   `;
 
@@ -790,18 +870,20 @@ export class SizeEditor extends ComponentBase {
         </div>
 
         <div class="controls">
-          <div class="lock-toggle">
-            <input
-              type="checkbox"
-              ?checked=${this.aspectRatioLocked}
+          <div class="lock-toggle" title="Lock aspect ratio when resizing">
+            <button
+              class="lock-btn ${this.aspectRatioLocked ? 'locked' : ''}"
+              type="button"
               ?disabled=${this.disabled}
-              @change=${() => this.onToggleLock()}
-            />
-            <label class="lock-label" title="Lock aspect ratio when resizing">🔗</label>
+              @click=${() => this.onToggleLock()}
+            >
+              🔗
+            </button>
           </div>
 
           <button
             type="button"
+            class="reset-btn"
             ?disabled=${this.disabled || !this.hasOriginalSize}
             @click=${() => this.onResetSize()}
             title="Reset to original size"

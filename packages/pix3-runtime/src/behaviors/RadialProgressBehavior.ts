@@ -3,7 +3,7 @@ import { Script } from '../core/ScriptComponent';
 import type { PropertySchema } from '../fw/property-schema';
 import { Sprite2D } from '../nodes/2D/Sprite2D';
 
-const VERTEX_SHADER = /* glsl */`
+const VERTEX_SHADER = /* glsl */ `
 varying vec2 vUv;
 void main() {
   vUv = uv;
@@ -11,7 +11,7 @@ void main() {
 }
 `;
 
-const FRAGMENT_SHADER = /* glsl */`
+const FRAGMENT_SHADER = /* glsl */ `
 uniform sampler2D map;
 uniform bool hasMap;
 uniform vec3 color;
@@ -105,14 +105,15 @@ export class RadialProgressBehavior extends Script {
             precision: 1,
           },
           getValue: (c: unknown) => (c as RadialProgressBehavior).getAnimationSpeed(),
-          setValue: (c: unknown, v: unknown) => (c as RadialProgressBehavior).setAnimationSpeed(Number(v)),
+          setValue: (c: unknown, v: unknown) =>
+            (c as RadialProgressBehavior).setAnimationSpeed(Number(v)),
         },
         {
           name: 'startAngle',
           type: 'number',
           ui: {
             label: 'Start Angle',
-            description: 'Starting angle in degrees. 0 = top (12 o\'clock), 90 = right',
+            description: "Starting angle in degrees. 0 = top (12 o'clock), 90 = right",
             group: 'Progress',
             min: -360,
             max: 360,
@@ -120,8 +121,10 @@ export class RadialProgressBehavior extends Script {
             precision: 0,
             unit: '°',
           },
-          getValue: (c: unknown) => Math.round((c as RadialProgressBehavior).getStartAngle() * (180 / Math.PI)),
-          setValue: (c: unknown, v: unknown) => (c as RadialProgressBehavior).setStartAngle(Number(v) * (Math.PI / 180)),
+          getValue: (c: unknown) =>
+            Math.round((c as RadialProgressBehavior).getStartAngle() * (180 / Math.PI)),
+          setValue: (c: unknown, v: unknown) =>
+            (c as RadialProgressBehavior).setStartAngle(Number(v) * (Math.PI / 180)),
         },
         {
           name: 'clockwise',
@@ -132,7 +135,8 @@ export class RadialProgressBehavior extends Script {
             group: 'Progress',
           },
           getValue: (c: unknown) => (c as RadialProgressBehavior).getClockwise(),
-          setValue: (c: unknown, v: unknown) => (c as RadialProgressBehavior).setClockwise(Boolean(v)),
+          setValue: (c: unknown, v: unknown) =>
+            (c as RadialProgressBehavior).setClockwise(Boolean(v)),
         },
       ],
       groups: {
@@ -165,7 +169,11 @@ export class RadialProgressBehavior extends Script {
       ? spriteMesh.material[0]
       : spriteMesh.material;
 
-    const baseMat = originalMat as { map?: Texture | null; color?: { r: number; g: number; b: number }; opacity?: number };
+    const baseMat = originalMat as {
+      map?: Texture | null;
+      color?: { r: number; g: number; b: number };
+      opacity?: number;
+    };
     const tex = baseMat.map ?? null;
     this._lastKnownTexture = tex;
     this._opacity = baseMat.opacity ?? 1.0;
@@ -204,26 +212,44 @@ export class RadialProgressBehavior extends Script {
     }
   }
 
-  getValue(): number { return this._value; }
-  setValue(v: number): void {
-    this._value = Math.max(0, Math.min(1, v));
-    this.config.value = this._value;
+  getValue(): number {
+    return this._value;
+  }
+  setValue(v: number, immediate = false): void {
+    const clampedValue = Math.max(0, Math.min(1, v));
+    this._value = clampedValue;
+    this.config.value = clampedValue;
+
+    if (immediate) {
+      this._currentValue = clampedValue;
+      this._updateUniforms();
+    }
   }
 
-  getAnimationSpeed(): number { return this._animationSpeed; }
+  setValueImmediate(v: number): void {
+    this.setValue(v, true);
+  }
+
+  getAnimationSpeed(): number {
+    return this._animationSpeed;
+  }
   setAnimationSpeed(v: number): void {
     this._animationSpeed = Math.max(0, v);
     this.config.animationSpeed = this._animationSpeed;
   }
 
-  getStartAngle(): number { return this._startAngle; }
+  getStartAngle(): number {
+    return this._startAngle;
+  }
   setStartAngle(radians: number): void {
     this._startAngle = radians;
     this.config.startAngle = Math.round(radians * (180 / Math.PI));
     this._updateAngleUniforms();
   }
 
-  getClockwise(): boolean { return this._clockwise; }
+  getClockwise(): boolean {
+    return this._clockwise;
+  }
   setClockwise(v: boolean): void {
     this._clockwise = v;
     this.config.clockwise = v;
@@ -234,7 +260,7 @@ export class RadialProgressBehavior extends Script {
 
   private _buildMaterial(
     tex: Texture | null,
-    baseMat: { color?: { r: number; g: number; b: number }; opacity?: number },
+    baseMat: { color?: { r: number; g: number; b: number }; opacity?: number }
   ): ShaderMaterial {
     const r = baseMat.color?.r ?? 1;
     const g = baseMat.color?.g ?? 1;
@@ -260,7 +286,9 @@ export class RadialProgressBehavior extends Script {
 
   private _syncTexture(): void {
     if (!this._originalMaterial || !this._radialMaterial) return;
-    const origMat = Array.isArray(this._originalMaterial) ? this._originalMaterial[0] : this._originalMaterial;
+    const origMat = Array.isArray(this._originalMaterial)
+      ? this._originalMaterial[0]
+      : this._originalMaterial;
     const currentTex = (origMat as { map?: Texture | null }).map ?? null;
     if (currentTex !== this._lastKnownTexture) {
       this._lastKnownTexture = currentTex;

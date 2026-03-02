@@ -1,10 +1,7 @@
 import { Mesh, MeshBasicMaterial, PlaneGeometry, Texture } from 'three';
 import { Node2D, type Node2DProps } from '../Node2D';
 import type { PropertySchema } from '../../fw/property-schema';
-import {
-  coerceTextureResource,
-  type TextureResourceRef,
-} from '../../core/TextureResource';
+import { coerceTextureResource, type TextureResourceRef } from '../../core/TextureResource';
 
 export interface SpriteAnchor2D {
   x: number;
@@ -18,6 +15,7 @@ export interface Sprite2DProps extends Omit<Node2DProps, 'type'> {
   height?: number;
   color?: string;
   anchor?: SpriteAnchor2D | [number, number];
+  aspectRatioLocked?: boolean;
 }
 
 export class Sprite2D extends Node2D {
@@ -68,7 +66,9 @@ export class Sprite2D extends Node2D {
     this.add(this.mesh);
   }
 
-  private static normalizeAnchor(anchor: SpriteAnchor2D | [number, number] | undefined): SpriteAnchor2D {
+  private static normalizeAnchor(
+    anchor: SpriteAnchor2D | [number, number] | undefined
+  ): SpriteAnchor2D {
     if (!anchor) {
       return { x: 0.5, y: 0.5 };
     }
@@ -137,7 +137,9 @@ export class Sprite2D extends Node2D {
       const w = img.naturalWidth ?? img.width;
       const h = img.naturalHeight ?? img.height;
 
-      console.log(`[Sprite2D] Texture loaded: ${w}x${h} for node "${this.name}" (natural=${img.naturalWidth}x${img.naturalHeight})`);
+      console.log(
+        `[Sprite2D] Texture loaded: ${w}x${h} for node "${this.name}" (natural=${img.naturalWidth}x${img.naturalHeight})`
+      );
 
       if (w && h) {
         this.textureAspectRatio = w / h; // Store aspect ratio
@@ -160,7 +162,7 @@ export class Sprite2D extends Node2D {
     this.geometry = new PlaneGeometry(w, h);
     this.mesh.geometry = this.geometry;
     this.applyAnchorOffset();
-    
+
     // Re-apply opacity to the new geometry/material if needed
     // The material is reused, but we need to ensure it updates
     this.material.needsUpdate = true;
@@ -237,6 +239,7 @@ export class Sprite2D extends Node2D {
             label: 'Width',
             description: 'Sprite width in pixels',
             group: 'Size',
+            editor: 'sprite-size',
             step: 1,
             precision: 0,
             min: 1,
@@ -255,6 +258,7 @@ export class Sprite2D extends Node2D {
             label: 'Height',
             description: 'Sprite height in pixels',
             group: 'Size',
+            editor: 'sprite-size',
             step: 1,
             precision: 0,
             min: 1,
@@ -264,6 +268,20 @@ export class Sprite2D extends Node2D {
           setValue: (node: unknown, value: unknown) => {
             const sprite = node as Sprite2D;
             sprite.updateSize(sprite.width ?? 64, Number(value));
+          },
+        },
+        {
+          name: 'aspectRatioLocked',
+          type: 'boolean',
+          ui: {
+            label: 'Aspect Ratio Locked',
+            description: 'Maintain aspect ratio when resizing',
+            group: 'Size',
+            hidden: true,
+          },
+          getValue: (node: unknown) => (node as Sprite2D).aspectRatioLocked ?? false,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Sprite2D).aspectRatioLocked = Boolean(value);
           },
         },
       ],

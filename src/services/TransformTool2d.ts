@@ -686,6 +686,29 @@ export class TransformTool2d {
         height = Math.max(minSize, Math.abs(localPoint.y - anchorLocal.y));
       }
 
+      let preserveAspect = false;
+      if (transform.nodeIds.length === 1) {
+        const primaryNode = sceneGraph.nodeMap.get(transform.nodeIds[0]);
+        if (primaryNode && 'aspectRatioLocked' in primaryNode && (primaryNode as any).aspectRatioLocked) {
+          preserveAspect = true;
+        }
+      }
+
+      if (preserveAspect && startSize.x > 0 && startSize.y > 0) {
+        const startRatio = startSize.x / startSize.y;
+        if (affectsX && !affectsY) {
+          height = width / startRatio;
+        } else if (affectsY && !affectsX) {
+          width = height * startRatio;
+        } else if (affectsX && affectsY) {
+          const scaleX = width / startSize.x;
+          const scaleY = height / startSize.y;
+          const maxScale = Math.max(scaleX, scaleY);
+          width = startSize.x * maxScale;
+          height = startSize.y * maxScale;
+        }
+      }
+
       const scaleFactorX = width / startSize.x;
       const scaleFactorY = height / startSize.y;
 

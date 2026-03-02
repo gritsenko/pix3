@@ -138,6 +138,7 @@ export class InspectorPanel extends ComponentBase {
   private scriptCreatorRequestedHandler?: (e: Event) => void;
 
   private readonly texturePreviewUrls = new Map<string, string>();
+  private readonly texturePreviewMetadata = new Map<string, { width: number, height: number, size: number }>();
   private readonly texturePreviewLoads = new Set<string>();
 
   connectedCallback() {
@@ -189,6 +190,7 @@ export class InspectorPanel extends ComponentBase {
       URL.revokeObjectURL(previewUrl);
     }
     this.texturePreviewUrls.clear();
+    this.texturePreviewMetadata.clear();
     this.texturePreviewLoads.clear();
   }
 
@@ -469,7 +471,20 @@ export class InspectorPanel extends ComponentBase {
         try {
           const blob = await this.fileSystemAPI.readBlob(resourceUrl);
           const objectUrl = URL.createObjectURL(blob);
+
+          // Get image dimensions
+          const dimensions = await new Promise<{ width: number; height: number }>((resolve) => {
+            const img = new Image();
+            img.onload = () => resolve({ width: img.naturalWidth, height: img.naturalHeight });
+            img.onerror = () => resolve({ width: 0, height: 0 });
+            img.src = objectUrl;
+          });
+
           this.texturePreviewUrls.set(resourceUrl, objectUrl);
+          this.texturePreviewMetadata.set(resourceUrl, {
+            ...dimensions,
+            size: blob.size,
+          });
           this.requestUpdate();
         } catch {
           // Keep empty preview when read fails.
@@ -1842,6 +1857,7 @@ export class InspectorPanel extends ComponentBase {
     if (prop.type === 'object' && prop.ui?.editor === 'texture-resource') {
       const textureValue = this.toTextureResourceValue(state.value);
       const previewUrl = this.getTexturePreviewUrl(textureValue.url);
+      const metadata = this.texturePreviewMetadata.get(textureValue.url.trim());
 
       return html`
         <div class="property-group">
@@ -1849,6 +1865,9 @@ export class InspectorPanel extends ComponentBase {
           <pix3-texture-resource-editor
             .resourceUrl=${textureValue.url}
             .previewUrl=${previewUrl}
+            .originalWidth=${metadata?.width ?? 0}
+            .originalHeight=${metadata?.height ?? 0}
+            .fileSize=${metadata?.size ?? 0}
             ?disabled=${readOnly}
             @change=${(event: CustomEvent<{ url: string }>) =>
               this.applyPropertyChange(prop.name, {
