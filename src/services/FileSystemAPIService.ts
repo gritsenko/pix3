@@ -253,9 +253,9 @@ export class FileSystemAPIService {
         typeof window === 'undefined'
           ? undefined
           : (window as Window &
-            typeof globalThis & {
-              showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
-            });
+              typeof globalThis & {
+                showDirectoryPicker?: () => Promise<FileSystemDirectoryHandle>;
+              });
 
       const picker = globalWindow?.showDirectoryPicker;
       if (typeof picker !== 'function') {

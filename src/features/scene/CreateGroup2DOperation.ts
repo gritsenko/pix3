@@ -10,9 +10,7 @@ import { Vector2 } from 'three';
 import {
   attachNode,
   detachNode,
-  removeAutoCreatedLayoutIfUnused,
-  resolveDefault2DParent,
-  restoreAutoCreatedLayout,
+  resolve2DParentForCreation,
 } from '@/features/scene/node-placement';
 import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
@@ -21,6 +19,7 @@ export interface CreateGroup2DOperationParams {
   width?: number;
   height?: number;
   position?: Vector2;
+  parentNodeId?: string | null;
 }
 
 export class CreateGroup2DOperation implements Operation<OperationInvokeResult> {
@@ -70,7 +69,11 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
       position: this.params.position,
     });
 
-    const { parent: targetParent, createdLayout } = resolveDefault2DParent(sceneGraph);
+    const targetParent = resolve2DParentForCreation(
+      sceneGraph,
+      this.params.parentNodeId ?? null,
+      state.selection.primaryNodeId
+    );
     attachNode(sceneGraph, node, targetParent);
 
     SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
@@ -83,13 +86,11 @@ export class CreateGroup2DOperation implements Operation<OperationInvokeResult> 
         label: `Create ${groupName}`,
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
-          removeAutoCreatedLayoutIfUnused(sceneGraph, createdLayout);
           SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
           SceneStateUpdater.markSceneDirty(state, activeSceneId);
           SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
         },
         redo: () => {
-          restoreAutoCreatedLayout(sceneGraph, createdLayout);
           attachNode(sceneGraph, node, targetParent);
           SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
           SceneStateUpdater.markSceneDirty(state, activeSceneId);

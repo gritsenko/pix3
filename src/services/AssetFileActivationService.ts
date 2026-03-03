@@ -23,13 +23,7 @@ export interface AssetActivation {
  * It dispatches appropriate commands based on file type (e.g., LoadSceneCommand for .pix3scene files).
  */
 export class AssetFileActivationService {
-  static readonly SUPPORTED_IMAGE_EXTENSIONS = new Set([
-    'png',
-    'jpg',
-    'jpeg',
-    'webm',
-    'aif',
-  ]);
+  static readonly SUPPORTED_IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'webm', 'aif']);
   private static readonly UI_LAYER_NAME = 'UI Layer';
 
   @inject(CommandDispatcher)
@@ -114,9 +108,10 @@ export class AssetFileActivationService {
     if (!localPath) {
       const confirm = await this.dialogService.showConfirmation({
         title: 'Configure Local Project Path',
-        message: 'To open script files in VS Code, you must configure the absolute local path to this project.\n\nWould you like to configure it now?',
+        message:
+          'To open script files in VS Code, you must configure the absolute local path to this project.\n\nWould you like to configure it now?',
         confirmLabel: 'Configure',
-        cancelLabel: 'Later'
+        cancelLabel: 'Later',
       });
 
       if (confirm) {
@@ -127,10 +122,10 @@ export class AssetFileActivationService {
 
     // Strip res:// and join with local path
     const relativePath = resourcePath ? this.fileSystem.normalizeResourcePath(resourcePath) : '';
-    
+
     // Normalize slashes for the OS (VS Code handle cross-platform paths well usually, but let's be safe)
     const fullPath = `${localPath.replace(/\/$/, '')}/${relativePath.replace(/^\//, '')}`;
-    
+
     // Open in VS Code using vscode:// protocol
     const vscodeUrl = `vscode://file/${fullPath}`;
     window.open(vscodeUrl, '_blank');

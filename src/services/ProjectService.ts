@@ -459,6 +459,10 @@ Happy creating! 🎨
     const normalized = normalizeProjectManifest(manifest);
     const payload = {
       version: normalized.version,
+      viewportBaseSize: {
+        width: normalized.viewportBaseSize.width,
+        height: normalized.viewportBaseSize.height,
+      },
       metadata: normalized.metadata ?? {},
       autoloads: normalized.autoloads.map(entry => ({
         scriptPath: entry.scriptPath,

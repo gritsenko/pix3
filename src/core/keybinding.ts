@@ -1,9 +1,9 @@
 /**
  * Keybinding system for cross-platform keyboard shortcuts.
- * 
+ *
  * Supports abstract keybinding descriptors (e.g., 'Mod+D', 'Mod+Shift+Z')
  * where 'Mod' expands to Cmd on macOS and Ctrl on Windows/Linux.
- * 
+ *
  * Keybindings can have context clauses ('when') for conditional execution.
  */
 
@@ -13,15 +13,15 @@ import type { EditorContextState } from '@/state/AppState';
 
 /**
  * Abstract keybinding descriptor string.
- * 
+ *
  * Format: `Modifier+Modifier+Key` or multiple alternatives separated by `|`
- * 
+ *
  * Examples:
  * - `'Mod+D'` - Cmd+D on Mac, Ctrl+D elsewhere
  * - `'Mod+Shift+Z | Ctrl+Y'` - Two alternative keybindings for redo
  * - `'Delete | Backspace'` - Either Delete or Backspace
  * - `'Alt+Shift+F'` - Alt+Shift+F on all platforms
- * 
+ *
  * Modifiers: `Mod`, `Ctrl`, `Shift`, `Alt`, `Cmd` (Mac-specific)
  * Keys: Character keys (A-Z, 0-9) or special keys (Enter, Escape, Delete, etc.)
  */
@@ -29,15 +29,15 @@ export type KeybindingDescriptor = string;
 
 /**
  * Context clause for conditional keybinding execution (VS Code-style "when" clause).
- * 
+ *
  * Format: Simple boolean expressions with context keys.
- * 
+ *
  * Examples:
  * - `'viewportFocused'`
  * - `'!isInputFocused'`
  * - `'viewportFocused && !isModalOpen'`
  * - `'(viewportFocused || sceneTreeFocused) && !isInputFocused'`
- * 
+ *
  * Supported context keys:
  * - `viewportFocused` - Viewport panel has focus
  * - `sceneTreeFocused` - Scene tree panel has focus
@@ -75,29 +75,80 @@ export interface Keybinding {
  */
 const KEY_CODE_MAP: Record<string, string> = {
   // Letters
-  a: 'KeyA', b: 'KeyB', c: 'KeyC', d: 'KeyD', e: 'KeyE', f: 'KeyF',
-  g: 'KeyG', h: 'KeyH', i: 'KeyI', j: 'KeyJ', k: 'KeyK', l: 'KeyL',
-  m: 'KeyM', n: 'KeyN', o: 'KeyO', p: 'KeyP', q: 'KeyQ', r: 'KeyR',
-  s: 'KeyS', t: 'KeyT', u: 'KeyU', v: 'KeyV', w: 'KeyW', x: 'KeyX',
-  y: 'KeyY', z: 'KeyZ',
+  a: 'KeyA',
+  b: 'KeyB',
+  c: 'KeyC',
+  d: 'KeyD',
+  e: 'KeyE',
+  f: 'KeyF',
+  g: 'KeyG',
+  h: 'KeyH',
+  i: 'KeyI',
+  j: 'KeyJ',
+  k: 'KeyK',
+  l: 'KeyL',
+  m: 'KeyM',
+  n: 'KeyN',
+  o: 'KeyO',
+  p: 'KeyP',
+  q: 'KeyQ',
+  r: 'KeyR',
+  s: 'KeyS',
+  t: 'KeyT',
+  u: 'KeyU',
+  v: 'KeyV',
+  w: 'KeyW',
+  x: 'KeyX',
+  y: 'KeyY',
+  z: 'KeyZ',
   // Numbers
-  '0': 'Digit0', '1': 'Digit1', '2': 'Digit2', '3': 'Digit3', '4': 'Digit4',
-  '5': 'Digit5', '6': 'Digit6', '7': 'Digit7', '8': 'Digit8', '9': 'Digit9',
+  '0': 'Digit0',
+  '1': 'Digit1',
+  '2': 'Digit2',
+  '3': 'Digit3',
+  '4': 'Digit4',
+  '5': 'Digit5',
+  '6': 'Digit6',
+  '7': 'Digit7',
+  '8': 'Digit8',
+  '9': 'Digit9',
 };
 
 /**
  * Special keys that use event.key instead of event.code for matching.
  */
 const SPECIAL_KEYS = new Set([
-  'Enter', 'Escape', 'Tab', 'Space', 'Backspace', 'Delete',
-  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-  'Home', 'End', 'PageUp', 'PageDown',
-  'F1', 'F2', 'F3', 'F4', 'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+  'Enter',
+  'Escape',
+  'Tab',
+  'Space',
+  'Backspace',
+  'Delete',
+  'ArrowUp',
+  'ArrowDown',
+  'ArrowLeft',
+  'ArrowRight',
+  'Home',
+  'End',
+  'PageUp',
+  'PageDown',
+  'F1',
+  'F2',
+  'F3',
+  'F4',
+  'F5',
+  'F6',
+  'F7',
+  'F8',
+  'F9',
+  'F10',
+  'F11',
+  'F12',
 ]);
 
 /**
  * Parse a keybinding descriptor into a normalized Keybinding object.
- * 
+ *
  * @param descriptor - Abstract keybinding descriptor (e.g., 'Mod+D', 'Delete | Backspace')
  * @param options - Optional context and repeat prevention settings
  * @returns Array of parsed keybindings (multiple if alternatives are specified)
@@ -108,7 +159,7 @@ export function parseKeybinding(
 ): Keybinding[] {
   const platform = getCurrentPlatform();
   const alternatives = descriptor.split('|').map(s => s.trim());
-  
+
   return alternatives.map(alt => {
     const parts = alt.split('+').map(s => s.trim());
     const keybinding: Keybinding = {
@@ -120,7 +171,7 @@ export function parseKeybinding(
     let keyPart = '';
     for (const part of parts) {
       const lower = part.toLowerCase();
-      
+
       if (lower === 'mod') {
         // Expand 'Mod' to platform-specific modifier
         if (platform === 'mac') {
@@ -168,7 +219,7 @@ export function parseKeybinding(
 
 /**
  * Format a keybinding descriptor for display on the current platform.
- * 
+ *
  * @param descriptor - Abstract keybinding descriptor
  * @param platform - Target platform (defaults to current platform)
  * @returns Formatted display string (e.g., '⌘D' on Mac, 'Ctrl+D' on Windows)
@@ -178,17 +229,17 @@ export function formatKeybindingForDisplay(
   platform?: Platform
 ): string {
   const targetPlatform = platform ?? getCurrentPlatform();
-  
+
   // For descriptors with alternatives (|), show only the first one
   const primaryDescriptor = descriptor.split('|')[0].trim();
   const parts = primaryDescriptor.split('+').map(s => s.trim());
-  
+
   const symbols: string[] = [];
   let keyPart = '';
 
   for (const part of parts) {
     const lower = part.toLowerCase();
-    
+
     if (lower === 'mod') {
       if (targetPlatform === 'mac') {
         symbols.push('⌘');
@@ -238,7 +289,7 @@ export function formatKeybindingForDisplay(
 
 /**
  * Evaluate a context clause against the current editor context.
- * 
+ *
  * @param whenClause - Context clause to evaluate (e.g., 'viewportFocused && !isModalOpen')
  * @param context - Current editor context state
  * @returns True if the context clause is satisfied
@@ -254,7 +305,7 @@ export function evaluateContext(
   // Simple boolean expression parser
   // Supported operators: !, &&, ||, ()
   // Context keys: viewportFocused, sceneTreeFocused, inspectorFocused, assetsFocused, isInputFocused, isModalOpen
-  
+
   const contextValues: Record<string, boolean> = {
     viewportFocused: context.focusedArea === 'viewport',
     sceneTreeFocused: context.focusedArea === 'scene-tree',

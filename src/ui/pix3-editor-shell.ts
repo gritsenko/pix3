@@ -180,7 +180,7 @@ export class Pix3EditorShell extends ComponentBase {
     const openProjectInIdeCommand = new OpenProjectInIdeCommand();
     const buildProjectCommand = new BuildProjectCommand();
     const editorSettingsCommand = new OpenEditorSettingsCommand();
-    
+
     // Register viewport commands
     const selectModeCommand = new SetTransformModeCommand('select');
     const translateModeCommand = new SetTransformModeCommand('translate');
@@ -193,7 +193,7 @@ export class Pix3EditorShell extends ComponentBase {
     const zoomAllCommand = new ZoomAllCommand();
     const toggleLightingCommand = new ToggleLightingCommand();
     const toggleNavigationModeCommand = new ToggleNavigationModeCommand();
-    
+
     this.commandRegistry.registerMany(
       undoCommand,
       redoCommand,

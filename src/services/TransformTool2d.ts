@@ -43,7 +43,7 @@ export interface Transform2DState {
 export interface Selection2DOverlay {
   group: THREE.Group;
   handles: THREE.Object3D[];
-  frame: THREE.LineSegments;
+  frame: THREE.Group;
   nodeIds: string[];
   combinedBounds: THREE.Box3;
   centerWorld: THREE.Vector3;
@@ -65,6 +65,7 @@ export interface Active2DTransform {
 export class TransformTool2d {
   private readonly min2DSizeCssPx = 4;
   private readonly handleSizeCssPx = 10;
+  private readonly frameWidthCssPx = 1;
   /** Extra CSS-pixel margin around handles for pointer hit testing */
   private readonly handleHitMarginCssPx = 4;
   /** Radius of handle corners in CSS pixels */
@@ -163,6 +164,11 @@ export class TransformTool2d {
     return this.handleSizeCssPx * this.getDpr();
   }
 
+  private getFrameThicknessWorldPx(zoom: number): number {
+    const safeZoom = Math.max(0.0001, zoom);
+    return (this.frameWidthCssPx * this.getDpr()) / safeZoom;
+  }
+
   /**
    * Helper to generate a rounded-rectangle geometry in pixel space. Size and radius
    * are expressed in the same units (world/physical pixels). The shape is centered
@@ -195,34 +201,92 @@ export class TransformTool2d {
   /**
    * Create a selection frame (rectangle outline) for 2D objects
    */
-  createFrame(bounds: THREE.Box3): THREE.LineSegments {
+  createFrame(bounds: THREE.Box3): THREE.Group {
     const min = bounds.min;
     const max = bounds.max;
+    const width = max.x - min.x;
+    const height = max.y - min.y;
+    const centerX = (min.x + max.x) / 2;
+    const centerY = (min.y + max.y) / 2;
     const z = (min.z + max.z) / 2;
-    const points = [
-      new THREE.Vector3(min.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, min.y, z),
-    ];
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    geometry.computeBoundingBox();
 
-    const material = new THREE.LineBasicMaterial({
-      color: 0x4e8df5,
-      linewidth: 1,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.95,
-    });
-    const frame = new THREE.LineSegments(geometry, material);
+    const thickness = this.getFrameThicknessWorldPx(1);
+
+    // Create a group to hold all border meshes
+    const frame = new THREE.Group();
+    frame.position.set(centerX, centerY, z);
     frame.userData.is2DFrame = true;
     frame.renderOrder = 1000;
     frame.layers.set(1);
+
+    // Top border
+    const topGeometry = new THREE.PlaneGeometry(1, 1);
+    const topMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4e8df5,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const topBorder = new THREE.Mesh(topGeometry, topMaterial);
+    topBorder.position.set(0, height / 2 - thickness / 2, 0); // Align to top edge
+    topBorder.scale.set(width, thickness, 1);
+    topBorder.layers.set(1);
+    topBorder.renderOrder = 1000;
+    topBorder.userData.edge = 'top';
+    frame.add(topBorder);
+
+    // Bottom border
+    const bottomGeometry = new THREE.PlaneGeometry(1, 1);
+    const bottomMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4e8df5,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const bottomBorder = new THREE.Mesh(bottomGeometry, bottomMaterial);
+    bottomBorder.position.set(0, -height / 2 + thickness / 2, 0); // Align to bottom edge
+    bottomBorder.scale.set(width, thickness, 1);
+    bottomBorder.layers.set(1);
+    bottomBorder.renderOrder = 1000;
+    bottomBorder.userData.edge = 'bottom';
+    frame.add(bottomBorder);
+
+    // Left border
+    const leftGeometry = new THREE.PlaneGeometry(1, 1);
+    const leftMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4e8df5,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const leftBorder = new THREE.Mesh(leftGeometry, leftMaterial);
+    leftBorder.position.set(-width / 2 + thickness / 2, 0, 0); // Align to left edge
+    leftBorder.scale.set(thickness, height, 1);
+    leftBorder.layers.set(1);
+    leftBorder.renderOrder = 1000;
+    leftBorder.userData.edge = 'left';
+    frame.add(leftBorder);
+
+    // Right border
+    const rightGeometry = new THREE.PlaneGeometry(1, 1);
+    const rightMaterial = new THREE.MeshBasicMaterial({
+      color: 0x4e8df5,
+      transparent: true,
+      opacity: 1,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const rightBorder = new THREE.Mesh(rightGeometry, rightMaterial);
+    rightBorder.position.set(width / 2 - thickness / 2, 0, 0); // Align to right edge
+    rightBorder.scale.set(thickness, height, 1);
+    rightBorder.layers.set(1);
+    rightBorder.renderOrder = 1000;
+    rightBorder.userData.edge = 'right';
+    frame.add(rightBorder);
+
     return frame;
   }
 
@@ -312,10 +376,7 @@ export class TransformTool2d {
     const handleSize = this.getHandleSizeWorldPx();
 
     // calculate clamped corner radius in world pixels
-    const cornerRadius = Math.min(
-      this.handleCornerRadiusCssPx * this.getDpr(),
-      handleSize / 2
-    );
+    const cornerRadius = Math.min(this.handleCornerRadiusCssPx * this.getDpr(), handleSize / 2);
 
     const handles: THREE.Object3D[] = [];
     (
@@ -354,26 +415,41 @@ export class TransformTool2d {
   /**
    * Update the positions of handles when selection bounds change
    */
-  updateHandlePositions(overlay: Selection2DOverlay): void {
+  updateHandlePositions(overlay: Selection2DOverlay, zoom = 1): void {
     const bounds = overlay.combinedBounds;
     const min = bounds.min;
     const max = bounds.max;
+    const width = max.x - min.x;
+    const height = max.y - min.y;
+    const centerX = (min.x + max.x) / 2;
+    const centerY = (min.y + max.y) / 2;
     const z = (min.z + max.z) / 2;
     const midX = (min.x + max.x) / 2;
     const midY = (min.y + max.y) / 2;
     const center = bounds.getCenter(new THREE.Vector3());
 
-    const framePoints = [
-      new THREE.Vector3(min.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, min.y, z),
-    ];
-    overlay.frame.geometry.setFromPoints(framePoints);
+    const thickness = this.getFrameThicknessWorldPx(zoom);
+
+    // Update frame edges
+    overlay.frame.position.set(centerX, centerY, z);
+    overlay.frame.traverse(child => {
+      if (child instanceof THREE.Mesh) {
+        const edge = child.userData.edge as 'top' | 'bottom' | 'left' | 'right' | undefined;
+        if (edge === 'top') {
+          child.position.set(0, height / 2 - thickness / 2, 0);
+          child.scale.set(width, thickness, 1);
+        } else if (edge === 'bottom') {
+          child.position.set(0, -height / 2 + thickness / 2, 0);
+          child.scale.set(width, thickness, 1);
+        } else if (edge === 'left') {
+          child.position.set(-width / 2 + thickness / 2, 0, 0);
+          child.scale.set(thickness, height, 1);
+        } else if (edge === 'right') {
+          child.position.set(width / 2 - thickness / 2, 0, 0);
+          child.scale.set(thickness, height, 1);
+        }
+      }
+    });
 
     // Fixed rotation handle offset (3x handle size for consistent distance)
     const rotationOffset = this.getHandleSizeWorldPx() * 3;
@@ -404,6 +480,9 @@ export class TransformTool2d {
         handle.geometry.dispose();
         handle.geometry = lineGeom;
         handle.position.set(0, 0, 0);
+      }
+      if (handle instanceof THREE.Group || handle instanceof THREE.Mesh) {
+        handle.scale.setScalar(1 / Math.max(0.0001, zoom));
       }
     }
 
@@ -689,7 +768,11 @@ export class TransformTool2d {
       let preserveAspect = false;
       if (transform.nodeIds.length === 1) {
         const primaryNode = sceneGraph.nodeMap.get(transform.nodeIds[0]);
-        if (primaryNode && 'aspectRatioLocked' in primaryNode && (primaryNode as any).aspectRatioLocked) {
+        if (
+          primaryNode &&
+          'aspectRatioLocked' in primaryNode &&
+          (primaryNode as any).aspectRatioLocked
+        ) {
           preserveAspect = true;
         }
       }

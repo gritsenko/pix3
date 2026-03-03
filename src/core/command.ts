@@ -29,27 +29,27 @@ export interface CommandMetadata {
   readonly menuPath?: string;
   /**
    * Keyboard shortcut descriptor (e.g., 'Mod+D', 'Mod+Shift+Z | Ctrl+Y').
-   * 
+   *
    * Format: Abstract keybinding where 'Mod' expands to Cmd on macOS, Ctrl elsewhere.
    * Multiple alternatives can be separated with '|'.
-   * 
+   *
    * Examples:
    * - 'Mod+D' - Cmd+D on Mac, Ctrl+D elsewhere
    * - 'Mod+Shift+Z | Ctrl+Y' - Two alternatives for redo
    * - 'Delete | Backspace' - Either Delete or Backspace
-   * 
+   *
    * The keybinding is automatically registered with KeybindingService and
    * displayed in menus with platform-appropriate formatting.
    */
   readonly keybinding?: KeybindingDescriptor;
   /**
    * Context clause for conditional keybinding execution (VS Code-style "when" clause).
-   * 
+   *
    * Examples:
    * - '!isInputFocused' - Execute only when not typing in an input
    * - 'viewportFocused && !isModalOpen' - Execute only in viewport when no modal is open
    * - '(viewportFocused || sceneTreeFocused) && !isInputFocused'
-   * 
+   *
    * Available context keys:
    * - viewportFocused, sceneTreeFocused, inspectorFocused, assetsFocused
    * - isInputFocused, isModalOpen

@@ -283,6 +283,3 @@ export class ScriptCompilerService {
     this.initPromise = null;
   }
 }
-
-
-

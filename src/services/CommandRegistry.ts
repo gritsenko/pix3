@@ -60,14 +60,10 @@ export class CommandRegistry {
 
     // Register keybinding if specified
     if (command.metadata.keybinding) {
-      this.keybindingService.register(
-        command.metadata.id,
-        command.metadata.keybinding,
-        {
-          when: command.metadata.when,
-          preventRepeat: command.metadata.preventRepeat,
-        }
-      );
+      this.keybindingService.register(command.metadata.id, command.metadata.keybinding, {
+        when: command.metadata.when,
+        preventRepeat: command.metadata.preventRepeat,
+      });
     }
   }
 

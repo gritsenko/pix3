@@ -72,10 +72,14 @@ export class EditorTabService {
 
         let savedActiveTabId = appState.tabs.activeTabId;
         const activeTab = appState.tabs.tabs.find(t => t.id === savedActiveTabId);
-        
+
         // If the active tab is excluded (like game tab), use the previous active tab
-        if (activeTab && (activeTab.resourceId.startsWith('templ://') || activeTab.type === 'game')) {
-          savedActiveTabId = this.previousActiveTabIdBeforeGame ?? 
+        if (
+          activeTab &&
+          (activeTab.resourceId.startsWith('templ://') || activeTab.type === 'game')
+        ) {
+          savedActiveTabId =
+            this.previousActiveTabIdBeforeGame ??
             (filteredTabs.length > 0 ? filteredTabs[0].id : null);
         }
 
@@ -137,7 +141,13 @@ export class EditorTabService {
 
     const tabId = this.deriveTabId(type, resourceId);
     const existing = appState.tabs.tabs.find(t => t.id === tabId);
-    console.log('[EditorTabService] openResourceTab:', { type, resourceId, tabId, activate, existing: !!existing });
+    console.log('[EditorTabService] openResourceTab:', {
+      type,
+      resourceId,
+      tabId,
+      activate,
+      existing: !!existing,
+    });
 
     if (existing) {
       if (activate) {
@@ -156,7 +166,10 @@ export class EditorTabService {
     if (type === 'game' && !existing && activate) {
       const activeSceneTabId = this.findSceneTabIdBySceneId(appState.scenes.activeSceneId);
       this.previousActiveTabIdBeforeGame = activeSceneTabId ?? appState.tabs.activeTabId;
-      console.log('[EditorTabService] Saving previous active tab before game:', this.previousActiveTabIdBeforeGame);
+      console.log(
+        '[EditorTabService] Saving previous active tab before game:',
+        this.previousActiveTabIdBeforeGame
+      );
     }
 
     const tab: EditorTab = {
@@ -196,7 +209,9 @@ export class EditorTabService {
       console.log('[EditorTabService] Restoring session:', {
         savedTabCount: session.tabs.length,
         savedActiveTabId: session.activeTabId,
-        tabs: session.tabs.map((t: { type: string; resourceId: string }) => `${t.type}:${t.resourceId}`),
+        tabs: session.tabs.map(
+          (t: { type: string; resourceId: string }) => `${t.type}:${t.resourceId}`
+        ),
       });
 
       // Skip template tabs (templ://) — they should not be restored.
@@ -220,7 +235,10 @@ export class EditorTabService {
       this.isRestoringProjectSession = true;
       try {
         for (const tabData of tabsToRestore) {
-          console.log('[EditorTabService] Opening tab without activation:', `${tabData.type}:${tabData.resourceId}`);
+          console.log(
+            '[EditorTabService] Opening tab without activation:',
+            `${tabData.type}:${tabData.resourceId}`
+          );
           await this.openResourceTab(
             tabData.type as EditorTabType,
             tabData.resourceId,
@@ -229,14 +247,17 @@ export class EditorTabService {
           );
         }
 
-        console.log('[EditorTabService] All tabs opened, now focusing active tab:', session.activeTabId);
+        console.log(
+          '[EditorTabService] All tabs opened, now focusing active tab:',
+          session.activeTabId
+        );
         let tabFocused = false;
         if (session.activeTabId) {
           console.log('[EditorTabService] Restoring saved active tab:', session.activeTabId);
           await this.focusTab(session.activeTabId);
           tabFocused = appState.tabs.tabs.some(t => t.id === session.activeTabId);
         }
-        
+
         if (!tabFocused && tabsToRestore.length > 0) {
           const firstTabId = this.deriveTabId(
             tabsToRestore[0].type as EditorTabType,
@@ -343,7 +364,7 @@ export class EditorTabService {
           remainingTabs: appState.tabs.tabs.map(t => ({ id: t.id, type: t.type })),
         });
       }
-      
+
       appState.tabs.activeTabId = null;
       if (next) {
         await this.activateTab(next.id);
@@ -374,7 +395,11 @@ export class EditorTabService {
     if (!next) return;
 
     const previousId = appState.tabs.activeTabId;
-    console.log('[EditorTabService] activateTab:', { activeTabId: tabId, previousId, tabType: next.type });
+    console.log('[EditorTabService] activateTab:', {
+      activeTabId: tabId,
+      previousId,
+      tabType: next.type,
+    });
 
     // Capture state from previous active tab before switching.
     if (previousId && previousId !== tabId) {

@@ -19,7 +19,7 @@ export class ProjectSettingsService {
       return;
     }
 
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       const id = `project-settings-${this.nextId++}`;
       this.activeDialog = {
         id,
@@ -43,14 +43,16 @@ export class ProjectSettingsService {
   /**
    * Subscribe to changes in active dialogs.
    */
-  public subscribe(listener: (activeDialog: ProjectSettingsDialogInstance | null) => void): () => void {
+  public subscribe(
+    listener: (activeDialog: ProjectSettingsDialogInstance | null) => void
+  ): () => void {
     this.listeners.add(listener);
     listener(this.activeDialog);
     return () => this.listeners.delete(listener);
   }
 
   private notifyListeners(): void {
-    this.listeners.forEach((listener) => listener(this.activeDialog));
+    this.listeners.forEach(listener => listener(this.activeDialog));
   }
 
   public dispose(): void {

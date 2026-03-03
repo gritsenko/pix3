@@ -13,6 +13,10 @@ export interface RemoveAutoloadParams {
 
 interface ProjectManifestSnapshotLike {
   version: string;
+  viewportBaseSize: {
+    width: number;
+    height: number;
+  };
   autoloads: ReadonlyArray<{
     scriptPath: string;
     singleton: string;
@@ -23,6 +27,10 @@ interface ProjectManifestSnapshotLike {
 
 const cloneManifest = (manifest: ProjectManifestSnapshotLike): ProjectManifest => ({
   version: manifest.version,
+  viewportBaseSize: {
+    width: manifest.viewportBaseSize.width,
+    height: manifest.viewportBaseSize.height,
+  },
   metadata: manifest.metadata ? { ...manifest.metadata } : {},
   autoloads: manifest.autoloads.map(entry => ({ ...entry })),
 });

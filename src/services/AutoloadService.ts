@@ -1,6 +1,7 @@
 import { injectable, inject } from '@/fw/di';
 import { appState } from '@/state';
 import type { AutoloadConfig, ProjectManifest } from '@/core/ProjectManifest';
+import { createDefaultProjectManifest } from '@/core/ProjectManifest';
 import { NodeBase, ScriptRegistry, type ScriptComponent } from '@pix3/runtime';
 import { subscribe } from 'valtio/vanilla';
 
@@ -35,11 +36,7 @@ export class AutoloadService {
   }
 
   async initialize(manifest: ProjectManifest | null): Promise<void> {
-    const resolvedManifest: ProjectManifest = manifest ?? {
-      version: '1.0.0',
-      autoloads: [],
-      metadata: {},
-    };
+    const resolvedManifest: ProjectManifest = manifest ?? createDefaultProjectManifest();
 
     this.cleanup();
 

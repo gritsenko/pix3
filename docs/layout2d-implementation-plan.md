@@ -1,339 +1,326 @@
 # Layout2D Node Implementation Plan
 
-## Overview
+## New Phase Plan (2026-03-03): Project Base Viewport + 2D Placement Refactor
 
-This document describes the implementation of a special `Layout2D` node that represents the 2D game viewport, separating it from the editor's WebGL viewport. This allows for consistent anchor-based layout calculations and enables testing different screen sizes from the inspector.
+This section defines a new implementation phase for editor/runtime behavior updates.
 
-## Status: ✅ COMPLETED
+### Goals
 
-All tasks have been completed. Layout2D is fully integrated into Pix3.
+1. Add project-level base viewport size in Project Settings.
+2. Persist base viewport size in `pix3project.yaml`.
+3. Always render a base viewport frame in editor viewport (both navigation modes), but only when 2D layer rendering is enabled.
+4. Remove auto-creation of `Layout2D`/root 2D container when creating 2D nodes.
+5. Improve 2D object frame readability (crisper, higher-contrast outlines).
 
-## Current System Analysis
+### Final UX Requirements
 
-The current 2D layout system anchors root `Group2D` nodes directly to the editor's WebGL viewport:
+- Base viewport size is edited in Project Settings (`General` tab).
+- Base viewport size is loaded/saved from project manifest (`pix3project.yaml`).
+- In editor viewport:
+  - Base viewport frame is shown in both `2d` and `3d` navigation modes.
+  - Base viewport frame is hidden only when `appState.ui.showLayer2D === false`.
+- Creating 2D nodes:
+  - If currently selected node is a compatible 2D container -> create inside it.
+  - Otherwise -> create at scene root.
+  - Scene root may contain any number of mixed node types (2D/3D) without auto-generated container.
+- 2D object outlines are visibly sharper and easier to read.
 
-- `ViewportRenderService.resize()` calls `SceneManager.resizeRoot()` with viewport dimensions
-- Root `Group2D` nodes use `isViewportContainer` property to identify viewport-aligned containers
-- `Group2D.updateLayout(width, height)` receives parent dimensions and recursively updates children
-- Visuals update with green color (0x4ecf4e) for viewport containers
+---
 
-**This has been replaced with Layout2D.**
+## Phase 1 - Project Manifest Data Model
 
-## Proposed Architecture ✅ IMPLEMENTED
+**Status:** ✅ Completed (2026-03-04)
 
-### Layout2D Node ✅
+### Scope
 
-**File**: `packages/pix3-runtime/src/nodes/2D/Layout2D.ts`
+Introduce project-level viewport base size in manifest schema and defaults.
 
-**Implemented Features**:
+### Files
 
-- Extends `Node2D`
-- Properties:
-  - `width`: number - Game viewport width in pixels (default: 1920)
-  - `height`: number - Game viewport height in pixels (default: 1080)
-  - `resolutionPreset`: ResolutionPreset enum - Quick preset selection
-  - `showViewportOutline`: boolean - Toggle visual border
-- Methods:
-  - `updateLayout(width?, height?)`: Update dimensions and trigger child recalculation
-  - `recalculateChildLayouts()`: Recursively call `updateLayout()` on all `Group2D` children
-  - `getPropertySchema()`: Expose properties to inspector with preset dropdown
+- `src/core/ProjectManifest.ts`
+- `src/services/ProjectService.ts`
 
-**Resolution Presets** ✅ IMPLEMENTED:
+### Changes
 
-```typescript
-enum ResolutionPreset {
-  Custom = 'custom',
-  FullHD = '1920x1080',
-  HD = '1280x720',
-  MobilePortrait = '1080x1920',
-  MobileLandscape = '1920x1080',
-  Tablet = '1024x768',
+1. Extend `ProjectManifest` with:
+
+```ts
+viewportBaseSize: {
+  width: number;
+  height: number;
 }
 ```
 
-### 2. Update SceneLoader ✅
+2. Add safe defaults in `createDefaultProjectManifest()`:
+   - `width: 1920`
+   - `height: 1080`
 
-**File**: `packages/pix3-runtime/src/core/SceneLoader.ts`
+3. Update `normalizeProjectManifest(input)`:
+   - Parse and validate both values.
+   - Coerce invalid/missing values to defaults.
+   - Clamp to sane minimum (recommended: `>= 64`) to avoid camera/projection edge cases.
 
-**Changes Implemented**:
+4. Ensure `ProjectService.saveProjectManifest()` includes `viewportBaseSize` in YAML payload.
 
-- ✅ Added `'Layout2D'` case in `createNodeFromDefinition()`
-- ✅ Parse Layout2D-specific properties (width, height, resolutionPreset, showViewportOutline)
-- ✅ Load from scene file YAML structure
-- ✅ Added `Layout2DProperties` interface
+### Acceptance Criteria
 
-### 3. Update SceneManager ✅
+- Opening old projects without `viewportBaseSize` still works and auto-populates defaults in memory.
+- Saving any project writes `viewportBaseSize` to `pix3project.yaml`.
 
-**File**: `packages/pix3-runtime/src/core/SceneManager.ts`
+---
 
-**Changes Implemented**:
+## Phase 2 - Project Settings UI + Operation Persistence
 
-- ✅ Modified `resizeRoot()` to:
-  - Accept `skipLayout2D: boolean` parameter
-  - Only update Group2D children when `skipLayout2D` is true
-  - Add `findLayout2D()` helper method
-- ✅ Group2D children now anchor to Layout2D dimensions, not viewport
-- ✅ Removed `isViewportContainer` logic support
+**Status:** ✅ Completed (2026-03-04)
 
-### 4. Create Layout2D Visual Renderer ✅
+### Scope
 
-**File**: `src/services/ViewportRenderService.ts`
+Expose base viewport size in settings dialog and persist through operation flow (with undo/redo).
 
-**Changes Implemented**:
+### Files
 
-- ✅ Added `layout2dVisuals: Map<string, THREE.Group>` map
-- ✅ Added `createLayout2DVisual()` method:
-  - Renders dashed border for viewport boundaries
-  - Uses distinctive color (purple 0x9b59b6) to differentiate from Group2D
-- ✅ Updated `syncAll2DVisuals()` to handle Layout2D visuals
-- ✅ Modified `resize()` to pass `skipLayout2D: true` to prevent Layout2D from resizing with viewport
-- ✅ Added Layout2D cleanup in `syncSceneContent()`
-- ✅ Updated `get2DVisual()` to handle Layout2D
+- `src/ui/shared/pix3-project-settings-dialog.ts`
+- `src/ui/shared/pix3-project-settings-dialog.ts.css`
+- `src/features/project/UpdateProjectSettingsOperation.ts`
 
-**Visual Design** ✅ IMPLEMENTED:
+### Changes
 
-```
-┌─────────────────────────────┐
-│                           │  ← Dashed purple border (showViewportOutline=true)
-│  Group2D children         │  ← Child content
-│  (anchored here)          │
-└─────────────────────────────┘  ← Layout2D boundaries
-```
+1. In dialog state, add fields:
+   - `baseViewportWidth`
+   - `baseViewportHeight`
 
-### 5. Update ViewportRenderService for Layout Recalculation ✅
+2. Initialize fields from `appState.project.manifest?.viewportBaseSize`.
 
-**File**: `src/services/ViewportRenderService.ts`
+3. Add numeric inputs in `General` tab:
+   - `Base Viewport Width`
+   - `Base Viewport Height`
 
-**Changes Implemented**:
+4. Update `UpdateProjectSettingsOperation` params to include base viewport size.
 
-- ✅ In `resize()` method: Call `sceneManager.resizeRoot(pixelWidth, pixelHeight, true)` - passes `skipLayout2D: true` to prevent Layout2D from resizing
-- ✅ Removed `isViewportContainer` color differentiation from Group2D visual sync
-- ✅ Group2D visual is now uniformly blue (0x96cbf6)
-- ✅ Layout2D visibility handled via `updateNodeVisibility()` and `updateNodeTransform()`
+5. In operation `perform()`:
+   - Keep existing project metadata updates (`projectName`, `localAbsolutePath`).
+   - Clone current manifest.
+   - Apply viewport size changes.
+   - Persist via `ProjectService.saveProjectManifest(nextManifest)`.
+   - Update `state.project.manifest`.
 
-### 6. Create Command/Operation for Layout2D ✅
+6. In `undo`/`redo`:
+   - Save previous/next manifest through `ProjectService` (not only in-memory mutation).
+   - Keep behavior symmetric and deterministic.
 
-**Files**:
+### Acceptance Criteria
 
-- ✅ `src/features/scene/CreateLayout2DCommand.ts`
-- ✅ `src/features/scene/CreateLayout2DOperation.ts`
-- ✅ `src/features/scene/UpdateLayout2DSizeCommand.ts`
-- ✅ `src/features/scene/UpdateLayout2DSizeOperation.ts`
+- Changing base viewport size in dialog updates manifest and file.
+- Undo/redo restores both in-memory manifest and YAML contents.
 
-**Implemented Functionality**:
+---
 
-- ✅ CreateLayout2D: Auto-create when scene loads (single instance per scene)
-- ✅ UpdateLayout2DSize: Handle preset dropdown and manual width/height changes
+## Phase 3 - Base Viewport Frame Rendering in Editor
 
-### 7. Register Layout2D in NodeRegistry ✅
+**Status:** ✅ Completed (2026-03-04)
 
-**File**: `src/services/NodeRegistry.ts`
+### Scope
 
-**Changes Implemented**:
+Render a global base viewport frame independent of `Layout2D` node existence.
 
-- ✅ Added Layout2D registration (order: 0, before Group2D)
-- ✅ Set category to '2D'
-- ✅ Icon: 'layout'
+### Files
 
-### 8. Update Inspector for Layout2D Properties ✅
+- `src/services/ViewportRenderService.ts`
 
-**File**: `src/ui/object-inspector/inspector-panel.ts`
+### Changes
 
-**Changes Implemented**:
+1. Add dedicated visual object/map member for base frame (single frame object is enough).
 
-- ✅ Layout2D property schema already provides UI via existing system
-- ✅ Preset dropdown renders properly in inspector
-- ✅ Visual feedback when preset changes (update width/height)
+2. Create `createBaseViewportFrame()` helper:
+   - Rect outline centered at origin.
+   - Dimensions from manifest base size.
+   - Add to 2D layer (`LAYER_2D`).
+   - Configure material for high readability:
+     - strong color contrast
+     - `transparent: true`
+     - high opacity
+     - `depthTest = false`
+     - `depthWrite = false`
 
-### 9. Remove Legacy isViewportContainer Logic ✅
+3. Add `syncBaseViewportFrame()`:
+   - Rebuild/update on project manifest change.
+   - Re-apply visibility based on `showLayer2D`.
+   - Keep visible regardless of navigation mode (`2d`/`3d`).
 
-**Files Updated**:
+4. Ensure render path respects rule:
+   - if `showLayer2D` is disabled, frame is not rendered.
+   - if `showLayer2D` is enabled, frame is rendered in both modes.
 
-- ✅ `packages/pix3-runtime/src/nodes/2D/Group2D.ts` - Removed `isViewportContainer` getter
-- ✅ `src/services/ViewportRenderService.ts` - Removed isViewportContainer checks and green color
-- ✅ Removed `isViewportContainer` references from visual creation and sync code
+5. Keep existing `Layout2D.showViewportOutline` behavior for Layout2D node borders as a separate visual concern.
 
-### 10. Update Startup Scene Template ✅
+### Acceptance Criteria
 
-**File**: `src/templates/startup-scene.pix3scene`
+- Base viewport frame is visible in both navigation modes.
+- Toggling 2D layer visibility hides/shows frame immediately.
+- Frame updates immediately after changing Project Settings base size.
 
-**Changes Implemented**:
+---
 
-- ✅ Replaced root Group2D "ui-layer" with Layout2D node
-- ✅ Structure:
-
-```yaml
-root:
-  - id: environment-root
-    type: Node3D
-    ...
-  - id: layout2d-root
-    type: Layout2D
-    name: 2D Layout
-    properties:
-      width: 1920
-      height: 1080
-      resolutionPreset: FullHD
-      showViewportOutline: true
-    children:
-      - id: logo-sprite
-        type: Sprite2D
-        ...
-```
-
-### 11. Update SceneGraph and Scene Hierarchy State ✅
-
-**File**: `packages/pix3-runtime/src/core/SceneGraph.ts`
-
-**Changes Implemented**:
-
-- ✅ Layout2D can be a root node (inherited from Node2D)
-
-### 12. Scene Migration (One-time) ⚠️ MANUAL
-
-**Operation**: Create migration command for existing scenes
-
-**Logic**:
-
-- ✅ Detect scenes with root Group2D using viewport container anchors
-- ⚠️ Wrap them in new Layout2D node (requires manual migration)
-- ⚠️ Convert isViewportContainer nodes to regular Group2D children (legacy property removed)
-- ⚠️ Preserve existing anchors/offsets (now relative to Layout2D instead of viewport)
-
-**Status**: Migration path exists but requires users to manually update existing scenes.
-
-## File Structure Summary
-
-```
-packages/pix3-runtime/src/nodes/2D/
-  Layout2D.ts           ✅ CREATED
-
-src/features/scene/
-  CreateLayout2DCommand.ts          ✅ CREATED
-  CreateLayout2DOperation.ts        ✅ CREATED
-  UpdateLayout2DSizeCommand.ts      ✅ CREATED
-  UpdateLayout2DSizeOperation.ts    ✅ CREATED
-
-src/services/
-  NodeRegistry.ts      ✅ MODIFIED - Register Layout2D
-  ViewportRenderService.ts  ✅ MODIFIED - Layout2D visuals, remove isViewportContainer
-
-packages/pix3-runtime/src/core/
-  SceneManager.ts     ✅ MODIFIED - Update resizeRoot logic for Layout2D
-  SceneLoader.ts     ✅ MODIFIED - Load Layout2D from YAML
-
-src/templates/
-  startup-scene.pix3scene     ✅ MODIFIED - Use Layout2D instead of root Group2D
-
-packages/pix3-runtime/src/nodes/2D/
-  Group2D.ts          ✅ MODIFIED - Remove isViewportContainer property
-```
-
-## Implementation Status: ✅ COMPLETE
-
-All tasks completed:
-
-1. ✅ **Create Layout2D node class** (core data structure)
-2. ✅ **Update SceneLoader** (YAML parsing support)
-3. ✅ **Update SceneManager** (layout recalculation logic)
-4. ✅ **Create commands/operations** (mutation support)
-5. ✅ **Update ViewportRenderService** (visual rendering + resize logic)
-6. ✅ **Register in NodeRegistry** (create menu integration)
-7. ✅ **Update startup scene template** (default scene)
-8. ✅ **Remove isViewportContainer legacy** (cleanup)
-9. ⚠️ **Test**:
-   - ✅ Create scene with Layout2D
-   - ✅ Change resolution presets
-   - ✅ Add Group2D children with different anchor configurations
-   - ⚠️ Verify anchors recalculate correctly when Layout2D size changes
-   - ✅ Verify visual rendering (border, color)
-
-## Key Technical Details
-
-### Layout Recalculation Flow ✅
-
-```
-User changes Layout2D size/preset
-  ↓
-UpdateLayout2DSizeOperation.execute()
-  ↓
-layout2d.width/height updated
-  ↓
-layout2d.updateLayout() called
-  ↓
-layout2d.recalculateChildLayouts()
-  ↓
-For each Group2D child:
-  child.updateLayout(layout2d.width, layout2d.height)
-  ↓
-Recursive: child.updateLayout() calls child's children
-```
-
-### Coordinate System ✅
-
-- Layout2D positioned at (0, 0) with no rotation/scale (immutable root)
-- All child Group2D/Sprite2D positions relative to Layout2D center
-- Anchors (0-1) normalized across Layout2D dimensions
-- Offsets in pixels from anchor points
-- **Layout2D size is INDEPENDENT of editor viewport size**
-
-### Visual Differentiation ✅
-
-- Layout2D: Purple dashed border (0x9b59b6) with toggleable visibility
-- Group2D: Blue solid outline (0x96cbf6)
-- Sprite2D: No outline (texture rendered)
-
-### Scene File Format ✅
-
-```yaml
-root:
-  - id: layout2d-root
-    type: Layout2D
-    name: 2D Layout
-    properties:
-      width: 1920
-      height: 1080
-      resolutionPreset: FullHD
-      showViewportOutline: true
-    children:
-      - id: ui-group
-        type: Group2D
-        name: UI Group
-        properties:
-          width: 200
-          height: 100
-          layout:
-            anchorMin: [0, 1]
-            anchorMax: [0, 1]
-            offsetMin: [20, -20]
-            offsetMax: [220, -120]
-        children: []
-```
-
-## User Decisions ✅ IMPLEMENTED
-
-Based on initial consultation:
-
-1. ✅ **Auto-creation**: Layout2D is added to startup scene template (backward compatibility requires manual migration)
-2. ✅ **Viewport Presets**: Layout2D includes preset dropdown for common mobile/desktop resolutions
-3. ✅ **Backward Compatibility**: System removed isViewportContainer property - forced migration required
-
-## Benefits
-
-This plan provides a clean separation between editor viewport and game viewport, enabling:
-
-- ✅ Accurate game layout testing independent of editor window size
-- ✅ Quick switching between different screen resolutions
-- ✅ More consistent anchor recalculations
-- ✅ Better understanding of actual game viewport boundaries
-- ✅ Easier game UI development for multiple screen sizes
-
-## Known Issues (Post-Implementation)
-
-1. ⚠️ **Layout2D size independence**: Layout2D should stay at configured size (e.g., 1920x1080) and only change via inspector. Editor viewport resize should not affect Layout2D size.
-
-2. ⚠️ **Visibility checkbox**: When Layout2D visibility unchecked, all content (border + children) should hide immediately.
-
-3. ⚠️ **Show Viewport Outline checkbox**: Should only affect border visibility, not size changes.
-
-These issues were reported during initial testing and require further investigation.
+## Phase 4 - 2D Camera Scaling Refactor to Base Viewport
+
+**Status:** ✅ Completed (2026-03-04)
+
+### Scope
+
+Use project base viewport size as camera space baseline for 2D editing.
+
+### Files
+
+- `src/services/ViewportRenderService.ts`
+
+### Changes
+
+1. Replace orthographic frustum sizing logic based on physical pixels with base-size-driven logic.
+
+2. In `resize(width, height)`:
+   - Keep renderer pixel sizing as is.
+   - For orthographic camera bounds, derive from `viewportBaseSize` and host aspect ratio.
+   - Preserve user zoom (`orthographicCamera.zoom`) across resize.
+
+3. Keep pan/zoom tools behavior compatible with new unit space.
+
+4. Ensure selection overlays and gizmos stay screen-stable after refactor.
+
+### Acceptance Criteria
+
+- Resizing editor panel/window does not redefine authored base-space dimensions.
+- 2D composition remains stable against base frame.
+- Existing 2D manipulation remains functional.
+
+---
+
+## Phase 5 - Remove Auto-Root2D/Layout2D Creation for 2D Nodes
+
+**Status:** ✅ Completed (2026-03-04)
+
+### Scope
+
+Drop legacy placement behavior that creates a `Layout2D` container implicitly.
+
+### Files
+
+- `src/features/scene/node-placement.ts`
+- All 2D create operations in `src/features/scene/Create*2DOperation.ts`
+- `src/features/scene/CreateNodeBaseCommand.ts` (or per-command wrappers where needed)
+
+### Changes
+
+1. In `node-placement.ts`:
+   - Remove `resolveDefault2DParent()` auto-creation behavior.
+   - Remove `removeAutoCreatedLayoutIfUnused()` and `restoreAutoCreatedLayout()` helpers.
+   - Add helper to resolve compatible selected parent:
+     - selected node exists
+     - selected node is container
+     - selected node is 2D-compatible for 2D creation
+
+2. Update all 2D create operations:
+   - Remove `autoCreatedLayout` variables and related undo/redo handling.
+   - Parent resolution order:
+     1. explicit `parentNodeId` (if valid)
+     2. selected compatible container
+     3. root
+
+3. Keep `SceneStateUpdater.selectNode(state, createdNodeId)` behavior unchanged for consistent created-node payload extraction.
+
+4. Preserve insert index logic where already implemented (`CreateSprite2DOperation`) and normalize similar behavior across other 2D operations when feasible.
+
+### Acceptance Criteria
+
+- No create operation auto-adds `Layout2D`.
+- 2D node creation works with/without selected container.
+- Root-level creation works in mixed 2D/3D roots.
+- Undo/redo remains clean and symmetric.
+
+---
+
+## Phase 6 - Improve 2D Outline Clarity
+
+**Status:** ✅ Completed (2026-03-04)
+
+### Scope
+
+Make 2D node frames visually crisp and readable.
+
+### Files
+
+- `src/services/ViewportRenderService.ts`
+
+### Changes
+
+1. Material tuning for 2D frames (Layout2D/Group2D/UI/Sprite outlines where applicable):
+   - stronger default opacity
+   - consistent high-contrast palette
+   - disable depth conflict (`depthTest=false`, `depthWrite=false`)
+
+2. Pixel-snapping strategy for 2D visual roots:
+   - in sync/update paths, align positions to pixel grid (or half-pixel where visually correct for line center).
+   - avoid subpixel drift after transforms.
+
+3. Ensure line visibility under zoom changes:
+   - maintain minimum perceptual stroke visibility.
+   - avoid disappearing/thinning artifacts at common zoom values.
+
+4. Verify interaction overlays remain distinguishable from passive node outlines.
+
+### Acceptance Criteria
+
+- 2D outlines are clearly visible at default zoom.
+- Outlines remain readable when zooming in/out.
+- No severe shimmering in static scene.
+
+---
+
+## Phase 7 - Regression, Validation, and Test Coverage
+
+**Status:** 🟡 In progress (build verification completed; focused tests pending)
+
+### Scope
+
+Protect new behavior with focused tests and manual validation checklist.
+
+### Test Targets
+
+1. Manifest normalization unit tests:
+   - missing `viewportBaseSize`
+   - invalid values
+   - persisted values roundtrip
+
+2. Operation tests:
+   - `UpdateProjectSettingsOperation` updates manifest + undo/redo
+
+3. 2D create operation tests:
+   - selected compatible container -> child creation
+   - no compatible selection -> root creation
+   - no auto-layout node insertion
+
+4. Manual validation matrix:
+   - navigation mode `2d` + `3d`
+   - `showLayer2D` on/off
+   - viewport resize behavior
+   - drag-drop image to tree and viewport
+   - undo/redo for node creation and project settings
+
+---
+
+## Rollout Notes
+
+- Backward compatibility: old manifests load with defaults.
+- Existing scenes: no forced migration required for this phase.
+- Docs update after implementation:
+  - `docs/pix3-specification.md` (project manifest section and viewport behavior)
+  - `docs/architecture.md` (brief note on base viewport frame + new 2D placement rule)
+
+## Definition of Done
+
+All phases are complete when:
+
+1. Base viewport size is editable and persisted in `pix3project.yaml`.
+2. Base frame is always visible in editor for both navigation modes, gated only by `showLayer2D`.
+3. 2D node creation never auto-creates `Layout2D`.
+4. 2D outlines are noticeably sharper/readable.
+5. Undo/redo and tests confirm stable behavior.

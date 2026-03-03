@@ -32,7 +32,11 @@ export class ServiceContainer {
   }
 
   // Register a service
-  addService<T>(token: symbol, implementation: new (...args: any[]) => T, lifetime: ServiceLifetimeOption) {
+  addService<T>(
+    token: symbol,
+    implementation: new (...args: any[]) => T,
+    lifetime: ServiceLifetimeOption
+  ) {
     // If a service is re-registered, remove any existing cached singleton instance so
     // tests and runtime can replace implementations without stale instances.
     if (this.singletonInstances.has(token)) {

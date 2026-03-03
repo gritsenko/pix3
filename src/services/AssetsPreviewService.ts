@@ -107,7 +107,8 @@ export class AssetsPreviewService {
       return;
     }
 
-    const selectedFolderPath = kind === 'directory' ? this.normalizePath(path) : this.getParentPath(path);
+    const selectedFolderPath =
+      kind === 'directory' ? this.normalizePath(path) : this.getParentPath(path);
     await this.setSelectedFolder(selectedFolderPath);
   }
 
@@ -185,7 +186,9 @@ export class AssetsPreviewService {
     this.notify();
 
     try {
-      const entries = await this.projectService.listDirectory(folderPath === '.' ? '.' : folderPath);
+      const entries = await this.projectService.listDirectory(
+        folderPath === '.' ? '.' : folderPath
+      );
       const filteredEntries = entries
         .filter(entry => !entry.name.startsWith('.') && entry.name !== 'node_modules')
         .sort((a, b) => {
@@ -313,7 +316,9 @@ export class AssetsPreviewService {
     objectUrl: string
   ): Promise<{ width: number | null; height: number | null }> {
     try {
-      const bitmapFactory = (globalThis as { createImageBitmap?: (source: ImageBitmapSource) => Promise<ImageBitmap> }).createImageBitmap;
+      const bitmapFactory = (
+        globalThis as { createImageBitmap?: (source: ImageBitmapSource) => Promise<ImageBitmap> }
+      ).createImageBitmap;
       if (bitmapFactory) {
         const bitmap = await bitmapFactory(blob);
         const dimensions = { width: bitmap.width, height: bitmap.height };

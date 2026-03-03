@@ -155,7 +155,10 @@ export class ProjectScriptLoaderService {
       try {
         compilationResult = await this.compiler.bundle(filesMap);
       } catch (error) {
-        const userError = this.handleCompilationError(error as CompilationError, checkedDirectories);
+        const userError = this.handleCompilationError(
+          error as CompilationError,
+          checkedDirectories
+        );
         appState.project.errorMessage = userError;
         appState.project.scriptsStatus = 'error';
         return;
@@ -338,7 +341,10 @@ export class ProjectScriptLoaderService {
   /**
    * Handle compilation errors by logging and displaying to user
    */
-  private handleCompilationError(error: CompilationError, checkedDirectories: readonly string[]): string {
+  private handleCompilationError(
+    error: CompilationError,
+    checkedDirectories: readonly string[]
+  ): string {
     const location = error.file
       ? `${error.file}:${error.line ?? '?'}:${error.column ?? '?'}`
       : 'unknown location';
@@ -361,4 +367,3 @@ export class ProjectScriptLoaderService {
     this.clearAll();
   }
 }
-

@@ -38,13 +38,13 @@ class EditorSceneLoader extends SceneLoader {
 class EditorSceneManager extends SceneManager {
   constructor() {
     const container = ServiceContainer.getInstance();
-    
+
     const loaderToken = container.getOrCreateToken(SceneLoader);
     const loader = container.getService<SceneLoader>(loaderToken);
-    
+
     const saverToken = container.getOrCreateToken(SceneSaver);
     const saver = container.getService<SceneSaver>(saverToken);
-    
+
     super(loader, saver);
   }
 }

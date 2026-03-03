@@ -30,6 +30,15 @@ export class ProjectSettingsDialog extends ComponentBase {
   private localAbsolutePath: string = '';
 
   @state()
+  private viewportBaseWidth: string = '1920';
+
+  @state()
+  private viewportBaseHeight: string = '1080';
+
+  private viewportBaseWidthDirty = false;
+  private viewportBaseHeightDirty = false;
+
+  @state()
   private activeTab: SettingsTab = 'general';
 
   @state()
@@ -50,7 +59,11 @@ export class ProjectSettingsDialog extends ComponentBase {
     super.connectedCallback();
     this.projectName = appState.project.projectName ?? '';
     this.localAbsolutePath = appState.project.localAbsolutePath ?? '';
+    this.syncViewportBaseSizeFromManifest();
     this.disposeProjectSubscription = subscribe(appState.project, () => {
+      if (!this.viewportBaseWidthDirty && !this.viewportBaseHeightDirty) {
+        this.syncViewportBaseSizeFromManifest();
+      }
       this.requestUpdate();
     });
   }
@@ -110,8 +123,47 @@ export class ProjectSettingsDialog extends ComponentBase {
                       placeholder="/Users/name/projects/my-game"
                     />
                     <div class="hint">
-                      Configure the absolute path to your project root to enable VS Code integration.
-                      Example: <code>/Users/name/Projects/my-pix3-game</code>
+                      Configure the absolute path to your project root to enable VS Code
+                      integration. Example: <code>/Users/name/Projects/my-pix3-game</code>
+                    </div>
+                  </div>
+
+                  <div class="settings-grid-2col">
+                    <div class="settings-field">
+                      <label for="viewportBaseWidth">Base Viewport Width</label>
+                      <input
+                        id="viewportBaseWidth"
+                        type="number"
+                        min="64"
+                        step="1"
+                        .value=${this.viewportBaseWidth}
+                        @input=${(e: InputEvent) => {
+                          this.viewportBaseWidth = (e.target as HTMLInputElement).value;
+                          this.viewportBaseWidthDirty = true;
+                        }}
+                      />
+                    </div>
+
+                    <div class="settings-field">
+                      <label for="viewportBaseHeight">Base Viewport Height</label>
+                      <input
+                        id="viewportBaseHeight"
+                        type="number"
+                        min="64"
+                        step="1"
+                        .value=${this.viewportBaseHeight}
+                        @input=${(e: InputEvent) => {
+                          this.viewportBaseHeight = (e.target as HTMLInputElement).value;
+                          this.viewportBaseHeightDirty = true;
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div class="settings-field">
+                    <div class="hint">
+                      Base viewport size is used as the editor reference frame for 2D composition
+                      and camera scaling.
                     </div>
                   </div>
                 </div>
@@ -149,8 +201,12 @@ export class ProjectSettingsDialog extends ComponentBase {
                     />
                     Enabled
                   </label>
-                  <button class="btn-save" @click=${() => this.onAddAutoload()}>Add Autoload</button>
-                  ${this.autoloadError ? html`<div class="autoload-error">${this.autoloadError}</div>` : ''}
+                  <button class="btn-save" @click=${() => this.onAddAutoload()}>
+                    Add Autoload
+                  </button>
+                  ${this.autoloadError
+                    ? html`<div class="autoload-error">${this.autoloadError}</div>`
+                    : ''}
 
                   <div class="autoload-table">
                     <div class="autoload-row autoload-row--header">
@@ -168,7 +224,10 @@ export class ProjectSettingsDialog extends ComponentBase {
                             type="checkbox"
                             .checked=${entry.enabled}
                             @change=${(e: Event) =>
-                              this.onToggleAutoload(entry.singleton, (e.target as HTMLInputElement).checked)}
+                              this.onToggleAutoload(
+                                entry.singleton,
+                                (e.target as HTMLInputElement).checked
+                              )}
                           />
                           <span>${entry.singleton}</span>
                           <span class="autoload-path">${entry.scriptPath}</span>
@@ -217,13 +276,34 @@ export class ProjectSettingsDialog extends ComponentBase {
   }
 
   private async onSave(): Promise<void> {
+    const parsedViewportBaseWidth = Number(this.viewportBaseWidth);
+    const parsedViewportBaseHeight = Number(this.viewportBaseHeight);
+
     const operation = new UpdateProjectSettingsOperation({
       projectName: this.projectName.trim() || undefined,
       localAbsolutePath: this.localAbsolutePath.trim() || null,
+      viewportBaseWidth: Number.isFinite(parsedViewportBaseWidth)
+        ? Math.max(64, Math.round(parsedViewportBaseWidth))
+        : 1920,
+      viewportBaseHeight: Number.isFinite(parsedViewportBaseHeight)
+        ? Math.max(64, Math.round(parsedViewportBaseHeight))
+        : 1080,
     });
 
     await this.operationService.invokeAndPush(operation);
+    this.viewportBaseWidthDirty = false;
+    this.viewportBaseHeightDirty = false;
     this.projectSettingsService.close();
+  }
+
+  private syncViewportBaseSizeFromManifest(): void {
+    const baseSize = appState.project.manifest?.viewportBaseSize;
+    if (!baseSize) {
+      return;
+    }
+
+    this.viewportBaseWidth = String(baseSize.width);
+    this.viewportBaseHeight = String(baseSize.height);
   }
 
   private async onAddAutoload(): Promise<void> {

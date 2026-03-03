@@ -1,9 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import {
-  parseKeybinding,
-  formatKeybindingForDisplay,
-  evaluateContext,
-} from './keybinding';
+import { parseKeybinding, formatKeybindingForDisplay, evaluateContext } from './keybinding';
 import type { EditorContextState } from '@/state/AppState';
 import { _clearPlatformCache } from '@/fw/platform';
 

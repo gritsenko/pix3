@@ -56,6 +56,8 @@ const LAYER_3D = 0;
 const LAYER_2D = 1;
 const LAYER_GIZMOS = 2;
 const TARGET_DIRECTION_RAY_LENGTH = 500;
+const DEFAULT_VIEWPORT_BASE_WIDTH = 1920;
+const DEFAULT_VIEWPORT_BASE_HEIGHT = 1080;
 
 @injectable()
 export class ViewportRendererService {
@@ -92,10 +94,11 @@ export class ViewportRendererService {
   private sprite3DTexturePaths = new Map<string, string | null>();
   private layout2dVisuals = new Map<string, THREE.Group>();
   private uiControl2DVisuals = new Map<string, THREE.Group>();
+  private baseViewportFrame?: THREE.Group;
   private selection2DOverlay?: Selection2DOverlay;
   private active2DTransform?: Active2DTransform;
   // Hover preview frame for 2D nodes (before selection)
-  private hoverPreview2D?: { nodeId: string; frame: THREE.LineSegments };
+  private hoverPreview2D?: { nodeId: string; frame: THREE.Group };
   private animationId?: number;
   private isPaused = true;
   private isWindowFocused = true;
@@ -319,10 +322,19 @@ export class ViewportRendererService {
       this.toggleGrid();
       this.syncNavigationMode();
       this.syncLighting();
+      this.syncBaseViewportFrame();
       this.updateNodeIconVisibility();
       this.handleFocusPause();
     });
     this.disposers.push(unsubscribeUi);
+
+    const unsubscribeProject = subscribe(appState.project, () => {
+      this.syncBaseViewportFrame();
+      if (this.viewportSize.width > 0 && this.viewportSize.height > 0) {
+        this.resize(this.viewportSize.width, this.viewportSize.height);
+      }
+    });
+    this.disposers.push(unsubscribeProject);
 
     // Window focus handling
     const onFocus = () => {
@@ -349,6 +361,7 @@ export class ViewportRendererService {
 
     this.syncNavigationMode();
     this.syncLighting();
+    this.syncBaseViewportFrame();
 
     // Initial sync
     syncIfActiveSceneChanged();
@@ -673,21 +686,37 @@ export class ViewportRendererService {
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
 
-    // Update orthographic camera to match viewport in physical pixels
-    // 1 world unit = 1 physical pixel, so sprites display at true pixel size
+    const viewportBaseSize = this.getProjectViewportBaseSize();
+    const baseAspect = viewportBaseSize.width / viewportBaseSize.height;
+    const viewportAspect = width / height;
+
+    // Update orthographic camera to project-space viewport base dimensions.
+    // This keeps 2D composition stable regardless of editor viewport pixel size.
     if (this.orthographicCamera) {
-      this.orthographicCamera.left = -pixelWidth / 2;
-      this.orthographicCamera.right = pixelWidth / 2;
-      this.orthographicCamera.top = pixelHeight / 2;
-      this.orthographicCamera.bottom = -pixelHeight / 2;
+      if (viewportAspect >= baseAspect) {
+        const cameraHeight = viewportBaseSize.height;
+        const cameraWidth = cameraHeight * viewportAspect;
+        this.orthographicCamera.left = -cameraWidth / 2;
+        this.orthographicCamera.right = cameraWidth / 2;
+        this.orthographicCamera.top = cameraHeight / 2;
+        this.orthographicCamera.bottom = -cameraHeight / 2;
+      } else {
+        const cameraWidth = viewportBaseSize.width;
+        const cameraHeight = cameraWidth / viewportAspect;
+        this.orthographicCamera.left = -cameraWidth / 2;
+        this.orthographicCamera.right = cameraWidth / 2;
+        this.orthographicCamera.top = cameraHeight / 2;
+        this.orthographicCamera.bottom = -cameraHeight / 2;
+      }
       this.orthographicCamera.updateProjectionMatrix();
     }
 
     // Trigger layout recalculation for root Group2D nodes
-    this.sceneManager.resizeRoot(pixelWidth, pixelHeight, true);
+    this.sceneManager.resizeRoot(viewportBaseSize.width, viewportBaseSize.height, true);
 
     // Sync all 2D visuals after layout recalculation
     this.syncAll2DVisuals();
+    this.syncBaseViewportFrame();
 
     // Trigger a single frame render to ensure the viewport is updated
     // even if rendering is currently paused (e.g. window unfocused).
@@ -821,6 +850,274 @@ export class ViewportRendererService {
     this.renderer.autoClear = true;
   }
 
+  private getProjectViewportBaseSize(): { width: number; height: number } {
+    const width = appState.project.manifest?.viewportBaseSize?.width;
+    const height = appState.project.manifest?.viewportBaseSize?.height;
+
+    return {
+      width:
+        typeof width === 'number' && Number.isFinite(width) && width > 0
+          ? width
+          : DEFAULT_VIEWPORT_BASE_WIDTH,
+      height:
+        typeof height === 'number' && Number.isFinite(height) && height > 0
+          ? height
+          : DEFAULT_VIEWPORT_BASE_HEIGHT,
+    };
+  }
+
+  private getCrisp2DPosition(position: THREE.Vector3): { x: number; y: number; z: number } {
+    return {
+      x: Math.round(position.x),
+      y: Math.round(position.y),
+      z: position.z,
+    };
+  }
+
+  private apply2DVisualTransform(node: Node2D, visualRoot: THREE.Group): void {
+    const crispPosition = this.getCrisp2DPosition(node.position);
+    visualRoot.position.set(crispPosition.x, crispPosition.y, crispPosition.z);
+    visualRoot.rotation.copy(node.rotation);
+    visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+    visualRoot.visible = node.visible;
+  }
+
+  private getFrameThicknessWorldPx(zoom: number): number {
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const safeZoom = Math.max(0.0001, zoom);
+    return dpr / safeZoom;
+  }
+
+  private updateRectFrameEdges(
+    frame: THREE.Group,
+    width: number,
+    height: number,
+    thickness: number
+  ): void {
+    frame.traverse(child => {
+      if (!(child instanceof THREE.Mesh)) {
+        return;
+      }
+      const edge = child.userData.edge as 'top' | 'bottom' | 'left' | 'right' | undefined;
+      if (edge === 'top') {
+        child.position.set(0, height / 2 - thickness / 2, 0);
+        child.scale.set(width, thickness, 1);
+      } else if (edge === 'bottom') {
+        child.position.set(0, -height / 2 + thickness / 2, 0);
+        child.scale.set(width, thickness, 1);
+      } else if (edge === 'left') {
+        child.position.set(-width / 2 + thickness / 2, 0, 0);
+        child.scale.set(thickness, height, 1);
+      } else if (edge === 'right') {
+        child.position.set(width / 2 - thickness / 2, 0, 0);
+        child.scale.set(thickness, height, 1);
+      }
+    });
+  }
+
+  private sync2DServiceFrameThickness(): void {
+    const zoom = this.orthographicCamera?.zoom ?? 1;
+    const thickness = this.getFrameThicknessWorldPx(zoom);
+
+    if (this.baseViewportFrame) {
+      const width = this.baseViewportFrame.userData.viewportBaseWidth as number | undefined;
+      const height = this.baseViewportFrame.userData.viewportBaseHeight as number | undefined;
+      if (typeof width === 'number' && typeof height === 'number') {
+        this.updateRectFrameEdges(this.baseViewportFrame, width, height, thickness);
+      }
+    }
+
+    if (this.hoverPreview2D) {
+      const width = this.hoverPreview2D.frame.userData.frameWidth as number | undefined;
+      const height = this.hoverPreview2D.frame.userData.frameHeight as number | undefined;
+      if (typeof width === 'number' && typeof height === 'number') {
+        this.updateRectFrameEdges(this.hoverPreview2D.frame, width, height, thickness);
+      }
+    }
+
+    const safeZoom = Math.max(0.0001, zoom);
+    for (const visualRoot of this.group2DVisuals.values()) {
+      const sizeGroup = visualRoot.userData.sizeGroup as THREE.Group | undefined;
+      if (!sizeGroup) {
+        continue;
+      }
+
+      const nodeWidth = Math.abs(sizeGroup.scale.x);
+      const nodeHeight = Math.abs(sizeGroup.scale.y);
+      const safeWidth = Math.max(1, nodeWidth);
+      const safeHeight = Math.max(1, nodeHeight);
+      const localThicknessX = Math.min(1, thickness / safeWidth);
+      const localThicknessY = Math.min(1, thickness / safeHeight);
+
+      sizeGroup.traverse(child => {
+        if (!(child instanceof THREE.Mesh)) {
+          return;
+        }
+        const edge = child.userData.edge as 'top' | 'bottom' | 'left' | 'right' | undefined;
+        if (edge === 'top') {
+          child.position.set(0, 0.5 - localThicknessY / 2, 0);
+          child.scale.set(1, localThicknessY, 1);
+        } else if (edge === 'bottom') {
+          child.position.set(0, -0.5 + localThicknessY / 2, 0);
+          child.scale.set(1, localThicknessY, 1);
+        } else if (edge === 'left') {
+          child.position.set(-0.5 + localThicknessX / 2, 0, 0);
+          child.scale.set(localThicknessX, 1, 1);
+        } else if (edge === 'right') {
+          child.position.set(0.5 - localThicknessX / 2, 0, 0);
+          child.scale.set(localThicknessX, 1, 1);
+        }
+      });
+    }
+
+    if (this.selection2DOverlay) {
+      this.transformTool2d.updateHandlePositions(this.selection2DOverlay, safeZoom);
+    }
+  }
+
+  private createBaseViewportFrame(width: number, height: number): THREE.Group {
+    const thickness = this.getFrameThicknessWorldPx(1);
+
+    // Create a group to hold all border meshes
+    const frame = new THREE.Group();
+    frame.layers.set(LAYER_2D);
+    frame.renderOrder = 950;
+    frame.userData.isBaseViewportFrame = true;
+
+    // Top border
+    const topGeometry = new THREE.PlaneGeometry(1, 1);
+    const topMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffcf33,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const topBorder = new THREE.Mesh(topGeometry, topMaterial);
+    topBorder.position.set(0, height / 2 - thickness / 2, 0); // Align to top edge
+    topBorder.scale.set(width, thickness, 1);
+    topBorder.layers.set(LAYER_2D);
+    topBorder.renderOrder = 950;
+    topBorder.userData.isBaseViewportFrame = true;
+    topBorder.userData.edge = 'top';
+    frame.add(topBorder);
+
+    // Bottom border
+    const bottomGeometry = new THREE.PlaneGeometry(1, 1);
+    const bottomMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffcf33,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const bottomBorder = new THREE.Mesh(bottomGeometry, bottomMaterial);
+    bottomBorder.position.set(0, -height / 2 + thickness / 2, 0); // Align to bottom edge
+    bottomBorder.scale.set(width, thickness, 1);
+    bottomBorder.layers.set(LAYER_2D);
+    bottomBorder.renderOrder = 950;
+    bottomBorder.userData.isBaseViewportFrame = true;
+    bottomBorder.userData.edge = 'bottom';
+    frame.add(bottomBorder);
+
+    // Left border
+    const leftGeometry = new THREE.PlaneGeometry(1, 1);
+    const leftMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffcf33,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const leftBorder = new THREE.Mesh(leftGeometry, leftMaterial);
+    leftBorder.position.set(-width / 2 + thickness / 2, 0, 0); // Align to left edge
+    leftBorder.scale.set(thickness, height, 1);
+    leftBorder.layers.set(LAYER_2D);
+    leftBorder.renderOrder = 950;
+    leftBorder.userData.isBaseViewportFrame = true;
+    leftBorder.userData.edge = 'left';
+    frame.add(leftBorder);
+
+    // Right border
+    const rightGeometry = new THREE.PlaneGeometry(1, 1);
+    const rightMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffcf33,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const rightBorder = new THREE.Mesh(rightGeometry, rightMaterial);
+    rightBorder.position.set(width / 2 - thickness / 2, 0, 0); // Align to right edge
+    rightBorder.scale.set(thickness, height, 1);
+    rightBorder.layers.set(LAYER_2D);
+    rightBorder.renderOrder = 950;
+    rightBorder.userData.isBaseViewportFrame = true;
+    rightBorder.userData.edge = 'right';
+    frame.add(rightBorder);
+
+    return frame;
+  }
+
+  private syncBaseViewportFrame(): void {
+    if (!this.scene) {
+      return;
+    }
+
+    const viewportBaseSize = this.getProjectViewportBaseSize();
+
+    // Check if rebuild is needed - need to cast userData to access custom properties
+    let needsRebuild = true;
+    if (this.baseViewportFrame) {
+      const userData = this.baseViewportFrame.userData as {
+        viewportBaseWidth?: number;
+        viewportBaseHeight?: number;
+      };
+      needsRebuild =
+        userData.viewportBaseWidth !== viewportBaseSize.width ||
+        userData.viewportBaseHeight !== viewportBaseSize.height;
+    } else {
+      needsRebuild = true;
+    }
+
+    if (needsRebuild) {
+      if (this.baseViewportFrame) {
+        this.scene.remove(this.baseViewportFrame);
+        // Dispose all geometries and materials in the group
+        this.baseViewportFrame.traverse(obj => {
+          if (obj instanceof THREE.Mesh && obj.geometry) {
+            obj.geometry.dispose();
+            if (obj.material instanceof THREE.Material) {
+              obj.material.dispose();
+            }
+          }
+        });
+      }
+
+      this.baseViewportFrame = this.createBaseViewportFrame(
+        viewportBaseSize.width,
+        viewportBaseSize.height
+      );
+
+      // Cast userData to any to set custom properties
+      (this.baseViewportFrame.userData as any).viewportBaseWidth = viewportBaseSize.width;
+      (this.baseViewportFrame.userData as any).viewportBaseHeight = viewportBaseSize.height;
+
+      this.scene.add(this.baseViewportFrame);
+    }
+
+    if (!this.baseViewportFrame) {
+      return;
+    }
+
+    if (this.baseViewportFrame.parent !== this.scene) {
+      this.scene.add(this.baseViewportFrame);
+    }
+
+    this.baseViewportFrame.visible = appState.ui.showLayer2D;
+    this.sync2DServiceFrameThickness();
+  }
+
   /**
    * Sync all Group2D and Sprite2D visuals to match their node state.
    * Called after layout recalculation to update visual positions/sizes.
@@ -835,10 +1132,7 @@ export class ViewportRendererService {
         if (node instanceof Layout2D) {
           const visualRoot = this.layout2dVisuals.get(node.nodeId);
           if (visualRoot) {
-            visualRoot.position.copy(node.position);
-            visualRoot.rotation.copy(node.rotation);
-            visualRoot.scale.set(node.scale.x, node.scale.y, 1);
-            visualRoot.visible = node.visible;
+            this.apply2DVisualTransform(node, visualRoot);
             const borderGroup = visualRoot.userData.borderGroup as THREE.Group | undefined;
             if (borderGroup) {
               borderGroup.visible = node.showViewportOutline;
@@ -849,41 +1143,32 @@ export class ViewportRendererService {
         } else if (node instanceof Group2D) {
           const visualRoot = this.group2DVisuals.get(node.nodeId);
           if (visualRoot) {
-            visualRoot.position.copy(node.position);
-            visualRoot.rotation.copy(node.rotation);
-            visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+            this.apply2DVisualTransform(node, visualRoot);
             const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
             if (sizeGroup) {
               sizeGroup.scale.set(node.width, node.height, 1);
             }
-            visualRoot.visible = node.visible;
             this.apply2DVisualOpacity(node, visualRoot);
           }
         } else if (node instanceof Sprite2D) {
           const visualRoot = this.sprite2DVisuals.get(node.nodeId);
           if (visualRoot) {
-            visualRoot.position.copy(node.position);
-            visualRoot.rotation.copy(node.rotation);
-            visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+            this.apply2DVisualTransform(node, visualRoot);
             const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
             if (sizeGroup) {
               sizeGroup.scale.set(node.width ?? 64, node.height ?? 64, 1);
             }
-            visualRoot.visible = node.visible;
             this.apply2DVisualOpacity(node, visualRoot);
           }
         } else if (node instanceof UIControl2D) {
           const visualRoot = this.uiControl2DVisuals.get(node.nodeId);
           if (visualRoot) {
-            visualRoot.position.copy(node.position);
-            visualRoot.rotation.copy(node.rotation);
-            visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+            this.apply2DVisualTransform(node, visualRoot);
             const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
             if (sizeGroup) {
               const { width, height } = this.getUIControlDimensions(node);
               sizeGroup.scale.set(width, height, 1);
             }
-            visualRoot.visible = node.visible;
             this.apply2DVisualOpacity(node, visualRoot);
           }
         }
@@ -912,13 +1197,10 @@ export class ViewportRendererService {
       return;
     }
 
-    // Scale delta by current zoom level so pan feels consistent at any zoom
-    // We also account for devicePixelRatio because the orthographic camera is sized
-    // to physical pixels (World Units), while WheelEvent deltas are in CSS pixels.
+    // Scale delta by current zoom level so pan feels consistent at any zoom.
     const zoomFactor = this.orthographicCamera.zoom;
-    const dpr = window.devicePixelRatio || 1;
-    const scaledDeltaX = (deltaX * dpr) / zoomFactor;
-    const scaledDeltaY = (deltaY * dpr) / zoomFactor;
+    const scaledDeltaX = deltaX / zoomFactor;
+    const scaledDeltaY = deltaY / zoomFactor;
     const panScale = 0.5;
 
     // Translate both camera position and target so it pans instead of rotating.
@@ -948,6 +1230,7 @@ export class ViewportRendererService {
     const newZoom = Math.max(0.1, this.orthographicCamera.zoom * factor);
     this.orthographicCamera.zoom = newZoom;
     this.orthographicCamera.updateProjectionMatrix();
+    this.sync2DServiceFrameThickness();
 
     // Rescale overlay handles to maintain constant screen-space size.
     if (this.selection2DOverlay) {
@@ -972,6 +1255,7 @@ export class ViewportRendererService {
     const clampedZoom = Math.max(0.1, zoom);
     this.orthographicCamera.zoom = clampedZoom;
     this.orthographicCamera.updateProjectionMatrix();
+    this.sync2DServiceFrameThickness();
 
     // Rescale overlay handles to maintain constant screen-space size.
     if (this.selection2DOverlay) {
@@ -1280,25 +1564,25 @@ export class ViewportRendererService {
       ...this.uiControl2DVisuals.values(),
     ];
 
-    console.debug('[ViewportRenderer] 2D raycast candidates', {
-      count: candidates.length,
-      nodeIds: candidates.map(c => c.userData?.nodeId).filter(Boolean),
-      mouse,
-    });
+    // console.debug('[ViewportRenderer] 2D raycast candidates', {
+    //   count: candidates.length,
+    //   nodeIds: candidates.map(c => c.userData?.nodeId).filter(Boolean),
+    //   mouse,
+    // });
 
     const intersects = raycaster
       .intersectObjects(candidates, true)
       .filter(intersection => this.isVisibleInHierarchy(intersection.object));
-    console.debug(
-      '[ViewportRenderer] 2D raycast intersects',
-      intersects.map(i => ({
-        nodeId: i.object.userData?.nodeId,
-        distance: i.distance,
-        point: i.point,
-      }))
-    );
+    // console.debug(
+    //   '[ViewportRenderer] 2D raycast intersects',
+    //   intersects.map(i => ({
+    //     nodeId: i.object.userData?.nodeId,
+    //     distance: i.distance,
+    //     point: i.point,
+    //   }))
+    // );
     if (!intersects.length) {
-      console.debug('[ViewportRenderer] 2D raycast miss at', { pixelX, pixelY });
+      // console.debug('[ViewportRenderer] 2D raycast miss at', { pixelX, pixelY });
       return null;
     }
 
@@ -1316,9 +1600,8 @@ export class ViewportRendererService {
     }
 
     let bestIntersect = intersects[0];
-    let bestOrder = orderMap.get(
-      (bestIntersect.object.userData?.nodeId as string | undefined) ?? ''
-    ) ?? -1;
+    let bestOrder =
+      orderMap.get((bestIntersect.object.userData?.nodeId as string | undefined) ?? '') ?? -1;
 
     for (let i = 1; i < intersects.length; i++) {
       const nid = (intersects[i].object.userData?.nodeId as string | undefined) ?? '';
@@ -1401,10 +1684,7 @@ export class ViewportRendererService {
     } else if (node instanceof Layout2D) {
       const visualRoot = this.layout2dVisuals.get(node.nodeId);
       if (visualRoot) {
-        visualRoot.position.copy(node.position);
-        visualRoot.rotation.copy(node.rotation);
-        visualRoot.scale.set(node.scale.x, node.scale.y, 1);
-        visualRoot.visible = node.visible;
+        this.apply2DVisualTransform(node, visualRoot);
         const borderGroup = visualRoot.userData.borderGroup as THREE.Group | undefined;
         if (borderGroup) {
           borderGroup.visible = node.showViewportOutline;
@@ -1415,9 +1695,7 @@ export class ViewportRendererService {
     } else if (node instanceof Group2D) {
       const visualRoot = this.group2DVisuals.get(node.nodeId);
       if (visualRoot) {
-        visualRoot.position.copy(node.position);
-        visualRoot.rotation.copy(node.rotation);
-        visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+        this.apply2DVisualTransform(node, visualRoot);
         const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
         if (sizeGroup) {
           sizeGroup.scale.set(node.width, node.height, 1);
@@ -1428,9 +1706,7 @@ export class ViewportRendererService {
     } else if (node instanceof Sprite2D) {
       const visualRoot = this.sprite2DVisuals.get(node.nodeId);
       if (visualRoot) {
-        visualRoot.position.copy(node.position);
-        visualRoot.rotation.copy(node.rotation);
-        visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+        this.apply2DVisualTransform(node, visualRoot);
         const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
         if (sizeGroup) {
           // Use natural dimensions if width/height are undefined (first load)
@@ -1456,15 +1732,12 @@ export class ViewportRendererService {
           }
         }
 
-        visualRoot.visible = node.visible;
         this.apply2DVisualOpacity(node, visualRoot);
       }
     } else if (node instanceof UIControl2D) {
       const visualRoot = this.uiControl2DVisuals.get(node.nodeId);
       if (visualRoot) {
-        visualRoot.position.copy(node.position);
-        visualRoot.rotation.copy(node.rotation);
-        visualRoot.scale.set(node.scale.x, node.scale.y, 1);
+        this.apply2DVisualTransform(node, visualRoot);
 
         const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
         if (sizeGroup) {
@@ -1490,8 +1763,6 @@ export class ViewportRendererService {
 
         this.updateUIControlLabelVisual(visualRoot, node);
         this.apply2DVisualOpacity(node, visualRoot);
-
-        visualRoot.visible = node.visible;
       }
     }
 
@@ -1849,6 +2120,7 @@ export class ViewportRendererService {
       sceneGraph.rootNodes.forEach(node => {
         this.processNodeForRendering(node);
       });
+      this.syncBaseViewportFrame();
       this.buildNodeIcons(sceneGraph.rootNodes);
 
       this.updateSelection();
@@ -1930,29 +2202,7 @@ export class ViewportRendererService {
     // Visual hierarchy:
     // - root group: position/rotation/scale (transform scale)
     // - size group: width/height only (does NOT affect children)
-    // - line: normalized outline
-    const points: THREE.Vector3[] = [
-      new THREE.Vector3(-0.5, -0.5, 0),
-      new THREE.Vector3(0.5, -0.5, 0),
-      new THREE.Vector3(0.5, -0.5, 0),
-      new THREE.Vector3(0.5, 0.5, 0),
-      new THREE.Vector3(0.5, 0.5, 0),
-      new THREE.Vector3(-0.5, 0.5, 0),
-      new THREE.Vector3(-0.5, 0.5, 0),
-      new THREE.Vector3(-0.5, -0.5, 0),
-    ];
-
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    geometry.computeBoundingBox();
-
-    // Create line material with 2D node color
-    const material = new THREE.LineBasicMaterial({
-      color: 0x96cbf6,
-      linewidth: 2,
-      transparent: true,
-      opacity: 1,
-    });
-    material.userData.baseOpacity = 1;
+    // - frame: four meshes representing the border with actual thickness in screen space
 
     const root = new THREE.Group();
     root.position.copy(node.position);
@@ -1965,13 +2215,96 @@ export class ViewportRendererService {
     sizeGroup.scale.set(node.width, node.height, 1);
     sizeGroup.layers.set(LAYER_2D);
 
-    const line = new THREE.LineSegments(geometry, material);
-    line.layers.set(LAYER_2D);
-    line.userData.isGroup2DVisual = true;
-    line.userData.nodeId = node.nodeId;
-    line.userData.lineMaterial = material; // Store reference for color updates
+    // Create four border lines as actual meshes with thickness.
+    // Border mesh lives in normalized space (sizeGroup scales to node width/height),
+    // so convert world-pixel thickness into normalized local units.
+    const thickness = this.getFrameThicknessWorldPx(1);
+    const safeWidth = Math.max(1, Math.abs(node.width));
+    const safeHeight = Math.max(1, Math.abs(node.height));
+    const thicknessX = Math.min(1, thickness / safeWidth);
+    const thicknessY = Math.min(1, thickness / safeHeight);
 
-    sizeGroup.add(line);
+    // Top border
+    const topGeometry = new THREE.PlaneGeometry(1, 1);
+    const topMaterial = new THREE.MeshBasicMaterial({
+      color: 0x96cbf6,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+    });
+    topMaterial.userData.baseOpacity = 1;
+    const topBorder = new THREE.Mesh(topGeometry, topMaterial);
+    topBorder.position.set(0, 0.5 - thicknessY / 2, 0); // Align top edge
+    topBorder.scale.set(1, thicknessY, 1);
+    topBorder.layers.set(LAYER_2D);
+    topBorder.renderOrder = 410;
+    topBorder.userData.isGroup2DVisual = true;
+    topBorder.userData.nodeId = node.nodeId;
+    topBorder.userData.lineMaterial = topMaterial; // Store reference for color updates
+    topBorder.userData.edge = 'top';
+
+    // Bottom border
+    const bottomGeometry = new THREE.PlaneGeometry(1, 1);
+    const bottomMaterial = new THREE.MeshBasicMaterial({
+      color: 0x96cbf6,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+    });
+    bottomMaterial.userData.baseOpacity = 1;
+    const bottomBorder = new THREE.Mesh(bottomGeometry, bottomMaterial);
+    bottomBorder.position.set(0, -0.5 + thicknessY / 2, 0); // Align bottom edge
+    bottomBorder.scale.set(1, thicknessY, 1);
+    bottomBorder.layers.set(LAYER_2D);
+    bottomBorder.renderOrder = 410;
+    bottomBorder.userData.isGroup2DVisual = true;
+    bottomBorder.userData.nodeId = node.nodeId;
+    bottomBorder.userData.lineMaterial = bottomMaterial; // Store reference for color updates
+    bottomBorder.userData.edge = 'bottom';
+
+    // Left border
+    const leftGeometry = new THREE.PlaneGeometry(1, 1);
+    const leftMaterial = new THREE.MeshBasicMaterial({
+      color: 0x96cbf6,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+    });
+    leftMaterial.userData.baseOpacity = 1;
+    const leftBorder = new THREE.Mesh(leftGeometry, leftMaterial);
+    leftBorder.position.set(-0.5 + thicknessX / 2, 0, 0); // Align left edge
+    leftBorder.scale.set(thicknessX, 1, 1);
+    leftBorder.layers.set(LAYER_2D);
+    leftBorder.renderOrder = 410;
+    leftBorder.userData.isGroup2DVisual = true;
+    leftBorder.userData.nodeId = node.nodeId;
+    leftBorder.userData.lineMaterial = leftMaterial; // Store reference for color updates
+    leftBorder.userData.edge = 'left';
+
+    // Right border
+    const rightGeometry = new THREE.PlaneGeometry(1, 1);
+    const rightMaterial = new THREE.MeshBasicMaterial({
+      color: 0x96cbf6,
+      transparent: true,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
+    });
+    rightMaterial.userData.baseOpacity = 1;
+    const rightBorder = new THREE.Mesh(rightGeometry, rightMaterial);
+    rightBorder.position.set(0.5 - thicknessX / 2, 0, 0); // Align right edge
+    rightBorder.scale.set(thicknessX, 1, 1);
+    rightBorder.layers.set(LAYER_2D);
+    rightBorder.renderOrder = 410;
+    rightBorder.userData.isGroup2DVisual = true;
+    rightBorder.userData.nodeId = node.nodeId;
+    rightBorder.userData.lineMaterial = rightMaterial; // Store reference for color updates
+    rightBorder.userData.edge = 'right';
+
+    sizeGroup.add(topBorder, bottomBorder, leftBorder, rightBorder);
     root.add(sizeGroup);
 
     // Keep references for updates
@@ -2002,7 +2335,9 @@ export class ViewportRendererService {
       color: 0x00ffff,
       linewidth: 2,
       transparent: true,
-      opacity: 1,
+      opacity: 0.95,
+      depthTest: false,
+      depthWrite: false,
     });
     material.userData.baseOpacity = 1;
 
@@ -2020,6 +2355,7 @@ export class ViewportRendererService {
 
     const line = new THREE.LineSegments(geometry, material);
     line.layers.set(LAYER_2D);
+    line.renderOrder = 420;
     line.userData.isLayout2DVisual = true;
     line.userData.nodeId = node.nodeId;
 
@@ -3114,68 +3450,13 @@ export class ViewportRendererService {
       return;
     }
 
-    const min = combinedBounds.min;
-    const max = combinedBounds.max;
-    const z = (min.z + max.z) / 2;
-    const midX = (min.x + max.x) / 2;
-    const midY = (min.y + max.y) / 2;
     const center = combinedBounds.getCenter(new THREE.Vector3());
-
-    const framePoints = [
-      new THREE.Vector3(min.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, min.y, z),
-    ];
-    this.selection2DOverlay.frame.geometry.setFromPoints(framePoints);
-
-    // Use fixed rotation handle offset from TransformTool2d for consistency.
-    // Divide by current zoom so the offset stays constant in screen-space pixels.
-    const zoom = this.orthographicCamera?.zoom ?? 1;
-    const rotationOffset = this.transformTool2d.getRotationHandleOffset() / zoom;
-
-    const handlePositions: Record<string, THREE.Vector3> = {
-      'scale-nw': new THREE.Vector3(min.x, max.y, z),
-      'scale-n': new THREE.Vector3(midX, max.y, z),
-      'scale-ne': new THREE.Vector3(max.x, max.y, z),
-      'scale-e': new THREE.Vector3(max.x, midY, z),
-      'scale-se': new THREE.Vector3(max.x, min.y, z),
-      'scale-s': new THREE.Vector3(midX, min.y, z),
-      'scale-sw': new THREE.Vector3(min.x, min.y, z),
-      'scale-w': new THREE.Vector3(min.x, midY, z),
-      rotate: new THREE.Vector3(midX, max.y + rotationOffset, z),
-    };
-
-    for (const handle of this.selection2DOverlay.handles) {
-      const type = handle.userData?.handleType as string | undefined;
-      // The rotate connector line geometry is defined in world-space points; don't also translate the Line.
-      if (type && handlePositions[type] && !(handle instanceof THREE.Line)) {
-        handle.position.copy(handlePositions[type]);
-      }
-      if (type === 'rotate' && handle instanceof THREE.Line) {
-        const lineGeom = new THREE.BufferGeometry().setFromPoints([
-          new THREE.Vector3(midX, max.y, z),
-          handlePositions.rotate,
-        ]);
-        handle.geometry.dispose();
-        handle.geometry = lineGeom;
-        handle.position.set(0, 0, 0);
-      }
-      // Counter-scale handle groups/meshes so they remain a constant size in screen-space pixels.
-      if (handle instanceof THREE.Group || handle instanceof THREE.Mesh) {
-        handle.scale.setScalar(1 / zoom);
-      }
-    }
-
     this.selection2DOverlay.combinedBounds.copy(combinedBounds);
     this.selection2DOverlay.centerWorld.copy(center);
+    this.sync2DServiceFrameThickness();
   }
 
-  private create2DFrame(bounds: THREE.Box3): THREE.LineSegments {
+  private create2DFrame(bounds: THREE.Box3): THREE.Group {
     return this.transformTool2d.createFrame(bounds);
   }
 
@@ -3290,10 +3571,15 @@ export class ViewportRendererService {
 
     if (this.scene && this.hoverPreview2D.frame) {
       this.scene.remove(this.hoverPreview2D.frame);
-      this.hoverPreview2D.frame.geometry.dispose();
-      if (this.hoverPreview2D.frame.material instanceof THREE.Material) {
-        this.hoverPreview2D.frame.material.dispose();
-      }
+      // Dispose all geometries and materials in the group
+      this.hoverPreview2D.frame.traverse(obj => {
+        if (obj instanceof THREE.Mesh && obj.geometry) {
+          obj.geometry.dispose();
+          if (obj.material instanceof THREE.Material) {
+            obj.material.dispose();
+          }
+        }
+      });
     }
 
     this.hoverPreview2D = undefined;
@@ -3303,35 +3589,93 @@ export class ViewportRendererService {
   /**
    * Create a preview frame for hovering over 2D nodes.
    */
-  private create2DHoverPreviewFrame(bounds: THREE.Box3, color: number): THREE.LineSegments {
+  private create2DHoverPreviewFrame(bounds: THREE.Box3, color: number): THREE.Group {
     const min = bounds.min;
     const max = bounds.max;
+    const width = max.x - min.x;
+    const height = max.y - min.y;
+    const centerX = (min.x + max.x) / 2;
+    const centerY = (min.y + max.y) / 2;
     const z = (min.z + max.z) / 2 + 0.1; // Slightly above to prevent z-fighting
 
-    const points = [
-      new THREE.Vector3(min.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, min.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(max.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, max.y, z),
-      new THREE.Vector3(min.x, min.y, z),
-    ];
+    const thickness = this.getFrameThicknessWorldPx(1);
 
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    const material = new THREE.LineBasicMaterial({
-      color,
-      linewidth: 1,
-      depthTest: false,
-      transparent: true,
-      opacity: 0.6,
-    });
-
-    const frame = new THREE.LineSegments(geometry, material);
+    // Create a group to hold all border meshes
+    const frame = new THREE.Group();
+    frame.position.set(centerX, centerY, z);
     frame.userData.isHoverPreview = true;
+    frame.userData.frameWidth = width;
+    frame.userData.frameHeight = height;
     frame.renderOrder = 999; // Just below selection overlay
     frame.layers.set(LAYER_2D);
+
+    // Top border
+    const topGeometry = new THREE.PlaneGeometry(1, 1);
+    const topMaterial = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.6,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const topBorder = new THREE.Mesh(topGeometry, topMaterial);
+    topBorder.position.set(0, height / 2 - thickness / 2, 0); // Align to top edge
+    topBorder.scale.set(width, thickness, 1);
+    topBorder.layers.set(LAYER_2D);
+    topBorder.renderOrder = 999;
+    topBorder.userData.edge = 'top';
+    frame.add(topBorder);
+
+    // Bottom border
+    const bottomGeometry = new THREE.PlaneGeometry(1, 1);
+    const bottomMaterial = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.6,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const bottomBorder = new THREE.Mesh(bottomGeometry, bottomMaterial);
+    bottomBorder.position.set(0, -height / 2 + thickness / 2, 0); // Align to bottom edge
+    bottomBorder.scale.set(width, thickness, 1);
+    bottomBorder.layers.set(LAYER_2D);
+    bottomBorder.renderOrder = 999;
+    bottomBorder.userData.edge = 'bottom';
+    frame.add(bottomBorder);
+
+    // Left border
+    const leftGeometry = new THREE.PlaneGeometry(1, 1);
+    const leftMaterial = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.6,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const leftBorder = new THREE.Mesh(leftGeometry, leftMaterial);
+    leftBorder.position.set(-width / 2 + thickness / 2, 0, 0); // Align to left edge
+    leftBorder.scale.set(thickness, height, 1);
+    leftBorder.layers.set(LAYER_2D);
+    leftBorder.renderOrder = 999;
+    leftBorder.userData.edge = 'left';
+    frame.add(leftBorder);
+
+    // Right border
+    const rightGeometry = new THREE.PlaneGeometry(1, 1);
+    const rightMaterial = new THREE.MeshBasicMaterial({
+      color,
+      transparent: true,
+      opacity: 0.6,
+      depthTest: false,
+      depthWrite: false,
+    });
+    const rightBorder = new THREE.Mesh(rightGeometry, rightMaterial);
+    rightBorder.position.set(width / 2 - thickness / 2, 0, 0); // Align to right edge
+    rightBorder.scale.set(thickness, height, 1);
+    rightBorder.layers.set(LAYER_2D);
+    rightBorder.renderOrder = 999;
+    rightBorder.userData.edge = 'right';
+    frame.add(rightBorder);
 
     return frame;
   }

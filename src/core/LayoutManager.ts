@@ -287,7 +287,7 @@ export class LayoutManagerService {
         shouldAutoFocus,
       });
 
-      // Use 'as any' to bypass strict ComponentItemConfig type definition 
+      // Use 'as any' to bypass strict ComponentItemConfig type definition
       // which might be missing reorderEnabled / popoutEnabled in some versions.
       const itemConfig: any = {
         type: 'component',
@@ -424,8 +424,8 @@ export class LayoutManagerService {
     try {
       const parent = (item as ContentItem & { parent?: unknown }).parent as
         | {
-          setActiveComponentItem?: (it: ComponentItem, focus?: boolean) => void;
-        }
+            setActiveComponentItem?: (it: ComponentItem, focus?: boolean) => void;
+          }
         | undefined;
       if (parent && typeof parent.setActiveComponentItem === 'function') {
         console.log('[LayoutManager] Calling setActiveComponentItem on parent');
@@ -522,9 +522,9 @@ export class LayoutManagerService {
           const item = args[0] as ContentItem | undefined;
           const itemInfo = item as
             | (ContentItem & {
-              componentType?: string;
-              container?: { state?: { tabId?: string } };
-            })
+                componentType?: string;
+                container?: { state?: { tabId?: string } };
+              })
             | undefined;
 
           const componentType = itemInfo?.componentType;
@@ -756,7 +756,8 @@ export class LayoutManagerService {
     ) {
       return nodeInfo.container?.state?.tabId ?? null;
     }
-    const children: ContentItem[] = (nodeInfo as { contentItems?: ContentItem[] }).contentItems ?? [];
+    const children: ContentItem[] =
+      (nodeInfo as { contentItems?: ContentItem[] }).contentItems ?? [];
     for (const child of children) {
       const found = this.findTabIdByTitle(child, title);
       if (found) return found;

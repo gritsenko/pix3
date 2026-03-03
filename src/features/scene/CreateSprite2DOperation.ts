@@ -4,13 +4,9 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { AssetLoader, type Layout2D, type NodeBase, SceneManager, Sprite2D } from '@pix3/runtime';
+import { AssetLoader, type NodeBase, SceneManager, Sprite2D } from '@pix3/runtime';
 import { Vector2 } from 'three';
-import {
-  removeAutoCreatedLayoutIfUnused,
-  resolveDefault2DParent,
-  restoreAutoCreatedLayout,
-} from '@/features/scene/node-placement';
+import { resolve2DParentForCreation } from '@/features/scene/node-placement';
 import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 
@@ -40,7 +36,7 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
   }
 
   async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
+    const { state, container, snapshot } = context;
     const activeSceneId = state.scenes.activeSceneId;
 
     if (!activeSceneId) {
@@ -58,6 +54,7 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
     const nodeId = `sprite2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
     const spriteName = this.params.spriteName || 'Sprite2D';
     const texturePath = this.params.texturePath ?? null;
+    const selectedParentAtInvoke = snapshot.selection.primaryNodeId;
     const textureSize = await this.resolveTextureSize(container, texturePath);
     const initialWidth = this.params.width ?? textureSize?.width;
     const initialHeight = this.params.height ?? textureSize?.height;
@@ -77,20 +74,17 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       node.textureAspectRatio = textureSize.width / textureSize.height;
     }
 
-    const parentNodeId = this.params.parentNodeId ?? null;
-    const parentNode = parentNodeId
-      ? ((sceneGraph.nodeMap.get(parentNodeId) as NodeBase | undefined) ?? null)
-      : null;
-    let autoCreatedLayout: Layout2D | null = null;
-    const targetParent =
-      parentNode ??
-      (() => {
-        const result = resolveDefault2DParent(sceneGraph);
-        autoCreatedLayout = result.createdLayout;
-        return result.parent;
-      })();
+    const targetParent = resolve2DParentForCreation(
+      sceneGraph,
+      this.params.parentNodeId ?? null,
+      selectedParentAtInvoke
+    );
 
-    const insertIndex = this.resolveInsertIndex(sceneGraph.rootNodes, targetParent, this.params.insertIndex);
+    const insertIndex = this.resolveInsertIndex(
+      sceneGraph.rootNodes,
+      targetParent,
+      this.params.insertIndex
+    );
     this.insertNode(sceneGraph.rootNodes, node, targetParent, insertIndex);
     sceneGraph.nodeMap.set(node.nodeId, node);
     SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
@@ -105,7 +99,6 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
         undo: () => {
           this.removeNode(sceneGraph.rootNodes, node);
           sceneGraph.nodeMap.delete(node.nodeId);
-          removeAutoCreatedLayoutIfUnused(sceneGraph, autoCreatedLayout);
           SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
           SceneStateUpdater.markSceneDirty(state, activeSceneId);
           SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
@@ -114,7 +107,6 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
         redo: () => {
           this.insertNode(sceneGraph.rootNodes, node, targetParent, insertIndex);
           sceneGraph.nodeMap.set(node.nodeId, node);
-          restoreAutoCreatedLayout(sceneGraph, autoCreatedLayout);
           SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
           SceneStateUpdater.markSceneDirty(state, activeSceneId);
           SceneStateUpdater.selectNode(state, nodeId);
@@ -133,19 +125,18 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
     }
 
     try {
-      const assetLoader = container.getService<AssetLoader>(container.getOrCreateToken(AssetLoader));
+      const assetLoader = container.getService<AssetLoader>(
+        container.getOrCreateToken(AssetLoader)
+      );
       const texture = await assetLoader.loadTexture(texturePath);
-      const image = texture.image as { naturalWidth?: number; naturalHeight?: number; width?: number; height?: number } | undefined;
+      const image = texture.image as
+        | { naturalWidth?: number; naturalHeight?: number; width?: number; height?: number }
+        | undefined;
       const width = image?.naturalWidth ?? image?.width;
       const height = image?.naturalHeight ?? image?.height;
       texture.dispose();
 
-      if (
-        typeof width === 'number' &&
-        width > 0 &&
-        typeof height === 'number' &&
-        height > 0
-      ) {
+      if (typeof width === 'number' && width > 0 && typeof height === 'number' && height > 0) {
         return { width, height };
       }
     } catch {

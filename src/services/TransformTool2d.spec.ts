@@ -177,9 +177,9 @@ describe('TransformTool2d', () => {
       let scaleHandle: THREE.Mesh | undefined;
       if (scaleGroup instanceof THREE.Group) {
         // use fill child as the actual mesh to inspect
-        scaleHandle = scaleGroup.children.find(
-          c => (c as any).userData?.isFill
-        ) as THREE.Mesh | undefined;
+        scaleHandle = scaleGroup.children.find(c => (c as any).userData?.isFill) as
+          | THREE.Mesh
+          | undefined;
       } else if (scaleGroup instanceof THREE.Mesh) {
         scaleHandle = scaleGroup;
       }

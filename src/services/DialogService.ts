@@ -160,7 +160,5 @@ export class DialogService {
 
 export function resolveDialogService(): DialogService {
   const container = ServiceContainer.getInstance();
-  return container.getService(
-    container.getOrCreateToken(DialogService)
-  ) as DialogService;
+  return container.getService(container.getOrCreateToken(DialogService)) as DialogService;
 }

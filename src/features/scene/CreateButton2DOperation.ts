@@ -4,16 +4,13 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import type { Layout2D } from '@pix3/runtime';
 import { Button2D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { Vector2 } from 'three';
 import {
   attachNode,
   detachNode,
-  removeAutoCreatedLayoutIfUnused,
-  resolveDefault2DParent,
-  restoreAutoCreatedLayout,
+  resolve2DParentForCreation,
 } from '@/features/scene/node-placement';
 import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
@@ -67,16 +64,11 @@ export class CreateButton2DOperation implements Operation<OperationInvokeResult>
       height: this.params.height,
     });
 
-    const parentNodeId = this.params.parentNodeId ?? null;
-    const parentNode = parentNodeId ? (sceneGraph.nodeMap.get(parentNodeId) ?? null) : null;
-    let autoCreatedLayout: Layout2D | null = null;
-    const targetParent =
-      parentNode ??
-      (() => {
-        const result = resolveDefault2DParent(sceneGraph);
-        autoCreatedLayout = result.createdLayout;
-        return result.parent;
-      })();
+    const targetParent = resolve2DParentForCreation(
+      sceneGraph,
+      this.params.parentNodeId ?? null,
+      state.selection.primaryNodeId
+    );
 
     attachNode(sceneGraph, node, targetParent);
     SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
@@ -89,14 +81,12 @@ export class CreateButton2DOperation implements Operation<OperationInvokeResult>
         label: `Create ${buttonName}`,
         undo: () => {
           detachNode(sceneGraph, node, targetParent);
-          removeAutoCreatedLayoutIfUnused(sceneGraph, autoCreatedLayout);
           SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
           SceneStateUpdater.markSceneDirty(state, activeSceneId);
           SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
         },
         redo: () => {
           attachNode(sceneGraph, node, targetParent);
-          restoreAutoCreatedLayout(sceneGraph, autoCreatedLayout);
           SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
           SceneStateUpdater.markSceneDirty(state, activeSceneId);
           SceneStateUpdater.selectNode(state, nodeId);

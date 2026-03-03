@@ -7,14 +7,43 @@ export interface AutoloadConfig {
 export interface ProjectManifest {
   version: string;
   autoloads: AutoloadConfig[];
+  viewportBaseSize: {
+    width: number;
+    height: number;
+  };
   metadata?: Record<string, unknown>;
 }
 
 export const DEFAULT_PROJECT_MANIFEST_VERSION = '1.0.0';
+export const DEFAULT_VIEWPORT_BASE_WIDTH = 1920;
+export const DEFAULT_VIEWPORT_BASE_HEIGHT = 1080;
+const MIN_VIEWPORT_BASE_SIZE = 64;
+
+const normalizeViewportBaseSize = (
+  input: unknown
+): {
+  width: number;
+  height: number;
+} => {
+  const record = input && typeof input === 'object' ? (input as Record<string, unknown>) : {};
+  const rawWidth = Number(record.width);
+  const rawHeight = Number(record.height);
+  const width = Number.isFinite(rawWidth) ? Math.round(rawWidth) : DEFAULT_VIEWPORT_BASE_WIDTH;
+  const height = Number.isFinite(rawHeight) ? Math.round(rawHeight) : DEFAULT_VIEWPORT_BASE_HEIGHT;
+
+  return {
+    width: Math.max(MIN_VIEWPORT_BASE_SIZE, width),
+    height: Math.max(MIN_VIEWPORT_BASE_SIZE, height),
+  };
+};
 
 export const createDefaultProjectManifest = (): ProjectManifest => ({
   version: DEFAULT_PROJECT_MANIFEST_VERSION,
   autoloads: [],
+  viewportBaseSize: {
+    width: DEFAULT_VIEWPORT_BASE_WIDTH,
+    height: DEFAULT_VIEWPORT_BASE_HEIGHT,
+  },
   metadata: {},
 });
 
@@ -52,6 +81,7 @@ export const normalizeProjectManifest = (input: unknown): ProjectManifest => {
         ? record.version
         : DEFAULT_PROJECT_MANIFEST_VERSION,
     autoloads,
+    viewportBaseSize: normalizeViewportBaseSize(record.viewportBaseSize),
     metadata:
       record.metadata && typeof record.metadata === 'object'
         ? (record.metadata as Record<string, unknown>)

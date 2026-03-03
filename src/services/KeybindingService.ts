@@ -1,6 +1,6 @@
 /**
  * Centralized keyboard shortcut service.
- * 
+ *
  * Manages keybinding registration, keyboard event matching, and context evaluation.
  * Commands register their keybindings, and the service handles platform-specific
  * formatting and event matching.
@@ -12,16 +12,8 @@ import { getCurrentPlatform } from '@/fw/platform';
 import type { AppState } from '@/state';
 import { appState } from '@/state';
 import type { CommandId } from '@/core/command';
-import type {
-  KeybindingDescriptor,
-  KeybindingContext,
-  Keybinding,
-} from '@/core/keybinding';
-import {
-  parseKeybinding,
-  formatKeybindingForDisplay,
-  evaluateContext,
-} from '@/core/keybinding';
+import type { KeybindingDescriptor, KeybindingContext, Keybinding } from '@/core/keybinding';
+import { parseKeybinding, formatKeybindingForDisplay, evaluateContext } from '@/core/keybinding';
 
 interface RegisteredKeybinding {
   commandId: CommandId;
@@ -31,7 +23,7 @@ interface RegisteredKeybinding {
 
 /**
  * Service for managing keyboard shortcuts across the application.
- * 
+ *
  * Features:
  * - Platform-aware keybinding formatting (⌘ on Mac, Ctrl on Windows/Linux)
  * - Context-sensitive execution ('when' clauses)
@@ -52,7 +44,7 @@ export class KeybindingService {
 
   /**
    * Register a keybinding for a command.
-   * 
+   *
    * @param commandId - Unique command identifier
    * @param descriptor - Abstract keybinding descriptor (e.g., 'Mod+D')
    * @param options - Optional context and repeat prevention settings
@@ -64,10 +56,10 @@ export class KeybindingService {
   ): void {
     try {
       const keybindings = parseKeybinding(descriptor, options);
-      
+
       // Check for conflicts with existing keybindings
       this.detectConflicts(commandId, keybindings);
-      
+
       this.registry.set(commandId, {
         commandId,
         keybindings,
@@ -80,7 +72,7 @@ export class KeybindingService {
 
   /**
    * Unregister a keybinding for a command.
-   * 
+   *
    * @param commandId - Command identifier to unregister
    */
   unregister(commandId: CommandId): void {
@@ -89,7 +81,7 @@ export class KeybindingService {
 
   /**
    * Get the formatted display string for a command's keybinding.
-   * 
+   *
    * @param commandId - Command identifier
    * @returns Formatted shortcut string (e.g., '⌘D' on Mac, 'Ctrl+D' on Windows) or undefined
    */
@@ -98,13 +90,13 @@ export class KeybindingService {
     if (!registered) {
       return undefined;
     }
-    
+
     return formatKeybindingForDisplay(registered.descriptor, this.platform);
   }
 
   /**
    * Handle a keyboard event and find the matching command.
-   * 
+   *
    * @param event - Keyboard event to match
    * @returns Command ID if a matching keybinding is found and context is satisfied, otherwise undefined
    */
@@ -115,7 +107,7 @@ export class KeybindingService {
       target.tagName === 'INPUT' ||
       target.tagName === 'TEXTAREA' ||
       target.contentEditable === 'true';
-    
+
     // Update global input focus state
     if (this.state.editorContext.isInputFocused !== isInputElement) {
       this.state.editorContext.isInputFocused = isInputElement;
@@ -129,7 +121,7 @@ export class KeybindingService {
           if (!evaluateContext(keybinding.when, this.state.editorContext)) {
             continue;
           }
-          
+
           return registered.commandId;
         }
       }
@@ -140,7 +132,7 @@ export class KeybindingService {
 
   /**
    * Check if a keyboard event matches a keybinding.
-   * 
+   *
    * @param event - Keyboard event
    * @param keybinding - Parsed keybinding to match against
    * @returns True if the event matches the keybinding
@@ -163,9 +155,12 @@ export class KeybindingService {
     if (event.code && event.code === keybinding.key) {
       return true;
     }
-    
+
     // Fallback to event.key for special keys or if code doesn't match
-    if (keybinding.keyFallback && event.key.toLowerCase() === keybinding.keyFallback.toLowerCase()) {
+    if (
+      keybinding.keyFallback &&
+      event.key.toLowerCase() === keybinding.keyFallback.toLowerCase()
+    ) {
       return true;
     }
 
@@ -174,7 +169,7 @@ export class KeybindingService {
 
   /**
    * Detect conflicts with existing keybindings and warn in console.
-   * 
+   *
    * @param commandId - Command being registered
    * @param keybindings - Keybindings to check for conflicts
    */
@@ -189,10 +184,10 @@ export class KeybindingService {
           if (this.bindingsConflict(newBinding, existingBinding)) {
             console.warn(
               `Keybinding conflict detected: ${commandId} and ${existingCommandId} both use ` +
-              `${this.formatBindingForLog(newBinding)}` +
-              (newBinding.when || existingBinding.when
-                ? ` with potentially overlapping contexts`
-                : '')
+                `${this.formatBindingForLog(newBinding)}` +
+                (newBinding.when || existingBinding.when
+                  ? ` with potentially overlapping contexts`
+                  : '')
             );
           }
         }
@@ -202,7 +197,7 @@ export class KeybindingService {
 
   /**
    * Check if two keybindings conflict (same key + modifiers).
-   * 
+   *
    * @param a - First keybinding
    * @param b - Second keybinding
    * @returns True if the keybindings conflict
@@ -220,7 +215,7 @@ export class KeybindingService {
 
   /**
    * Format a keybinding for logging.
-   * 
+   *
    * @param keybinding - Keybinding to format
    * @returns Human-readable string
    */

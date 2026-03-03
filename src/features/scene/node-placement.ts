@@ -1,35 +1,28 @@
 import type { NodeBase } from '@pix3/runtime';
 import type { SceneGraph } from '@pix3/runtime';
-import { Layout2D } from '@pix3/runtime';
+import { Node2D } from '@pix3/runtime';
 import { Node3D } from '@pix3/runtime';
 
-export interface Default2DParentResolution {
-  parent: NodeBase;
-  createdLayout: Layout2D | null;
-}
+const isCompatible2DContainer = (node: NodeBase | null): node is NodeBase => {
+  return Boolean(node && node instanceof Node2D && node.isContainer);
+};
 
-export const resolveDefault2DParent = (sceneGraph: SceneGraph): Default2DParentResolution => {
-  const existingLayout = sceneGraph.rootNodes.find(node => node instanceof Layout2D);
-  if (existingLayout) {
-    return {
-      parent: existingLayout,
-      createdLayout: null,
-    };
+export const resolve2DParentForCreation = (
+  sceneGraph: SceneGraph,
+  parentNodeId: string | null,
+  selectedNodeId: string | null
+): NodeBase | null => {
+  const explicitParent = parentNodeId ? (sceneGraph.nodeMap.get(parentNodeId) ?? null) : null;
+  if (isCompatible2DContainer(explicitParent)) {
+    return explicitParent;
   }
 
-  const layoutNodeId = `layout2d-auto-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-  const layout = new Layout2D({
-    id: layoutNodeId,
-    name: 'Layout2D',
-  });
+  const selectedParent = selectedNodeId ? (sceneGraph.nodeMap.get(selectedNodeId) ?? null) : null;
+  if (isCompatible2DContainer(selectedParent)) {
+    return selectedParent;
+  }
 
-  sceneGraph.rootNodes.push(layout);
-  sceneGraph.nodeMap.set(layoutNodeId, layout);
-
-  return {
-    parent: layout,
-    createdLayout: layout,
-  };
+  return null;
 };
 
 export const resolveDefault3DParent = (sceneGraph: SceneGraph): NodeBase | null => {
@@ -60,33 +53,4 @@ export const detachNode = (
     sceneGraph.rootNodes = sceneGraph.rootNodes.filter(rootNode => rootNode.nodeId !== node.nodeId);
   }
   sceneGraph.nodeMap.delete(node.nodeId);
-};
-
-export const removeAutoCreatedLayoutIfUnused = (
-  sceneGraph: SceneGraph,
-  layoutNode: Layout2D | null
-): void => {
-  if (!layoutNode) {
-    return;
-  }
-
-  const rootIndex = sceneGraph.rootNodes.indexOf(layoutNode);
-  if (rootIndex < 0 || layoutNode.children.length > 0) {
-    return;
-  }
-
-  sceneGraph.rootNodes.splice(rootIndex, 1);
-  sceneGraph.nodeMap.delete(layoutNode.nodeId);
-};
-
-export const restoreAutoCreatedLayout = (
-  sceneGraph: SceneGraph,
-  layoutNode: Layout2D | null
-): void => {
-  if (!layoutNode || sceneGraph.nodeMap.has(layoutNode.nodeId)) {
-    return;
-  }
-
-  sceneGraph.rootNodes.push(layoutNode);
-  sceneGraph.nodeMap.set(layoutNode.nodeId, layoutNode);
 };
