@@ -2,6 +2,17 @@ import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
 import { LAYER_3D } from '../constants';
 
+export type ViewportOrientation = 'portrait' | 'landscape';
+
+export interface ViewportInfo {
+  width: number;
+  height: number;
+  orientation: ViewportOrientation;
+  aspect: number;
+}
+
+export type ViewportChangeListener = (info: ViewportInfo) => void;
+
 /**
  * Delegate interface implemented by SceneRunner to expose scene internals
  * without creating circular dependencies.
@@ -41,6 +52,9 @@ export class SceneService {
   private fadeOverlay: HTMLDivElement | null = null;
   private fadeAnimationId: number | null = null;
   private canvas: HTMLCanvasElement | null = null;
+  private viewportWidth = 0;
+  private viewportHeight = 0;
+  private readonly viewportListeners = new Set<ViewportChangeListener>();
 
   /**
    * Called by SceneRunner to provide access to scene internals.
@@ -65,6 +79,7 @@ export class SceneService {
     this.fadeOverlay = null;
     this.canvas = null;
     this.delegate = null;
+    this.viewportListeners.clear();
   }
 
   // ── Camera control ──────────────────────────────────────────────────────────
@@ -103,6 +118,64 @@ export class SceneService {
    */
   getActiveCamera(): Camera3D | null {
     return this.delegate?.getActiveCameraNode() ?? null;
+  }
+
+  // ── Viewport APIs ───────────────────────────────────────────────────────────
+
+  setViewportSize(width: number, height: number): void {
+    const nextWidth = Number.isFinite(width) ? Math.max(0, Math.round(width)) : 0;
+    const nextHeight = Number.isFinite(height) ? Math.max(0, Math.round(height)) : 0;
+
+    if (this.viewportWidth === nextWidth && this.viewportHeight === nextHeight) {
+      return;
+    }
+
+    this.viewportWidth = nextWidth;
+    this.viewportHeight = nextHeight;
+
+    const info = this.getViewportInfo();
+    for (const listener of this.viewportListeners) {
+      listener(info);
+    }
+  }
+
+  getViewportInfo(): ViewportInfo {
+    const dimensions = this.resolveViewportDimensions();
+    const orientation: ViewportOrientation =
+      dimensions.width >= dimensions.height ? 'landscape' : 'portrait';
+
+    return {
+      width: dimensions.width,
+      height: dimensions.height,
+      orientation,
+      aspect: dimensions.height > 0 ? dimensions.width / dimensions.height : 1,
+    };
+  }
+
+  getViewportSize(): { width: number; height: number } {
+    const info = this.getViewportInfo();
+    return { width: info.width, height: info.height };
+  }
+
+  getOrientation(): ViewportOrientation {
+    return this.getViewportInfo().orientation;
+  }
+
+  isPortrait(): boolean {
+    return this.getOrientation() === 'portrait';
+  }
+
+  isLandscape(): boolean {
+    return this.getOrientation() === 'landscape';
+  }
+
+  onViewportChanged(listener: ViewportChangeListener): () => void {
+    this.viewportListeners.add(listener);
+    listener(this.getViewportInfo());
+
+    return () => {
+      this.viewportListeners.delete(listener);
+    };
   }
 
   /**
@@ -233,5 +306,34 @@ export class SceneService {
     };
 
     this.fadeAnimationId = requestAnimationFrame(step);
+  }
+
+  private resolveViewportDimensions(): { width: number; height: number } {
+    if (this.viewportWidth > 0 && this.viewportHeight > 0) {
+      return {
+        width: this.viewportWidth,
+        height: this.viewportHeight,
+      };
+    }
+
+    const canvasWidth = this.canvas?.width ?? 0;
+    const canvasHeight = this.canvas?.height ?? 0;
+    if (canvasWidth > 0 && canvasHeight > 0) {
+      return {
+        width: canvasWidth,
+        height: canvasHeight,
+      };
+    }
+
+    if (typeof window !== 'undefined') {
+      const devicePixelRatio = Number.isFinite(window.devicePixelRatio)
+        ? window.devicePixelRatio
+        : 1;
+      const width = Math.max(0, Math.round(window.innerWidth * devicePixelRatio));
+      const height = Math.max(0, Math.round(window.innerHeight * devicePixelRatio));
+      return { width, height };
+    }
+
+    return { width: 0, height: 0 };
   }
 }

@@ -191,6 +191,7 @@ export class SceneRunner {
     if (this.viewportSize.width !== width || this.viewportSize.height !== height) {
       this.viewportSize.width = width;
       this.viewportSize.height = height;
+      this.sceneService.setViewportSize(width, height);
 
       // Update Layout2D nodes
       if (this.runtimeGraph) {

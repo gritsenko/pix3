@@ -15,6 +15,7 @@ export interface Camera3DProps extends Omit<Node3DProps, 'type'> {
 export class Camera3D extends Node3D {
   readonly camera: Camera;
   private targetDistance = TARGET_DISTANCE;
+  private shakeRafId: number | null = null;
 
   constructor(props: Camera3DProps) {
     super(props, 'Camera3D');
@@ -93,6 +94,46 @@ export class Camera3D extends Node3D {
       this.camera.fov = value;
       this.camera.updateProjectionMatrix();
     }
+  }
+
+  shake(intensity: number = 0.2, duration: number = 0.35): void {
+    if (intensity <= 0 || duration <= 0) {
+      return;
+    }
+
+    this.stopShake();
+    const startTime = performance.now();
+
+    const tick = (now: number) => {
+      const elapsed = (now - startTime) / 1000;
+      const progress = Math.min(1, elapsed / duration);
+
+      if (progress >= 1) {
+        this.stopShake();
+        return;
+      }
+
+      const damping = 1 - progress;
+      const amount = intensity * damping;
+
+      this.camera.position.set(
+        (Math.random() * 2 - 1) * amount,
+        (Math.random() * 2 - 1) * amount,
+        (Math.random() * 2 - 1) * amount * 0.35,
+      );
+
+      this.shakeRafId = requestAnimationFrame(tick);
+    };
+
+    this.shakeRafId = requestAnimationFrame(tick);
+  }
+
+  private stopShake(): void {
+    if (this.shakeRafId !== null) {
+      cancelAnimationFrame(this.shakeRafId);
+      this.shakeRafId = null;
+    }
+    this.camera.position.set(0, 0, 0);
   }
 
   static override getPropertySchema(): PropertySchema {
