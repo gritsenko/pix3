@@ -1,6 +1,7 @@
 import { Object3D } from 'three';
 import type { PropertySchema } from '../fw/property-schema';
 import type { ScriptComponent, Constructor } from '../core/ScriptComponent';
+import type { SceneService } from '../core/SceneService';
 
 export interface NodeMetadata {
   [key: string]: unknown;
@@ -39,6 +40,9 @@ export class NodeBase extends Object3D {
 
   /** Reference to InputSystem (injected by runtime) */
   _input?: import('../core/InputService').InputService;
+
+  /** Reference to SceneService (injected by runtime) */
+  _scene?: SceneService;
 
   constructor(props: NodeBaseProps) {
     super();
@@ -92,6 +96,26 @@ export class NodeBase extends Object3D {
     }
   }
 
+  get scene(): SceneService | undefined {
+    return this._scene;
+  }
+
+  set scene(service: SceneService | undefined) {
+    this._scene = service;
+
+    // Propagate to children
+    for (const child of this.children) {
+      if (child instanceof NodeBase) {
+        child.scene = service;
+      }
+    }
+
+    // Propagate to components
+    for (const component of this.components) {
+      component.scene = service;
+    }
+  }
+
   get parentNode(): NodeBase | null {
     return this.parent instanceof NodeBase ? this.parent : null;
   }
@@ -103,6 +127,9 @@ export class NodeBase extends Object3D {
     this.add(child);
     if (this._input) {
       child.input = this._input;
+    }
+    if (this._scene) {
+      child.scene = this._scene;
     }
   }
 

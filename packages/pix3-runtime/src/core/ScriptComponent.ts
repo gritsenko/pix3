@@ -7,6 +7,7 @@
 
 import type { PropertySchema } from '../fw/property-schema';
 import type { NodeBase } from '../nodes/NodeBase';
+import type { SceneService } from './SceneService';
 
 /**
  * Type helper for constructors
@@ -72,6 +73,12 @@ export interface ScriptComponent {
    * Injected by the SceneRunner or runtime environment.
    */
   input?: import('./InputService').InputService;
+
+  /**
+   * Access to the Scene Service (camera control, screen fades, etc.).
+   * Injected by the SceneRunner or runtime environment.
+   */
+  scene?: SceneService;
 }
 
 /**
@@ -86,6 +93,7 @@ export abstract class Script implements ScriptComponent {
   config: Record<string, unknown> = {};
   _started: boolean = false;
   input?: import('./InputService').InputService;
+  scene?: SceneService;
 
   constructor(id: string, type: string) {
     this.id = id;

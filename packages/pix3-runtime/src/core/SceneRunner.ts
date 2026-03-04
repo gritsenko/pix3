@@ -10,6 +10,7 @@ import {
 import { SceneManager } from './SceneManager';
 import { RuntimeRenderer } from './RuntimeRenderer';
 import { InputService } from './InputService';
+import { SceneService } from './SceneService';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
 import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
@@ -21,6 +22,7 @@ export class SceneRunner {
   private readonly sceneManager: SceneManager;
   private readonly renderer: RuntimeRenderer;
   private readonly inputService: InputService;
+  private readonly sceneService: SceneService;
   private readonly clock: Clock;
   private animationFrameId: number | null = null;
   private isRunning: boolean = false;
@@ -34,6 +36,7 @@ export class SceneRunner {
     this.sceneManager = sceneManager;
     this.renderer = renderer;
     this.inputService = new InputService();
+    this.sceneService = new SceneService();
     this.clock = new Clock();
     this.scene = new Scene();
     // Default background
@@ -45,6 +48,20 @@ export class SceneRunner {
     this.orthographicCamera.position.z = 100;
     this.orthographicCamera.layers.disableAll();
     this.orthographicCamera.layers.enable(LAYER_2D);
+
+    // Wire SceneService delegate
+    const runner = this;
+    this.sceneService.setDelegate({
+      getActiveCameraNode(): Camera3D | null {
+        return runner.activeCamera;
+      },
+      setActiveCameraNode(camera: Camera3D | null): void {
+        runner.activeCamera = camera;
+      },
+      findNodeById(id: string): NodeBase | null {
+        return runner.findNodeById(id);
+      },
+    });
   }
 
   /**
@@ -61,6 +78,9 @@ export class SceneRunner {
     }
 
     this.stop();
+
+    // Ensure fade overlay is positioned over the correct canvas
+    this.sceneService.attachCanvas(this.renderer.domElement);
 
     // Setup scene
     this.scene.clear();
@@ -79,6 +99,8 @@ export class SceneRunner {
     for (const node of this.runtimeGraph.rootNodes) {
       // Inject InputService
       node.input = this.inputService;
+      // Inject SceneService
+      node.scene = this.sceneService;
       this.scene.add(node);
     }
 
@@ -266,6 +288,15 @@ export class SceneRunner {
         const cam = this.findActiveCamera(childNodes);
         if (cam) return cam;
       }
+    }
+    return null;
+  }
+
+  private findNodeById(id: string): NodeBase | null {
+    if (!this.runtimeGraph) return null;
+    for (const node of this.runtimeGraph.rootNodes) {
+      const found = node.findById(id);
+      if (found) return found;
     }
     return null;
   }

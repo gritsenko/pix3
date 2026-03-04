@@ -10,6 +10,7 @@ export * from './core/SceneManager';
 export * from './core/SceneRunner';
 export * from './core/RuntimeRenderer';
 export * from './core/InputService';
+export * from './core/SceneService';
 export * from './core/TextureResource';
 
 // Nodes
