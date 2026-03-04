@@ -93,6 +93,19 @@ export class SceneService {
   }
 
   /**
+   * Returns the currently active Camera3D node, or null if none is set.
+   *
+   * Example usage in a script:
+   * ```ts
+   * const cam = this.scene?.getActiveCamera();
+   * if (cam) cam.fov = 75;
+   * ```
+   */
+  getActiveCamera(): Camera3D | null {
+    return this.delegate?.getActiveCameraNode() ?? null;
+  }
+
+  /**
    * Switch to a different camera with a fade-to-black transition.
    * Timeline: fadeOut → (camera switch at black) → fadeIn.
    *

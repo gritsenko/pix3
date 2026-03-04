@@ -73,6 +73,28 @@ export class Camera3D extends Node3D {
     this.camera.rotation.set(0, 0, 0);
   }
 
+  /**
+   * Get the field of view in degrees (perspective cameras only).
+   * Returns 0 for orthographic cameras.
+   */
+  get fov(): number {
+    if (this.camera instanceof PerspectiveCamera) {
+      return this.camera.fov;
+    }
+    return 0;
+  }
+
+  /**
+   * Set the field of view in degrees (perspective cameras only).
+   * Has no effect on orthographic cameras.
+   */
+  set fov(value: number) {
+    if (this.camera instanceof PerspectiveCamera) {
+      this.camera.fov = value;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
   static override getPropertySchema(): PropertySchema {
     const base = super.getPropertySchema();
 
