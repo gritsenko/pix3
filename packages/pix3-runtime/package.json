@@ -14,10 +14,11 @@
     "build": "tsc"
   },
   "dependencies": {
-    "three": "^0.160.0",
+    "three": "^0.183.2",
     "yaml": "^2.3.4"
   },
   "devDependencies": {
+    "@types/three": "^0.183.1",
     "typescript": "^5.2.2"
   }
 }

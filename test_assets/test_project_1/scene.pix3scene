@@ -57,23 +57,19 @@ root:
         type: Particles3D
         name: Particles3D
         properties:
-          transform:
-            position: [1.3937239225206879, 0, -1.2259128863737991]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
           texture:
             type: texture
             url: res://images/64x64.png
           emitterShape: point
-          emitterRadius: 0.5
+          emitterRadius: 1.42
           emitterBoxSize: [1, 1, 1]
-          particleShape: cube
-          emissionRate: 24
+          particleShape: plane
+          emissionRate: 43
           maxParticles: 512
-          lifetime: 2
-          speed: 2
-          speedSpread: 0.5
-          gravity: [0, 0, 0]
+          lifetime: 0.88
+          speed: 0
+          speedSpread: 0.49
+          gravity: [0, 3.01, 0]
           particleSize: 0.2
           sizeRandomness: 0.2
           startColor: "#ffffff"
@@ -84,22 +80,26 @@ root:
           playing: true
           loop: true
           prewarm: false
-          preview: true
+          preview: false
           simulationSpace: local
+          transform:
+            position: [1.3937239225206879, 0, -1.2259128863737991]
+            rotationEuler: [0, 0, 0]
+            scale: [1, 1, 1]
         children: []
       - id: pointlight-1772748601246-uryl8yw
         type: PointLightNode
         name: Point Light
         properties:
-          transform:
-            position: [2.919661629680196, 2.5107811972543703, 0]
-            rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
           color: "#ffffff"
           intensity: 56
           distance: 0
           decay: 2
           castShadow: true
+          transform:
+            position: [2.919661629680196, 2.5107811972543703, 0]
+            rotationEuler: [0, 0, 0]
+            scale: [1, 1, 1]
         children: []
   - id: layout2d-root
     type: Layout2D

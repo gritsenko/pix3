@@ -16,13 +16,13 @@
     "postinstall": "node -e \"require('fs').copyFileSync('node_modules/esbuild-wasm/esbuild.wasm', 'public/esbuild.wasm')\""
   },
   "dependencies": {
-    "@types/three": "^0.180.0",
+    "@types/three": "^0.183.1",
     "esbuild-wasm": "^0.24.0",
     "feather-icons": "^4.29.2",
     "golden-layout": "^2.6.0",
     "lit": "^3.3.1",
     "reflect-metadata": "^0.2.2",
-    "three": "^0.180.0",
+    "three": "^0.183.2",
     "valtio": "^2.1.8",
     "yaml": "^2.6.0"
   },
