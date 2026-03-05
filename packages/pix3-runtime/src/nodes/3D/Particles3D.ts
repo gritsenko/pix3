@@ -144,7 +144,7 @@ export class Particles3D extends Node3D {
       transparent: true,
       depthWrite: false,
       blending: AdditiveBlending,
-      vertexColors: true,
+      vertexColors: false,
       side: DoubleSide,
     });
     this.configureMaterialForInstanceAlpha();
@@ -261,7 +261,7 @@ export class Particles3D extends Node3D {
   override tick(dt: number): void {
     super.tick(dt);
 
-    if (!this.playing || dt <= 0) {
+    if ((!this.playing && !this.preview) || dt <= 0) {
       return;
     }
 
