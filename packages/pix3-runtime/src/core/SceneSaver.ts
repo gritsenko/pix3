@@ -22,6 +22,7 @@ import { GeometryMesh } from '../nodes/3D/GeometryMesh';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
+import { Particles3D } from '../nodes/3D/Particles3D';
 import type { SceneGraph } from './SceneManager';
 import type { SceneNodeDefinition, InstanceOverrides } from './SceneLoader';
 import { getNodePropertySchema } from '../fw/property-schema-utils';
@@ -42,7 +43,7 @@ interface PrefabMarkerMetadata {
 }
 
 export class SceneSaver {
-  constructor() { }
+  constructor() {}
 
   /**
    * Serialize a scene graph back to YAML format for saving.
@@ -106,21 +107,19 @@ export class SceneSaver {
     yaml = yaml.replace(/pivot:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'pivot: [$1, $2]');
 
     // Replace expanded layout anchor/offset arrays with inline format
+    yaml = yaml.replace(/anchorMin:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'anchorMin: [$1, $2]');
+    yaml = yaml.replace(/anchorMax:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'anchorMax: [$1, $2]');
+    yaml = yaml.replace(/offsetMin:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'offsetMin: [$1, $2]');
+    yaml = yaml.replace(/offsetMax:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'offsetMax: [$1, $2]');
+
+    // Replace expanded particle vectors with inline format
     yaml = yaml.replace(
-      /anchorMin:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
-      'anchorMin: [$1, $2]'
+      /emitterBoxSize:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'emitterBoxSize: [$1, $2, $3]'
     );
     yaml = yaml.replace(
-      /anchorMax:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
-      'anchorMax: [$1, $2]'
-    );
-    yaml = yaml.replace(
-      /offsetMin:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
-      'offsetMin: [$1, $2]'
-    );
-    yaml = yaml.replace(
-      /offsetMax:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
-      'offsetMax: [$1, $2]'
+      /gravity:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g,
+      'gravity: [$1, $2, $3]'
     );
 
     return yaml;
@@ -233,7 +232,9 @@ export class SceneSaver {
     return definition;
   }
 
-  private serializeMetadata(metadata: Record<string, unknown>): Record<string, unknown> | undefined {
+  private serializeMetadata(
+    metadata: Record<string, unknown>
+  ): Record<string, unknown> | undefined {
     const entries = Object.entries(metadata).filter(([key]) => key !== '__pix3Prefab');
     if (entries.length === 0) {
       return undefined;
@@ -308,10 +309,7 @@ export class SceneSaver {
 
       // Default anchors are (0.5, 0.5) - only save if different
       const hasCustomAnchors =
-        anchorMin.x !== 0.5 ||
-        anchorMin.y !== 0.5 ||
-        anchorMax.x !== 0.5 ||
-        anchorMax.y !== 0.5;
+        anchorMin.x !== 0.5 || anchorMin.y !== 0.5 || anchorMax.x !== 0.5 || anchorMax.y !== 0.5;
 
       // Default offsets depend on size, so save if anchors are custom or offsets are non-zero
       const hasCustomOffsets =
@@ -506,6 +504,32 @@ export class SceneSaver {
       props.color = node.color;
       props.billboard = node.billboard;
       props.billboardRoll = node.billboardRoll;
+    } else if (node instanceof Particles3D) {
+      if (node.texture) {
+        props.texture = { ...node.texture };
+      }
+      props.emitterShape = node.emitterShape;
+      props.emitterRadius = node.emitterRadius;
+      props.emitterBoxSize = [node.emitterBoxSize.x, node.emitterBoxSize.y, node.emitterBoxSize.z];
+      props.particleShape = node.particleShape;
+      props.emissionRate = node.emissionRate;
+      props.maxParticles = node.maxParticles;
+      props.lifetime = node.lifetime;
+      props.speed = node.speed;
+      props.speedSpread = node.speedSpread;
+      props.gravity = [node.gravity.x, node.gravity.y, node.gravity.z];
+      props.particleSize = node.particleSize;
+      props.sizeRandomness = node.sizeRandomness;
+      props.startColor = node.startColor;
+      props.endColor = node.endColor;
+      props.startAlpha = node.startAlpha;
+      props.endAlpha = node.endAlpha;
+      props.billboard = node.billboard;
+      props.playing = node.playing;
+      props.loop = node.loop;
+      props.prewarm = node.prewarm;
+      props.preview = node.preview;
+      props.simulationSpace = node.simulationSpace;
     }
 
     return props;

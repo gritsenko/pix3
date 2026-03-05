@@ -571,11 +571,12 @@ export class TextureResourceEditor extends ComponentBase {
   }
 
   protected render() {
-    const fileSizeStr = this.fileSize > 0
-      ? this.fileSize < 1024 * 1024
-        ? `${(this.fileSize / 1024).toFixed(1)} KB`
-        : `${(this.fileSize / (1024 * 1024)).toFixed(1)} MB`
-      : '';
+    const fileSizeStr =
+      this.fileSize > 0
+        ? this.fileSize < 1024 * 1024
+          ? `${(this.fileSize / 1024).toFixed(1)} KB`
+          : `${(this.fileSize / (1024 * 1024)).toFixed(1)} MB`
+        : '';
 
     return html`
       <div class="editor-row">
@@ -591,18 +592,15 @@ export class TextureResourceEditor extends ComponentBase {
         </div>
 
         ${this.previewUrl && (this.originalWidth > 0 || this.fileSize > 0)
-          ? html`
-            <div class="info-column">
+          ? html` <div class="info-column">
               ${this.originalWidth > 0
-                ? html`
-                  <div class="info-item">
+                ? html` <div class="info-item">
                     <span class="info-label">Dim:</span>
                     ${this.originalWidth} × ${this.originalHeight}
                   </div>`
                 : ''}
               ${this.fileSize > 0
-                ? html`
-                  <div class="info-item">
+                ? html` <div class="info-item">
                     <span class="info-label">Size:</span>
                     ${fileSizeStr}
                   </div>`
@@ -664,7 +662,7 @@ export class SizeEditor extends ComponentBase {
   @state()
   private localAspectRatio: number = 1;
 
-  updated(changedProperties: Map<string, any>): void {
+  updated(changedProperties: Map<string, unknown>): void {
     if (changedProperties.has('width') || changedProperties.has('height')) {
       if (this.height > 0) {
         this.localAspectRatio = this.width / this.height;
@@ -896,6 +894,135 @@ export class SizeEditor extends ComponentBase {
   }
 }
 
+@customElement('pix3-slider-number-editor')
+export class SliderNumberEditor extends ComponentBase {
+  protected static useShadowDom = true;
+
+  @property({ type: Number })
+  value: number = 0;
+
+  @property({ type: Number })
+  min: number = 0;
+
+  @property({ type: Number })
+  max: number = 100;
+
+  @property({ type: Number })
+  step: number = 0.01;
+
+  @property({ type: Number })
+  precision: number = 2;
+
+  @property({ type: Boolean })
+  disabled: boolean = false;
+
+  private clamp(v: number): number {
+    const hasFiniteMin = Number.isFinite(this.min);
+    const hasFiniteMax = Number.isFinite(this.max);
+    let result = v;
+
+    if (hasFiniteMin) {
+      result = Math.max(this.min, result);
+    }
+    if (hasFiniteMax) {
+      result = Math.min(this.max, result);
+    }
+    return result;
+  }
+
+  private emitChange(nextValue: number): void {
+    this.dispatchEvent(
+      new CustomEvent('change', {
+        detail: { value: nextValue },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private onSliderInput(event: Event): void {
+    const raw = Number.parseFloat((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(raw)) {
+      return;
+    }
+    this.emitChange(this.clamp(raw));
+  }
+
+  private onNumberInput(event: Event): void {
+    const raw = Number.parseFloat((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(raw)) {
+      return;
+    }
+    this.emitChange(this.clamp(raw));
+  }
+
+  static styles = css`
+    :host {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .slider {
+      flex: 1;
+      accent-color: var(--pix3-accent-color, #ffcf33);
+      min-width: 0;
+    }
+
+    .number-input {
+      width: 5.5rem;
+      background: var(--color-input-bg, #222);
+      color: var(--color-text-primary, #eee);
+      border: 1px solid var(--color-border, #333);
+      border-radius: 0.25rem;
+      padding: 0.25rem 0.45rem;
+      font-size: 0.8rem;
+      box-sizing: border-box;
+      text-align: right;
+    }
+
+    .number-input:focus {
+      outline: none;
+      border-color: var(--color-accent, #4e8df5);
+    }
+
+    .slider:disabled,
+    .number-input:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  `;
+
+  protected render() {
+    const safeStep = Number.isFinite(this.step) && this.step > 0 ? this.step : 0.01;
+    const safeValue = this.clamp(this.value);
+
+    return html`
+      <input
+        class="slider"
+        type="range"
+        .value=${safeValue.toString()}
+        min=${this.min.toString()}
+        max=${this.max.toString()}
+        step=${safeStep.toString()}
+        ?disabled=${this.disabled}
+        @input=${(event: Event) => this.onSliderInput(event)}
+      />
+      <input
+        class="number-input"
+        type="number"
+        .value=${safeValue.toFixed(this.precision)}
+        min=${this.min.toString()}
+        max=${this.max.toString()}
+        step=${safeStep.toString()}
+        ?disabled=${this.disabled}
+        @input=${(event: Event) => this.onNumberInput(event)}
+      />
+    `;
+  }
+}
+
 declare global {
   interface HTMLElementTagNameMap {
     'pix3-vector2-editor': Vector2Editor;
@@ -903,5 +1030,6 @@ declare global {
     'pix3-euler-editor': EulerEditor;
     'pix3-texture-resource-editor': TextureResourceEditor;
     'pix3-size-editor': SizeEditor;
+    'pix3-slider-number-editor': SliderNumberEditor;
   }
 }

@@ -40,6 +40,7 @@ export * from './nodes/3D/GeometryMesh';
 export * from './nodes/3D/MeshInstance';
 export * from './nodes/3D/Sprite3D';
 export * from './nodes/3D/AnimatedSprite3D';
+export * from './nodes/3D/Particles3D';
 export * from './nodes/3D/PointLightNode';
 export * from './nodes/3D/SpotLightNode';
 

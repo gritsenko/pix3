@@ -28,6 +28,7 @@ import { SpotLightNode } from '@pix3/runtime';
 import { Camera3D } from '@pix3/runtime';
 import { MeshInstance } from '@pix3/runtime';
 import { Sprite3D } from '@pix3/runtime';
+import { Particles3D } from '@pix3/runtime';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager, InputService } from '@pix3/runtime';
 import { OperationService } from '@/services/OperationService';
@@ -92,6 +93,7 @@ export class ViewportRendererService {
   private group2DVisuals = new Map<string, THREE.Group>();
   private sprite2DVisuals = new Map<string, THREE.Group>();
   private sprite3DTexturePaths = new Map<string, string | null>();
+  private particles3DTexturePaths = new Map<string, string | null>();
   private layout2dVisuals = new Map<string, THREE.Group>();
   private uiControl2DVisuals = new Map<string, THREE.Group>();
   private baseViewportFrame?: THREE.Group;
@@ -109,6 +111,7 @@ export class ViewportRendererService {
   private nodeIcons = new Map<string, THREE.Sprite>();
   private cameraIconTexture?: THREE.Texture;
   private lampIconTexture?: THREE.Texture;
+  private particlesIconTexture?: THREE.Texture;
   private transformStartStates = new Map<
     string,
     { position: THREE.Vector3; rotation: THREE.Euler; scale: THREE.Vector3 }
@@ -611,18 +614,31 @@ export class ViewportRendererService {
         this.refreshNodeIconMaterials('light');
       });
     }
+    if (!this.particlesIconTexture) {
+      new THREE.TextureLoader().load('/particles.png', texture => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        this.particlesIconTexture = texture;
+        this.refreshNodeIconMaterials('particles');
+      });
+    }
   }
 
-  private refreshNodeIconMaterials(kind: 'camera' | 'light'): void {
+  private refreshNodeIconMaterials(kind: 'camera' | 'light' | 'particles'): void {
     for (const icon of this.nodeIcons.values()) {
-      const iconKind = (icon.userData.iconKind as 'camera' | 'light' | undefined) ?? undefined;
+      const iconKind =
+        (icon.userData.iconKind as 'camera' | 'light' | 'particles' | undefined) ?? undefined;
       if (iconKind !== kind) {
         continue;
       }
 
       if (icon.material instanceof THREE.SpriteMaterial) {
-        icon.material.map =
-          kind === 'camera' ? (this.cameraIconTexture ?? null) : (this.lampIconTexture ?? null);
+        if (kind === 'camera') {
+          icon.material.map = this.cameraIconTexture ?? null;
+        } else if (kind === 'light') {
+          icon.material.map = this.lampIconTexture ?? null;
+        } else {
+          icon.material.map = this.particlesIconTexture ?? null;
+        }
         icon.material.needsUpdate = true;
       }
     }
@@ -776,6 +792,8 @@ export class ViewportRendererService {
     for (const mixer of this.animationMixers.values()) {
       mixer.update(delta);
     }
+
+    this.tickParticlePreview(delta);
 
     // Update controls once before rendering if they exist
     const is2DMode = appState.ui.navigationMode === '2d';
@@ -1681,6 +1699,10 @@ export class ViewportRendererService {
       if (node instanceof Sprite3D) {
         this.syncSprite3DTexture(node);
       }
+
+      if (node instanceof Particles3D) {
+        this.syncParticles3DTexture(node);
+      }
     } else if (node instanceof Layout2D) {
       const visualRoot = this.layout2dVisuals.get(node.nodeId);
       if (visualRoot) {
@@ -2087,6 +2109,7 @@ export class ViewportRendererService {
       }
       this.sprite2DVisuals.clear();
       this.sprite3DTexturePaths.clear();
+      this.particles3DTexturePaths.clear();
 
       for (const visual of this.layout2dVisuals.values()) {
         if (visual.parent) {
@@ -2157,6 +2180,10 @@ export class ViewportRendererService {
 
     if (node instanceof Sprite3D) {
       this.syncSprite3DTexture(node);
+    }
+
+    if (node instanceof Particles3D) {
+      this.syncParticles3DTexture(node);
     }
 
     let current2DVisualRoot = parent2DVisualRoot;
@@ -2399,13 +2426,18 @@ export class ViewportRendererService {
         node instanceof DirectionalLightNode ||
         node instanceof PointLightNode ||
         node instanceof SpotLightNode;
+      const isParticles = node instanceof Particles3D;
 
-      if (!isCamera && !isLight) {
+      if (!isCamera && !isLight && !isParticles) {
         return;
       }
 
       const material = new THREE.SpriteMaterial({
-        map: isCamera ? (this.cameraIconTexture ?? null) : (this.lampIconTexture ?? null),
+        map: isCamera
+          ? (this.cameraIconTexture ?? null)
+          : isLight
+            ? (this.lampIconTexture ?? null)
+            : (this.particlesIconTexture ?? null),
         color: 0xffffff,
         transparent: true,
         depthTest: false,
@@ -2418,7 +2450,7 @@ export class ViewportRendererService {
       icon.layers.set(LAYER_GIZMOS);
       icon.renderOrder = 999;
       icon.userData.nodeId = node.nodeId;
-      icon.userData.iconKind = isCamera ? 'camera' : 'light';
+      icon.userData.iconKind = isCamera ? 'camera' : isLight ? 'light' : 'particles';
       this.nodeIcons.set(node.nodeId, icon);
       this.scene?.add(icon);
     };
@@ -2857,7 +2889,34 @@ export class ViewportRendererService {
       for (const node of nodes) {
         if (node instanceof Sprite3D) {
           node.applyBillboard(cameraQuaternion);
+        } else if (node instanceof Particles3D) {
+          node.applyBillboard(cameraQuaternion);
         }
+        if (node.children.length > 0) {
+          visit(node.children);
+        }
+      }
+    };
+
+    visit(sceneGraph.rootNodes);
+  }
+
+  private tickParticlePreview(dt: number): void {
+    if (dt <= 0 || appState.ui.isPlaying) {
+      return;
+    }
+
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return;
+    }
+
+    const visit = (nodes: NodeBase[]) => {
+      for (const node of nodes) {
+        if (node instanceof Particles3D && node.preview) {
+          node.tick(dt);
+        }
+
         if (node.children.length > 0) {
           visit(node.children);
         }
@@ -2914,6 +2973,61 @@ export class ViewportRendererService {
 
       console.warn(
         '[ViewportRenderer] Skipping Sprite3D texture load for scheme',
+        currentTexturePath
+      );
+    })();
+  }
+
+  private syncParticles3DTexture(node: Particles3D): void {
+    const currentTexturePath = node.texturePath ?? null;
+    const previousTexturePath = this.particles3DTexturePaths.get(node.nodeId) ?? null;
+    if (currentTexturePath === previousTexturePath) {
+      return;
+    }
+
+    this.particles3DTexturePaths.set(node.nodeId, currentTexturePath);
+    if (!currentTexturePath) {
+      node.clearTexture();
+      return;
+    }
+
+    const textureLoader = new THREE.TextureLoader();
+    void (async () => {
+      try {
+        const blob = await this.resourceManager.readBlob(currentTexturePath);
+        const blobUrl = URL.createObjectURL(blob);
+        textureLoader.load(
+          blobUrl,
+          texture => {
+            try {
+              node.setTexture(texture);
+            } finally {
+              URL.revokeObjectURL(blobUrl);
+            }
+          },
+          undefined,
+          () => {
+            URL.revokeObjectURL(blobUrl);
+          }
+        );
+        return;
+      } catch {
+        const schemeMatch = /^([a-z]+[a-z0-9+.-]*):\/\//i.exec(currentTexturePath);
+        const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : '';
+        if (scheme === 'http' || scheme === 'https' || scheme === '') {
+          const texture = textureLoader.load(currentTexturePath, undefined, undefined, () => {
+            console.warn(
+              '[ViewportRenderer] Failed to load Particles3D texture',
+              currentTexturePath
+            );
+          });
+          node.setTexture(texture);
+          return;
+        }
+      }
+
+      console.warn(
+        '[ViewportRenderer] Skipping Particles3D texture load for scheme',
         currentTexturePath
       );
     })();
@@ -4061,6 +4175,7 @@ export class ViewportRendererService {
     }
     this.sprite2DVisuals.clear();
     this.sprite3DTexturePaths.clear();
+    this.particles3DTexturePaths.clear();
 
     for (const visual of this.uiControl2DVisuals.values()) {
       this.disposeObject3D(visual);

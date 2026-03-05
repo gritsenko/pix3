@@ -18,6 +18,7 @@ import { CreateLabel2DCommand } from '@/features/scene/CreateLabel2DCommand';
 import { CreateColorRect2DCommand } from '@/features/scene/CreateColorRect2DCommand';
 import { CreateAnimatedSprite2DCommand } from '@/features/scene/CreateAnimatedSprite2DCommand';
 import { CreateAnimatedSprite3DCommand } from '@/features/scene/CreateAnimatedSprite3DCommand';
+import { CreateParticles3DCommand } from '@/features/scene/CreateParticles3DCommand';
 import { CreateNode3DCommand } from '@/features/scene/CreateNode3DCommand';
 import type { Command } from '@/core/command';
 import { injectable } from '@/fw';
@@ -300,6 +301,18 @@ export class NodeRegistry {
       icon: 'image',
       keywords: ['create', 'animated', 'sprite', '3d', 'image', 'texture', 'billboard'],
       order: 5.1,
+    });
+
+    this.registerNodeType({
+      id: 'particles3d',
+      displayName: 'Particles3D',
+      description: '3D particle emitter with configurable shapes and motion',
+      category: '3D',
+      commandClass: CreateParticles3DCommand,
+      color: '#fe9ebeff',
+      icon: 'sparkles',
+      keywords: ['create', 'particles', '3d', 'vfx', 'emitter', 'effect', 'smoke', 'fire'],
+      order: 5.2,
     });
   }
 

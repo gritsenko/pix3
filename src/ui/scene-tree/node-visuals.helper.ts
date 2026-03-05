@@ -16,6 +16,7 @@ import { DirectionalLightNode } from '@pix3/runtime';
 import { MeshInstance } from '@pix3/runtime';
 import { GeometryMesh } from '@pix3/runtime';
 import { Sprite3D } from '@pix3/runtime';
+import { Particles3D } from '@pix3/runtime';
 
 // Color constants for node types
 const NODE_2D_COLOR = '#96cbf6ff';
@@ -69,6 +70,9 @@ export function getNodeVisuals(node: NodeBase): { color: string; icon: string } 
   }
   if (node instanceof Sprite3D) {
     return { color: NODE_3D_COLOR, icon: 'image' };
+  }
+  if (node instanceof Particles3D) {
+    return { color: NODE_3D_COLOR, icon: 'sparkles' };
   }
   if (node instanceof GeometryMesh) {
     return { color: NODE_3D_COLOR, icon: 'box' };

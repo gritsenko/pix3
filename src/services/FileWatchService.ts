@@ -95,7 +95,7 @@ export class FileWatchService {
 
     this.watchers.set(filePath, intervalId);
 
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.MODE === 'development') {
       console.debug(`[FileWatchService] Started watching: ${filePath}`);
     }
   }
@@ -128,7 +128,7 @@ export class FileWatchService {
       this.fileHandles.delete(filePath);
       this.lastModifiedTimes.delete(filePath);
 
-      if (process.env.NODE_ENV === 'development') {
+      if (import.meta.env.MODE === 'development') {
         console.debug(`[FileWatchService] Stopped watching: ${filePath}`);
       }
     }
@@ -166,7 +166,7 @@ export class FileWatchService {
         // File was modified externally
         this.lastModifiedTimes.set(filePath, currentModifiedTime);
 
-        if (process.env.NODE_ENV === 'development') {
+        if (import.meta.env.MODE === 'development') {
           console.debug(`[FileWatchService] External change detected: ${filePath}`, {
             lastKnownTime,
             currentModifiedTime,

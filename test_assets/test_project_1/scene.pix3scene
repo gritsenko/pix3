@@ -26,17 +26,6 @@ root:
             rotationEuler: [-10, 0, 0]
             scale: [1, 1, 1]
         children: []
-      - id: key-light
-        type: DirectionalLightNode
-        name: Key Light
-        properties:
-          intensity: 1.2
-          color: "#ffffff"
-          transform:
-            position: [5, 8, 3]
-            rotationEuler: [-45, 35, 0]
-            scale: [1, 1, 1]
-        children: []
       - id: demo-box
         type: GeometryMesh
         name: Demo Box
@@ -50,12 +39,6 @@ root:
             position: [0, 0.5, 0]
             rotationEuler: [0, 45, 0]
             scale: [1, 1, 1]
-        components:
-          - id: test_rotate-1769874090897-mtdj91e
-            type: core:TestRotate
-            enabled: true
-            config:
-              rotationSpeed: 1
         children: []
       - id: box-1770498038485-qjs32ot
         type: GeometryMesh
@@ -70,6 +53,54 @@ root:
             type: user:BoxController
             enabled: true
         children: []
+      - id: particles3d-1772748545167-tail6mz
+        type: Particles3D
+        name: Particles3D
+        properties:
+          transform:
+            position: [1.3937239225206879, 0, -1.2259128863737991]
+            rotationEuler: [0, 0, 0]
+            scale: [1, 1, 1]
+          texture:
+            type: texture
+            url: res://images/64x64.png
+          emitterShape: point
+          emitterRadius: 0.5
+          emitterBoxSize: [1, 1, 1]
+          particleShape: cube
+          emissionRate: 24
+          maxParticles: 512
+          lifetime: 2
+          speed: 2
+          speedSpread: 0.5
+          gravity: [0, 0, 0]
+          particleSize: 0.2
+          sizeRandomness: 0.2
+          startColor: "#ffffff"
+          endColor: "#ffd24d"
+          startAlpha: 1
+          endAlpha: 0
+          billboard: true
+          playing: true
+          loop: true
+          prewarm: false
+          preview: true
+          simulationSpace: local
+        children: []
+      - id: pointlight-1772748601246-uryl8yw
+        type: PointLightNode
+        name: Point Light
+        properties:
+          transform:
+            position: [2.919661629680196, 2.5107811972543703, 0]
+            rotationEuler: [0, 0, 0]
+            scale: [1, 1, 1]
+          color: "#ffffff"
+          intensity: 56
+          distance: 0
+          decay: 2
+          castShadow: true
+        children: []
   - id: layout2d-root
     type: Layout2D
     name: 2D Layout
@@ -79,6 +110,7 @@ root:
       resolutionPreset: custom
       showViewportOutline: true
       visible: true
+      scaleMode: scale
       transform:
         position: [0, 0]
         scale: [1, 1]
@@ -98,15 +130,15 @@ root:
         type: Group2D
         name: UI Group
         properties:
-          width: 142.46093749999997
-          height: 143.89062500000003
+          width: 142
+          height: 144
           layout:
             anchorMin: [1, 1]
             anchorMax: [1, 1]
             offsetMin: [-144, -146]
             offsetMax: [-2, -2]
           transform:
-            position: [226.76953125, 226.0546875]
+            position: [227, 226]
             scale: [1, 1]
             rotation: 0
         children:
@@ -114,7 +146,9 @@ root:
             type: Sprite2D
             name: Logo Sprite
             properties:
-              texture: { type: 'texture', url: 'res://images/64x64.png' }
+              texture:
+                type: texture
+                url: res://images/64x64.png
               width: 64
               height: 64
               transform:
@@ -125,7 +159,11 @@ root:
       - id: label2d-1771422490002-wcvk9d9
         type: Label2D
         name: Label2D Loaded
-        properties: {}
+        properties:
+          transform:
+            position: [0, 0]
+            scale: [1, 1]
+            rotation: 0
       - id: label2d-1771422584843-h4umykj
         type: Label2D
         name: Label2D Created
@@ -134,7 +172,6 @@ root:
             position: [-57.09298494654061, 191.0184205540586]
             scale: [1, 1]
             rotation: 0
-        children: []
       - id: button2d-1771422526986-t4o9uis
         type: Button2D
         name: Button2D
@@ -147,7 +184,7 @@ root:
           pressedColor: "#3a3a3a"
           buttonAction: Submit
           transform:
-            position: [9.086070153895335, 79.71881262630518]
+            position: [-128.06474708236027, 246.6021707243736]
             scale: [1, 1]
             rotation: 0
         children: []

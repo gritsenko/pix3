@@ -228,6 +228,15 @@ export class IconService {
   <path d="M4 12H20" stroke="currentColor" stroke-width="1.5"/>
 </svg>`
     );
+
+    this.customIcons.set(
+      'sparkles',
+      `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <path d="M12 3L13.8 8.2L19 10L13.8 11.8L12 17L10.2 11.8L5 10L10.2 8.2L12 3Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+  <path d="M18.5 15L19.4 17.1L21.5 18L19.4 18.9L18.5 21L17.6 18.9L15.5 18L17.6 17.1L18.5 15Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+  <path d="M5.5 14L6.2 15.5L7.7 16.2L6.2 16.9L5.5 18.4L4.8 16.9L3.3 16.2L4.8 15.5L5.5 14Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/>
+</svg>`
+    );
   }
 
   /**

@@ -14,6 +14,7 @@ import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { AnimatedSprite3D } from '../nodes/3D/AnimatedSprite3D';
+import { Particles3D } from '../nodes/3D/Particles3D';
 import { Joystick2D } from '../nodes/2D/UI/Joystick2D';
 import { Button2D } from '../nodes/2D/UI/Button2D';
 import { Slider2D } from '../nodes/2D/UI/Slider2D';
@@ -133,6 +134,33 @@ export interface Sprite3DProperties {
   billboardRoll?: number;
 }
 
+export interface Particles3DProperties {
+  texture?: TextureResourceRef | null;
+  texturePath?: string | null;
+  emitterShape?: 'point' | 'sphere' | 'box';
+  emitterRadius?: number;
+  emitterBoxSize?: [number, number, number] | { x: number; y: number; z: number };
+  particleShape?: 'plane' | 'sphere' | 'cube';
+  emissionRate?: number;
+  maxParticles?: number;
+  lifetime?: number;
+  speed?: number;
+  speedSpread?: number;
+  gravity?: [number, number, number] | { x: number; y: number; z: number };
+  particleSize?: number;
+  sizeRandomness?: number;
+  startColor?: string;
+  endColor?: string;
+  startAlpha?: number;
+  endAlpha?: number;
+  billboard?: boolean;
+  playing?: boolean;
+  loop?: boolean;
+  prewarm?: boolean;
+  preview?: boolean;
+  simulationSpace?: 'local' | 'world';
+}
+
 export interface Node2DProperties {
   position?: Vector2 | [number, number];
   scale?: Vector2 | [number, number];
@@ -171,7 +199,11 @@ export class SceneLoader {
   private readonly scriptRegistry: ScriptRegistry;
   private readonly resourceManager: ResourceManager;
 
-  constructor(assetLoader: AssetLoader, scriptRegistry: ScriptRegistry, resourceManager: ResourceManager) {
+  constructor(
+    assetLoader: AssetLoader,
+    scriptRegistry: ScriptRegistry,
+    resourceManager: ResourceManager
+  ) {
     this.assetLoader = assetLoader;
     this.scriptRegistry = scriptRegistry;
     this.resourceManager = resourceManager;
@@ -324,13 +356,17 @@ export class SceneLoader {
 
     const instancePath = definition.instance;
     if (!instancePath) {
-      throw new SceneValidationError('Instance node is missing an instance path.', [sceneIdentifier]);
+      throw new SceneValidationError('Instance node is missing an instance path.', [
+        sceneIdentifier,
+      ]);
     }
 
     const normalizedInstancePath = this.normalizeInstancePath(instancePath);
     if (instanceStack.includes(normalizedInstancePath)) {
       const cycle = [...instanceStack, normalizedInstancePath].join(' -> ');
-      throw new SceneValidationError(`Instance cycle detected for "${normalizedInstancePath}".`, [cycle]);
+      throw new SceneValidationError(`Instance cycle detected for "${normalizedInstancePath}".`, [
+        cycle,
+      ]);
     }
 
     const nestedStack = [...instanceStack, normalizedInstancePath];
@@ -404,7 +440,11 @@ export class SceneLoader {
     Object.assign(node.metadata, metadata);
   }
 
-  private registerSubtree(index: Map<string, NodeBase>, root: NodeBase, sceneIdentifier: string): void {
+  private registerSubtree(
+    index: Map<string, NodeBase>,
+    root: NodeBase,
+    sceneIdentifier: string
+  ): void {
     const stack: NodeBase[] = [root];
     while (stack.length > 0) {
       const node = stack.pop();
@@ -515,7 +555,10 @@ export class SceneLoader {
     };
   }
 
-  private populateNodeComponents(node: NodeBase, componentDefinitions: ComponentDefinition[]): void {
+  private populateNodeComponents(
+    node: NodeBase,
+    componentDefinitions: ComponentDefinition[]
+  ): void {
     for (const componentDef of componentDefinitions) {
       const componentId = componentDef.id || `${node.nodeId}-${componentDef.type}-${Date.now()}`;
       const component = this.scriptRegistry.createComponent(componentDef.type, componentId);
@@ -572,7 +615,7 @@ export class SceneLoader {
 
     this.walkSubtree(root, node => {
       const marker = this.getPrefabMarker(node);
-      const sourceMap = marker ? remapBySourcePath.get(marker.sourcePath) ?? null : null;
+      const sourceMap = marker ? (remapBySourcePath.get(marker.sourcePath) ?? null) : null;
 
       const schema = getNodePropertySchema(node);
       this.remapPropertiesBySchema(node, schema.properties, sourceMap, remapByEffective);
@@ -582,7 +625,12 @@ export class SceneLoader {
         if (!componentSchema) {
           continue;
         }
-        this.remapPropertiesBySchema(component, componentSchema.properties, sourceMap, remapByEffective);
+        this.remapPropertiesBySchema(
+          component,
+          componentSchema.properties,
+          sourceMap,
+          remapByEffective
+        );
       }
     });
   }
@@ -678,7 +726,10 @@ export class SceneLoader {
     }
   }
 
-  private applyLegacyInstanceRootProperties(node: NodeBase, properties: Record<string, unknown>): void {
+  private applyLegacyInstanceRootProperties(
+    node: NodeBase,
+    properties: Record<string, unknown>
+  ): void {
     if (!properties || Object.keys(properties).length === 0) {
       return;
     }
@@ -810,7 +861,10 @@ export class SceneLoader {
           properties: props,
           position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
           scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
-          rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? ((transform?.rotation ?? props.rotation) as number) : 0,
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
           color: typeof props.color === 'string' ? props.color : undefined,
@@ -821,13 +875,16 @@ export class SceneLoader {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
         const frames = Array.isArray(props.frames) ? props.frames.map(coerceTextureResource) : [];
-        
+
         const sprite = new AnimatedSprite2D({
           ...baseProps,
           properties: props,
           position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
           scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
-          rotation: typeof (transform?.rotation ?? props.rotation) === 'number' ? ((transform?.rotation ?? props.rotation) as number) : 0,
+          rotation:
+            typeof (transform?.rotation ?? props.rotation) === 'number'
+              ? ((transform?.rotation ?? props.rotation) as number)
+              : 0,
           opacity: this.asNumber(props.opacity, undefined),
           frames,
           width: this.asNumber(props.width, undefined),
@@ -845,7 +902,10 @@ export class SceneLoader {
               const texture = await this.assetLoader.loadTexture(frame.url);
               sprite.setTextureForFrame(index, texture);
             } catch (error) {
-              console.warn(`[SceneLoader] Error loading texture for AnimatedSprite2D "${sprite.nodeId}":`, error);
+              console.warn(
+                `[SceneLoader] Error loading texture for AnimatedSprite2D "${sprite.nodeId}":`,
+                error
+              );
             }
           }
         });
@@ -871,7 +931,8 @@ export class SceneLoader {
           texture,
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
-          aspectRatioLocked: typeof props.aspectRatioLocked === 'boolean' ? props.aspectRatioLocked : undefined,
+          aspectRatioLocked:
+            typeof props.aspectRatioLocked === 'boolean' ? props.aspectRatioLocked : undefined,
           anchor: this.readVector2(props.anchor, new Vector2(0.5, 0.5)),
           color: typeof props.color === 'string' ? props.color : undefined,
         });
@@ -881,7 +942,10 @@ export class SceneLoader {
             const texture = await this.assetLoader.loadTexture(texturePath);
             sprite.setTexture(texture);
           } catch (error) {
-            console.warn(`[SceneLoader] Error loading texture for Sprite2D "${sprite.nodeId}":`, error);
+            console.warn(
+              `[SceneLoader] Error loading texture for Sprite2D "${sprite.nodeId}":`,
+              error
+            );
           }
         }
 
@@ -1243,7 +1307,8 @@ export class SceneLoader {
         const props = baseProps.properties as Record<string, unknown>;
         let src = this.asString(props['src']) ?? null;
         const castShadow = typeof props['castShadow'] === 'boolean' ? props['castShadow'] : true;
-        const receiveShadow = typeof props['receiveShadow'] === 'boolean' ? props['receiveShadow'] : true;
+        const receiveShadow =
+          typeof props['receiveShadow'] === 'boolean' ? props['receiveShadow'] : true;
         const initialAnimation = this.asString(props['initialAnimation']) ?? null;
         const isPlaying = typeof props['isPlaying'] === 'boolean' ? props['isPlaying'] : true;
         const isLoop = typeof props['isLoop'] === 'boolean' ? props['isLoop'] : true;
@@ -1298,7 +1363,7 @@ export class SceneLoader {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
         const props = baseProps.properties as Record<string, unknown>;
         const frames = Array.isArray(props.frames) ? props.frames.map(coerceTextureResource) : [];
-        
+
         const sprite = new AnimatedSprite3D({
           ...baseProps,
           properties: parsed.restProps,
@@ -1323,7 +1388,10 @@ export class SceneLoader {
               const texture = await this.assetLoader.loadTexture(frame.url);
               sprite.setTextureForFrame(index, texture);
             } catch (error) {
-              console.warn(`[SceneLoader] Error loading texture for AnimatedSprite3D "${sprite.nodeId}":`, error);
+              console.warn(
+                `[SceneLoader] Error loading texture for AnimatedSprite3D "${sprite.nodeId}":`,
+                error
+              );
             }
           }
         });
@@ -1362,6 +1430,67 @@ export class SceneLoader {
         }
 
         return sprite;
+      }
+      case 'Particles3D': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as Particles3DProperties;
+        const texture = coerceTextureResource(props.texture ?? props.texturePath ?? null);
+        const emitterBoxSize = this.readVector3(props.emitterBoxSize, new Vector3(1, 1, 1));
+        const gravity = this.readVector3(props.gravity, new Vector3(0, 0, 0));
+
+        const particles = new Particles3D({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          texture,
+          emitterShape: props.emitterShape,
+          emitterRadius: this.asNumber(props.emitterRadius, 0.5),
+          emitterBoxSize: {
+            x: emitterBoxSize.x,
+            y: emitterBoxSize.y,
+            z: emitterBoxSize.z,
+          },
+          particleShape: props.particleShape,
+          emissionRate: this.asNumber(props.emissionRate, 24),
+          maxParticles: this.asNumber(props.maxParticles, 512),
+          lifetime: this.asNumber(props.lifetime, 2),
+          speed: this.asNumber(props.speed, 2),
+          speedSpread: this.asNumber(props.speedSpread, 0.5),
+          gravity: {
+            x: gravity.x,
+            y: gravity.y,
+            z: gravity.z,
+          },
+          particleSize: this.asNumber(props.particleSize, 0.2),
+          sizeRandomness: this.asNumber(props.sizeRandomness, 0.2),
+          startColor: this.asString(props.startColor) ?? '#ffffff',
+          endColor: this.asString(props.endColor) ?? '#ffd24d',
+          startAlpha: this.asNumber(props.startAlpha, 1),
+          endAlpha: this.asNumber(props.endAlpha, 0),
+          billboard: typeof props.billboard === 'boolean' ? props.billboard : true,
+          playing: typeof props.playing === 'boolean' ? props.playing : true,
+          loop: typeof props.loop === 'boolean' ? props.loop : true,
+          prewarm: typeof props.prewarm === 'boolean' ? props.prewarm : false,
+          preview: typeof props.preview === 'boolean' ? props.preview : false,
+          simulationSpace: props.simulationSpace === 'world' ? 'world' : 'local',
+        });
+
+        if (particles.texturePath) {
+          try {
+            const textureAsset = await this.assetLoader.loadTexture(particles.texturePath);
+            particles.setTexture(textureAsset);
+          } catch (error) {
+            console.warn(
+              `[SceneLoader] Error loading texture for Particles3D "${particles.nodeId}":`,
+              error
+            );
+          }
+        }
+
+        return particles;
       }
       default:
         return new NodeBase({ ...baseProps, type: definition.type });

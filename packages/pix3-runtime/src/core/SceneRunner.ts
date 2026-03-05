@@ -16,6 +16,7 @@ import { NodeBase } from '../nodes/NodeBase';
 import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { AnimatedSprite3D } from '../nodes/3D/AnimatedSprite3D';
+import { Particles3D } from '../nodes/3D/Particles3D';
 import { LAYER_3D, LAYER_2D } from '../constants';
 
 export class SceneRunner {
@@ -305,7 +306,11 @@ export class SceneRunner {
   private updateBillboardSprites(nodes: NodeBase[], camera: Camera): void {
     const cameraQuaternion = camera.getWorldQuaternion(new Quaternion());
     for (const node of nodes) {
-      if (node instanceof Sprite3D || node instanceof AnimatedSprite3D) {
+      if (
+        node instanceof Sprite3D ||
+        node instanceof AnimatedSprite3D ||
+        node instanceof Particles3D
+      ) {
         node.applyBillboard(cameraQuaternion);
       }
       if (node.children.length > 0) {
