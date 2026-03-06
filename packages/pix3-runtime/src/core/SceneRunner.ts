@@ -32,6 +32,8 @@ export class SceneRunner {
   private activeCamera: Camera3D | null = null;
   private orthographicCamera: OrthographicCamera;
   private viewportSize = { width: 0, height: 0 };
+  /** Adaptive logical camera dimensions computed from viewportBaseSize + viewport aspect. */
+  private logicalCameraSize = { width: 1, height: 1 };
 
   constructor(sceneManager: SceneManager, renderer: RuntimeRenderer) {
     this.sceneManager = sceneManager;
@@ -119,6 +121,11 @@ export class SceneRunner {
       this.activeCamera.camera.layers.enable(LAYER_3D);
     }
 
+    // Reset viewport tracking so render() recomputes logicalCameraSize with
+    // the new scene's Layout2D authored dimensions on the first tick.
+    this.viewportSize = { width: 0, height: 0 };
+    this.logicalCameraSize = { width: 1, height: 1 };
+
     // Initial tick to update transforms before render
     this.updateNodes(0);
 
@@ -185,20 +192,50 @@ export class SceneRunner {
 
   private render(): void {
     const canvas = this.renderer.domElement;
-    const width = canvas.width;
-    const height = canvas.height;
+    // Use CSS (logical) pixel dimensions for display-independent scaling so that
+    // the camera coordinate space is consistent regardless of device pixel ratio.
+    const cssWidth = canvas.clientWidth > 0 ? canvas.clientWidth : canvas.width;
+    const cssHeight = canvas.clientHeight > 0 ? canvas.clientHeight : canvas.height;
 
     // 0. Handle Resizing
-    if (this.viewportSize.width !== width || this.viewportSize.height !== height) {
-      this.viewportSize.width = width;
-      this.viewportSize.height = height;
-      this.sceneService.setViewportSize(width, height);
+    if (this.viewportSize.width !== cssWidth || this.viewportSize.height !== cssHeight) {
+      this.viewportSize.width = cssWidth;
+      this.viewportSize.height = cssHeight;
+      this.sceneService.setViewportSize(cssWidth, cssHeight);
 
-      // Update Layout2D nodes
+      // Compute adaptive logical camera dimensions (Expand / Match-Min mode).
+      // The Layout2D's authored size is the base resolution that must always
+      // fit entirely within the camera view.
+      let cameraWidth = cssWidth;
+      let cameraHeight = cssHeight;
+
+      if (this.runtimeGraph) {
+        const layout2d = this.runtimeGraph.rootNodes.find(
+          (n): n is Layout2D => n instanceof Layout2D
+        );
+        if (layout2d && layout2d.width > 0 && layout2d.height > 0) {
+          const baseW = layout2d.width;
+          const baseH = layout2d.height;
+          const baseAspect = baseW / baseH;
+          const viewportAspect = cssWidth / cssHeight;
+          if (viewportAspect >= baseAspect) {
+            cameraHeight = baseH;
+            cameraWidth = cameraHeight * viewportAspect;
+          } else {
+            cameraWidth = baseW;
+            cameraHeight = cameraWidth / viewportAspect;
+          }
+        }
+      }
+
+      this.logicalCameraSize = { width: cameraWidth, height: cameraHeight };
+
+      // Update Layout2D nodes with the logical camera dimensions so that
+      // anchored children track the visible camera edges.
       if (this.runtimeGraph) {
         for (const node of this.runtimeGraph.rootNodes) {
           if (node instanceof Layout2D) {
-            this.applyLayout2DViewportScaling(node, width, height);
+            this.applyLayout2DViewportScaling(node, cameraWidth, cameraHeight);
           }
         }
       }
@@ -222,7 +259,8 @@ export class SceneRunner {
     }
 
     if (this.activeCamera) {
-      const aspect = width / height;
+      // Use CSS pixel aspect ratio for correct visual perspective.
+      const aspect = cssWidth / cssHeight;
       if (this.activeCamera.camera instanceof PerspectiveCamera) {
         if (this.activeCamera.camera.aspect !== aspect) {
           this.activeCamera.camera.aspect = aspect;
@@ -231,12 +269,11 @@ export class SceneRunner {
       }
     }
 
-    // 2D Camera - Update to match physical pixels 1:1
-    // Note: canvas.width/height are physical pixels (drawingBufferWidth/Height)
-    // We want 0,0 to be center
+    // 2D Camera - use the adaptive logical camera dimensions so the ortho camera
+    // coordinate space matches the authored design resolution with expand-mode scaling.
     if (this.orthographicCamera) {
-      const halfW = width / 2;
-      const halfH = height / 2;
+      const halfW = this.logicalCameraSize.width / 2;
+      const halfH = this.logicalCameraSize.height / 2;
 
       if (
         this.orthographicCamera.left !== -halfW ||

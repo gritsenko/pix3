@@ -706,29 +706,34 @@ export class ViewportRendererService {
     const baseAspect = viewportBaseSize.width / viewportBaseSize.height;
     const viewportAspect = width / height;
 
-    // Update orthographic camera to project-space viewport base dimensions.
-    // This keeps 2D composition stable regardless of editor viewport pixel size.
+    // Compute adaptive logical camera dimensions (Expand / Match-Min mode).
+    // The viewportBaseSize must always fit entirely within the camera view:
+    // if the viewport is wider than the base, expand width; if taller, expand height.
+    let cameraWidth = viewportBaseSize.width;
+    let cameraHeight = viewportBaseSize.height;
+    if (viewportAspect >= baseAspect) {
+      cameraHeight = viewportBaseSize.height;
+      cameraWidth = cameraHeight * viewportAspect;
+    } else {
+      cameraWidth = viewportBaseSize.width;
+      cameraHeight = cameraWidth / viewportAspect;
+    }
+
+    // Update orthographic camera to the adaptive logical camera dimensions.
+    // This keeps 2D composition stable regardless of editor viewport pixel size
+    // while ensuring anchored elements track the visible camera edges.
     if (this.orthographicCamera) {
-      if (viewportAspect >= baseAspect) {
-        const cameraHeight = viewportBaseSize.height;
-        const cameraWidth = cameraHeight * viewportAspect;
-        this.orthographicCamera.left = -cameraWidth / 2;
-        this.orthographicCamera.right = cameraWidth / 2;
-        this.orthographicCamera.top = cameraHeight / 2;
-        this.orthographicCamera.bottom = -cameraHeight / 2;
-      } else {
-        const cameraWidth = viewportBaseSize.width;
-        const cameraHeight = cameraWidth / viewportAspect;
-        this.orthographicCamera.left = -cameraWidth / 2;
-        this.orthographicCamera.right = cameraWidth / 2;
-        this.orthographicCamera.top = cameraHeight / 2;
-        this.orthographicCamera.bottom = -cameraHeight / 2;
-      }
+      this.orthographicCamera.left = -cameraWidth / 2;
+      this.orthographicCamera.right = cameraWidth / 2;
+      this.orthographicCamera.top = cameraHeight / 2;
+      this.orthographicCamera.bottom = -cameraHeight / 2;
       this.orthographicCamera.updateProjectionMatrix();
     }
 
-    // Trigger layout recalculation for root Group2D nodes
-    this.sceneManager.resizeRoot(viewportBaseSize.width, viewportBaseSize.height, true);
+    // Trigger layout recalculation using adaptive camera dimensions so that
+    // anchored Group2D children align to the visible camera edges, not the
+    // fixed authoring canvas.
+    this.sceneManager.resizeRoot(cameraWidth, cameraHeight, true);
 
     // Sync all 2D visuals after layout recalculation
     this.syncAll2DVisuals();

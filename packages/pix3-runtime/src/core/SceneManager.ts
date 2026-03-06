@@ -81,19 +81,27 @@ export class SceneManager {
       layout2dNode.position.set(transform.offsetX, transform.offsetY, 0);
     }
 
-    // When skipLayout2D is true (editor mode), still propagate layout to
-    // Layout2D's Group2D children using the Layout2D's own authored resolution.
-    // This ensures _parentWidth/_parentHeight are cached so anchor-based
-    // layout recalculations work after interactive edits (move, resize, etc.).
+    // When skipLayout2D is true (editor mode), propagate the adaptive camera
+    // dimensions (width/height) to all Group2D children so that anchor-based
+    // layout places elements at the visible camera edges, not at the fixed
+    // authored canvas boundaries.
     if (layout2dNode && skipLayout2D) {
-      layout2dNode.recalculateChildLayouts();
+      layout2dNode.recalculateChildLayouts(width, height);
     }
 
     for (const node of graph.rootNodes) {
       if (node instanceof Group2D) {
-        const layout2dWidth = layout2dNode?.width ?? width;
-        const layout2dHeight = layout2dNode?.height ?? height;
-        node.updateLayout(layout2dWidth, layout2dHeight);
+        if (skipLayout2D) {
+          // Editor mode: use adaptive camera dimensions so root Group2D nodes
+          // also anchor to the visible camera boundary.
+          node.updateLayout(width, height);
+        } else {
+          // Runtime mode (skipLayout2D=false): use Layout2D authored dimensions
+          // since the Layout2D itself is scaled by calculateScaleTransform.
+          const layout2dWidth = layout2dNode?.width ?? width;
+          const layout2dHeight = layout2dNode?.height ?? height;
+          node.updateLayout(layout2dWidth, layout2dHeight);
+        }
       }
     }
   }
