@@ -3,6 +3,7 @@ import { parse as parseYaml } from 'yaml';
 
 import {
   AssetLoader,
+  AudioService,
   ResourceManager,
   SceneLoader,
   SceneSaver,
@@ -37,7 +38,8 @@ function createLoader(files: Record<string, string>): SceneLoader {
   const resources = new InMemoryResourceManager(files);
   const scriptRegistry = new ScriptRegistry();
   registerBuiltInScripts(scriptRegistry);
-  const assetLoader = new AssetLoader(resources);
+  const audioService = new AudioService();
+  const assetLoader = new AssetLoader(resources, audioService);
   return new SceneLoader(assetLoader, scriptRegistry, resources);
 }
 

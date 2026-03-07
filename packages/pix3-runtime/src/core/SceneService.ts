@@ -1,6 +1,8 @@
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
 import { LAYER_3D } from '../constants';
+import type { AudioService } from './AudioService';
+import type { AssetLoader } from './AssetLoader';
 
 export type ViewportOrientation = 'portrait' | 'landscape';
 
@@ -21,6 +23,8 @@ export interface SceneServiceDelegate {
   getActiveCameraNode(): Camera3D | null;
   setActiveCameraNode(camera: Camera3D | null): void;
   findNodeById(id: string): NodeBase | null;
+  getAudioService(): AudioService;
+  getAssetLoader(): AssetLoader;
 }
 
 /**
@@ -118,6 +122,14 @@ export class SceneService {
    */
   getActiveCamera(): Camera3D | null {
     return this.delegate?.getActiveCameraNode() ?? null;
+  }
+
+  getAudioService(): AudioService | null {
+    return this.delegate?.getAudioService() ?? null;
+  }
+
+  getAssetLoader(): AssetLoader | null {
+    return this.delegate?.getAssetLoader() ?? null;
   }
 
   // ── Viewport APIs ───────────────────────────────────────────────────────────
@@ -273,12 +285,7 @@ export class SceneService {
     }
   }
 
-  private animateFade(
-    from: number,
-    to: number,
-    duration: number,
-    onComplete?: () => void
-  ): void {
+  private animateFade(from: number, to: number, duration: number, onComplete?: () => void): void {
     if (!this.fadeOverlay) return;
     const overlay = this.fadeOverlay;
     const durationMs = Math.max(0, duration * 1000);

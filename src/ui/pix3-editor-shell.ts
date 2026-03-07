@@ -21,6 +21,10 @@ import {
   EditorSettingsService,
   type EditorSettingsDialogInstance,
 } from '@/services/EditorSettingsService';
+import {
+  NodeTypePickerService,
+  type NodeTypePickerInstance,
+} from '@/services/NodeTypePickerService';
 import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { AutoloadService } from '@/services/AutoloadService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
@@ -62,6 +66,7 @@ import './shared/pix3-behavior-picker';
 import './shared/pix3-script-creator';
 import './shared/pix3-project-settings-dialog';
 import './shared/pix3-editor-settings-dialog';
+import './shared/pix3-node-type-picker';
 import './shared/pix3-status-bar';
 import './shared/pix3-background';
 import './welcome/pix3-welcome';
@@ -111,6 +116,9 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(EditorSettingsService)
   private readonly editorSettingsService!: EditorSettingsService;
 
+  @inject(NodeTypePickerService)
+  private readonly nodeTypePickerService!: NodeTypePickerService;
+
   @inject(ScriptExecutionService)
   private readonly scriptExecutionService!: ScriptExecutionService;
 
@@ -143,6 +151,9 @@ export class Pix3EditorShell extends ComponentBase {
   @state()
   private activeEditorSettingsDialog: EditorSettingsDialogInstance | null = null;
 
+  @state()
+  private activeNodeTypePicker: NodeTypePickerInstance | null = null;
+
   @property({ type: Boolean, reflect: true, attribute: 'shell-ready' })
   protected shellReady = false;
 
@@ -152,6 +163,7 @@ export class Pix3EditorShell extends ComponentBase {
   private disposeDialogsSubscription?: () => void;
   private disposeProjectSettingsSubscription?: () => void;
   private disposeEditorSettingsSubscription?: () => void;
+  private disposeNodeTypePickerSubscription?: () => void;
   private disposeBehaviorPickerSubscription?: () => void;
   private disposeScriptCreatorSubscription?: () => void;
   private onWelcomeProjectReady?: (e: Event) => void;
@@ -238,6 +250,11 @@ export class Pix3EditorShell extends ComponentBase {
 
     this.disposeEditorSettingsSubscription = this.editorSettingsService.subscribe(dialog => {
       this.activeEditorSettingsDialog = dialog;
+      this.requestUpdate();
+    });
+
+    this.disposeNodeTypePickerSubscription = this.nodeTypePickerService.subscribe(picker => {
+      this.activeNodeTypePicker = picker;
       this.requestUpdate();
     });
 
@@ -366,6 +383,8 @@ export class Pix3EditorShell extends ComponentBase {
     this.disposeProjectSettingsSubscription = undefined;
     this.disposeEditorSettingsSubscription?.();
     this.disposeEditorSettingsSubscription = undefined;
+    this.disposeNodeTypePickerSubscription?.();
+    this.disposeNodeTypePickerSubscription = undefined;
     this.disposeBehaviorPickerSubscription?.();
     this.disposeBehaviorPickerSubscription = undefined;
     this.disposeScriptCreatorSubscription?.();
@@ -524,6 +543,7 @@ export class Pix3EditorShell extends ComponentBase {
         <pix3-status-bar></pix3-status-bar>
         ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
         ${this.renderProjectSettingsHost()} ${this.renderEditorSettingsHost()}
+        ${this.renderNodeTypePickerHost()}
       </div>
     `;
   }
@@ -673,6 +693,44 @@ export class Pix3EditorShell extends ComponentBase {
         <pix3-editor-settings-dialog></pix3-editor-settings-dialog>
       </div>
     `;
+  }
+
+  private renderNodeTypePickerHost() {
+    if (!this.activeNodeTypePicker) {
+      return null;
+    }
+
+    return html`
+      <div
+        class="node-type-picker-host"
+        @node-type-selected=${(e: CustomEvent) => this.onNodeTypeSelected(e)}
+        @node-type-picker-cancelled=${(e: CustomEvent) => this.onNodeTypePickerCancelled(e)}
+      >
+        <pix3-node-type-picker .pickerId=${this.activeNodeTypePicker.id}></pix3-node-type-picker>
+      </div>
+    `;
+  }
+
+  private onNodeTypeSelected(e: CustomEvent): void {
+    const { pickerId, nodeTypeId } = e.detail as {
+      pickerId?: string;
+      nodeTypeId?: string;
+    };
+
+    if (typeof pickerId !== 'string' || typeof nodeTypeId !== 'string') {
+      return;
+    }
+
+    this.nodeTypePickerService.select(pickerId, nodeTypeId);
+  }
+
+  private onNodeTypePickerCancelled(e: CustomEvent): void {
+    const { pickerId } = e.detail as { pickerId?: string };
+    if (typeof pickerId !== 'string') {
+      return;
+    }
+
+    this.nodeTypePickerService.cancel(pickerId);
   }
 
   /**

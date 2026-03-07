@@ -1,6 +1,7 @@
 // Core
 export * from './core/ResourceManager';
 export * from './core/AssetLoader';
+export * from './core/AudioService';
 export * from './core/ScriptRegistry';
 export * from './core/ScriptComponent';
 export * from './core/ProjectManifest';
@@ -17,6 +18,7 @@ export * from './core/TextureResource';
 export * from './nodes/NodeBase';
 export * from './nodes/Node2D';
 export * from './nodes/Node3D';
+export * from './nodes/AudioPlayer';
 
 // 2D Nodes
 export * from './nodes/2D/Sprite2D';
@@ -52,6 +54,7 @@ export * from './behaviors/SineBehavior';
 export * from './behaviors/RadialProgressBehavior';
 export * from './behaviors/PinToNodeBehavior';
 export * from './behaviors/FadeBehavior';
+export * from './behaviors/PlaySoundBehavior';
 
 // Framework
 export * from './fw/property-schema';

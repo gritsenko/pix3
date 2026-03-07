@@ -20,6 +20,7 @@ import { CreateAnimatedSprite2DCommand } from '@/features/scene/CreateAnimatedSp
 import { CreateAnimatedSprite3DCommand } from '@/features/scene/CreateAnimatedSprite3DCommand';
 import { CreateParticles3DCommand } from '@/features/scene/CreateParticles3DCommand';
 import { CreateNode3DCommand } from '@/features/scene/CreateNode3DCommand';
+import { CreateAudioPlayerCommand } from '@/features/scene/CreateAudioPlayerCommand';
 import type { Command } from '@/core/command';
 import { injectable } from '@/fw';
 
@@ -32,7 +33,7 @@ export interface NodeTypeInfo {
   id: string;
   displayName: string;
   description: string;
-  category: '2D' | '3D';
+  category: '2D' | '3D' | 'Audio';
   subcategory?: 'UI';
   commandClass: NodeTypeCommandConstructor;
   color: string;
@@ -314,6 +315,19 @@ export class NodeRegistry {
       keywords: ['create', 'particles', '3d', 'vfx', 'emitter', 'effect', 'smoke', 'fire'],
       order: 5.2,
     });
+
+    // Audio Node Types
+    this.registerNodeType({
+      id: 'audioplayer',
+      displayName: 'AudioPlayer',
+      description: 'Audio playback node for scene and UI sounds',
+      category: 'Audio',
+      commandClass: CreateAudioPlayerCommand,
+      color: '#7fd1b9ff',
+      icon: 'volume-2',
+      keywords: ['create', 'audio', 'sound', 'music', 'sfx', 'player'],
+      order: 1,
+    });
   }
 
   private registerNodeType(nodeType: NodeTypeInfo): void {
@@ -323,10 +337,15 @@ export class NodeRegistry {
   /**
    * Get all node types organized by category
    */
-  public getNodeTypesByCategory(): { '2D': NodeTypeInfo[]; '3D': NodeTypeInfo[] } {
-    const categories: { '2D': NodeTypeInfo[]; '3D': NodeTypeInfo[] } = {
+  public getNodeTypesByCategory(): {
+    '2D': NodeTypeInfo[];
+    '3D': NodeTypeInfo[];
+    Audio: NodeTypeInfo[];
+  } {
+    const categories: { '2D': NodeTypeInfo[]; '3D': NodeTypeInfo[]; Audio: NodeTypeInfo[] } = {
       '2D': [],
       '3D': [],
+      Audio: [],
     };
 
     for (const nodeType of this.nodeTypes.values()) {
@@ -334,7 +353,7 @@ export class NodeRegistry {
     }
 
     // Sort by order within each category
-    for (const category of Object.keys(categories) as Array<'2D' | '3D'>) {
+    for (const category of Object.keys(categories) as Array<'2D' | '3D' | 'Audio'>) {
       categories[category].sort((a: NodeTypeInfo, b: NodeTypeInfo) => a.order - b.order);
     }
 
@@ -374,7 +393,7 @@ export class NodeRegistry {
   /**
    * Get node types for a specific category
    */
-  public getNodeTypesByCategoryId(category: '2D' | '3D'): NodeTypeInfo[] {
+  public getNodeTypesByCategoryId(category: '2D' | '3D' | 'Audio'): NodeTypeInfo[] {
     return this.getAllNodeTypes().filter(nodeType => nodeType.category === category);
   }
 
@@ -399,7 +418,7 @@ export class NodeRegistry {
     label: string;
     icon: string;
     color: string;
-    category: '2D' | '3D';
+    category: '2D' | '3D' | 'Audio';
   }> {
     return this.getAllNodeTypes().map(nodeType => ({
       id: nodeType.id,
@@ -459,6 +478,18 @@ export class NodeRegistry {
         color: nodeType.color,
       })),
     });
+
+    if (categories.Audio.length > 0) {
+      groups.push({
+        label: 'Audio Nodes',
+        items: categories.Audio.map(nodeType => ({
+          id: nodeType.id,
+          label: nodeType.displayName,
+          icon: nodeType.icon,
+          color: nodeType.color,
+        })),
+      });
+    }
 
     return groups;
   }

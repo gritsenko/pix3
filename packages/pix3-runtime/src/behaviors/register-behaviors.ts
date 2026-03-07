@@ -13,6 +13,7 @@ import { PinToNodeBehavior } from './PinToNodeBehavior';
 import { FollowBehavior } from './FollowBehavior';
 import { FadeBehavior } from './FadeBehavior';
 import { RadialProgressBehavior } from './RadialProgressBehavior';
+import { PlaySoundBehavior } from './PlaySoundBehavior';
 
 /**
  * Register all built-in script components
@@ -80,6 +81,15 @@ export function registerBuiltInScripts(registry: ScriptRegistry): void {
     category: 'UI',
     componentClass: RadialProgressBehavior,
     keywords: ['radial', 'progress', 'bar', 'circle', 'mask', 'ui'],
+  });
+
+  registry.registerComponent({
+    id: 'core:PlaySound',
+    displayName: 'Play Sound',
+    description: 'Plays an audio track when a node signal is emitted',
+    category: 'Audio',
+    componentClass: PlaySoundBehavior,
+    keywords: ['audio', 'sound', 'sfx', 'trigger', 'event'],
   });
 
   console.log('[ScriptRegistry] Registered built-in script components');

@@ -2,6 +2,7 @@ import { ServiceContainer, ServiceLifetime } from '@/fw/di';
 import { ResourceManager } from '@/services/ResourceManager';
 import {
   AssetLoader,
+  AudioService,
   InputService,
   SceneLoader,
   SceneManager,
@@ -17,7 +18,10 @@ import {
 class EditorAssetLoader extends AssetLoader {
   constructor() {
     const container = ServiceContainer.getInstance();
-    super(container.getService<ResourceManager>(container.getOrCreateToken(ResourceManager)));
+    super(
+      container.getService<ResourceManager>(container.getOrCreateToken(ResourceManager)),
+      container.getService<AudioService>(container.getOrCreateToken(AudioService))
+    );
   }
 }
 
@@ -51,6 +55,12 @@ class EditorSceneManager extends SceneManager {
 
 export function registerRuntimeServices(): void {
   const container = ServiceContainer.getInstance();
+
+  container.addService(
+    container.getOrCreateToken(AudioService),
+    AudioService,
+    ServiceLifetime.Singleton
+  );
 
   // 0. InputService
   container.addService(

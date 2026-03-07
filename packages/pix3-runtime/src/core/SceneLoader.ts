@@ -22,6 +22,7 @@ import { Bar2D } from '../nodes/2D/UI/Bar2D';
 import { Checkbox2D } from '../nodes/2D/UI/Checkbox2D';
 import { InventorySlot2D } from '../nodes/2D/UI/InventorySlot2D';
 import { Label2D } from '../nodes/2D/UI/Label2D';
+import { AudioPlayer } from '../nodes/AudioPlayer';
 import type { SceneGraph } from './SceneManager';
 
 import { GeometryMesh } from '../nodes/3D/GeometryMesh';
@@ -950,6 +951,16 @@ export class SceneLoader {
         }
 
         return sprite;
+      }
+      case 'AudioPlayer': {
+        const props = baseProps.properties as Record<string, unknown>;
+        return new AudioPlayer({
+          ...baseProps,
+          audioTrack: this.asString(props.audioTrack),
+          autoplay: typeof props.autoplay === 'boolean' ? props.autoplay : undefined,
+          loop: typeof props.loop === 'boolean' ? props.loop : undefined,
+          volume: this.asNumber(props.volume, undefined),
+        });
       }
       case 'Group':
         return new NodeBase({ ...baseProps, type: 'Group' });

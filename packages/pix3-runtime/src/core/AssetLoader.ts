@@ -3,6 +3,7 @@ import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { NodeBase } from '../nodes/NodeBase';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AnimationClip, Texture, TextureLoader } from 'three';
+import { AudioService } from './AudioService';
 
 export interface AssetLoaderResult {
   node: NodeBase;
@@ -15,16 +16,19 @@ export interface AssetLoaderResult {
  * Supported formats:
  * - .glb / .gltf → MeshInstance
  * - .png / .jpg / .jpeg / .webp → used by Sprite2D
- * - (TODO) .mp3 / .ogg → AudioNode
+ * - .mp3 / .ogg / .wav → AudioBuffer
  */
 export class AssetLoader {
   private readonly resources: ResourceManager;
+  private readonly audioService?: AudioService;
   private textureLoader: TextureLoader;
   private readonly textureCache = new Map<string, Texture>();
   private readonly textureLoadInFlight = new Map<string, Promise<Texture>>();
+  private readonly audioLoadInFlight = new Map<string, Promise<AudioBuffer>>();
 
-  constructor(resources: ResourceManager) {
+  constructor(resources: ResourceManager, audioService?: AudioService) {
     this.resources = resources;
+    this.audioService = audioService;
     this.textureLoader = new TextureLoader();
   }
 
@@ -53,16 +57,74 @@ export class AssetLoader {
       case 'webp':
         // For images, we usually want the texture, but if loadAsset is called,
         // we could potentially return a Sprite2D. However, let's just implement loadTexture for now.
-        throw new Error(`[AssetLoader] Generic image node creation not yet implemented. Use loadTexture. Path: ${resourcePath}`);
+        throw new Error(
+          `[AssetLoader] Generic image node creation not yet implemented. Use loadTexture. Path: ${resourcePath}`
+        );
 
       case 'mp3':
       case 'ogg':
       case 'wav':
-        throw new Error(`[AssetLoader] Audio loading not yet implemented: ${resourcePath}`);
+        await this.loadAudio(resourcePath);
+        throw new Error(
+          `[AssetLoader] Audio assets are not node assets. Use loadAudio() instead. Path: ${resourcePath}`
+        );
 
       default:
         throw new Error(`[AssetLoader] Unsupported asset type: ${extension}`);
     }
+  }
+
+  async loadAudio(resourcePath: string): Promise<AudioBuffer> {
+    if (!this.audioService) {
+      throw new Error('[AssetLoader] AudioService is required to decode audio assets.');
+    }
+    const audioService = this.audioService;
+
+    const cached = this.resources.getAudioBuffer(resourcePath);
+    if (cached) {
+      return cached;
+    }
+
+    const inFlight = this.audioLoadInFlight.get(resourcePath);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    console.log(`[AssetLoader] Loading audio: ${resourcePath}`);
+
+    const loadPromise = (async (): Promise<AudioBuffer> => {
+      try {
+        let arrayBuffer: ArrayBuffer;
+        try {
+          const url = this.resources.normalize(resourcePath);
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status} while fetching ${url}`);
+          }
+          arrayBuffer = await response.arrayBuffer();
+        } catch {
+          // Fallback for embedded resources that are not directly fetchable by URL.
+          const blob = await this.resources.readBlob(resourcePath);
+          arrayBuffer = await blob.arrayBuffer();
+        }
+
+        const audioBuffer = await audioService.decodeAudioData(arrayBuffer);
+
+        console.log(`[AssetLoader] Successfully loaded audio: ${resourcePath}`);
+        this.resources.setAudioBuffer(resourcePath, audioBuffer);
+        return audioBuffer;
+      } catch (err) {
+        console.error(`[AssetLoader] Failed to load audio: ${resourcePath}`, err);
+        throw err;
+      }
+    })();
+
+    this.audioLoadInFlight.set(resourcePath, loadPromise);
+    loadPromise.finally(() => {
+      this.audioLoadInFlight.delete(resourcePath);
+    });
+
+    return loadPromise;
   }
 
   /**

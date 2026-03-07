@@ -23,6 +23,7 @@ export type EmbeddedResourceMap = Record<string, EmbeddedResourceEntry>;
 export class ResourceManager {
   private baseUrl: string;
   private readonly embeddedResources: Map<string, EmbeddedResourceEntry>;
+  private audioBuffers = new Map<string, AudioBuffer>();
 
   constructor(baseUrl: string = '/', embeddedResources: EmbeddedResourceMap = {}) {
     this.baseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
@@ -39,18 +40,26 @@ export class ResourceManager {
    */
   normalize(resource: string): string {
     const scheme = this.getScheme(resource);
-    
+
     if (scheme === 'res') {
-        const path = resource.substring(6); // remove res://
-        return this.buildUrl(path);
+      const path = resource.substring(6); // remove res://
+      return this.buildUrl(path);
     }
-    
+
     if (scheme === 'http' || scheme === 'https' || scheme === 'blob' || scheme === 'data') {
-        return resource;
+      return resource;
     }
-    
+
     // Default to relative path from base
     return this.buildUrl(resource);
+  }
+
+  getAudioBuffer(key: string): AudioBuffer | undefined {
+    return this.audioBuffers.get(key);
+  }
+
+  setAudioBuffer(key: string, buffer: AudioBuffer): void {
+    this.audioBuffers.set(key, buffer);
   }
 
   async readText(resource: string): Promise<string> {

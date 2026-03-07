@@ -9,6 +9,7 @@ import type { SceneTreeNode } from './scene-tree-node';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { KeybindingService } from '@/services/KeybindingService';
 import { NodeRegistry } from '@/services/NodeRegistry';
+import { NodeTypePickerService } from '@/services/NodeTypePickerService';
 import { ReparentNodeCommand } from '@/features/scene/ReparentNodeCommand';
 import { CreatePrefabInstanceCommand } from '@/features/scene/CreatePrefabInstanceCommand';
 import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
@@ -24,7 +25,7 @@ import {
 
 import '../shared/pix3-panel';
 import '../shared/pix3-toolbar';
-import '../shared/pix3-dropdown-button';
+import '../shared/pix3-toolbar-button';
 import './scene-tree-node';
 import './scene-tree-panel.ts.css';
 
@@ -64,6 +65,9 @@ export class SceneTreePanel extends ComponentBase {
   @inject(NodeRegistry)
   private readonly nodeRegistry!: NodeRegistry;
 
+  @inject(NodeTypePickerService)
+  private readonly nodeTypePickerService!: NodeTypePickerService;
+
   @state()
   private activeScene: SceneDescriptor | null = this.resolveActiveSceneDescriptor();
 
@@ -101,12 +105,6 @@ export class SceneTreePanel extends ComponentBase {
   private lastNodeDataChangeSignal = appState.scenes.nodeDataChangeSignal;
 
   @state()
-  private createNodeItems: Array<{
-    label: string;
-    items: Array<{ id: string; label: string; icon: string; color: string }>;
-  }> = [];
-
-  @state()
   private contextMenu: {
     nodeId: string;
     x: number;
@@ -139,7 +137,6 @@ export class SceneTreePanel extends ComponentBase {
     super.connectedCallback();
     this.syncSceneState();
     this.syncSelectionState();
-    this.syncCreateNodeItems();
     this.disposeSceneSubscription = subscribe(appState.scenes, () => {
       this.syncSceneState();
     });
@@ -178,12 +175,11 @@ export class SceneTreePanel extends ComponentBase {
       >
         ${activeSceneName ? html`<span slot="subtitle">${activeSceneName}</span>` : null}
         <pix3-toolbar slot="toolbar" label="Scene tree controls">
-          <pix3-dropdown-button
+          <pix3-toolbar-button
             icon="plus-circle"
             aria-label="Create node"
-            .groupedItems=${this.createNodeItems}
-            @item-select=${this.onCreateNode}
-          ></pix3-dropdown-button>
+            @click=${this.onOpenNodeTypePicker}
+          ></pix3-toolbar-button>
         </pix3-toolbar>
         <div
           class="tree-container"
@@ -340,10 +336,6 @@ export class SceneTreePanel extends ComponentBase {
     }
   }
 
-  private syncCreateNodeItems(): void {
-    this.createNodeItems = this.nodeRegistry.getGroupedDropdownItems();
-  }
-
   private syncSelectionState(): void {
     this.selectedNodeIds = [...appState.selection.nodeIds];
     this.primaryNodeId = appState.selection.primaryNodeId;
@@ -456,7 +448,9 @@ export class SceneTreePanel extends ComponentBase {
   }
 
   private scrollNodeIntoView(nodeId: string): boolean {
-    const treeNodeElements = this.querySelectorAll<HTMLElement>('.tree-node__content[data-node-id]');
+    const treeNodeElements = this.querySelectorAll<HTMLElement>(
+      '.tree-node__content[data-node-id]'
+    );
     for (const treeNodeElement of treeNodeElements) {
       if (treeNodeElement.dataset.nodeId !== nodeId) {
         continue;
@@ -499,11 +493,10 @@ export class SceneTreePanel extends ComponentBase {
     this.collapsedNodeIds = next;
   }
 
-  private async onCreateNode(event: CustomEvent): Promise<void> {
-    const { id } = event.detail;
-    const command = this.nodeRegistry.createCommand(id);
+  private async createNodeByType(nodeTypeId: string): Promise<void> {
+    const command = this.nodeRegistry.createCommand(nodeTypeId);
     if (!command) {
-      console.error('[SceneTreePanel] Unknown node type:', id);
+      console.error('[SceneTreePanel] Unknown node type:', nodeTypeId);
       return;
     }
 
@@ -513,6 +506,15 @@ export class SceneTreePanel extends ComponentBase {
       console.error('[SceneTreePanel] Failed to create node:', error);
     }
   }
+
+  private onOpenNodeTypePicker = async (): Promise<void> => {
+    const nodeTypeId = await this.nodeTypePickerService.showPicker();
+    if (!nodeTypeId) {
+      return;
+    }
+
+    await this.createNodeByType(nodeTypeId);
+  };
 
   private async onNodeDrop(event: CustomEvent): Promise<void> {
     const { draggedNodeId, targetNodeId, position } = event.detail;
@@ -658,7 +660,7 @@ export class SceneTreePanel extends ComponentBase {
 
   private isImageResource(resourcePath: string): boolean {
     const normalized = resourcePath.toLowerCase().split('?')[0].split('#')[0];
-    const extension = normalized.includes('.') ? normalized.split('.').pop() ?? '' : '';
+    const extension = normalized.includes('.') ? (normalized.split('.').pop() ?? '') : '';
     return IMAGE_EXTENSIONS.has(extension);
   }
 

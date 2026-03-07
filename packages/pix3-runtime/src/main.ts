@@ -2,6 +2,7 @@ import 'reflect-metadata';
 
 import {
   AssetLoader,
+  AudioService,
   registerBuiltInScripts,
   ResourceManager,
   RuntimeRenderer,
@@ -22,11 +23,12 @@ async function bootstrap(): Promise<void> {
   }
 
   const resourceManager = new ResourceManager('/', embeddedAssets);
+  const audioService = new AudioService();
   const scriptRegistry = new ScriptRegistry();
   registerBuiltInScripts(scriptRegistry);
   registerProjectScripts(scriptRegistry);
 
-  const assetLoader = new AssetLoader(resourceManager);
+  const assetLoader = new AssetLoader(resourceManager, audioService);
   const sceneLoader = new SceneLoader(assetLoader, scriptRegistry, resourceManager);
   const sceneSaver = new SceneSaver();
   const sceneManager = new SceneManager(sceneLoader, sceneSaver);
@@ -43,7 +45,7 @@ async function bootstrap(): Promise<void> {
   const renderer = new RuntimeRenderer({ antialias: true, shadows: true });
   renderer.attach(app);
 
-  const runner = new SceneRunner(sceneManager, renderer);
+  const runner = new SceneRunner(sceneManager, renderer, audioService, assetLoader);
   await runner.startScene(scenePath);
 }
 

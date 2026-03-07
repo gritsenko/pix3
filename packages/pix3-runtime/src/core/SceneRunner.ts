@@ -11,12 +11,15 @@ import { SceneManager } from './SceneManager';
 import { RuntimeRenderer } from './RuntimeRenderer';
 import { InputService } from './InputService';
 import { SceneService } from './SceneService';
+import { AudioService } from './AudioService';
+import { AssetLoader } from './AssetLoader';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
 import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { AnimatedSprite3D } from '../nodes/3D/AnimatedSprite3D';
 import { Particles3D } from '../nodes/3D/Particles3D';
+import { AudioPlayer } from '../nodes/AudioPlayer';
 import { LAYER_3D, LAYER_2D } from '../constants';
 
 export class SceneRunner {
@@ -35,7 +38,12 @@ export class SceneRunner {
   /** Adaptive logical camera dimensions computed from viewportBaseSize + viewport aspect. */
   private logicalCameraSize = { width: 1, height: 1 };
 
-  constructor(sceneManager: SceneManager, renderer: RuntimeRenderer) {
+  constructor(
+    sceneManager: SceneManager,
+    renderer: RuntimeRenderer,
+    audioService: AudioService,
+    assetLoader: AssetLoader
+  ) {
     this.sceneManager = sceneManager;
     this.renderer = renderer;
     this.inputService = new InputService();
@@ -63,6 +71,12 @@ export class SceneRunner {
       },
       findNodeById(id: string): NodeBase | null {
         return runner.findNodeById(id);
+      },
+      getAudioService(): AudioService {
+        return audioService;
+      },
+      getAssetLoader(): AssetLoader {
+        return assetLoader;
       },
     });
   }
@@ -146,6 +160,10 @@ export class SceneRunner {
 
     // Clear the runtime scene to release resources
     if (this.runtimeGraph) {
+      for (const rootNode of this.runtimeGraph.rootNodes) {
+        this.stopAudioPlayers(rootNode);
+      }
+
       // Remove nodes from the THREE scene (optional, as scene.clear() might be called next start)
       // But good for cleanup
       this.scene.clear();
@@ -478,5 +496,15 @@ export class SceneRunner {
     }
 
     return value as Record<string, unknown>;
+  }
+
+  private stopAudioPlayers(node: NodeBase): void {
+    if (node instanceof AudioPlayer) {
+      node.stop();
+    }
+
+    for (const child of node.children) {
+      this.stopAudioPlayers(child);
+    }
   }
 }

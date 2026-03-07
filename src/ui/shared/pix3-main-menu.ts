@@ -2,6 +2,7 @@ import { ComponentBase, customElement, html, inject, state, unsafeCSS } from '@/
 import { CommandRegistry } from '@/services/CommandRegistry';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { NodeRegistry } from '@/services/NodeRegistry';
+import { NodeTypePickerService } from '@/services/NodeTypePickerService';
 import { IconService, IconSize } from '@/services/IconService';
 import styles from './pix3-main-menu.ts.css?raw';
 
@@ -34,6 +35,9 @@ export class Pix3MainMenu extends ComponentBase {
 
   @inject(IconService)
   private readonly iconService!: IconService;
+
+  @inject(NodeTypePickerService)
+  private readonly nodeTypePickerService!: NodeTypePickerService;
 
   // Use light DOM (default) to avoid clipping issues with absolutely positioned dropdowns
   @state()
@@ -248,11 +252,22 @@ export class Pix3MainMenu extends ComponentBase {
   };
 
   private toggleSection = (sectionId: string) => {
+    if (sectionId === 'create') {
+      this.activeSection = null;
+      this.menuOpenedByClick = false;
+      void this.openNodeTypePicker();
+      return;
+    }
+
     this.activeSection = this.activeSection === sectionId ? null : sectionId;
     this.menuOpenedByClick = this.activeSection !== null;
   };
 
   private handleSectionHover = (sectionId: string) => {
+    if (sectionId === 'create') {
+      return;
+    }
+
     // Only allow hover to open menus if a menu is already open (either by click or hover)
     if (this.activeSection !== null) {
       this.activeSection = sectionId;
@@ -291,15 +306,6 @@ export class Pix3MainMenu extends ComponentBase {
       id: 'create',
       label: 'Create',
       items: [],
-      groupedItems: this.nodeRegistry.getGroupedDropdownItems().map(group => ({
-        label: group.label,
-        items: group.items.map(item => ({
-          id: `create-${item.id}`,
-          label: item.label,
-          icon: item.icon,
-          nodeTypeId: item.id,
-        })),
-      })),
     };
 
     const sectionsWithoutCreate = commandSections.filter(section => section.id !== 'create');
@@ -340,6 +346,15 @@ export class Pix3MainMenu extends ComponentBase {
         </div>
       </div>
     `;
+  }
+
+  private async openNodeTypePicker(): Promise<void> {
+    const nodeTypeId = await this.nodeTypePickerService.showPicker();
+    if (!nodeTypeId) {
+      return;
+    }
+
+    await this.executeCreateMenuItem(nodeTypeId);
   }
 }
 

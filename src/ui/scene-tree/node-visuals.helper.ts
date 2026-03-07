@@ -17,6 +17,7 @@ import { MeshInstance } from '@pix3/runtime';
 import { GeometryMesh } from '@pix3/runtime';
 import { Sprite3D } from '@pix3/runtime';
 import { Particles3D } from '@pix3/runtime';
+import { AudioPlayer } from '@pix3/runtime';
 
 // Color constants for node types
 const NODE_2D_COLOR = '#96cbf6ff';
@@ -73,6 +74,9 @@ export function getNodeVisuals(node: NodeBase): { color: string; icon: string } 
   }
   if (node instanceof Particles3D) {
     return { color: NODE_3D_COLOR, icon: 'sparkles' };
+  }
+  if (node instanceof AudioPlayer) {
+    return { color: '#7fd1b9ff', icon: 'volume-2' };
   }
   if (node instanceof GeometryMesh) {
     return { color: NODE_3D_COLOR, icon: 'box' };
