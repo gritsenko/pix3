@@ -48,6 +48,7 @@ export interface Particles3DProps extends Omit<Node3DProps, 'type'> {
   loop?: boolean;
   prewarm?: boolean;
   preview?: boolean;
+  disableRotation?: boolean;
   simulationSpace?: 'local' | 'world';
 }
 
@@ -88,6 +89,7 @@ export class Particles3D extends Node3D {
   loop: boolean;
   prewarm: boolean;
   preview: boolean;
+  disableRotation: boolean;
   simulationSpace: 'local' | 'world';
 
   private particles: ParticleState[] = [];
@@ -137,6 +139,7 @@ export class Particles3D extends Node3D {
     this.loop = props.loop ?? true;
     this.prewarm = props.prewarm ?? false;
     this.preview = props.preview ?? false;
+    this.disableRotation = props.disableRotation ?? false;
     this.simulationSpace = props.simulationSpace ?? 'local';
 
     this.material = new MeshBasicMaterial({
@@ -323,8 +326,8 @@ export class Particles3D extends Node3D {
     particle.active = true;
     particle.age = 0;
     particle.lifetime = this.lifetime * MathUtils.lerp(0.85, 1.15, Math.random());
-    particle.rotation = Math.random() * Math.PI * 2;
-    particle.angularVelocity = MathUtils.lerp(-3, 3, Math.random());
+    particle.rotation = this.disableRotation ? 0 : Math.random() * Math.PI * 2;
+    particle.angularVelocity = this.disableRotation ? 0 : MathUtils.lerp(-3, 3, Math.random());
     this.assignSpawnPosition(particle.position);
 
     this.tempDirection.set(
@@ -745,6 +748,15 @@ export class Particles3D extends Node3D {
           setValue: (node: unknown, value: unknown) => {
             const v = value as { x: number; y: number; z: number };
             (node as Particles3D).gravity = { x: Number(v.x), y: Number(v.y), z: Number(v.z) };
+          },
+        },
+        {
+          name: 'disableRotation',
+          type: 'boolean',
+          ui: { label: 'Disable Rotation', group: 'Emission' },
+          getValue: (node: unknown) => (node as Particles3D).disableRotation,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Particles3D).disableRotation = Boolean(value);
           },
         },
         {

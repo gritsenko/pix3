@@ -5,6 +5,7 @@ import { NodeBase } from '../nodes/NodeBase';
 import { Node2D } from '../nodes/Node2D';
 import { Object3D } from 'three';
 import { Camera3D } from '../nodes/3D/Camera3D';
+import { Layout2D } from '../nodes/2D/Layout2D';
 
 export class PinToNodeBehavior extends Script {
     targetNodeId: string = '';
@@ -12,6 +13,8 @@ export class PinToNodeBehavior extends Script {
 
     private targetNode: NodeBase | null = null;
     private cameraNode: Camera3D | null = null;
+    private _layout2D: Layout2D | null = null;
+    private _unsubscribeViewport: (() => void) | null = null;
     private _tempWorldPos = new Vector3();
     private _tempPinnedWorldPos = new Vector3();
     private _tempPinnedLocalPos = new Vector3();
@@ -47,8 +50,14 @@ export class PinToNodeBehavior extends Script {
     override onStart() {
         this.targetNode = null;
         this.cameraNode = null;
+        this._layout2D = null;
 
-        if (!this.node || !this.targetNodeId) return;
+        this._unsubscribeViewport?.();
+        this._unsubscribeViewport = this.scene?.onViewportChanged(() => {
+            // Triggers re-computation of logical camera size on next update frame.
+        }) ?? null;
+
+        if (!this.node) return;
 
         // Traverse up to find the THREE.Scene root
         let root: Object3D = this.node;
@@ -56,11 +65,21 @@ export class PinToNodeBehavior extends Script {
             root = root.parent;
         }
 
+        // Cache Layout2D for logical camera size computation
+        this._layout2D = this.findLayout2D(root);
+
+        if (!this.targetNodeId) return;
+
         // Resolve target node
         this.targetNode = this.findNodeById(root, this.targetNodeId);
 
         // Find the active Camera3D
         this.findCamera(root);
+    }
+
+    override onDetach() {
+        this._unsubscribeViewport?.();
+        this._unsubscribeViewport = null;
     }
 
     private findNodeById(root: Object3D, id: string): NodeBase | null {
@@ -70,6 +89,15 @@ export class PinToNodeBehavior extends Script {
         for (const child of root.children) {
             const match = this.findNodeById(child, id);
             if (match) return match;
+        }
+        return null;
+    }
+
+    private findLayout2D(root: Object3D): Layout2D | null {
+        if (root instanceof Layout2D) return root;
+        for (const child of root.children) {
+            const found = this.findLayout2D(child);
+            if (found) return found;
         }
         return null;
     }
@@ -112,7 +140,7 @@ export class PinToNodeBehavior extends Script {
         // Project 3D vector to 2D screen space using the camera
         this._tempWorldPos.project(cameraObj);
 
-        const viewport = this.getViewportSize();
+        const viewport = this.getLogicalCameraSize();
         if (viewport.width <= 0 || viewport.height <= 0) return;
 
         // Convert NDC (-1..1) to the 2D world space used by SceneRunner's orthographic camera.
@@ -133,13 +161,33 @@ export class PinToNodeBehavior extends Script {
         this.node.position.set(this._tempPinnedLocalPos.x, this._tempPinnedLocalPos.y, this.node.position.z);
     }
 
-    private getViewportSize(): { width: number; height: number } {
-        if (this.input && this.input.width > 0 && this.input.height > 0) {
-            return { width: this.input.width, height: this.input.height };
+    /**
+     * Returns the logical 2D camera dimensions used by SceneRunner's orthographic camera.
+     * Mirrors the Expand/Match-Min scaling that SceneRunner computes from Layout2D authored
+     * resolution vs. the current viewport aspect ratio.  Using CSS pixel dimensions here
+     * (instead of device pixels) keeps coordinate-space consistent regardless of DPR.
+     */
+    private getLogicalCameraSize(): { width: number; height: number } {
+        const cssWidth = this.input?.width ?? window.innerWidth;
+        const cssHeight = this.input?.height ?? window.innerHeight;
+
+        if (cssWidth <= 0 || cssHeight <= 0) {
+            return { width: 1, height: 1 };
         }
 
-        const fallbackWidth = Math.max(1, Math.round(window.innerWidth * window.devicePixelRatio));
-        const fallbackHeight = Math.max(1, Math.round(window.innerHeight * window.devicePixelRatio));
-        return { width: fallbackWidth, height: fallbackHeight };
+        const layout2D = this._layout2D;
+        if (layout2D && layout2D.width > 0 && layout2D.height > 0) {
+            const baseW = layout2D.width;
+            const baseH = layout2D.height;
+            const baseAspect = baseW / baseH;
+            const viewportAspect = cssWidth / cssHeight;
+            if (viewportAspect >= baseAspect) {
+                return { width: baseH * viewportAspect, height: baseH };
+            } else {
+                return { width: baseW, height: baseW / viewportAspect };
+            }
+        }
+
+        return { width: cssWidth, height: cssHeight };
     }
 }
