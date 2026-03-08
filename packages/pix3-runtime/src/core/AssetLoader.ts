@@ -95,17 +95,29 @@ export class AssetLoader {
     const loadPromise = (async (): Promise<AudioBuffer> => {
       try {
         let arrayBuffer: ArrayBuffer;
-        try {
-          const url = this.resources.normalize(resourcePath);
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status} while fetching ${url}`);
-          }
-          arrayBuffer = await response.arrayBuffer();
-        } catch {
-          // Fallback for embedded resources that are not directly fetchable by URL.
+        if (resourcePath.startsWith('res://')) {
+          // Use readBlob directly for res:// paths, same as textures and models.
+          // Fetching via normalized URL can return a dev-server HTML fallback page,
+          // causing decodeAudioData to throw EncodingError.
           const blob = await this.resources.readBlob(resourcePath);
           arrayBuffer = await blob.arrayBuffer();
+        } else {
+          try {
+            const url = this.resources.normalize(resourcePath);
+            const response = await fetch(url);
+            if (!response.ok) {
+              throw new Error(`HTTP ${response.status} while fetching ${url}`);
+            }
+            const contentType = response.headers.get('content-type') ?? '';
+            if (contentType.includes('text/html')) {
+              throw new Error(`Unexpected HTML response for audio at ${url}`);
+            }
+            arrayBuffer = await response.arrayBuffer();
+          } catch {
+            // Fallback for embedded resources that are not directly fetchable by URL.
+            const blob = await this.resources.readBlob(resourcePath);
+            arrayBuffer = await blob.arrayBuffer();
+          }
         }
 
         const audioBuffer = await audioService.decodeAudioData(arrayBuffer);
