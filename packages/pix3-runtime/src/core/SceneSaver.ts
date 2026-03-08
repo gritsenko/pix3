@@ -18,6 +18,8 @@ import { Label2D } from '../nodes/2D/UI/Label2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
+import { AmbientLightNode } from '../nodes/3D/AmbientLightNode';
+import { HemisphereLightNode } from '../nodes/3D/HemisphereLightNode';
 import { GeometryMesh } from '../nodes/3D/GeometryMesh';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
@@ -142,13 +144,17 @@ export class SceneSaver {
       metadata: this.serializeMetadata(node.metadata),
     };
 
-    // Ensure correct type for DirectionalLightNode
+    // Ensure correct type for light nodes
     if (node instanceof DirectionalLightNode) {
       definition.type = 'DirectionalLightNode';
     } else if (node instanceof PointLightNode) {
       definition.type = 'PointLightNode';
     } else if (node instanceof SpotLightNode) {
       definition.type = 'SpotLightNode';
+    } else if (node instanceof AmbientLightNode) {
+      definition.type = 'AmbientLightNode';
+    } else if (node instanceof HemisphereLightNode) {
+      definition.type = 'HemisphereLightNode';
     }
 
     // Serialize components
@@ -458,6 +464,8 @@ export class SceneSaver {
       props.color = '#' + node.light.color.getHexString();
       props.intensity = node.light.intensity;
       props.castShadow = node.light.castShadow;
+      props.shadowCameraSize = node.light.shadow.camera.right;
+      props.shadowMapSize = node.light.shadow.mapSize.width;
     } else if (node instanceof PointLightNode) {
       props.color = '#' + node.light.color.getHexString();
       props.intensity = node.light.intensity;
@@ -472,6 +480,13 @@ export class SceneSaver {
       props.penumbra = node.light.penumbra;
       props.decay = node.light.decay;
       props.castShadow = node.light.castShadow;
+    } else if (node instanceof AmbientLightNode) {
+      props.color = '#' + node.light.color.getHexString();
+      props.intensity = node.light.intensity;
+    } else if (node instanceof HemisphereLightNode) {
+      props.skyColor = '#' + node.light.color.getHexString();
+      props.groundColor = '#' + node.light.groundColor.getHexString();
+      props.intensity = node.light.intensity;
     } else if (node instanceof Camera3D) {
       if (node.camera instanceof PerspectiveCamera) {
         props.projection = 'perspective';

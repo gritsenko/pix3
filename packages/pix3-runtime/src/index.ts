@@ -45,6 +45,8 @@ export * from './nodes/3D/AnimatedSprite3D';
 export * from './nodes/3D/Particles3D';
 export * from './nodes/3D/PointLightNode';
 export * from './nodes/3D/SpotLightNode';
+export * from './nodes/3D/AmbientLightNode';
+export * from './nodes/3D/HemisphereLightNode';
 
 // Behaviors
 export * from './behaviors/register-behaviors';

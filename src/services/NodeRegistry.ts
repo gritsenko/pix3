@@ -4,6 +4,8 @@ import { CreateBoxCommand } from '@/features/scene/CreateBoxCommand';
 import { CreateDirectionalLightCommand } from '@/features/scene/CreateDirectionalLightCommand';
 import { CreatePointLightCommand } from '@/features/scene/CreatePointLightCommand';
 import { CreateSpotLightCommand } from '@/features/scene/CreateSpotLightCommand';
+import { CreateAmbientLightCommand } from '@/features/scene/CreateAmbientLightCommand';
+import { CreateHemisphereLightCommand } from '@/features/scene/CreateHemisphereLightCommand';
 import { CreateCamera3DCommand } from '@/features/scene/CreateCamera3DCommand';
 import { CreateMeshInstanceCommand } from '@/features/scene/CreateMeshInstanceCommand';
 import { CreateSprite3DCommand } from '@/features/scene/CreateSprite3DCommand';
@@ -254,6 +256,30 @@ export class NodeRegistry {
       icon: 'sun',
       keywords: ['create', 'light', 'spot', '3d', 'illumination'],
       order: 4,
+    });
+
+    this.registerNodeType({
+      id: 'ambientlight',
+      displayName: 'Ambient Light',
+      description: 'Global ambient light that illuminates all objects equally',
+      category: '3D',
+      commandClass: CreateAmbientLightCommand,
+      color: '#ffe484ff',
+      icon: 'sun',
+      keywords: ['create', 'light', 'ambient', '3d', 'global', 'illumination'],
+      order: 4.1,
+    });
+
+    this.registerNodeType({
+      id: 'hemispherelight',
+      displayName: 'Hemisphere Light',
+      description: 'Sky/ground hemisphere light simulating natural outdoor lighting',
+      category: '3D',
+      commandClass: CreateHemisphereLightCommand,
+      color: '#b8d4ffff',
+      icon: 'sun',
+      keywords: ['create', 'light', 'hemisphere', '3d', 'sky', 'global', 'outdoor'],
+      order: 4.2,
     });
 
     this.registerNodeType({

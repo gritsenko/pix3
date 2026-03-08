@@ -45,7 +45,7 @@ root:
         name: Box
         properties:
           transform:
-            position: [0, 0, 1.618293032008267]
+            position: [-2.265116941748845, 0, 0.21532506153587705]
             rotationEuler: [0, 0, 0]
             scale: [1, 1, 1]
         components:
@@ -92,12 +92,12 @@ root:
         name: Point Light
         properties:
           color: "#ffffff"
-          intensity: 56
+          intensity: 12.6
           distance: 0
           decay: 2
           castShadow: true
           transform:
-            position: [2.919661629680196, 2.5107811972543703, 0]
+            position: [2.01597568460783, 2.5107811972543703, 0]
             rotationEuler: [0, 0, 0]
             scale: [1, 1, 1]
         children: []
@@ -138,7 +138,7 @@ root:
             offsetMin: [-144, -146]
             offsetMax: [-2, -2]
           transform:
-            position: [227, 226]
+            position: [902.7425742574258, 466]
             scale: [1, 1]
             rotation: 0
         children:

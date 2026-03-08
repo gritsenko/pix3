@@ -2625,7 +2625,7 @@ export class ViewportRendererService {
     const direction =
       rawDirection.lengthSq() > 1e-8
         ? rawDirection.normalize()
-        : new THREE.Vector3(0, 0, 1).applyQuaternion(
+        : new THREE.Vector3(0, 0, -1).applyQuaternion(
             node.getWorldQuaternion(new THREE.Quaternion())
           );
     const farPos = nodeWorldPos.clone().add(direction.multiplyScalar(TARGET_DIRECTION_RAY_LENGTH));
@@ -2694,7 +2694,7 @@ export class ViewportRendererService {
     }
     const nodeWorldPos = node.getWorldPosition(new THREE.Vector3());
     const rawDirection = targetPos.clone().sub(nodeWorldPos);
-    const fallbackAxisZ = cameraNode instanceof DirectionalLightNode ? 1 : -1;
+    const fallbackAxisZ = -1;
     const direction =
       rawDirection.lengthSq() > 1e-8
         ? rawDirection.normalize()

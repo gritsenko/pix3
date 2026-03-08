@@ -12,6 +12,8 @@ import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
+import { AmbientLightNode } from '../nodes/3D/AmbientLightNode';
+import { HemisphereLightNode } from '../nodes/3D/HemisphereLightNode';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { AnimatedSprite3D } from '../nodes/3D/AnimatedSprite3D';
 import { Particles3D } from '../nodes/3D/Particles3D';
@@ -105,6 +107,8 @@ export interface DirectionalLightNodeProperties {
   color?: string;
   intensity?: number;
   castShadow?: boolean;
+  shadowCameraSize?: number;
+  shadowMapSize?: number;
 }
 
 export interface PointLightNodeProperties {
@@ -123,6 +127,17 @@ export interface SpotLightNodeProperties {
   penumbra?: number;
   decay?: number;
   castShadow?: boolean;
+}
+
+export interface AmbientLightNodeProperties {
+  color?: string;
+  intensity?: number;
+}
+
+export interface HemisphereLightNodeProperties {
+  skyColor?: string;
+  groundColor?: string;
+  intensity?: number;
 }
 
 export interface Sprite3DProperties {
@@ -1259,6 +1274,8 @@ export class SceneLoader {
           color: props.color ?? '#ffffff',
           intensity: props.intensity ?? 1,
           castShadow: typeof props.castShadow === 'boolean' ? props.castShadow : true,
+          shadowCameraSize: typeof props.shadowCameraSize === 'number' ? props.shadowCameraSize : 20,
+          shadowMapSize: typeof props.shadowMapSize === 'number' ? props.shadowMapSize : 2048,
         });
       }
       case 'PointLightNode': {
@@ -1295,6 +1312,35 @@ export class SceneLoader {
           penumbra: props.penumbra ?? 0,
           decay: props.decay ?? 2,
           castShadow: typeof props.castShadow === 'boolean' ? props.castShadow : true,
+        });
+      }
+      case 'AmbientLightNode': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as AmbientLightNodeProperties;
+        return new AmbientLightNode({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          color: props.color ?? '#ffffff',
+          intensity: props.intensity ?? 0.5,
+        });
+      }
+      case 'HemisphereLightNode': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as HemisphereLightNodeProperties;
+        return new HemisphereLightNode({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          skyColor: props.skyColor ?? '#ffffff',
+          groundColor: props.groundColor ?? '#444444',
+          intensity: props.intensity ?? 0.5,
         });
       }
       case 'Camera3D': {
