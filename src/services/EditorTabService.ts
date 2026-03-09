@@ -301,7 +301,7 @@ export class EditorTabService {
       }
     }
 
-    if (tab.type === 'game') {
+    if (tab.type === 'game' && !appState.ui.isGamePopoutOpen) {
       await this.operationService.invoke(
         new SetPlayModeOperation({
           isPlaying: false,

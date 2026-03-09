@@ -4,19 +4,30 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import type { Navigation2DSettings } from '@/state/AppState';
+import type { GameAspectRatio, Navigation2DSettings } from '@/state/AppState';
 
 export interface UpdateEditorSettingsParams {
   warnOnUnsavedUnload?: boolean;
   pauseRenderingOnUnfocus?: boolean;
   navigation2D?: Partial<Navigation2DSettings>;
+  gameAspectRatio?: GameAspectRatio;
 }
 
 export interface EditorSettingsSnapshot {
   warnOnUnsavedUnload: boolean;
   pauseRenderingOnUnfocus: boolean;
   navigation2D: Navigation2DSettings;
+  gameAspectRatio: GameAspectRatio;
 }
+
+const isGameAspectRatio = (value: unknown): value is GameAspectRatio => {
+  return (
+    value === 'free' ||
+    value === '16:9-landscape' ||
+    value === '16:9-portrait' ||
+    value === '4:3'
+  );
+};
 
 export const EDITOR_SETTINGS_STORAGE_KEY = 'pix3.editorSettings:v1';
 
@@ -44,6 +55,9 @@ export const loadEditorSettings = (): Partial<EditorSettingsSnapshot> | null => 
         if (Object.keys(nav2D).length > 0) {
           result.navigation2D = nav2D as Navigation2DSettings;
         }
+      }
+      if (isGameAspectRatio(parsed.gameAspectRatio)) {
+        result.gameAspectRatio = parsed.gameAspectRatio;
       }
       return result;
     }
@@ -86,11 +100,15 @@ export class UpdateEditorSettingsOperation implements Operation<OperationInvokeR
       zoomSensitivity: this.params.navigation2D?.zoomSensitivity ?? prevNav2D.zoomSensitivity,
     };
 
+    const prevGameAspectRatio = snapshot.ui.gameAspectRatio;
+    const nextGameAspectRatio = this.params.gameAspectRatio ?? prevGameAspectRatio;
+
     const hasChanges =
       nextWarn !== prevWarn ||
       nextPause !== prevPause ||
       nextNav2D.panSensitivity !== prevNav2D.panSensitivity ||
-      nextNav2D.zoomSensitivity !== prevNav2D.zoomSensitivity;
+      nextNav2D.zoomSensitivity !== prevNav2D.zoomSensitivity ||
+      nextGameAspectRatio !== prevGameAspectRatio;
 
     if (!hasChanges) {
       return { didMutate: false };
@@ -99,18 +117,21 @@ export class UpdateEditorSettingsOperation implements Operation<OperationInvokeR
     state.ui.warnOnUnsavedUnload = nextWarn;
     state.ui.pauseRenderingOnUnfocus = nextPause;
     state.ui.navigation2D = nextNav2D;
+    state.ui.gameAspectRatio = nextGameAspectRatio;
 
     const serialize = (
       w: boolean,
       p: boolean,
-      n: Navigation2DSettings
+      n: Navigation2DSettings,
+      g: GameAspectRatio
     ): EditorSettingsSnapshot => ({
       warnOnUnsavedUnload: w,
       pauseRenderingOnUnfocus: p,
       navigation2D: n,
+      gameAspectRatio: g,
     });
 
-    persistEditorSettings(serialize(nextWarn, nextPause, nextNav2D));
+    persistEditorSettings(serialize(nextWarn, nextPause, nextNav2D, nextGameAspectRatio));
 
     return {
       didMutate: true,
@@ -120,13 +141,15 @@ export class UpdateEditorSettingsOperation implements Operation<OperationInvokeR
           state.ui.warnOnUnsavedUnload = prevWarn;
           state.ui.pauseRenderingOnUnfocus = prevPause;
           state.ui.navigation2D = prevNav2D;
-          persistEditorSettings(serialize(prevWarn, prevPause, prevNav2D));
+          state.ui.gameAspectRatio = prevGameAspectRatio;
+          persistEditorSettings(serialize(prevWarn, prevPause, prevNav2D, prevGameAspectRatio));
         },
         redo: async () => {
           state.ui.warnOnUnsavedUnload = nextWarn;
           state.ui.pauseRenderingOnUnfocus = nextPause;
           state.ui.navigation2D = nextNav2D;
-          persistEditorSettings(serialize(nextWarn, nextPause, nextNav2D));
+          state.ui.gameAspectRatio = nextGameAspectRatio;
+          persistEditorSettings(serialize(nextWarn, nextPause, nextNav2D, nextGameAspectRatio));
         },
       },
     };

@@ -1,37 +1,33 @@
 import { ComponentBase, customElement, html, inject, state, css, unsafeCSS } from '@/fw';
-import {
-  AssetLoader,
-  AudioService,
-  SceneManager,
-  SceneRunner,
-  RuntimeRenderer,
-} from '@pix3/runtime';
 import { appState } from '@/state';
+import type { GameAspectRatio } from '@/state/AppState';
 import { subscribe } from 'valtio/vanilla';
 import styles from './game-tab.ts.css?raw';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { GamePlaySessionService } from '@/services/GamePlaySessionService';
 
 @customElement('pix3-game-tab')
 export class GameViewTab extends ComponentBase {
   static useShadowDom = true;
 
-  @inject(SceneManager)
-  private readonly sceneManager!: SceneManager;
-
   @inject(CommandDispatcher)
   private readonly commandDispatcher!: CommandDispatcher;
 
-  @inject(AudioService)
-  private readonly audioService!: AudioService;
-
-  @inject(AssetLoader)
-  private readonly assetLoader!: AssetLoader;
+  @inject(GamePlaySessionService)
+  private readonly gamePlaySessionService!: GamePlaySessionService;
 
   @state()
-  private aspectRatio: 'free' | '16:9-landscape' | '16:9-portrait' | '4:3' = 'free';
+  private aspectRatio: GameAspectRatio = appState.ui.gameAspectRatio;
 
-  private runner?: SceneRunner;
-  private renderer?: RuntimeRenderer;
+  @state()
+  private isPlaying = appState.ui.isPlaying;
+
+  @state()
+  private isRunning = false;
+
+  @state()
+  private isGamePopoutOpen = appState.ui.isGamePopoutOpen;
+
   private gameContainer?: HTMLElement;
   private viewportContainer?: HTMLElement;
   private resizeObserver?: ResizeObserver;
@@ -44,12 +40,11 @@ export class GameViewTab extends ComponentBase {
 
   disconnectedCallback(): void {
     super.disconnectedCallback();
-    this.stopGame();
+    if (this.gameContainer) {
+      this.gamePlaySessionService.unregisterTabHost(this.gameContainer);
+    }
     this.resizeObserver?.disconnect();
     this.disposeSubscription?.();
-    window.removeEventListener('focus', this.onFocus);
-    window.removeEventListener('blur', this.onBlur);
-    document.removeEventListener('visibilitychange', this.onVisibilityChange);
   }
 
   protected firstUpdated(): void {
@@ -57,12 +52,25 @@ export class GameViewTab extends ComponentBase {
     this.gameContainer = this.shadowRoot?.querySelector('.game-host') as HTMLElement;
 
     if (this.gameContainer) {
-      void this.initGame();
+      this.gamePlaySessionService.registerTabHost(this.gameContainer, window, isRunning => {
+        this.isRunning = isRunning;
+        this.requestUpdate();
+      });
     }
 
     if (this.viewportContainer) {
       this.resizeObserver?.observe(this.viewportContainer);
     }
+
+    this.disposeSubscription = subscribe(appState.ui, () => {
+      this.aspectRatio = appState.ui.gameAspectRatio;
+      this.isPlaying = appState.ui.isPlaying;
+      this.isGamePopoutOpen = appState.ui.isGamePopoutOpen;
+      requestAnimationFrame(() => this.handleResize());
+      this.requestUpdate();
+    });
+
+    requestAnimationFrame(() => this.handleResize());
   }
 
   private startResizeObserver() {
@@ -73,10 +81,6 @@ export class GameViewTab extends ComponentBase {
 
   private handleResize() {
     this.applyViewportFit();
-
-    if (this.renderer && this.gameContainer) {
-      this.renderer.resize();
-    }
   }
 
   private applyViewportFit() {
@@ -84,19 +88,21 @@ export class GameViewTab extends ComponentBase {
       return;
     }
 
-    if (this.aspectRatio === 'free') {
-      this.gameContainer.style.width = '100%';
-      this.gameContainer.style.height = '100%';
-      return;
-    }
-
-    const targetAspect = this.getAspectValue(this.aspectRatio);
-    const availableWidth = this.viewportContainer.clientWidth;
-    const availableHeight = this.viewportContainer.clientHeight;
+    const { width: availableWidth, height: availableHeight } = this.getViewportInnerSize(
+      this.viewportContainer
+    );
 
     if (availableWidth <= 0 || availableHeight <= 0) {
       return;
     }
+
+    if (this.aspectRatio === 'free') {
+      this.gameContainer.style.width = `${Math.floor(availableWidth)}px`;
+      this.gameContainer.style.height = `${Math.floor(availableHeight)}px`;
+      return;
+    }
+
+    const targetAspect = this.getAspectValue(this.aspectRatio);
 
     let fittedWidth = availableWidth;
     let fittedHeight = fittedWidth / targetAspect;
@@ -110,7 +116,21 @@ export class GameViewTab extends ComponentBase {
     this.gameContainer.style.height = `${Math.floor(fittedHeight)}px`;
   }
 
-  private getAspectValue(aspectRatio: '16:9-landscape' | '16:9-portrait' | '4:3'): number {
+  private getViewportInnerSize(viewport: HTMLElement): { width: number; height: number } {
+    const rect = viewport.getBoundingClientRect();
+    const styles = window.getComputedStyle(viewport);
+    const horizontalPadding =
+      Number.parseFloat(styles.paddingLeft || '0') + Number.parseFloat(styles.paddingRight || '0');
+    const verticalPadding =
+      Number.parseFloat(styles.paddingTop || '0') + Number.parseFloat(styles.paddingBottom || '0');
+
+    return {
+      width: Math.max(0, rect.width - horizontalPadding),
+      height: Math.max(0, rect.height - verticalPadding),
+    };
+  }
+
+  private getAspectValue(aspectRatio: Exclude<GameAspectRatio, 'free'>): number {
     switch (aspectRatio) {
       case '16:9-landscape':
         return 16 / 9;
@@ -121,93 +141,22 @@ export class GameViewTab extends ComponentBase {
     }
   }
 
-  private isAspectRatio(
-    value: string
-  ): value is 'free' | '16:9-landscape' | '16:9-portrait' | '4:3' {
+  private isAspectRatio(value: string): value is GameAspectRatio {
     return (
       value === 'free' || value === '16:9-landscape' || value === '16:9-portrait' || value === '4:3'
     );
   }
 
-  private async initGame() {
-    if (!this.gameContainer) return;
-    if (this.runner) return; // Already running
-
-    // 1. Create Renderer
-    this.renderer = new RuntimeRenderer({
-      antialias: true,
-      shadows: true,
-    });
-    this.renderer.attach(this.gameContainer);
-
-    // 2. Create Runner
-    this.runner = new SceneRunner(
-      this.sceneManager,
-      this.renderer,
-      this.audioService,
-      this.assetLoader
-    );
-
-    // 3. Start Scene
-    const activeSceneId = appState.scenes.activeSceneId;
-    if (activeSceneId) {
-      console.log(`[GameView] Starting scene: ${activeSceneId}`);
-      try {
-        await this.runner.startScene(activeSceneId);
-      } catch (error) {
-        console.error('[GameView] Failed to start scene:', error);
-      }
-    } else {
-      console.warn('[GameView] No active scene to play.');
-    }
-
-    // Handle focus pausing
-    window.addEventListener('focus', this.onFocus);
-    window.addEventListener('blur', this.onBlur);
-    document.addEventListener('visibilitychange', this.onVisibilityChange);
-
-    this.disposeSubscription = subscribe(appState.ui, () => {
-      this.handleFocusPause();
-    });
-  }
-
-  private onFocus = () => {
-    this.handleFocusPause();
-  };
-
-  private onBlur = () => {
-    this.handleFocusPause();
-  };
-
-  private onVisibilityChange = () => {
-    this.handleFocusPause();
-  };
-
-  private handleFocusPause() {
-    if (!this.runner) return;
-
-    const isVisible = document.visibilityState === 'visible' && document.hasFocus();
-    const shouldPause = appState.ui.pauseRenderingOnUnfocus && !isVisible;
-    if (shouldPause) {
-      this.runner.pause();
-    } else {
-      this.runner.resume();
-    }
-  }
-
-  private stopGame() {
-    if (this.runner) {
-      this.runner.stop();
-      this.runner = undefined;
-    }
-    if (this.renderer) {
-      this.renderer.dispose();
-      this.renderer = undefined;
-    }
-  }
-
   private handleStopClick() {
-    this.commandDispatcher.executeById('game.stop');
+    void this.commandDispatcher.executeById('game.stop');
+  }
+
+  private handleRestartClick() {
+    void this.commandDispatcher.executeById('game.restart');
+  }
+
+  private handlePopoutClick() {
+    void this.commandDispatcher.executeById('game.open-popout-window');
   }
 
   private handleAspectChange(e: Event) {
@@ -217,8 +166,32 @@ export class GameViewTab extends ComponentBase {
     }
 
     this.aspectRatio = target.value;
-    // Defer resize to allow CSS to apply
+    void this.gamePlaySessionService.setAspectRatio(target.value);
     requestAnimationFrame(() => this.handleResize());
+  }
+
+  private getPlaceholderTitle(): string {
+    if (this.isGamePopoutOpen && !this.isRunning) {
+      return 'Game is rendering in a separate window';
+    }
+
+    if (this.isPlaying && !this.isRunning) {
+      return 'Preparing runtime preview';
+    }
+
+    return 'Game preview is idle';
+  }
+
+  private getPlaceholderCopy(): string {
+    if (this.isGamePopoutOpen && !this.isRunning) {
+      return 'Press Play to run in the detached game window, or focus that window if it is already open.';
+    }
+
+    if (this.isPlaying && !this.isRunning) {
+      return 'The runtime host is starting. The preview will appear here as soon as the scene is ready.';
+    }
+
+    return 'Press Play to run the active scene in this tab, or open a detached game window for an external preview.';
   }
 
   protected render() {
@@ -227,6 +200,23 @@ export class GameViewTab extends ComponentBase {
         <div class="top-toolbar">
           <button class="toolbar-button active" @click=${this.handleStopClick} title="Stop Game">
             <span style="margin-right: 4px;">■</span> Stop
+          </button>
+
+          ${this.isPlaying
+            ? html`
+                <button
+                  class="toolbar-button"
+                  @click=${this.handleRestartClick}
+                  title="Restart Game"
+                >
+                  <span style="margin-right: 4px;">↻</span> Restart
+                </button>
+              `
+            : null}
+
+          <button class="toolbar-button" @click=${this.handlePopoutClick} title="Open Game Window">
+            <span style="margin-right: 4px;">▣</span>
+            ${this.isGamePopoutOpen ? 'Focus Window' : 'Open Window'}
           </button>
 
           <div class="toolbar-separator"></div>
@@ -247,6 +237,16 @@ export class GameViewTab extends ComponentBase {
           <div class="game-host aspect-${this.aspectRatio.replace(':', '-')}" part="game-host">
             <!-- Canvas will be attached here -->
           </div>
+          ${this.isRunning
+            ? null
+            : html`
+                <div class="game-placeholder" part="game-placeholder">
+                  <div class="game-placeholder-card">
+                    <p class="game-placeholder-title">${this.getPlaceholderTitle()}</p>
+                    <p class="game-placeholder-copy">${this.getPlaceholderCopy()}</p>
+                  </div>
+                </div>
+              `}
         </div>
       </div>
     `;

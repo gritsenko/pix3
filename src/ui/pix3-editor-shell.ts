@@ -41,6 +41,8 @@ import { UndoCommand } from '@/features/history/UndoCommand';
 import { RedoCommand } from '@/features/history/RedoCommand';
 import { StartGameCommand } from '@/features/scripts/StartGameCommand';
 import { StopGameCommand } from '@/features/scripts/StopGameCommand';
+import { RestartGameCommand } from '@/features/scripts/RestartGameCommand';
+import { OpenGamePopoutWindowCommand } from '@/features/scripts/OpenGamePopoutWindowCommand';
 import { OpenProjectSettingsCommand } from '@/features/project/OpenProjectSettingsCommand';
 import { OpenProjectInIdeCommand } from '@/features/project/OpenProjectInIdeCommand';
 import { BuildProjectCommand } from '@/features/project/BuildProjectCommand';
@@ -55,6 +57,7 @@ import { ToggleLightingCommand } from '@/features/viewport/ToggleLightingCommand
 import { ToggleNavigationModeCommand } from '@/features/viewport/ToggleNavigationModeCommand';
 import { appState } from '@/state';
 import { ProjectService } from '@/services';
+import { GamePlaySessionService } from '@/services/GamePlaySessionService';
 import { EditorTabService } from '@/services/EditorTabService';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
@@ -95,6 +98,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(EditorTabService)
   private readonly editorTabService!: EditorTabService;
+
+  @inject(GamePlaySessionService)
+  private readonly gamePlaySessionService!: GamePlaySessionService;
 
   @inject(FileWatchService)
   private readonly fileWatchService!: FileWatchService;
@@ -182,8 +188,10 @@ export class Pix3EditorShell extends ComponentBase {
     const saveAsPrefabCommand = new SaveAsPrefabCommand();
     const undoCommand = new UndoCommand(this.operationService);
     const redoCommand = new RedoCommand(this.operationService);
-    const startGameCommand = new StartGameCommand(this.editorTabService);
-    const stopGameCommand = new StopGameCommand(this.editorTabService);
+    const startGameCommand = new StartGameCommand(this.editorTabService, this.gamePlaySessionService);
+    const stopGameCommand = new StopGameCommand(this.editorTabService, this.gamePlaySessionService);
+    const restartGameCommand = new RestartGameCommand(this.gamePlaySessionService);
+    const openGamePopoutWindowCommand = new OpenGamePopoutWindowCommand(this.gamePlaySessionService);
     const projectSettingsCommand = new OpenProjectSettingsCommand();
     const openProjectInIdeCommand = new OpenProjectInIdeCommand();
     const buildProjectCommand = new BuildProjectCommand();
@@ -213,6 +221,8 @@ export class Pix3EditorShell extends ComponentBase {
       saveAsPrefabCommand,
       startGameCommand,
       stopGameCommand,
+      restartGameCommand,
+      openGamePopoutWindowCommand,
       editorSettingsCommand,
       projectSettingsCommand,
       openProjectInIdeCommand,
@@ -275,6 +285,7 @@ export class Pix3EditorShell extends ComponentBase {
 
     // Initialize tab service early to catch session persistence
     this.editorTabService.initialize();
+    this.gamePlaySessionService.initialize();
 
     this.editorSettingsService.initialize();
 

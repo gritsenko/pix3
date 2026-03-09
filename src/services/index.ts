@@ -30,6 +30,7 @@ export {
   resolveDialogService,
 } from './DialogService';
 export { EditorTabService } from './EditorTabService';
+export { GamePlaySessionService } from './GamePlaySessionService';
 export { IconService, IconSize, type IconSizeValue } from './IconService';
 export { ScriptRegistry } from '@pix3/runtime';
 export { ScriptExecutionService } from './ScriptExecutionService';

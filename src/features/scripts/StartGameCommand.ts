@@ -6,6 +6,7 @@ import {
   type CommandMetadata,
 } from '@/core/command';
 import { EditorTabService } from '@/services/EditorTabService';
+import { GamePlaySessionService } from '@/services/GamePlaySessionService';
 import { OperationService } from '@/services/OperationService';
 import { SetPlayModeOperation } from '@/features/scripts/SetPlayModeOperation';
 
@@ -22,10 +23,15 @@ export class StartGameCommand extends CommandBase<void, void> {
   };
 
   private readonly editorTabService: EditorTabService;
+  private readonly gamePlaySessionService: GamePlaySessionService;
 
-  constructor(editorTabService: EditorTabService) {
+  constructor(
+    editorTabService: EditorTabService,
+    gamePlaySessionService: GamePlaySessionService
+  ) {
     super();
     this.editorTabService = editorTabService;
+    this.gamePlaySessionService = gamePlaySessionService;
   }
 
   preconditions(context: CommandContext): CommandPreconditionResult {
@@ -53,8 +59,12 @@ export class StartGameCommand extends CommandBase<void, void> {
       })
     );
 
-    const gameTabResourceId = 'game-view-instance';
-    await this.editorTabService.openResourceTab('game', gameTabResourceId, {}, true);
+    if (this.gamePlaySessionService.isPopoutOpen()) {
+      await this.gamePlaySessionService.openOrFocusPopoutWindow();
+    } else {
+      const gameTabResourceId = 'game-view-instance';
+      await this.editorTabService.openResourceTab('game', gameTabResourceId, {}, true);
+    }
 
     return {
       didMutate: true,

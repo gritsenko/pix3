@@ -159,6 +159,8 @@ export interface Navigation2DSettings {
   zoomSensitivity: number;
 }
 
+export type GameAspectRatio = 'free' | '16:9-landscape' | '16:9-portrait' | '4:3';
+
 export interface UIState {
   theme: ThemeName;
   isLayoutReady: boolean;
@@ -180,8 +182,12 @@ export interface UIState {
   warnOnUnsavedUnload: boolean;
   /** Pause rendering when the window is unfocused for battery economy */
   pauseRenderingOnUnfocus: boolean;
+  /** Preferred aspect ratio for the runtime preview surface */
+  gameAspectRatio: GameAspectRatio;
   /** True when the scene is in play mode (scripts running) */
   isPlaying: boolean;
+  /** True when a dedicated external game preview window is open */
+  isGamePopoutOpen: boolean;
   playModeStatus: 'stopped' | 'playing' | 'paused';
 }
 
@@ -279,7 +285,9 @@ export const createInitialAppState = (): AppState => ({
     showLighting: true,
     warnOnUnsavedUnload: true,
     pauseRenderingOnUnfocus: true,
+    gameAspectRatio: 'free',
     isPlaying: false,
+    isGamePopoutOpen: false,
     playModeStatus: 'stopped',
   },
   operations: {
