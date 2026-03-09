@@ -49,6 +49,20 @@ export class AudioService {
     window.addEventListener('focus', this.handleFocus);
   }
 
+  setVolume(value: number): void {
+    if (this.masterGain) {
+      this.masterGain.gain.setTargetAtTime(value, this.context?.currentTime ?? 0, 0.01);
+    }
+  }
+
+  mute(): void {
+    this.setVolume(0);
+  }
+
+  unmute(): void {
+    this.setVolume(1);
+  }
+
   private handleBlur = (): void => {
     if (this.context?.state === 'running') {
       this.suspendedByFocusLoss = true;

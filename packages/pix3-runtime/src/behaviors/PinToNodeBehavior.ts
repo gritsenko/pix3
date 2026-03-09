@@ -47,6 +47,35 @@ export class PinToNodeBehavior extends Script {
         this.targetNode = null;
     }
 
+    private getSceneRoot(): Object3D | null {
+        if (!this.node) return null;
+
+        let root: Object3D = this.node;
+        while (root.parent) {
+            root = root.parent;
+        }
+
+        return root;
+    }
+
+    private resolveProjectionCamera(root: Object3D | null): Camera3D | null {
+        const activeCamera = this.scene?.getActiveCamera() ?? null;
+        if (activeCamera) {
+            this.cameraNode = activeCamera;
+            return activeCamera;
+        }
+
+        if (this.cameraNode) {
+            return this.cameraNode;
+        }
+
+        if (root) {
+            this.findCamera(root);
+        }
+
+        return this.cameraNode;
+    }
+
     override onStart() {
         this.targetNode = null;
         this.cameraNode = null;
@@ -59,22 +88,17 @@ export class PinToNodeBehavior extends Script {
 
         if (!this.node) return;
 
-        // Traverse up to find the THREE.Scene root
-        let root: Object3D = this.node;
-        while (root.parent) {
-            root = root.parent;
-        }
+        const root = this.getSceneRoot();
+        if (!root) return;
 
         // Cache Layout2D for logical camera size computation
         this._layout2D = this.findLayout2D(root);
 
-        if (!this.targetNodeId) return;
+        if (this.targetNodeId) {
+            this.targetNode = this.findNodeById(root, this.targetNodeId);
+        }
 
-        // Resolve target node
-        this.targetNode = this.findNodeById(root, this.targetNodeId);
-
-        // Find the active Camera3D
-        this.findCamera(root);
+        this.resolveProjectionCamera(root);
     }
 
     override onDetach() {
@@ -114,21 +138,22 @@ export class PinToNodeBehavior extends Script {
     }
 
     override onUpdate(_dt: number) {
-        if (!this.targetNode || !this.node || !this.cameraNode || !(this.node instanceof Node2D)) {
-            // Re-try finding the target and camera if they were missing or added later
-            if (!this.targetNode || !this.cameraNode) {
-                let root: Object3D | null = this.node;
-                while (root?.parent) root = root.parent;
-                if (root) {
-                    if (!this.targetNode && this.targetNodeId) this.targetNode = this.findNodeById(root, this.targetNodeId);
-                    if (!this.cameraNode) this.findCamera(root);
-                }
-            }
+        if (!this.node || !(this.node instanceof Node2D)) {
             return;
         }
 
+        const root = this.getSceneRoot();
+        if (!root) return;
+
+        if (!this.targetNode && this.targetNodeId) {
+            this.targetNode = this.findNodeById(root, this.targetNodeId);
+        }
+
+        const projectionCamera = this.resolveProjectionCamera(root);
+        if (!this.targetNode || !projectionCamera) return;
+
         const targetObj = this.targetNode as unknown as Object3D;
-        const cameraObj = this.cameraNode.camera;
+        const cameraObj = projectionCamera.camera;
 
         if (!targetObj || !cameraObj) return;
 
