@@ -41,3 +41,4 @@ Future improvements:
 - publish online PWA version
 - version check and update functionality
 - asset library/store
+- log game events to editor's console
