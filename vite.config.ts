@@ -14,7 +14,6 @@ export default defineConfig({
   },
   optimizeDeps: {
     include: ['three', 'lit', 'valtio', 'yaml', 'golden-layout'],
-    exclude: ['@pix3/runtime'],
     esbuildOptions: {
       target: 'es2022',
     },

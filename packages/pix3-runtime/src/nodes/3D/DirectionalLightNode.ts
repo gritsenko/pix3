@@ -41,10 +41,10 @@ export class DirectionalLightNode extends Node3D {
     this.add(this.light);
     this.add(this.light.target);
 
-    const initialTarget = this.getWorldPosition(new Vector3()).add(
-      new Vector3(0, 0, -TARGET_DISTANCE).applyQuaternion(this.getWorldQuaternion(new Quaternion()))
-    );
-    this.setTargetPosition(initialTarget);
+    // Initialize target in local space (-Z direction) without calling lookAt(),
+    // which would normalize the Euler angles set by super(props) and corrupt saved rotations.
+    this.light.target.position.set(0, 0, -TARGET_DISTANCE);
+    this.light.target.updateMatrixWorld(true);
   }
 
   getTargetPosition(): Vector3 {
