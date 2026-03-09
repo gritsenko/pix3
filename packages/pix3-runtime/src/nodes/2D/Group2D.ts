@@ -196,6 +196,54 @@ export class Group2D extends Node2D {
     this._triggerLayoutUpdate();
   }
 
+  /**
+   * Update anchorMin while preserving the current visual rect.
+   */
+  setAnchorMinPreserveRect(value: Vector2): void {
+    this.setAnchorsPreserveRect(value, this._anchorMax);
+  }
+
+  /**
+   * Update anchorMax while preserving the current visual rect.
+   */
+  setAnchorMaxPreserveRect(value: Vector2): void {
+    this.setAnchorsPreserveRect(this._anchorMin, value);
+  }
+
+  /**
+   * Update anchors while preserving the current visual rect.
+   * This is used by editor property updates so changing anchors doesn't push
+   * the rect offscreen by reusing offsets from the previous anchor basis.
+   */
+  setAnchorsPreserveRect(anchorMin: Vector2, anchorMax: Vector2): void {
+    const currentCenterX = this.position.x;
+    const currentCenterY = this.position.y;
+    const currentWidth = this._width;
+    const currentHeight = this._height;
+
+    this._anchorMin.copy(anchorMin);
+    this._anchorMax.copy(anchorMax);
+    this._clampAnchor(this._anchorMin);
+    this._clampAnchor(this._anchorMax);
+
+    if (this._parentWidth > 0 && this._parentHeight > 0) {
+      const anchorMinX = (this._anchorMin.x - 0.5) * this._parentWidth;
+      const anchorMinY = (this._anchorMin.y - 0.5) * this._parentHeight;
+      const anchorMaxX = (this._anchorMax.x - 0.5) * this._parentWidth;
+      const anchorMaxY = (this._anchorMax.y - 0.5) * this._parentHeight;
+
+      const left = currentCenterX - currentWidth / 2;
+      const right = currentCenterX + currentWidth / 2;
+      const bottom = currentCenterY - currentHeight / 2;
+      const top = currentCenterY + currentHeight / 2;
+
+      this._offsetMin.set(left - anchorMinX, bottom - anchorMinY);
+      this._offsetMax.set(right - anchorMaxX, top - anchorMaxY);
+    }
+
+    this._triggerLayoutUpdate();
+  }
+
   // --- Offset Min ---
 
   get offsetMin(): Vector2 {
@@ -301,12 +349,14 @@ export class Group2D extends Node2D {
     let pw = parentWidth ?? this._parentWidth;
     let ph = parentHeight ?? this._parentHeight;
 
-    // If still zero, try to get from actual parent Group2D
+    // If still zero, try to get dimensions from the actual parent container.
     if (pw <= 0 || ph <= 0) {
-      const parentGroup = this.parent instanceof Group2D ? this.parent : null;
-      if (parentGroup) {
-        pw = parentGroup.width || pw;
-        ph = parentGroup.height || ph;
+      const parentContainer = this.parent as { width?: unknown; height?: unknown } | null;
+      const parentWidthValue = parentContainer?.width;
+      const parentHeightValue = parentContainer?.height;
+      if (typeof parentWidthValue === 'number' && typeof parentHeightValue === 'number') {
+        pw = parentWidthValue || pw;
+        ph = parentHeightValue || ph;
       }
     }
 
@@ -507,7 +557,7 @@ export class Group2D extends Node2D {
           setValue: (node: unknown, value: unknown) => {
             const n = node as Group2D;
             const v = value as { x: number; y: number };
-            n.anchorMin = new Vector2(v.x, v.y);
+            n.setAnchorMinPreserveRect(new Vector2(v.x, v.y));
           },
         },
         {
@@ -528,7 +578,7 @@ export class Group2D extends Node2D {
           setValue: (node: unknown, value: unknown) => {
             const n = node as Group2D;
             const v = value as { x: number; y: number };
-            n.anchorMax = new Vector2(v.x, v.y);
+            n.setAnchorMaxPreserveRect(new Vector2(v.x, v.y));
           },
         },
         {

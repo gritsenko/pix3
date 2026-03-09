@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
 import { TransformTool2d, type Selection2DOverlay } from './TransformTool2d';
-import { Group2D } from '@pix3/runtime';
+import { Group2D, Layout2D } from '@pix3/runtime';
 import { Vector2 } from 'three';
 
 describe('TransformTool2d', () => {
@@ -294,6 +294,33 @@ describe('Group2D anchor manipulation', () => {
       expect(group.offsetMin.x).toBe(0);
       expect(group.offsetMax.x).toBe(100);
     });
+
+    it('reads parent dimensions from Layout2D when cache is unavailable', () => {
+      const layout = new Layout2D({
+        id: 'layout',
+        name: 'Layout',
+        width: 1080,
+        height: 1080,
+      });
+      const group = new Group2D({
+        id: 'test',
+        name: 'Test',
+        width: 231,
+        height: 242,
+        anchorMin: new Vector2(1, 1),
+        anchorMax: new Vector2(1, 1),
+      });
+
+      layout.add(group);
+      group.position.set(378.4212496052736, 383.83459111273385, 0);
+
+      group.recalculateOffsets();
+
+      expect(group.offsetMin.x).toBeCloseTo(-277.0787503947264);
+      expect(group.offsetMin.y).toBeCloseTo(-277.16540888726615);
+      expect(group.offsetMax.x).toBeCloseTo(-46.07875039472638);
+      expect(group.offsetMax.y).toBeCloseTo(-35.165408887266146);
+    });
   });
 
   describe('updateLayout', () => {
@@ -319,6 +346,36 @@ describe('Group2D anchor manipulation', () => {
       // Should clamp to minimum 1px
       expect(group.width).toBeGreaterThanOrEqual(1);
       expect(group.height).toBeGreaterThanOrEqual(1);
+    });
+
+    it('preserves the rect when anchors change through property updates', () => {
+      const group = new Group2D({
+        id: 'test',
+        name: 'Test',
+        width: 231,
+        height: 242,
+      });
+
+      group.updateLayout(1080, 1080);
+      group.position.set(424.5, 419, 0);
+      group.recalculateOffsets(1080, 1080);
+
+      const schema = Group2D.getPropertySchema();
+      const anchorMin = schema.properties.find(prop => prop.name === 'anchorMin');
+      const anchorMax = schema.properties.find(prop => prop.name === 'anchorMax');
+
+      expect(anchorMin).toBeDefined();
+      expect(anchorMax).toBeDefined();
+
+      anchorMin!.setValue(group, { x: 1, y: 1 });
+      anchorMax!.setValue(group, { x: 1, y: 1 });
+
+      expect(group.position.x).toBe(424.5);
+      expect(group.position.y).toBe(419);
+      expect(group.offsetMin.x).toBe(-231);
+      expect(group.offsetMin.y).toBe(-242);
+      expect(group.offsetMax.x).toBe(0);
+      expect(group.offsetMax.y).toBe(0);
     });
   });
 });
