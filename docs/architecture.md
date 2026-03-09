@@ -407,8 +407,6 @@ and keep undo/redo selection cleanup symmetric.
 - **SetControllerCommand**: Sets a controller on a node via behavior picker
 - **ClearControllerCommand**: Removes controller from a node
 - **ToggleScriptEnabledCommand**: Toggles enabled state of a behavior or controller
-- **PlaySceneCommand**: Starts script execution loop
-- **StopSceneCommand**: Stops script execution loop
 - **SetPlayModeOperation**: Single source of truth for `ui.isPlaying` and `ui.playModeStatus`
 
 ## Script Component System
@@ -528,9 +526,7 @@ All script mutations use commands through CommandDispatcher:
 - **AddComponentCommand/Operation**: Add a component to a node
 - **RemoveComponentCommand/Operation**: Remove a component from a node
 - **ToggleScriptEnabledCommand/Operation**: Enable/disable a component
-- **PlaySceneCommand**: Start script execution loop
-- **StopSceneCommand**: Stop script execution loop
-- **SetPlayModeOperation**: Update play-mode state through OperationService (used by play/stop commands and game tab lifecycle)
+- **SetPlayModeOperation**: Update play-mode state through OperationService (used by game tab lifecycle)
 
 ### Built-in Components
 

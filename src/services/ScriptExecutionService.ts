@@ -6,7 +6,7 @@
  */
 
 import { injectable, inject } from '@/fw/di';
-import { SceneManager, type SceneGraph, InputService, MeshInstance } from '@pix3/runtime';
+import { SceneManager, type SceneGraph, InputService, MeshInstance, AudioService } from '@pix3/runtime';
 import { NodeBase } from '@pix3/runtime';
 import { AutoloadService } from './AutoloadService';
 
@@ -28,6 +28,9 @@ export class ScriptExecutionService {
 
   @inject(AutoloadService)
   private readonly autoloadService!: AutoloadService;
+
+  @inject(AudioService)
+  private readonly audioService!: AudioService;
 
   private animationFrameId: number | null = null;
   private lastTimestamp: number = 0;
@@ -82,6 +85,9 @@ export class ScriptExecutionService {
     }
 
     this.nodeStateSnapshots.delete(this.getSnapshotKey(this.currentSceneId));
+
+    // Stop all audio when exiting play mode
+    this.audioService.stopAll();
 
     // Detach all scripts from current scene
     this.detachScriptsFromScene();

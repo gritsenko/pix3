@@ -16,6 +16,8 @@ interface WindowWithWebkitAudioContext extends Window {
 export class AudioService {
   private context: AudioContext | null = null;
   private masterGain: GainNode | null = null;
+  private readonly activePlaybacks = new Set<AudioPlayback>();
+  private suspendedByFocusLoss = false;
 
   constructor() {
     const audioWindow = window as WindowWithWebkitAudioContext;
@@ -41,17 +43,50 @@ export class AudioService {
     // iOS Safari / Web Audio requirement: context must be resumed by user interaction
     window.addEventListener('pointerdown', () => this.unlock(), { once: true });
     window.addEventListener('keydown', () => this.unlock(), { once: true });
+
+    // Auto-mute on focus loss
+    window.addEventListener('blur', this.handleBlur);
+    window.addEventListener('focus', this.handleFocus);
   }
+
+  private handleBlur = (): void => {
+    if (this.context?.state === 'running') {
+      this.suspendedByFocusLoss = true;
+      void this.context.suspend();
+    }
+  };
+
+  private handleFocus = (): void => {
+    if (this.suspendedByFocusLoss && this.context?.state === 'suspended') {
+      this.suspendedByFocusLoss = false;
+      void this.context.resume();
+    }
+  };
 
   unlock(): void {
     if (!this.context) {
       return;
     }
 
-    if (this.context.state === 'suspended') {
+    if (this.context.state === 'suspended' && !this.suspendedByFocusLoss) {
       this.context.resume().catch(err => {
         console.warn('[AudioService] Failed to resume AudioContext:', err);
       });
+    }
+  }
+
+  /**
+   * Stops all active playbacks.
+   */
+  stopAll(): void {
+    const playbacks = Array.from(this.activePlaybacks);
+    this.activePlaybacks.clear();
+    for (const playback of playbacks) {
+      try {
+        playback.stop();
+      } catch (err) {
+        // Ignore
+      }
     }
   }
 
@@ -65,7 +100,7 @@ export class AudioService {
       };
     }
 
-    if (this.context.state === 'suspended') {
+    if (this.context.state === 'suspended' && !this.suspendedByFocusLoss) {
       console.warn(
         '[AudioService] Attempting to play audio while context is suspended. It might not be audible until user interaction.'
       );
@@ -83,7 +118,7 @@ export class AudioService {
 
     source.start();
 
-    return {
+    const playback: AudioPlayback = {
       stop: () => {
         try {
           source.stop();
@@ -91,9 +126,19 @@ export class AudioService {
           gainNode.disconnect();
         } catch (err) {
           // Ignore errors if already stopped
+        } finally {
+          this.activePlaybacks.delete(playback);
         }
       },
     };
+
+    source.onended = () => {
+      this.activePlaybacks.delete(playback);
+    };
+
+    this.activePlaybacks.add(playback);
+
+    return playback;
   }
 
   async decodeAudioData(audioData: ArrayBuffer): Promise<AudioBuffer> {

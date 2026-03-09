@@ -166,11 +166,9 @@ src/
       ClearControllerOperation.ts
       DetachBehaviorCommand.ts
       DetachBehaviorOperation.ts
-      PlaySceneCommand.ts
       SetPlayModeOperation.ts
       SetControllerCommand.ts
       SetControllerOperation.ts
-      StopSceneCommand.ts
       ToggleScriptEnabledCommand.ts
       ToggleScriptEnabledOperation.ts
     selection/

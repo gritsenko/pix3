@@ -133,7 +133,14 @@ export class PlaySoundBehavior extends Script {
 
     try {
       const buffer = await assetLoader.loadAudio(track);
-      audioService.play(buffer, {
+
+      // Re-check scene and audio service after async load
+      const currentAudioService = scene.getAudioService();
+      if (!currentAudioService) {
+        return;
+      }
+
+      currentAudioService.play(buffer, {
         volume: this.getVolume(),
         loop: this.getLoop(),
       });

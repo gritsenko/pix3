@@ -63,8 +63,15 @@ export class AudioPlayer extends NodeBase {
 
     try {
       const buffer = await assetLoader.loadAudio(this.audioTrack);
+
+      // Re-check scene and audio service after async load to handle stop/unmount during loading
+      const currentAudioService = scene.getAudioService();
+      if (!currentAudioService) {
+        return;
+      }
+
       this.stop();
-      this.playback = audioService.play(buffer, {
+      this.playback = currentAudioService.play(buffer, {
         loop: this.loop,
         volume: this.volume,
       });

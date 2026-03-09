@@ -27,6 +27,7 @@ export class SceneRunner {
   private readonly renderer: RuntimeRenderer;
   private readonly inputService: InputService;
   private readonly sceneService: SceneService;
+  private readonly audioService: AudioService;
   private readonly clock: Clock;
   private animationFrameId: number | null = null;
   private isRunning: boolean = false;
@@ -48,6 +49,7 @@ export class SceneRunner {
     this.renderer = renderer;
     this.inputService = new InputService();
     this.sceneService = new SceneService();
+    this.audioService = audioService;
     this.clock = new Clock();
     this.scene = new Scene();
     // Default background
@@ -163,6 +165,11 @@ export class SceneRunner {
       for (const rootNode of this.runtimeGraph.rootNodes) {
         this.stopAudioPlayers(rootNode);
       }
+
+      this.audioService.stopAll();
+
+      // Clear delegate to prevent any pending async calls from restarting audio/loading
+      this.sceneService.setDelegate(null);
 
       // Remove nodes from the THREE scene (optional, as scene.clear() might be called next start)
       // But good for cleanup
