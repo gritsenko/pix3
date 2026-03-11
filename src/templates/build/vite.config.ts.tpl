@@ -228,6 +228,8 @@ export default defineConfig({
     outDir: resolve(projectDir, 'dist'),
     emptyOutDir: true,
     cssCodeSplit: false,
+    minify: 'esbuild',
+    sourcemap: false,
     rollupOptions: {
       output: {
         inlineDynamicImports: true,

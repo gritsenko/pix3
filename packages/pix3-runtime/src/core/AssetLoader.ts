@@ -1,9 +1,9 @@
 import { ResourceManager } from './ResourceManager';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { NodeBase } from '../nodes/NodeBase';
-import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { AnimationClip, Texture, TextureLoader } from 'three';
 import { AudioService } from './AudioService';
+import type { GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export interface AssetLoaderResult {
   node: NodeBase;
@@ -220,6 +220,8 @@ export class AssetLoader {
       const blob = await this.resources.readBlob(resourcePath);
       const arrayBuffer = await blob.arrayBuffer();
 
+      // Lazy-load GLTFLoader only when needed to reduce bundle size
+      const { GLTFLoader } = await import('three/examples/jsm/loaders/GLTFLoader.js');
       const loader = new GLTFLoader();
 
       // Use parse() instead of loadAsync() with an empty resource path
