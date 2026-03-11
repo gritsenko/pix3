@@ -223,10 +223,13 @@ export class SceneRunner {
     const cssHeight = canvas.clientHeight > 0 ? canvas.clientHeight : canvas.height;
 
     // 0. Handle Resizing
-    if (this.viewportSize.width !== cssWidth || this.viewportSize.height !== cssHeight) {
+    // Track whether viewport changed so we can notify scripts AFTER cameras are updated.
+    const viewportChanged =
+      this.viewportSize.width !== cssWidth || this.viewportSize.height !== cssHeight;
+
+    if (viewportChanged) {
       this.viewportSize.width = cssWidth;
       this.viewportSize.height = cssHeight;
-      this.sceneService.setViewportSize(cssWidth, cssHeight);
 
       // Compute adaptive logical camera dimensions (Expand / Match-Min mode).
       // The Layout2D's authored size is the base resolution that must always
@@ -313,6 +316,13 @@ export class SceneRunner {
         this.orthographicCamera.updateProjectionMatrix();
       }
     }
+
+    // Notify scripts of viewport change AFTER camera matrices are updated so that
+    // pin/projection-based scripts (e.g. PinToNodeBehavior) project with correct matrices.
+    if (viewportChanged) {
+      this.sceneService.setViewportSize(cssWidth, cssHeight);
+    }
+
     // 2. Render Passes
 
     // Pass 1: 3D

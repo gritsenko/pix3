@@ -84,6 +84,7 @@ export class PinToNodeBehavior extends Script {
         this._unsubscribeViewport?.();
         this._unsubscribeViewport = this.scene?.onViewportChanged(() => {
             // Triggers re-computation of logical camera size on next update frame.
+            this.updatePinning();
         }) ?? null;
 
         if (!this.node) return;
@@ -99,6 +100,9 @@ export class PinToNodeBehavior extends Script {
         }
 
         this.resolveProjectionCamera(root);
+        
+        // Initial pin update
+        this.updatePinning();
     }
 
     override onDetach() {
@@ -138,6 +142,10 @@ export class PinToNodeBehavior extends Script {
     }
 
     override onUpdate(_dt: number) {
+        this.updatePinning();
+    }
+
+    private updatePinning() {
         if (!this.node || !(this.node instanceof Node2D)) {
             return;
         }
@@ -193,8 +201,9 @@ export class PinToNodeBehavior extends Script {
      * (instead of device pixels) keeps coordinate-space consistent regardless of DPR.
      */
     private getLogicalCameraSize(): { width: number; height: number } {
-        const cssWidth = this.input?.width ?? window.innerWidth;
-        const cssHeight = this.input?.height ?? window.innerHeight;
+        const viewport = this.scene?.getViewportSize();
+        const cssWidth = (viewport && viewport.width > 0) ? viewport.width : (window.innerWidth);
+        const cssHeight = (viewport && viewport.height > 0) ? viewport.height : (window.innerHeight);
 
         if (cssWidth <= 0 || cssHeight <= 0) {
             return { width: 1, height: 1 };
