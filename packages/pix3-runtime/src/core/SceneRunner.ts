@@ -192,9 +192,10 @@ export class SceneRunner {
   resume(): void {
     if (!this.isRunning || !this.isPaused) return;
     this.isPaused = false;
+    // Consume the time elapsed during pause so the next tick gets a fresh delta.
+    this.clock.getDelta();
     this.tick();
   }
-
   private tick = (): void => {
     if (!this.isRunning || this.isPaused) return;
 
