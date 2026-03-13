@@ -21,6 +21,7 @@ export type ViewportChangeListener = (info: ViewportInfo) => void;
  */
 export interface SceneServiceDelegate {
   getActiveCameraNode(): Camera3D | null;
+  getUICamera(): import('three').Camera | null;
   setActiveCameraNode(camera: Camera3D | null): void;
   findNodeById(id: string): NodeBase | null;
   getAudioService(): AudioService;
@@ -122,6 +123,13 @@ export class SceneService {
    */
   getActiveCamera(): Camera3D | null {
     return this.delegate?.getActiveCameraNode() ?? null;
+  }
+
+  /**
+   * Returns the internal orthographic camera used for 2D UI rendering.
+   */
+  getUICamera(): import('three').Camera | null {
+    return this.delegate?.getUICamera() ?? null;
   }
 
   getAudioService(): AudioService | null {

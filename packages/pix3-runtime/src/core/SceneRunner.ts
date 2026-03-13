@@ -68,6 +68,9 @@ export class SceneRunner {
       getActiveCameraNode(): Camera3D | null {
         return runner.activeCamera;
       },
+      getUICamera(): Camera | null {
+        return runner.orthographicCamera;
+      },
       setActiveCameraNode(camera: Camera3D | null): void {
         runner.activeCamera = camera;
       },
@@ -196,6 +199,7 @@ export class SceneRunner {
     this.clock.getDelta();
     this.tick();
   }
+
   private tick = (): void => {
     if (!this.isRunning || this.isPaused) return;
 
