@@ -1,7 +1,7 @@
 import { defineConfig, type Plugin } from 'vite';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { existsSync, readFileSync, statSync } from 'fs';
+import { existsSync, readFileSync, statSync, writeFileSync } from 'fs';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
 interface AssetManifest {
@@ -216,6 +216,65 @@ function runtimeBuildSizeReportPlugin(): Plugin {
   };
 }
 
+function classicScriptCompatibilityPlugin(): Plugin {
+  return {
+    name: 'classic-script-compatibility',
+    closeBundle() {
+      if (!existsSync(outputHtmlPath)) {
+        return;
+      }
+
+      const originalHtml = readFileSync(outputHtmlPath, 'utf-8');
+      let compatibleHtml = originalHtml
+        .replace(/<script\b([^>]*)>/gi, (_match, attrs: string) => {
+          const cleanedAttrs = attrs
+            .replace(/\s+type=(['"])module\1/gi, '')
+            .replace(/\s+crossorigin(?:=(['"]).*?\1)?/gi, '');
+
+          return `<script${cleanedAttrs}>`;
+        })
+        .replace(/\bimport\.meta\.url\b/g, 'document.baseURI');
+
+      const headOpenMatch = /<head>/i.exec(compatibleHtml);
+      const headCloseMatch = /<\/head>/i.exec(compatibleHtml);
+      const bodyOpenMatch = /<body\b[^>]*>/i.exec(compatibleHtml);
+
+      if (headOpenMatch && headCloseMatch && bodyOpenMatch) {
+        const headContentStart = headOpenMatch.index + headOpenMatch[0].length;
+        const headContentEnd = headCloseMatch.index;
+        const bodyCloseIndex = compatibleHtml
+          .toLowerCase()
+          .indexOf('</body>', bodyOpenMatch.index + bodyOpenMatch[0].length);
+
+        if (bodyCloseIndex === -1) {
+          throw new Error('Failed to locate </body> while rewriting classic script output.');
+        }
+
+        const headContent = compatibleHtml.slice(headContentStart, headContentEnd);
+        const headScripts = headContent.match(/<script\b[\s\S]*?<\/script>/gi) ?? [];
+
+        if (headScripts.length > 0) {
+          let nextHeadContent = headContent;
+          for (const scriptTag of headScripts) {
+            nextHeadContent = nextHeadContent.replace(scriptTag, '');
+          }
+
+          compatibleHtml =
+            compatibleHtml.slice(0, headContentStart) +
+            nextHeadContent +
+            compatibleHtml.slice(headContentEnd, bodyCloseIndex) +
+            `${headScripts.join('\n')}\n` +
+            compatibleHtml.slice(bodyCloseIndex);
+        }
+      }
+
+      if (compatibleHtml !== originalHtml) {
+        writeFileSync(outputHtmlPath, compatibleHtml, 'utf-8');
+      }
+    },
+  };
+}
+
 export default defineConfig({
   root: projectDir,
   base: './',
@@ -228,6 +287,7 @@ export default defineConfig({
     outDir: resolve(projectDir, 'dist'),
     emptyOutDir: true,
     cssCodeSplit: false,
+    modulePreload: false,
     minify: 'esbuild',
     sourcemap: false,
     rollupOptions: {
@@ -236,5 +296,10 @@ export default defineConfig({
       },
     },
   },
-  plugins: [embeddedRuntimeAssetsPlugin(), viteSingleFile(), runtimeBuildSizeReportPlugin()],
+  plugins: [
+    embeddedRuntimeAssetsPlugin(),
+    viteSingleFile(),
+    classicScriptCompatibilityPlugin(),
+    runtimeBuildSizeReportPlugin(),
+  ],
 });

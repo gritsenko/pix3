@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>{{PROJECT_NAME}} - Runtime</title>
+    <title>{{PROJECT_NAME}}</title>
     <style>
       html,
       body,

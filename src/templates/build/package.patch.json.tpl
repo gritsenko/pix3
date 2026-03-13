@@ -1,18 +1,20 @@
 {
+  "sideEffects": false,
   "scripts": {
-    "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "dev": "vite"
   },
   "dependencies": {
     "lit": "^3.3.1",
     "reflect-metadata": "^0.2.2",
-    "three": "^0.183.1",
+    "three": "^0.183.2",
     "yaml": "^2.6.0"
   },
   "devDependencies": {
+    "@types/node": "^25.5.0",
+    "@types/three": "^0.183.1",
     "typescript": "~5.8.3",
     "vite": "^7.1.7",
     "vite-plugin-singlefile": "^2.3.0"
-    "@types/three": "^0.183.1",
   }
 }

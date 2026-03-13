@@ -3,6 +3,7 @@ import { FileSystemAPIService } from './FileSystemAPIService';
 import type { CommandContext } from '@/core/command';
 
 interface BuildPackagePatch {
+  sideEffects?: boolean;
   scripts?: Record<string, string>;
   dependencies?: Record<string, string>;
   devDependencies?: Record<string, string>;
@@ -194,6 +195,10 @@ export class ProjectBuildService {
 
     const existing = this.parseJsonRecord(existingRaw);
     const patch = this.parseJsonRecord(patchTemplate) as BuildPackagePatch;
+
+    if (typeof patch.sideEffects === 'boolean' && typeof existing.sideEffects !== 'boolean') {
+      existing.sideEffects = patch.sideEffects;
+    }
 
     const scripts = this.ensureStringMap(existing, 'scripts');
     scripts.build = RUNTIME_BUILD_COMMAND;

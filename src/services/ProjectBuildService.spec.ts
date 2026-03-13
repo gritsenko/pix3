@@ -107,12 +107,22 @@ describe('ProjectBuildService', () => {
     const packageJsonRaw = fs.files.get('package.json');
     expect(typeof packageJsonRaw).toBe('string');
     const packageJson = JSON.parse(packageJsonRaw ?? '{}') as {
+      sideEffects?: boolean;
       scripts?: Record<string, string>;
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
     };
 
+    expect(packageJson.sideEffects).toBe(false);
     expect(packageJson.scripts?.build).toBe('vite build');
     expect(packageJson.scripts?.dev).toBe('vite');
     expect(packageJson.scripts?.test).toBe('vitest');
+    expect(packageJson.dependencies?.three).toBe('^0.183.2');
+    expect(packageJson.devDependencies?.['@types/node']).toBe('^25.5.0');
+
+    const viteConfig = fs.files.get('vite.config.ts');
+    expect(viteConfig).toContain("classicScriptCompatibilityPlugin");
+    expect(viteConfig).toContain('modulePreload: false');
 
     expect(result.sceneCount).toBe(1);
     expect(result.assetCount).toBe(2);
