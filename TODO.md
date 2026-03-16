@@ -43,3 +43,6 @@ Future improvements:
 - asset library/store
 - log game events to editor's console
 - particle rotation toggle and saving fix
+- build playable from editor
+- platform switch on game mode, to test condition for different platforms
+- allow to pack playable for ad networks from the app
