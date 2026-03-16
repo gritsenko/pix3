@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateJoystick2DOperationParams,
 } from '@/features/scene/CreateJoystick2DOperation';
 
-export interface CreateJoystick2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateJoystick2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateJoystick2DCommand extends CreateNodeBaseCommand<
   CreateJoystick2DOperationParams,

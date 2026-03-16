@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateInventorySlot2DOperationParams,
 } from '@/features/scene/CreateInventorySlot2DOperation';
 
-export interface CreateInventorySlot2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateInventorySlot2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateInventorySlot2DCommand extends CreateNodeBaseCommand<
   CreateInventorySlot2DOperationParams,

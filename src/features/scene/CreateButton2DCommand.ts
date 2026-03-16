@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateButton2DOperationParams,
 } from '@/features/scene/CreateButton2DOperation';
 
-export interface CreateButton2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateButton2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateButton2DCommand extends CreateNodeBaseCommand<
   CreateButton2DOperationParams,

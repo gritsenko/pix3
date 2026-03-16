@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateSlider2DOperationParams,
 } from '@/features/scene/CreateSlider2DOperation';
 
-export interface CreateSlider2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateSlider2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateSlider2DCommand extends CreateNodeBaseCommand<
   CreateSlider2DOperationParams,

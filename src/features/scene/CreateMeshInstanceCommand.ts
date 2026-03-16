@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateMeshInstanceOperationParams,
 } from '@/features/scene/CreateMeshInstanceOperation';
 
-export interface CreateMeshInstanceCommandPayload extends CreateNodeCommandPayload {}
+export type CreateMeshInstanceCommandPayload = CreateNodeCommandPayload;
 
 export class CreateMeshInstanceCommand extends CreateNodeBaseCommand<
   CreateMeshInstanceOperationParams,

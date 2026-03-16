@@ -1122,9 +1122,9 @@ export class ViewportRendererService {
         viewportBaseSize.height
       );
 
-      // Cast userData to any to set custom properties
-      (this.baseViewportFrame.userData as any).viewportBaseWidth = viewportBaseSize.width;
-      (this.baseViewportFrame.userData as any).viewportBaseHeight = viewportBaseSize.height;
+      // Cast userData to set custom viewport dimensions
+      this.baseViewportFrame.userData['viewportBaseWidth'] = viewportBaseSize.width;
+      this.baseViewportFrame.userData['viewportBaseHeight'] = viewportBaseSize.height;
 
       this.scene.add(this.baseViewportFrame);
     }
@@ -1737,8 +1737,8 @@ export class ViewportRendererService {
         const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
         if (sizeGroup) {
           // Use natural dimensions if width/height are undefined (first load)
-          const w = node.width ?? (node as any).originalWidth ?? 64;
-          const h = node.height ?? (node as any).originalHeight ?? 64;
+          const w = node.width ?? node.originalWidth ?? 64;
+          const h = node.height ?? node.originalHeight ?? 64;
           sizeGroup.scale.set(w, h, 1);
         }
 
@@ -2807,8 +2807,8 @@ export class ViewportRendererService {
     root.layers.set(LAYER_2D);
 
     const sizeGroup = new THREE.Group();
-    const w = node.width ?? (node as any).originalWidth ?? 64;
-    const h = node.height ?? (node as any).originalHeight ?? (96 / 217) * 64; // arbitrary but consistent
+    const w = node.width ?? node.originalWidth ?? 64;
+    const h = node.height ?? node.originalHeight ?? (96 / 217) * 64; // arbitrary but consistent
     sizeGroup.scale.set(w, h, 1);
     sizeGroup.layers.set(LAYER_2D);
     sizeGroup.add(mesh);

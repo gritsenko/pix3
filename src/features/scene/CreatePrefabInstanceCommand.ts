@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreatePrefabInstanceOperationParams,
 } from '@/features/scene/CreatePrefabInstanceOperation';
 
-export interface CreatePrefabInstanceCommandPayload extends CreateNodeCommandPayload {}
+export type CreatePrefabInstanceCommandPayload = CreateNodeCommandPayload;
 
 export class CreatePrefabInstanceCommand extends CreateNodeBaseCommand<
   CreatePrefabInstanceOperationParams,

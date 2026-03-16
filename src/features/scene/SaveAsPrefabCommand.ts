@@ -144,6 +144,7 @@ export class SaveAsPrefabCommand extends CommandBase<void, void> {
     const source = (nodeName && nodeName.trim().length > 0 ? nodeName : fallbackId).trim();
     const withoutExtension = source.replace(/\.pix3scene$/i, '');
     const sanitized = withoutExtension
+      // eslint-disable-next-line no-control-regex
       .replace(/[<>:"/\\|?*\x00-\x1f]/g, '-')
       .replace(/\s+/g, '_')
       .replace(/-+/g, '-')

@@ -85,7 +85,7 @@ export class DropdownPortal {
         } else {
           this.originalParent.appendChild(this.menuElement);
         }
-      } catch (e) {
+      } catch {
         // If restoration fails, just append to original parent
         if (this.originalParent.isConnected) {
           this.originalParent.appendChild(this.menuElement);

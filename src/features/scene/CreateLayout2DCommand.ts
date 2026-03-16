@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateLayout2DOperationParams,
 } from '@/features/scene/CreateLayout2DOperation';
 
-export interface CreateLayout2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateLayout2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateLayout2DCommand extends CreateNodeBaseCommand<
   CreateLayout2DOperationParams,

@@ -5,6 +5,9 @@ export const ServiceLifetime = {
 } as const;
 export type ServiceLifetimeOption = (typeof ServiceLifetime)[keyof typeof ServiceLifetime];
 
+/** Generic constructor type for dependency injection */
+type Constructor<T = unknown> = new (...args: unknown[]) => T;
+
 // Base service interface
 export interface IService {
   dispose?(): void;
@@ -32,11 +35,7 @@ export class ServiceContainer {
   }
 
   // Register a service
-  addService<T>(
-    token: symbol,
-    implementation: new (...args: any[]) => T,
-    lifetime: ServiceLifetimeOption
-  ) {
+  addService<T>(token: symbol, implementation: Constructor<T>, lifetime: ServiceLifetimeOption) {
     // If a service is re-registered, remove any existing cached singleton instance so
     // tests and runtime can replace implementations without stale instances.
     if (this.singletonInstances.has(token)) {
@@ -53,7 +52,7 @@ export class ServiceContainer {
   }
 
   // Retrieve an existing token or create a new one
-  getOrCreateToken(service: symbol | string | (new (...args: any[]) => any)): symbol {
+  getOrCreateToken(service: symbol | string | Constructor): symbol {
     if (typeof service === 'symbol') {
       return service;
     }
@@ -111,7 +110,7 @@ export function injectable<T>(lifetime: ServiceLifetimeOption = ServiceLifetime.
 // Inject decorator (auto-detects type if not provided)
 import 'reflect-metadata';
 
-export function inject<T>(serviceType?: new (...args: any[]) => T) {
+export function inject<T>(serviceType?: Constructor<T>) {
   return function (target: object, propertyKey: string | symbol) {
     // If no explicit type, use reflect-metadata to get the property type
     // eslint-disable-next-line @typescript-eslint/no-explicit-any

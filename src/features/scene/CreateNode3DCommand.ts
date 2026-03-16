@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateNode3DOperationParams,
 } from '@/features/scene/CreateNode3DOperation';
 
-export interface CreateNode3DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateNode3DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateNode3DCommand extends CreateNodeBaseCommand<
   CreateNode3DOperationParams,

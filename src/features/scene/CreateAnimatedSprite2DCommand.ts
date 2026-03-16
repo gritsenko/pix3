@@ -8,11 +8,9 @@ import {
   type CreateAnimatedSprite2DOperationParams,
 } from '@/features/scene/CreateAnimatedSprite2DOperation';
 
-export interface CreateAnimatedSprite2DCommandPayload extends CreateNodeCommandPayload {}
-
 export class CreateAnimatedSprite2DCommand extends CreateNodeBaseCommand<
   CreateAnimatedSprite2DOperationParams,
-  CreateAnimatedSprite2DCommandPayload
+  CreateNodeCommandPayload
 > {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-animatedsprite2d',

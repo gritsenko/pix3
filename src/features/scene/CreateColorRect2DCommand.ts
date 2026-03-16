@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateColorRect2DOperationParams,
 } from '@/features/scene/CreateColorRect2DOperation';
 
-export interface CreateColorRect2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateColorRect2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateColorRect2DCommand extends CreateNodeBaseCommand<
   CreateColorRect2DOperationParams,

@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateLabel2DOperationParams,
 } from '@/features/scene/CreateLabel2DOperation';
 
-export interface CreateLabel2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateLabel2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateLabel2DCommand extends CreateNodeBaseCommand<
   CreateLabel2DOperationParams,

@@ -768,11 +768,7 @@ export class TransformTool2d {
       let preserveAspect = false;
       if (transform.nodeIds.length === 1) {
         const primaryNode = sceneGraph.nodeMap.get(transform.nodeIds[0]);
-        if (
-          primaryNode &&
-          'aspectRatioLocked' in primaryNode &&
-          (primaryNode as any).aspectRatioLocked
-        ) {
+        if (primaryNode && 'aspectRatioLocked' in primaryNode && primaryNode.aspectRatioLocked) {
           preserveAspect = true;
         }
       }

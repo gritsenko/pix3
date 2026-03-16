@@ -20,7 +20,7 @@ export class EditorResourceManager extends RuntimeResourceManager {
       const path = resource.startsWith('res://') ? resource.substring(6) : resource;
       try {
         return await this.fileSystem.readTextFile(path);
-      } catch (error) {
+      } catch {
         // Fallback to network
         return super.readText(this.buildPublicUrl(resource));
       }
@@ -36,7 +36,7 @@ export class EditorResourceManager extends RuntimeResourceManager {
       const path = resource.startsWith('res://') ? resource.substring(6) : resource;
       try {
         return await this.fileSystem.readBlob(path);
-      } catch (error) {
+      } catch {
         // Fallback to network
         return super.readBlob(this.buildPublicUrl(resource));
       }
@@ -54,7 +54,7 @@ export class EditorResourceManager extends RuntimeResourceManager {
   }
 
   private buildPublicUrl(relativePath: string): string {
-    const envBase = (import.meta as any).env?.BASE_URL ?? '/';
+    const envBase = import.meta.env.BASE_URL ?? '/';
     const base = envBase.replace(/\/*$/, '/');
     const path = relativePath.startsWith('res://') ? relativePath.substring(6) : relativePath;
     const trimmedPath = path.replace(/^\/+/, '');

@@ -4,6 +4,7 @@ import {
   type ContentItem,
   type Stack,
   type ComponentItem,
+  type ComponentItemConfig,
 } from 'golden-layout';
 import { injectable } from '@/fw/di';
 import { appState, type AppState, type EditorTab, type PanelVisibilityState } from '@/state';
@@ -99,9 +100,8 @@ const DEFAULT_LAYOUT_CONFIG: LayoutConfig = {
                 componentType: PANEL_COMPONENT_TYPES.background,
                 title: PANEL_DISPLAY_TITLES[PANEL_COMPONENT_TYPES.background],
                 isClosable: false,
-                // Cast to any to allow reorderEnabled in strict TS environments
                 reorderEnabled: false,
-              } as any,
+              } as ComponentItemConfig,
             ],
           },
           {
@@ -287,9 +287,7 @@ export class LayoutManagerService {
         shouldAutoFocus,
       });
 
-      // Use 'as any' to bypass strict ComponentItemConfig type definition
-      // which might be missing reorderEnabled / popoutEnabled in some versions.
-      const itemConfig: any = {
+      const itemConfig: ComponentItemConfig & { popoutEnabled?: boolean } = {
         type: 'component',
         componentType:
           tab.type === 'game' ? PANEL_COMPONENT_TYPES.game : PANEL_COMPONENT_TYPES.viewport,

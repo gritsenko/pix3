@@ -326,7 +326,6 @@ export function evaluateContext(
     // Evaluate the boolean expression
     // Note: Using Function constructor is safe here since we've replaced all context keys
     // with boolean values and the expression only contains boolean operators
-    // eslint-disable-next-line no-new-func
     return new Function(`return ${expression}`)() as boolean;
   } catch {
     console.warn(`Failed to evaluate keybinding context: ${whenClause}`);

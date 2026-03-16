@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateSpotLightOperationParams,
 } from '@/features/scene/CreateSpotLightOperation';
 
-export interface CreateSpotLightCommandPayload extends CreateNodeCommandPayload {}
+export type CreateSpotLightCommandPayload = CreateNodeCommandPayload;
 
 export class CreateSpotLightCommand extends CreateNodeBaseCommand<
   CreateSpotLightOperationParams,

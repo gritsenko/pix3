@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateGroup2DOperationParams,
 } from '@/features/scene/CreateGroup2DOperation';
 
-export interface CreateGroup2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateGroup2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateGroup2DCommand extends CreateNodeBaseCommand<
   CreateGroup2DOperationParams,

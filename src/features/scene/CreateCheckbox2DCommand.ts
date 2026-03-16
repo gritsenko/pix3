@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateCheckbox2DOperationParams,
 } from '@/features/scene/CreateCheckbox2DOperation';
 
-export interface CreateCheckbox2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateCheckbox2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateCheckbox2DCommand extends CreateNodeBaseCommand<
   CreateCheckbox2DOperationParams,

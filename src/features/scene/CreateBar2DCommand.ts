@@ -1,4 +1,4 @@
-import { type CommandMetadata } from '@/core/command';
+﻿import { type CommandMetadata } from '@/core/command';
 import {
   CreateNodeBaseCommand,
   type CreateNodeCommandPayload,
@@ -8,7 +8,7 @@ import {
   type CreateBar2DOperationParams,
 } from '@/features/scene/CreateBar2DOperation';
 
-export interface CreateBar2DCommandPayload extends CreateNodeCommandPayload {}
+export type CreateBar2DCommandPayload = CreateNodeCommandPayload;
 
 export class CreateBar2DCommand extends CreateNodeBaseCommand<
   CreateBar2DOperationParams,
