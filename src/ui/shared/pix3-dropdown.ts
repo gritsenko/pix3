@@ -175,9 +175,7 @@ export class Pix3Dropdown extends ComponentBase {
                   ?disabled=${item.disabled}
                   @click=${() => this.selectItem(item)}
                 >
-                  ${item.icon
-                    ? html`<span class="dropdown__item-icon">${item.icon}</span>`
-                    : null}
+                  ${item.icon ? html`<span class="dropdown__item-icon">${item.icon}</span>` : null}
                   <span class="dropdown__item-label">${item.label}</span>
                 </button>`}`
         )}

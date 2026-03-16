@@ -35,7 +35,9 @@ export class UpdateSprite2DSizeCommand extends CommandBase<UpdateSprite2DSizePay
     return { canExecute: Boolean(sceneManager.getActiveSceneGraph()) };
   }
 
-  async execute(context: CommandContext): Promise<CommandExecutionResult<UpdateSprite2DSizePayload>> {
+  async execute(
+    context: CommandContext
+  ): Promise<CommandExecutionResult<UpdateSprite2DSizePayload>> {
     const operations = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );

@@ -139,7 +139,9 @@ export class GroupSelectedNodesOperation implements Operation<OperationInvokeRes
       return;
     }
 
-    const sortedByRestoreIndex = [...this.movedNodes].sort((a, b) => a.previousIndex - b.previousIndex);
+    const sortedByRestoreIndex = [...this.movedNodes].sort(
+      (a, b) => a.previousIndex - b.previousIndex
+    );
 
     for (const record of sortedByRestoreIndex) {
       const node = sceneGraph.nodeMap.get(record.nodeId);
@@ -149,7 +151,12 @@ export class GroupSelectedNodesOperation implements Operation<OperationInvokeRes
       const parent = record.previousParentId
         ? (sceneGraph.nodeMap.get(record.previousParentId) ?? null)
         : null;
-      this.reparentNode(sceneGraph.rootNodes, node, parent instanceof NodeBase ? parent : null, record.previousIndex);
+      this.reparentNode(
+        sceneGraph.rootNodes,
+        node,
+        parent instanceof NodeBase ? parent : null,
+        record.previousIndex
+      );
     }
 
     this.removeNode(sceneGraph.rootNodes, this.createdGroup);

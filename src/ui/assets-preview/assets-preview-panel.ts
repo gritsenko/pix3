@@ -50,7 +50,9 @@ export class AssetsPreviewPanel extends ComponentBase {
 
   protected render() {
     return html`
-      <pix3-panel panel-description="Select a folder in Asset Browser to preview files as thumbnails.">
+      <pix3-panel
+        panel-description="Select a folder in Asset Browser to preview files as thumbnails."
+      >
         <span slot="subtitle" class="folder-path">${this.snapshot.displayPath}</span>
         <div class="preview-root">
           ${this.snapshot.isLoading
@@ -137,7 +139,10 @@ export class AssetsPreviewPanel extends ComponentBase {
   }
 
   private toResourcePath(path: string): string {
-    const normalizedPath = path.replace(/\\+/g, '/').replace(/^(\.?\/)+/, '').replace(/^\/+/, '');
+    const normalizedPath = path
+      .replace(/\\+/g, '/')
+      .replace(/^(\.?\/)+/, '')
+      .replace(/^\/+/, '');
     return `res://${normalizedPath}`;
   }
 

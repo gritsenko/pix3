@@ -25,7 +25,10 @@ export class RemoveNodeFromGroupCommand extends CommandBase<void, void> {
   }
 
   preconditions(context: CommandContext): CommandPreconditionResult {
-    const activeSceneCheck = requireActiveScene(context, 'An active scene is required to edit groups');
+    const activeSceneCheck = requireActiveScene(
+      context,
+      'An active scene is required to edit groups'
+    );
     if (!activeSceneCheck.canExecute) {
       return activeSceneCheck;
     }

@@ -36,7 +36,8 @@ export class AddAutoloadCommand extends CommandBase<void, void> {
     if (!SINGLETON_NAME_REGEX.test(singleton)) {
       return {
         canExecute: false,
-        reason: 'Singleton name must start with a letter/underscore and contain only letters, digits, underscores.',
+        reason:
+          'Singleton name must start with a letter/underscore and contain only letters, digits, underscores.',
         scope: 'project',
       };
     }

@@ -10,7 +10,10 @@ import {
 
 export interface CreateLabel2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateLabel2DCommand extends CreateNodeBaseCommand<CreateLabel2DOperationParams, CreateLabel2DCommandPayload> {
+export class CreateLabel2DCommand extends CreateNodeBaseCommand<
+  CreateLabel2DOperationParams,
+  CreateLabel2DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-label2d',
     title: 'Create Label2D',

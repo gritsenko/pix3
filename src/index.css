@@ -51,12 +51,12 @@ body > pix3-editor {
 /* Golden Layout Customizations */
 
 /* Hide the background tab header when other tabs are present in the editor stack */
-.lm_tabs:has(.lm_tab:nth-child(2)) .lm_tab[title="Pix3"] {
+.lm_tabs:has(.lm_tab:nth-child(2)) .lm_tab[title='Pix3'] {
   display: none !important;
 }
 
 /* Ensure the background tab doesn't show a close button even if hovered */
-.lm_tab[title="Pix3"] .lm_close_tab {
+.lm_tab[title='Pix3'] .lm_close_tab {
   display: none !important;
 }
 

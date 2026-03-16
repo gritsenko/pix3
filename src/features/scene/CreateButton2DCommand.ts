@@ -10,7 +10,10 @@ import {
 
 export interface CreateButton2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateButton2DCommand extends CreateNodeBaseCommand<CreateButton2DOperationParams, CreateButton2DCommandPayload> {
+export class CreateButton2DCommand extends CreateNodeBaseCommand<
+  CreateButton2DOperationParams,
+  CreateButton2DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-button2d',
     title: 'Create Button2D',

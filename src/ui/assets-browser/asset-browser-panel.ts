@@ -52,8 +52,6 @@ export class AssetBrowserPanel extends ComponentBase {
   private scriptFileRevealRequestHandler?: (e: Event) => void;
   private assetsPreviewRevealPathHandler?: (e: Event) => void;
 
-
-
   private onAssetActivate = async (e: Event) => {
     const detail = (e as CustomEvent<AssetActivation>).detail;
     if (!detail) return;
@@ -150,7 +148,10 @@ export class AssetBrowserPanel extends ComponentBase {
   };
 
   private promptForAutoloadSingleton(): string | null {
-    const input = window.prompt('Autoload singleton name (letters, numbers, underscore):', 'Events');
+    const input = window.prompt(
+      'Autoload singleton name (letters, numbers, underscore):',
+      'Events'
+    );
     if (!input) {
       return null;
     }

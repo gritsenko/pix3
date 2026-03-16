@@ -10,7 +10,10 @@ import {
 
 export interface CreateLayout2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateLayout2DCommand extends CreateNodeBaseCommand<CreateLayout2DOperationParams, CreateLayout2DCommandPayload> {
+export class CreateLayout2DCommand extends CreateNodeBaseCommand<
+  CreateLayout2DOperationParams,
+  CreateLayout2DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-layout2d',
     title: 'Create Layout2D',

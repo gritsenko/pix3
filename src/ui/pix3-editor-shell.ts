@@ -188,10 +188,15 @@ export class Pix3EditorShell extends ComponentBase {
     const saveAsPrefabCommand = new SaveAsPrefabCommand();
     const undoCommand = new UndoCommand(this.operationService);
     const redoCommand = new RedoCommand(this.operationService);
-    const startGameCommand = new StartGameCommand(this.editorTabService, this.gamePlaySessionService);
+    const startGameCommand = new StartGameCommand(
+      this.editorTabService,
+      this.gamePlaySessionService
+    );
     const stopGameCommand = new StopGameCommand(this.editorTabService, this.gamePlaySessionService);
     const restartGameCommand = new RestartGameCommand(this.gamePlaySessionService);
-    const openGamePopoutWindowCommand = new OpenGamePopoutWindowCommand(this.gamePlaySessionService);
+    const openGamePopoutWindowCommand = new OpenGamePopoutWindowCommand(
+      this.gamePlaySessionService
+    );
     const projectSettingsCommand = new OpenProjectSettingsCommand();
     const openProjectInIdeCommand = new OpenProjectInIdeCommand();
     const buildProjectCommand = new BuildProjectCommand();

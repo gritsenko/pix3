@@ -10,7 +10,10 @@ import {
 
 export interface CreateBoxCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateBoxCommand extends CreateNodeBaseCommand<CreateBoxOperationParams, CreateBoxCommandPayload> {
+export class CreateBoxCommand extends CreateNodeBaseCommand<
+  CreateBoxOperationParams,
+  CreateBoxCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-box',
     title: 'Create Box',

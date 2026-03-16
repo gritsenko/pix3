@@ -1,7 +1,11 @@
 import { ref } from 'valtio/vanilla';
 import { SceneManager } from '@pix3/runtime';
 
-import { type Operation, type OperationContext, type OperationInvokeResult } from '@/core/Operation';
+import {
+  type Operation,
+  type OperationContext,
+  type OperationInvokeResult,
+} from '@/core/Operation';
 
 export interface RefreshPrefabInstancesOperationParams {
   sceneId: string;
@@ -24,7 +28,9 @@ export class RefreshPrefabInstancesOperation implements Operation<OperationInvok
 
   async perform(context: OperationContext): Promise<OperationInvokeResult> {
     const { state, container } = context;
-    const sceneManager = container.getService<SceneManager>(container.getOrCreateToken(SceneManager));
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
+    );
     const { sceneId } = this.params;
     const descriptor = state.scenes.descriptors[sceneId];
 
@@ -69,7 +75,9 @@ export class RefreshPrefabInstancesOperation implements Operation<OperationInvok
     return { didMutate: true };
   }
 
-  private hasPrefabInstances(graph: { nodeMap: Map<string, { instancePath: string | null }> }): boolean {
+  private hasPrefabInstances(graph: {
+    nodeMap: Map<string, { instancePath: string | null }>;
+  }): boolean {
     for (const node of graph.nodeMap.values()) {
       if (typeof node.instancePath === 'string' && node.instancePath.length > 0) {
         return true;

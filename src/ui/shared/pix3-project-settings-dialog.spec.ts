@@ -28,7 +28,9 @@ describe('ProjectSettingsDialog', () => {
 
     appState.project.manifest = {
       ...createDefaultProjectManifest(),
-      autoloads: [{ scriptPath: 'scripts/GameManager.ts', singleton: 'GameManager', enabled: true }],
+      autoloads: [
+        { scriptPath: 'scripts/GameManager.ts', singleton: 'GameManager', enabled: true },
+      ],
       viewportBaseSize: { width: 1920, height: 1080 },
     };
 

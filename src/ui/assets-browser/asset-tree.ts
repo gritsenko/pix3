@@ -358,10 +358,7 @@ export class AssetTree extends ComponentBase {
     appState.project.assetBrowserSelectedPath = this.selectedPath;
 
     // Persist to localStorage
-    this.projectService.saveAssetBrowserState(
-      Array.from(expandedPaths),
-      this.selectedPath
-    );
+    this.projectService.saveAssetBrowserState(Array.from(expandedPaths), this.selectedPath);
   }
 
   /**

@@ -1,8 +1,4 @@
-import {
-  CommandBase,
-  type CommandExecutionResult,
-  type CommandMetadata,
-} from '@/core/command';
+import { CommandBase, type CommandExecutionResult, type CommandMetadata } from '@/core/command';
 import { GamePlaySessionService } from '@/services/GamePlaySessionService';
 
 export class OpenGamePopoutWindowCommand extends CommandBase<void, void> {

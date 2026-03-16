@@ -25,10 +25,7 @@ export class StartGameCommand extends CommandBase<void, void> {
   private readonly editorTabService: EditorTabService;
   private readonly gamePlaySessionService: GamePlaySessionService;
 
-  constructor(
-    editorTabService: EditorTabService,
-    gamePlaySessionService: GamePlaySessionService
-  ) {
+  constructor(editorTabService: EditorTabService, gamePlaySessionService: GamePlaySessionService) {
     super();
     this.editorTabService = editorTabService;
     this.gamePlaySessionService = gamePlaySessionService;

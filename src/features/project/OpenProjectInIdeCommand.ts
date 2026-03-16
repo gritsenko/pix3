@@ -39,13 +39,14 @@ export class OpenProjectInIdeCommand extends CommandBase<void, void> {
 
   async execute(context: CommandContext): Promise<CommandExecutionResult<void>> {
     const localPath = context.state.project.localAbsolutePath;
-    
+
     if (!localPath) {
       const confirm = await this.dialogService.showConfirmation({
         title: 'Project Path Required',
-        message: 'A local absolute path is required to open the project in VS Code.\n\nWould you like to set it now in project settings?',
+        message:
+          'A local absolute path is required to open the project in VS Code.\n\nWould you like to set it now in project settings?',
         confirmLabel: 'Open Settings',
-        cancelLabel: 'Cancel'
+        cancelLabel: 'Cancel',
       });
 
       if (confirm) {

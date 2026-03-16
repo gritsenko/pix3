@@ -1,6 +1,12 @@
 import { injectable, inject } from '@/fw/di';
 import { subscribe } from 'valtio/vanilla';
-import { AssetLoader, AudioService, RuntimeRenderer, SceneManager, SceneRunner } from '@pix3/runtime';
+import {
+  AssetLoader,
+  AudioService,
+  RuntimeRenderer,
+  SceneManager,
+  SceneRunner,
+} from '@pix3/runtime';
 import { appState } from '@/state';
 import type { GameAspectRatio } from '@/state/AppState';
 import { OperationService } from '@/services/OperationService';
@@ -92,10 +98,16 @@ export class GamePlaySessionService {
 
   async setAspectRatio(aspectRatio: GameAspectRatio): Promise<void> {
     this.initialize();
-    await this.operationService.invoke(new UpdateEditorSettingsOperation({ gameAspectRatio: aspectRatio }));
+    await this.operationService.invoke(
+      new UpdateEditorSettingsOperation({ gameAspectRatio: aspectRatio })
+    );
   }
 
-  registerTabHost(mount: HTMLElement, windowRef: Window, setRunningState?: (isRunning: boolean) => void): void {
+  registerTabHost(
+    mount: HTMLElement,
+    windowRef: Window,
+    setRunningState?: (isRunning: boolean) => void
+  ): void {
     this.initialize();
     this.tabHost = {
       kind: 'tab',
@@ -288,7 +300,8 @@ export class GamePlaySessionService {
     }
 
     const documentRef = host.windowRef.document;
-    const isVisible = documentRef.visibilityState === 'visible' && host.windowRef.document.hasFocus();
+    const isVisible =
+      documentRef.visibilityState === 'visible' && host.windowRef.document.hasFocus();
     const shouldPause = appState.ui.pauseRenderingOnUnfocus && !isVisible;
     if (shouldPause) {
       this.runner.pause();
@@ -508,7 +521,8 @@ export class GamePlaySessionService {
     }
 
     const aspectRatio = appState.ui.gameAspectRatio;
-    const isRunning = forcedRunningState ?? (appState.ui.isPlaying && this.activeHostKind === 'popout');
+    const isRunning =
+      forcedRunningState ?? (appState.ui.isPlaying && this.activeHostKind === 'popout');
     this.popoutShell.aspectSelect.value = aspectRatio;
     this.popoutShell.statusValue.textContent = isRunning ? 'Playing' : 'Stopped';
     this.popoutShell.restartButton.disabled = !appState.ui.isPlaying;
@@ -580,10 +594,7 @@ export class GamePlaySessionService {
 
   private isGameAspectRatio(value: string): value is GameAspectRatio {
     return (
-      value === 'free' ||
-      value === '16:9-landscape' ||
-      value === '16:9-portrait' ||
-      value === '4:3'
+      value === 'free' || value === '16:9-landscape' || value === '16:9-portrait' || value === '4:3'
     );
   }
 

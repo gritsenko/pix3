@@ -22,10 +22,7 @@ export interface EditorSettingsSnapshot {
 
 const isGameAspectRatio = (value: unknown): value is GameAspectRatio => {
   return (
-    value === 'free' ||
-    value === '16:9-landscape' ||
-    value === '16:9-portrait' ||
-    value === '4:3'
+    value === 'free' || value === '16:9-landscape' || value === '16:9-portrait' || value === '4:3'
   );
 };
 

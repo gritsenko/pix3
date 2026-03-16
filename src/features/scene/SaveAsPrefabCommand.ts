@@ -84,8 +84,7 @@ export class SaveAsPrefabCommand extends CommandBase<void, void> {
     const sceneGraph = sceneManager.getActiveSceneGraph();
     const nodeNameFromScene = sceneGraph?.nodeMap.get(nodeId)?.name ?? null;
     const prefabPath =
-      this.params?.prefabPath ??
-      (await this.pickPrefabPath(fileSystem, nodeId, nodeNameFromScene));
+      this.params?.prefabPath ?? (await this.pickPrefabPath(fileSystem, nodeId, nodeNameFromScene));
     if (!prefabPath) {
       return { didMutate: false, payload: undefined };
     }

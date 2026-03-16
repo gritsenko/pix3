@@ -321,7 +321,7 @@ export class ViewportPanel extends ComponentBase {
 
   private isImageResource(resourcePath: string): boolean {
     const normalized = resourcePath.toLowerCase().split('?')[0].split('#')[0];
-    const extension = normalized.includes('.') ? normalized.split('.').pop() ?? '' : '';
+    const extension = normalized.includes('.') ? (normalized.split('.').pop() ?? '') : '';
     return ViewportPanel.IMAGE_EXTENSIONS.has(extension);
   }
 

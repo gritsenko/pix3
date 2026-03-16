@@ -10,7 +10,10 @@ import {
 
 export interface CreateCheckbox2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateCheckbox2DCommand extends CreateNodeBaseCommand<CreateCheckbox2DOperationParams, CreateCheckbox2DCommandPayload> {
+export class CreateCheckbox2DCommand extends CreateNodeBaseCommand<
+  CreateCheckbox2DOperationParams,
+  CreateCheckbox2DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-checkbox2d',
     title: 'Create Checkbox2D',

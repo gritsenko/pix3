@@ -33,7 +33,10 @@ export class GroupSelectedNodesCommand extends CommandBase<void, void> {
   }
 
   preconditions(context: CommandContext): CommandPreconditionResult {
-    const activeSceneCheck = requireActiveScene(context, 'An active scene is required to group nodes');
+    const activeSceneCheck = requireActiveScene(
+      context,
+      'An active scene is required to group nodes'
+    );
     if (!activeSceneCheck.canExecute) {
       return activeSceneCheck;
     }

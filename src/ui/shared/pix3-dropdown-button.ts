@@ -184,10 +184,7 @@ export class Pix3DropdownButton extends ComponentBase {
                       >
                         ${item.icon
                           ? html`<span class="dropdown__item-icon"
-                              >${this.iconService.getIconOrRawSvg(
-                                item.icon,
-                                IconSize.MEDIUM
-                              )}</span
+                              >${this.iconService.getIconOrRawSvg(item.icon, IconSize.MEDIUM)}</span
                             >`
                           : null}
                         <span class="dropdown__item-label">${item.label}</span>
@@ -207,10 +204,7 @@ export class Pix3DropdownButton extends ComponentBase {
                     >
                       ${item.icon
                         ? html`<span class="dropdown__item-icon"
-                            >${this.iconService.getIconOrRawSvg(
-                              item.icon,
-                              IconSize.MEDIUM
-                            )}</span
+                            >${this.iconService.getIconOrRawSvg(item.icon, IconSize.MEDIUM)}</span
                           >`
                         : null}
                       <span class="dropdown__item-label">${item.label}</span>

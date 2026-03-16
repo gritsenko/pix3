@@ -121,7 +121,7 @@ describe('ProjectBuildService', () => {
     expect(packageJson.devDependencies?.['@types/node']).toBe('^25.5.0');
 
     const viteConfig = fs.files.get('vite.config.ts');
-    expect(viteConfig).toContain("classicScriptCompatibilityPlugin");
+    expect(viteConfig).toContain('classicScriptCompatibilityPlugin');
     expect(viteConfig).toContain('modulePreload: false');
 
     expect(result.sceneCount).toBe(1);

@@ -198,7 +198,12 @@ export class DuplicateNodesOperation implements Operation<OperationInvokeResult>
       const parent = entry.parentId ? (sceneGraph.nodeMap.get(entry.parentId) ?? null) : null;
       const parentNode = parent instanceof NodeBase ? parent : null;
       this.insertNode(sceneGraph.rootNodes, entry.node, parentNode, entry.index);
-      this.registerSubtree(sceneManager, sceneGraph.nodeMap, entry.node, this.activeSceneIdAtCommit);
+      this.registerSubtree(
+        sceneManager,
+        sceneGraph.nodeMap,
+        entry.node,
+        this.activeSceneIdAtCommit
+      );
     }
 
     SceneStateUpdater.updateHierarchyState(state, this.activeSceneIdAtCommit, sceneGraph);
@@ -302,9 +307,7 @@ export class DuplicateNodesOperation implements Operation<OperationInvokeResult>
       version,
       description: maybeScene.description,
       metadata:
-        maybeScene.metadata && typeof maybeScene.metadata === 'object'
-          ? maybeScene.metadata
-          : {},
+        maybeScene.metadata && typeof maybeScene.metadata === 'object' ? maybeScene.metadata : {},
       root: maybeScene.root,
     };
   }

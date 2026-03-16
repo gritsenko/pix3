@@ -10,7 +10,7 @@ import { ServiceContainer } from '@/fw/di';
 
 /**
  * Command to set the transform tool mode in the viewport.
- * 
+ *
  * Transform modes:
  * - select: Selection mode (no gizmo)
  * - translate: Move tool

@@ -132,7 +132,9 @@ export class BehaviorPicker extends ComponentBase {
                     <div class="description-title">${selectedScript.displayName}</div>
                     <div class="description-text">${selectedScript.description}</div>
                   `
-                : html`<div class="description-empty">Select a component to see its description.</div>`}
+                : html`<div class="description-empty">
+                    Select a component to see its description.
+                  </div>`}
             </div>
           </div>
 

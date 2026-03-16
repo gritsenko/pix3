@@ -21,7 +21,9 @@ const createImportMapShim = () => {
   // Generate module code that re-exports the global API
   const moduleCode = `
     const api = window.__PIX3_ENGINE__;
-    ${Object.keys(EngineAPI).map(key => `export const ${key} = api.${key};`).join('\n')}
+    ${Object.keys(EngineAPI)
+      .map(key => `export const ${key} = api.${key};`)
+      .join('\n')}
   `;
 
   // Create blob URL for the module
@@ -31,7 +33,9 @@ const createImportMapShim = () => {
   // Generate module code for three
   const threeModuleCode = `
     const api = window.__PIX3_THREE__;
-    ${Object.keys(THREE).map(key => `export const ${key} = api.${key};`).join('\n')}
+    ${Object.keys(THREE)
+      .map(key => `export const ${key} = api.${key};`)
+      .join('\n')}
     export default api;
   `;
   const threeBlob = new Blob([threeModuleCode], { type: 'application/javascript' });
@@ -43,7 +47,7 @@ const createImportMapShim = () => {
   importMap.textContent = JSON.stringify({
     imports: {
       '@pix3/runtime': blobUrl,
-      'three': threeBlobUrl,
+      three: threeBlobUrl,
     },
   });
   document.head.appendChild(importMap);

@@ -192,21 +192,21 @@ export class SceneTreeNodeComponent extends ComponentBase {
           aria-level=${this.level}
           aria-selected=${isSelected ? 'true' : 'false'}
           aria-expanded=${ifDefined(
-      hasChildren ? (this.isCollapsed ? 'false' : 'true') : undefined
-    )}
+            hasChildren ? (this.isCollapsed ? 'false' : 'true') : undefined
+          )}
           tabindex=${this.focusable ? '0' : '-1'}
           data-node-id=${this.node.id}
           title=${this.getNodeTooltip(this.node)}
           @click=${(event: Event) => this.onSelectNode(event)}
           @contextmenu=${(event: MouseEvent) => {
-        void this.onContextMenu(event);
-      }}
+            void this.onContextMenu(event);
+          }}
           @keydown=${(event: KeyboardEvent) => {
-        if (event.key === 'Enter' || event.key === ' ') {
-          this.onSelectNode(event);
-          event.preventDefault();
-        }
-      }}
+            if (event.key === 'Enter' || event.key === ' ') {
+              this.onSelectNode(event);
+              event.preventDefault();
+            }
+          }}
           @dragstart=${(event: DragEvent) => this.onDragStart(event)}
           @dragend=${(event: DragEvent) => this.onDragEnd(event)}
           @dragover=${(event: DragEvent) => this.onDragOver(event)}
@@ -227,13 +227,15 @@ export class SceneTreeNodeComponent extends ComponentBase {
             <span class="tree-node__header">
               <span class="tree-node__name"> ${this.node.name} </span>
               ${this.node.instancePath
-        ? html`<span class="tree-node__instance-inline">${this.getInstanceFileName(this.node.instancePath)}</span>`
-        : null}
+                ? html`<span class="tree-node__instance-inline"
+                    >${this.getInstanceFileName(this.node.instancePath)}</span
+                  >`
+                : null}
               ${this.node.isPrefabNode
-        ? html`<span class="tree-node__prefab-badge" title="Prefab-linked node">🔗</span>`
-        : null}
+                ? html`<span class="tree-node__prefab-badge" title="Prefab-linked node">🔗</span>`
+                : null}
               ${this.node.scripts.length > 0
-        ? html`
+                ? html`
                     <button
                       type="button"
                       class="tree-node__script-indicator"
@@ -248,15 +250,15 @@ export class SceneTreeNodeComponent extends ComponentBase {
                       ${this.renderToggleIcon(this.getScriptIndicatorIconName())}
                     </button>
                   `
-        : null}
+                : null}
             </span>
           </span>
           <div class="tree-node__buttons">
             <button
               type="button"
               class="tree-node__button tree-node__button--visible ${this.isVisible
-        ? 'tree-node__button--active'
-        : ''}"
+                ? 'tree-node__button--active'
+                : ''}"
               aria-label=${this.isVisible ? `Hide ${this.node.name}` : `Show ${this.node.name}`}
               @click=${(event: Event) => this.onToggleVisibility(event)}
             >
@@ -265,8 +267,8 @@ export class SceneTreeNodeComponent extends ComponentBase {
             <button
               type="button"
               class="tree-node__button tree-node__button--lock ${this.isLocked
-        ? 'tree-node__button--active'
-        : ''}"
+                ? 'tree-node__button--active'
+                : ''}"
               aria-label=${this.isLocked ? `Unlock ${this.node.name}` : `Lock ${this.node.name}`}
               @click=${(event: Event) => this.onToggleLock(event)}
             >
@@ -275,12 +277,12 @@ export class SceneTreeNodeComponent extends ComponentBase {
           </div>
         </div>
         ${hasChildren && !this.isCollapsed
-        ? html`<ul class="tree-children" role="group">
+          ? html`<ul class="tree-children" role="group">
               ${repeat(
-          this.node.children,
-          child => child.id,
-          (child, index) =>
-            html`<li>
+                this.node.children,
+                child => child.id,
+                (child, index) =>
+                  html`<li>
                     <pix3-scene-tree-node
                       .node=${child}
                       .level=${this.level + 1}
@@ -292,9 +294,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
                       ?focusable=${index === 0}
                     ></pix3-scene-tree-node>
                   </li>`
-        )}
+              )}
             </ul>`
-        : null}
+          : null}
       </li>
     `;
   }
@@ -747,7 +749,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
   private isImageResource(resourcePath: string): boolean {
     const normalized = resourcePath.toLowerCase().split('?')[0].split('#')[0];
-    const extension = normalized.includes('.') ? normalized.split('.').pop() ?? '' : '';
+    const extension = normalized.includes('.') ? (normalized.split('.').pop() ?? '') : '';
     return IMAGE_EXTENSIONS.has(extension);
   }
 

@@ -10,7 +10,10 @@ import {
 
 export interface CreateJoystick2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateJoystick2DCommand extends CreateNodeBaseCommand<CreateJoystick2DOperationParams, CreateJoystick2DCommandPayload> {
+export class CreateJoystick2DCommand extends CreateNodeBaseCommand<
+  CreateJoystick2DOperationParams,
+  CreateJoystick2DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-joystick2d',
     title: 'Create Joystick2D',

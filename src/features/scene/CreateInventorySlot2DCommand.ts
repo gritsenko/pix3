@@ -10,7 +10,10 @@ import {
 
 export interface CreateInventorySlot2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateInventorySlot2DCommand extends CreateNodeBaseCommand<CreateInventorySlot2DOperationParams, CreateInventorySlot2DCommandPayload> {
+export class CreateInventorySlot2DCommand extends CreateNodeBaseCommand<
+  CreateInventorySlot2DOperationParams,
+  CreateInventorySlot2DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-inventoryslot2d',
     title: 'Create InventorySlot2D',

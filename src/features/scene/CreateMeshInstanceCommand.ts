@@ -10,7 +10,10 @@ import {
 
 export interface CreateMeshInstanceCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateMeshInstanceCommand extends CreateNodeBaseCommand<CreateMeshInstanceOperationParams, CreateMeshInstanceCommandPayload> {
+export class CreateMeshInstanceCommand extends CreateNodeBaseCommand<
+  CreateMeshInstanceOperationParams,
+  CreateMeshInstanceCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-mesh-instance',
     title: 'Create Mesh Instance',

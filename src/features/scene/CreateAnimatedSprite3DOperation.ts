@@ -8,11 +8,7 @@ import { AnimatedSprite3D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { Vector3 } from 'three';
 import { SceneStateUpdater } from '@/core/SceneStateUpdater';
-import {
-  attachNode,
-  detachNode,
-  resolveDefault3DParent,
-} from '@/features/scene/node-placement';
+import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
 
 export interface CreateAnimatedSprite3DOperationParams {
   nodeName?: string;

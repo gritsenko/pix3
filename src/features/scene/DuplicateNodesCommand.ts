@@ -33,7 +33,10 @@ export class DuplicateNodesCommand extends CommandBase<void, void> {
   }
 
   preconditions(context: CommandContext): CommandPreconditionResult {
-    const activeSceneCheck = requireActiveScene(context, 'An active scene is required to duplicate nodes');
+    const activeSceneCheck = requireActiveScene(
+      context,
+      'An active scene is required to duplicate nodes'
+    );
     if (!activeSceneCheck.canExecute) {
       return activeSceneCheck;
     }

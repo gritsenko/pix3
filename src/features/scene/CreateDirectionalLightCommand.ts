@@ -10,7 +10,10 @@ import {
 
 export interface CreateDirectionalLightCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateDirectionalLightCommand extends CreateNodeBaseCommand<CreateDirectionalLightOperationParams, CreateDirectionalLightCommandPayload> {
+export class CreateDirectionalLightCommand extends CreateNodeBaseCommand<
+  CreateDirectionalLightOperationParams,
+  CreateDirectionalLightCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-directional-light',
     title: 'Create Directional Light',

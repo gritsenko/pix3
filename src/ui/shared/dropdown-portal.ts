@@ -63,7 +63,10 @@ export class DropdownPortal {
     this.originalParent = menuElement.parentElement;
     this.originalNextSibling = menuElement.nextSibling;
     this.create();
-    this.positionInternal({ left: x, right: x, top: y, bottom: y, width: 0, height: 0 } as DOMRect, true);
+    this.positionInternal(
+      { left: x, right: x, top: y, bottom: y, width: 0, height: 0 } as DOMRect,
+      true
+    );
   }
 
   /**
@@ -74,7 +77,10 @@ export class DropdownPortal {
     if (this.menuElement && this.originalParent && this.originalParent.isConnected) {
       try {
         // Check if originalNextSibling is still a child of originalParent
-        if (this.originalNextSibling && this.originalNextSibling.parentNode === this.originalParent) {
+        if (
+          this.originalNextSibling &&
+          this.originalNextSibling.parentNode === this.originalParent
+        ) {
           this.originalParent.insertBefore(this.menuElement, this.originalNextSibling);
         } else {
           this.originalParent.appendChild(this.menuElement);
@@ -162,7 +168,7 @@ export class DropdownPortal {
 
       // If menu goes off bottom, position it above the trigger instead
       if (top + portalRect.height > viewportHeight) {
-        top = isExactPosition 
+        top = isExactPosition
           ? Math.max(0, viewportHeight - portalRect.height - 8)
           : Math.max(0, triggerRect.top - portalRect.height - 8);
       }

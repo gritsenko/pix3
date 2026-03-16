@@ -6,7 +6,13 @@
  */
 
 import { injectable, inject } from '@/fw/di';
-import { SceneManager, type SceneGraph, InputService, MeshInstance, AudioService } from '@pix3/runtime';
+import {
+  SceneManager,
+  type SceneGraph,
+  InputService,
+  MeshInstance,
+  AudioService,
+} from '@pix3/runtime';
 import { NodeBase } from '@pix3/runtime';
 import { AutoloadService } from './AutoloadService';
 

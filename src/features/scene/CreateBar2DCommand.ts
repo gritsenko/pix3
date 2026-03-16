@@ -10,7 +10,10 @@ import {
 
 export interface CreateBar2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateBar2DCommand extends CreateNodeBaseCommand<CreateBar2DOperationParams, CreateBar2DCommandPayload> {
+export class CreateBar2DCommand extends CreateNodeBaseCommand<
+  CreateBar2DOperationParams,
+  CreateBar2DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-bar2d',
     title: 'Create Bar2D',

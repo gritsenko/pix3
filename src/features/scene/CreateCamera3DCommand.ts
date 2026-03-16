@@ -10,7 +10,10 @@ import {
 
 export interface CreateCamera3DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateCamera3DCommand extends CreateNodeBaseCommand<CreateCamera3DOperationParams, CreateCamera3DCommandPayload> {
+export class CreateCamera3DCommand extends CreateNodeBaseCommand<
+  CreateCamera3DOperationParams,
+  CreateCamera3DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-camera3d',
     title: 'Create Camera3D',

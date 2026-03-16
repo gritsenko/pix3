@@ -10,7 +10,10 @@ import {
 
 export interface CreateGroup2DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateGroup2DCommand extends CreateNodeBaseCommand<CreateGroup2DOperationParams, CreateGroup2DCommandPayload> {
+export class CreateGroup2DCommand extends CreateNodeBaseCommand<
+  CreateGroup2DOperationParams,
+  CreateGroup2DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-group2d',
     title: 'Create Group2D',

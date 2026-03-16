@@ -10,7 +10,10 @@ import {
 
 export interface CreateNode3DCommandPayload extends CreateNodeCommandPayload {}
 
-export class CreateNode3DCommand extends CreateNodeBaseCommand<CreateNode3DOperationParams, CreateNode3DCommandPayload> {
+export class CreateNode3DCommand extends CreateNodeBaseCommand<
+  CreateNode3DOperationParams,
+  CreateNode3DCommandPayload
+> {
   readonly metadata: CommandMetadata = {
     id: 'scene.create-node3d',
     title: 'Create Node3D',

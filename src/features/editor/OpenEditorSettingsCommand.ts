@@ -1,10 +1,6 @@
 import { inject } from '@/fw/di';
 import { EditorSettingsService } from '@/services/EditorSettingsService';
-import {
-  CommandBase,
-  type CommandMetadata,
-  type CommandExecutionResult,
-} from '@/core/command';
+import { CommandBase, type CommandMetadata, type CommandExecutionResult } from '@/core/command';
 
 export class OpenEditorSettingsCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
