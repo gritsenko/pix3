@@ -26,6 +26,35 @@ describe('ViewportRendererService', () => {
     expect(mesh.position.y).toBe(-0.5);
   });
 
+  it('should create an editor anchor marker for Sprite2D visuals', () => {
+    const service = new ViewportRendererService();
+
+    const svc = service as unknown as {
+      createSprite2DVisual?: (s: Sprite2D) => THREE.Group;
+    };
+
+    const sprite = new Sprite2D({
+      id: 'sprite-anchor-marker-test',
+      width: 120,
+      height: 80,
+      anchor: { x: 0.25, y: 0.75 },
+    });
+
+    const visualRoot = svc.createSprite2DVisual?.(sprite);
+    expect(visualRoot).toBeDefined();
+
+    const anchorMarker = visualRoot?.userData.anchorMarker as THREE.Group;
+    const mesh = visualRoot?.userData.spriteMesh as THREE.Mesh;
+    expect(anchorMarker).toBeInstanceOf(THREE.Group);
+    expect(anchorMarker.position.x).toBe(0);
+    expect(anchorMarker.position.y).toBe(0);
+    expect(mesh.position.x).toBe(0.25);
+    expect(mesh.position.y).toBe(-0.25);
+
+    const markerParts = anchorMarker.children.filter(child => child instanceof THREE.Mesh);
+    expect(markerParts).toHaveLength(3);
+  });
+
   it('should use ResourceManager.readBlob for templ:// sprite textures', async () => {
     const service = new ViewportRendererService();
 

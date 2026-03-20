@@ -994,6 +994,21 @@ export class ViewportRendererService {
       });
     }
 
+    for (const visualRoot of this.sprite2DVisuals.values()) {
+      const sizeGroup = visualRoot.userData.sizeGroup as THREE.Group | undefined;
+      const anchorMarker = visualRoot.userData.anchorMarker as THREE.Group | undefined;
+      if (!sizeGroup || !anchorMarker) {
+        continue;
+      }
+
+      this.updateSprite2DAnchorMarker(
+        anchorMarker,
+        Math.abs(sizeGroup.scale.x),
+        Math.abs(sizeGroup.scale.y),
+        thickness
+      );
+    }
+
     if (this.selection2DOverlay) {
       this.transformTool2d.updateHandlePositions(this.selection2DOverlay, safeZoom);
     }
@@ -1747,6 +1762,20 @@ export class ViewportRendererService {
         if (mesh) {
           const anchor = this.getSprite2DAnchor(node);
           mesh.position.set(0.5 - anchor.x, 0.5 - anchor.y, 0);
+        }
+
+        const anchorMarker = visualRoot.userData.anchorMarker as THREE.Group | undefined;
+        if (anchorMarker) {
+          anchorMarker.position.set(0, 0, 0.01);
+
+          if (sizeGroup) {
+            this.updateSprite2DAnchorMarker(
+              anchorMarker,
+              Math.abs(sizeGroup.scale.x),
+              Math.abs(sizeGroup.scale.y),
+              this.getFrameThicknessWorldPx(this.orthographicCamera?.zoom ?? 1)
+            );
+          }
         }
 
         if (mesh && mesh.material instanceof THREE.MeshBasicMaterial) {
@@ -2813,16 +2842,121 @@ export class ViewportRendererService {
     sizeGroup.scale.set(w, h, 1);
     sizeGroup.layers.set(LAYER_2D);
     sizeGroup.add(mesh);
+
+    const anchorMarker = this.createSprite2DAnchorMarker(node, w, h);
+    sizeGroup.add(anchorMarker);
     root.add(sizeGroup);
 
     root.userData.isSprite2DVisualRoot = true;
     root.userData.nodeId = node.nodeId;
     root.userData.sizeGroup = sizeGroup;
     root.userData.spriteMesh = mesh;
+    root.userData.anchorMarker = anchorMarker;
     root.userData.texturePath = node.texturePath ?? null;
     this.apply2DVisualOpacity(node, root);
 
     return root;
+  }
+
+  private createSprite2DAnchorMarker(_node: Sprite2D, width: number, height: number): THREE.Group {
+    const marker = new THREE.Group();
+    marker.position.set(0, 0, 0.01);
+    marker.layers.set(LAYER_2D);
+    marker.renderOrder = 420;
+    marker.userData.isSprite2DAnchorMarker = true;
+
+    const horizontal = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({
+        color: 0x13161b,
+        transparent: true,
+        opacity: 0.95,
+        depthTest: false,
+        depthWrite: false,
+      })
+    );
+    horizontal.layers.set(LAYER_2D);
+    horizontal.renderOrder = 420;
+    horizontal.material.userData.baseOpacity = 1;
+    horizontal.userData.anchorMarkerPart = 'horizontal';
+    marker.add(horizontal);
+
+    const vertical = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1),
+      new THREE.MeshBasicMaterial({
+        color: 0x13161b,
+        transparent: true,
+        opacity: 0.95,
+        depthTest: false,
+        depthWrite: false,
+      })
+    );
+    vertical.layers.set(LAYER_2D);
+    vertical.renderOrder = 420;
+    vertical.material.userData.baseOpacity = 1;
+    vertical.userData.anchorMarkerPart = 'vertical';
+    marker.add(vertical);
+
+    const center = new THREE.Mesh(
+      new THREE.CircleGeometry(0.5, 16),
+      new THREE.MeshBasicMaterial({
+        color: 0xffcf33,
+        transparent: true,
+        opacity: 1,
+        depthTest: false,
+        depthWrite: false,
+      })
+    );
+    center.layers.set(LAYER_2D);
+    center.renderOrder = 421;
+    center.material.userData.baseOpacity = 1;
+    center.userData.anchorMarkerPart = 'center';
+    marker.add(center);
+
+    this.updateSprite2DAnchorMarker(
+      marker,
+      Math.abs(width),
+      Math.abs(height),
+      this.getFrameThicknessWorldPx(this.orthographicCamera?.zoom ?? 1)
+    );
+
+    return marker;
+  }
+
+  private updateSprite2DAnchorMarker(
+    marker: THREE.Group,
+    width: number,
+    height: number,
+    thickness: number
+  ): void {
+    const safeWidth = Math.max(1, width);
+    const safeHeight = Math.max(1, height);
+    const localThicknessX = Math.min(0.3, thickness / safeWidth);
+    const localThicknessY = Math.min(0.3, thickness / safeHeight);
+    const horizontalLength = Math.min(0.45, (thickness * 10) / safeWidth);
+    const verticalLength = Math.min(0.45, (thickness * 10) / safeHeight);
+    const centerSizeX = Math.min(0.2, (thickness * 4) / safeWidth);
+    const centerSizeY = Math.min(0.2, (thickness * 4) / safeHeight);
+
+    marker.traverse(child => {
+      if (!(child instanceof THREE.Mesh)) {
+        return;
+      }
+
+      const part = child.userData.anchorMarkerPart as
+        | 'horizontal'
+        | 'vertical'
+        | 'center'
+        | undefined;
+
+      if (part === 'horizontal') {
+        child.scale.set(horizontalLength * 2, localThicknessY, 1);
+      } else if (part === 'vertical') {
+        child.scale.set(localThicknessX, verticalLength * 2, 1);
+      } else if (part === 'center') {
+        child.scale.set(centerSizeX, centerSizeY, 1);
+      }
+    });
   }
 
   private getSprite2DAnchor(node: Sprite2D): { x: number; y: number } {

@@ -22,7 +22,7 @@
 - [ ] unify scene objects addressing from custom scripts (Сложность: M)
 - [ ] add opacity to 3d sprite with fade in/out APIs (Сложность: M)
 - [ ] particle rotation toggle and saving fix (Сложность: S)
-- [ ] sprite color fix on editor mode (Сложность: S)
+- [x] sprite color fix on editor mode (Сложность: S)
 
 ## UX / UI
 - [ ] drag and drop assets into editor viewport and scene tree (Сложность: L)
@@ -33,7 +33,7 @@
 - [ ] allow to preview sounds in editor (Сложность: M)
 - [ ] add alignment methods for 2d objects (Сложность: M)
 - [ ] add show all and reset zoom in 2d navigation mode (Сложность: S)
-- [ ] show anchor point of sprite in the editor (Сложность: S)
+- [x] show anchor point of sprite in the editor (Сложность: S)
 - [ ] allow to see file size in the asset preview/browser (Сложность: S)
 - [ ] add drag and drop support for audio files properties (Сложность: S)
 - [ ] better control of camera and light directions (Сложность: S)
