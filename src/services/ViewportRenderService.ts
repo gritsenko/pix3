@@ -193,6 +193,7 @@ export class ViewportRendererService {
 
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(0x13161b, 1);
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = appState.ui.showLighting;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
@@ -2834,6 +2835,10 @@ export class ViewportRendererService {
     };
   }
 
+  private applySrgbColorSpace(texture: THREE.Texture): void {
+    texture.colorSpace = THREE.SRGBColorSpace;
+  }
+
   private applyTextureToSprite2DMaterial(node: Sprite2D, material: THREE.MeshBasicMaterial): void {
     const texturePath = node.texturePath;
     if (!texturePath) {
@@ -2851,6 +2856,7 @@ export class ViewportRendererService {
           blobUrl,
           texture => {
             try {
+              this.applySrgbColorSpace(texture);
               material.map = texture;
               material.color.set(0xffffff);
               material.transparent = true;
@@ -2871,6 +2877,7 @@ export class ViewportRendererService {
         if (scheme === 'http' || scheme === 'https' || scheme === '') {
           try {
             const texture = textureLoader.load(texturePath);
+            this.applySrgbColorSpace(texture);
             material.map = texture;
             material.color.set(0xffffff);
             material.transparent = true;
@@ -3158,6 +3165,7 @@ export class ViewportRendererService {
           blobUrl,
           texture => {
             try {
+              this.applySrgbColorSpace(texture);
               material.map = texture;
               material.color.set(0xffffff);
               material.transparent = true;
@@ -3177,6 +3185,7 @@ export class ViewportRendererService {
         if (scheme === 'http' || scheme === 'https' || scheme === '') {
           try {
             const texture = textureLoader.load(texturePath);
+            this.applySrgbColorSpace(texture);
             material.map = texture;
             material.color.set(0xffffff);
             material.transparent = true;
@@ -3244,6 +3253,7 @@ export class ViewportRendererService {
     ctx.fillText(node.label, x, logicalHeight / 2);
 
     const texture = new THREE.CanvasTexture(canvas);
+    this.applySrgbColorSpace(texture);
     texture.needsUpdate = true;
 
     const geometry = new THREE.PlaneGeometry(logicalWidth, logicalHeight);
