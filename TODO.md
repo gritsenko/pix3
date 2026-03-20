@@ -1,48 +1,50 @@
 # TODO
 
-Future improvements:
+## Редактор (Editor)
+- [ ] add transform animation timeline editor for nodes and tween animation support (Сложность: L)
+- [ ] add animation editor for animated sprites (Сложность: L)
+- [ ] add image compression option (Сложность: M)
+- [ ] add glb inspector, that will show how different parts of model affect size (Сложность: M)
+- [ ] add image/asset library/store (Сложность: M)
+- [ ] log game events to editor's console (Сложность: M)
+- [ ] generate asset manifest on project build (Сложность: M)
+- [ ] publish runtime package to the cloud, to optimize pipeline (Сложность: M)
+- [x] fix icons for global light nodes (Сложность: S)
+- [ ] add icon to audio nodes (Сложность: S)
+- [ ] remove bounding boxes from global objects without transform (Сложность: S)
+- [ ] version check and update functionality (Сложность: S)
 
-- show anchor point of sprite in the editor
-- update nodes properties and hot reload them in the game mode
-- remove game tab and keep only popup window mode
-- not to hide camera, light, particles icons on select, but make them semitransparent
-- add icon to audio nodes
-- remove bounding boxes from global objects without transform
-- add drag and drop support for audio files properties
-- allow to see file size in the asset preview tab and asset browser
-- allow to preview sounds in editor
-- allow to preview glb models from asset preview and asset browser
-- drag and drop assets into editor viewport and scene tree to convert them into objects on the scene and put into correct parent node
-- generate asset manifest on project build
-- add opacity to 3d sprite, with fade in and fade out apis
-- make a node picker to use it on objects inspector for properties with node type (Pin to node behavior)
-- implement cinematic camera module, that will allow control camera more flexibly
-- add alignment methods for 2d objects
-- fix icons for global light nodes
-- add glb inspector, that will show how different parts of model affect size 
-- add bundle size calculation
-- add image compression option
-- unify scene objects addressing from custom scripts to make code more readable
-- publish runtime package to the cloud, to optimize pipeline
-- fix layout system to process correctly margins in anchor mode
-- add remote preview to check the game on device
-- add tools.gritsenko.biz integration, to allow publish playable into portfolio and share the link
-- improve UX of controls on Object inspector. Make it more compact and change number values with dragging.
-- better control of camera and light directions
-- update icons and layout of viewport toolbar
-- add show all and reset zoom in 2d navigation mode
-- add color picker for color values in Object inspector
-- add animation editor for animated sprites
-- add transform animation timeline editor for nodes and tween animation support
-- move 2d nodes with arrow keys
-- snap 2d objects to grid
-- sprite color fix on editor mode - too bright now
-- create landing page for edior
-- publish online PWA version
-- version check and update functionality
-- asset library/store
-- log game events to editor's console
-- particle rotation toggle and saving fix
-- build playable from editor
-- platform switch on game mode, to test condition for different platforms
-- allow to pack playable for ad networks from the app
+## Рантайм (Runtime)
+- [ ] add remote preview to check the game on device (Сложность: L)
+- [ ] implement cinematic camera module, that will allow control camera more flexibly (Сложность: L)
+- [ ] fix layout system to process correctly margins in anchor mode (Сложность: M)
+- [ ] update nodes properties and hot reload them in the game mode (Сложность: M)
+- [ ] unify scene objects addressing from custom scripts (Сложность: M)
+- [ ] add opacity to 3d sprite with fade in/out APIs (Сложность: M)
+- [ ] particle rotation toggle and saving fix (Сложность: S)
+- [ ] sprite color fix on editor mode (Сложность: S)
+
+## UX / UI
+- [ ] drag and drop assets into editor viewport and scene tree (Сложность: L)
+- [ ] improve UX of controls on Object inspector (dragging numbers, compact) (Сложность: M)
+- [ ] add color picker for color values in Object inspector (Сложность: M)
+- [ ] make a node picker for properties with node type (Сложность: M)
+- [ ] allow to preview glb models from asset browser (Сложность: M)
+- [ ] allow to preview sounds in editor (Сложность: M)
+- [ ] add alignment methods for 2d objects (Сложность: M)
+- [ ] add show all and reset zoom in 2d navigation mode (Сложность: S)
+- [ ] show anchor point of sprite in the editor (Сложность: S)
+- [ ] allow to see file size in the asset preview/browser (Сложность: S)
+- [ ] add drag and drop support for audio files properties (Сложность: S)
+- [ ] better control of camera and light directions (Сложность: S)
+- [ ] update icons and layout of viewport toolbar (Сложность: S)
+- [ ] not to hide camera/light icons on select, make semitransparent (Сложность: S)
+- [ ] snap 2d objects to grid (Сложность: S)
+- [ ] move 2d nodes with arrow keys (Сложность: S)
+- [ ] remove game tab and keep only popup window mode (Сложность: S)
+
+## Инфраструктура и Веб (Web & Infra)
+- [ ] add tools.gritsenko.biz integration (publish & share) (Сложность: L)
+- [ ] create landing page for editor (Сложность: M)
+- [ ] publish online PWA version (Сложность: M)
+- [ ] add bundle size calculation (Сложность: S)

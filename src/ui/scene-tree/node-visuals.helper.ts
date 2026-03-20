@@ -13,6 +13,10 @@ import { Checkbox2D } from '@pix3/runtime';
 import { InventorySlot2D } from '@pix3/runtime';
 import { Camera3D } from '@pix3/runtime';
 import { DirectionalLightNode } from '@pix3/runtime';
+import { PointLightNode } from '@pix3/runtime';
+import { SpotLightNode } from '@pix3/runtime';
+import { AmbientLightNode } from '@pix3/runtime';
+import { HemisphereLightNode } from '@pix3/runtime';
 import { MeshInstance } from '@pix3/runtime';
 import { GeometryMesh } from '@pix3/runtime';
 import { Sprite3D } from '@pix3/runtime';
@@ -64,6 +68,14 @@ export function getNodeVisuals(node: NodeBase): { color: string; icon: string } 
     return { color: NODE_2D_COLOR, icon: 'square' };
   }
   if (node instanceof DirectionalLightNode) {
+    return { color: NODE_3D_COLOR, icon: 'sun' };
+  }
+  if (
+    node instanceof PointLightNode ||
+    node instanceof SpotLightNode ||
+    node instanceof AmbientLightNode ||
+    node instanceof HemisphereLightNode
+  ) {
     return { color: NODE_3D_COLOR, icon: 'sun' };
   }
   if (node instanceof MeshInstance) {
