@@ -8,7 +8,7 @@ import { IconService } from '@/services/IconService';
 import { Navigation2DController } from '@/services/Navigation2DController';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
 import { toggleNavigationMode } from '@/features/viewport/ToggleNavigationModeCommand';
-import renderTransformToolbar from './transform-toolbar';
+import { renderViewportToolbar } from './viewport-toolbar';
 
 @customElement('pix3-editor-tab')
 export class EditorTabComponent extends ComponentBase {
@@ -152,115 +152,28 @@ export class EditorTabComponent extends ComponentBase {
         tabindex="0"
         data-nav-mode="${this.navigationMode}"
       >
-        <div
-          class="top-toolbar"
-          @click=${(e: Event) => e.stopPropagation()}
-          @pointerdown=${(e: Event) => e.stopPropagation()}
-          @pointerup=${(e: Event) => e.stopPropagation()}
-        >
-          ${isSceneTab
-            ? renderTransformToolbar(
-                this.transformMode,
-                m => this.handleTransformModeChange(m),
-                this.iconService
-              )
-            : null}
-          <div class="toolbar-separator"></div>
-
-          <button
-            class="toolbar-button"
-            aria-label="Toggle grid"
-            aria-pressed="${this.showGrid}"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.toggleGrid();
-            }}"
-            title="Toggle Grid (G)"
-          >
-            <span class="toolbar-icon">${this.iconService.getIcon('grid')}</span>
-          </button>
-          <button
-            class="toolbar-button"
-            aria-label="Toggle lighting"
-            aria-pressed="${this.showLighting}"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.toggleLighting();
-            }}"
-            title="Toggle Lighting (L)"
-          >
-            <span class="toolbar-icon">${this.iconService.getIcon('sun')}</span>
-          </button>
-          <button
-            class="toolbar-button layer-toggle-button"
-            aria-label="Toggle navigation mode"
-            aria-pressed="${this.navigationMode === '2d'}"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.toggleNavigationMode();
-            }}"
-            title="Toggle Navigation Mode (N)"
-          >
-            <span class="layer-label">${this.navigationMode === '3d' ? '3D' : '2D'}</span>
-          </button>
-          <button
-            class="toolbar-button layer-toggle-button"
-            aria-label="Toggle 3D layer"
-            aria-pressed="${this.showLayer3D}"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.toggleLayer3D();
-            }}"
-            title="Toggle 3D Layer (3)"
-          >
-            <span class="layer-label">3D</span>
-          </button>
-          <button
-            class="toolbar-button layer-toggle-button"
-            aria-label="Toggle 2D layer"
-            aria-pressed="${this.showLayer2D}"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.toggleLayer2D();
-            }}"
-            title="Toggle 2D Layer (2)"
-          >
-            <span class="layer-label">2D</span>
-          </button>
-
-          <div class="toolbar-separator"></div>
-
-          <button
-            class="toolbar-button"
-            aria-label="Zoom to default"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.zoomDefault();
-            }}"
-            title="Zoom Default (Home)"
-          >
-            <span class="toolbar-icon">${this.iconService.getIcon('zoom-default')}</span>
-          </button>
-          <button
-            class="toolbar-button"
-            aria-label="Zoom all"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.zoomAll();
-            }}"
-            title="Zoom All (F)"
-          >
-            <span class="toolbar-icon">${this.iconService.getIcon('zoom-all')}</span>
-          </button>
-
-          <div class="toolbar-spacer"></div>
+        <div class="viewport-toolbar-shell">
+          ${renderViewportToolbar(
+            {
+              transformMode: isSceneTab ? this.transformMode : null,
+              showGrid: this.showGrid,
+              showLighting: this.showLighting,
+              navigationMode: this.navigationMode,
+              showLayer3D: this.showLayer3D,
+              showLayer2D: this.showLayer2D,
+            },
+            {
+              onTransformModeChange: m => this.handleTransformModeChange(m),
+              onToggleGrid: () => this.toggleGrid(),
+              onToggleLighting: () => this.toggleLighting(),
+              onToggleNavigationMode: () => this.toggleNavigationMode(),
+              onToggleLayer3D: () => this.toggleLayer3D(),
+              onToggleLayer2D: () => this.toggleLayer2D(),
+              onZoomDefault: () => this.zoomDefault(),
+              onZoomAll: () => this.zoomAll(),
+            },
+            this.iconService
+          )}
         </div>
 
         <div class="viewport-host" part="canvas-host"></div>
@@ -304,19 +217,19 @@ export class EditorTabComponent extends ComponentBase {
   }
 
   private toggleGrid(): void {
-    appState.ui.showGrid = !appState.ui.showGrid;
+    void this.commandDispatcher.executeById('view.toggle-grid');
   }
 
   private toggleLayer2D(): void {
-    appState.ui.showLayer2D = !appState.ui.showLayer2D;
+    void this.commandDispatcher.executeById('view.toggle-layer-2d');
   }
 
   private toggleLayer3D(): void {
-    appState.ui.showLayer3D = !appState.ui.showLayer3D;
+    void this.commandDispatcher.executeById('view.toggle-layer-3d');
   }
 
   private toggleLighting(): void {
-    appState.ui.showLighting = !appState.ui.showLighting;
+    void this.commandDispatcher.executeById('view.toggle-lighting');
   }
 
   private toggleNavigationMode(): void {
@@ -325,11 +238,11 @@ export class EditorTabComponent extends ComponentBase {
   }
 
   private zoomDefault(): void {
-    this.viewportRenderer.zoomDefault();
+    void this.commandDispatcher.executeById('view.zoom-default');
   }
 
   private zoomAll(): void {
-    this.viewportRenderer.zoomAll();
+    void this.commandDispatcher.executeById('view.zoom-all');
   }
 
   private handleWheel = (event: WheelEvent): void => {

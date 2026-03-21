@@ -8,7 +8,8 @@ import { Navigation2DController } from '@/services/Navigation2DController';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
 import { CreatePrefabInstanceCommand } from '@/features/scene/CreatePrefabInstanceCommand';
 import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
-import renderTransformToolbar from './transform-toolbar';
+import { toggleNavigationMode } from '@/features/viewport/ToggleNavigationModeCommand';
+import { renderViewportToolbar } from './viewport-toolbar';
 
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
@@ -37,6 +38,12 @@ export class ViewportPanel extends ComponentBase {
 
   @state()
   private showLayer3D = false;
+
+  @state()
+  private showLighting = false;
+
+  @state()
+  private navigationMode = appState.ui.navigationMode;
 
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
@@ -90,11 +97,15 @@ export class ViewportPanel extends ComponentBase {
     this.showGrid = appState.ui.showGrid;
     this.showLayer2D = appState.ui.showLayer2D;
     this.showLayer3D = appState.ui.showLayer3D;
+    this.showLighting = appState.ui.showLighting;
+    this.navigationMode = appState.ui.navigationMode;
 
     subscribe(appState.ui, () => {
       this.showGrid = appState.ui.showGrid;
       this.showLayer2D = appState.ui.showLayer2D;
       this.showLayer3D = appState.ui.showLayer3D;
+      this.showLighting = appState.ui.showLighting;
+      this.navigationMode = appState.ui.navigationMode;
     });
 
     // Track focus for context-aware shortcuts
@@ -165,84 +176,28 @@ export class ViewportPanel extends ComponentBase {
         aria-label="Scene viewport"
         tabindex="0"
       >
-        <div
-          class="top-toolbar"
-          @click=${(e: Event) => e.stopPropagation()}
-          @pointerdown=${(e: Event) => e.stopPropagation()}
-          @pointerup=${(e: Event) => e.stopPropagation()}
-        >
-          <!-- Transform mode buttons -->
-          ${renderTransformToolbar(
-            this.transformMode,
-            m => this.handleTransformModeChange(m),
+        <div class="viewport-toolbar-shell">
+          ${renderViewportToolbar(
+            {
+              transformMode: this.transformMode,
+              showGrid: this.showGrid,
+              showLighting: this.showLighting,
+              navigationMode: this.navigationMode,
+              showLayer3D: this.showLayer3D,
+              showLayer2D: this.showLayer2D,
+            },
+            {
+              onTransformModeChange: m => this.handleTransformModeChange(m),
+              onToggleGrid: () => this.toggleGrid(),
+              onToggleLighting: () => this.toggleLighting(),
+              onToggleNavigationMode: () => this.toggleNavigationMode(),
+              onToggleLayer3D: () => this.toggleLayer3D(),
+              onToggleLayer2D: () => this.toggleLayer2D(),
+              onZoomDefault: () => this.zoomDefault(),
+              onZoomAll: () => this.zoomAll(),
+            },
             this.iconService
           )}
-          <div class="toolbar-separator"></div>
-          <!-- Viewport controls -->
-          <button
-            class="toolbar-button"
-            aria-label="Toggle grid"
-            aria-pressed="${this.showGrid}"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.toggleGrid();
-            }}"
-            title="Toggle Grid (G)"
-          >
-            <span class="toolbar-icon">${this.iconService.getIcon('grid')}</span>
-          </button>
-          <button
-            class="toolbar-button layer-toggle-button"
-            aria-label="Toggle 3D layer"
-            aria-pressed="${this.showLayer3D}"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.toggleLayer3D();
-            }}"
-            title="Toggle 3D Layer (3)"
-          >
-            <span class="layer-label">3D</span>
-          </button>
-          <button
-            class="toolbar-button layer-toggle-button"
-            aria-label="Toggle 2D layer"
-            aria-pressed="${this.showLayer2D}"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.toggleLayer2D();
-            }}"
-            title="Toggle 2D Layer (2)"
-          >
-            <span class="layer-label">2D</span>
-          </button>
-          <div class="toolbar-separator"></div>
-          <button
-            class="toolbar-button"
-            aria-label="Zoom to default"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.zoomDefault();
-            }}"
-            title="Zoom Default (Home)"
-          >
-            <span class="toolbar-icon">${this.iconService.getIcon('zoom-default')}</span>
-          </button>
-          <button
-            class="toolbar-button"
-            aria-label="Zoom all"
-            @click="${(e: Event) => {
-              e.stopPropagation();
-              e.stopImmediatePropagation();
-              this.zoomAll();
-            }}"
-            title="Zoom All (F)"
-          >
-            <span class="toolbar-icon">${this.iconService.getIcon('zoom-all')}</span>
-          </button>
         </div>
         <canvas class="viewport-canvas" part="canvas" aria-hidden="true"></canvas>
       </section>
@@ -345,23 +300,31 @@ export class ViewportPanel extends ComponentBase {
   }
 
   private toggleGrid(): void {
-    appState.ui.showGrid = !appState.ui.showGrid;
+    void this.commandDispatcher.executeById('view.toggle-grid');
   }
 
   private toggleLayer2D(): void {
-    appState.ui.showLayer2D = !appState.ui.showLayer2D;
+    void this.commandDispatcher.executeById('view.toggle-layer-2d');
   }
 
   private toggleLayer3D(): void {
-    appState.ui.showLayer3D = !appState.ui.showLayer3D;
+    void this.commandDispatcher.executeById('view.toggle-layer-3d');
+  }
+
+  private toggleLighting(): void {
+    void this.commandDispatcher.executeById('view.toggle-lighting');
+  }
+
+  private toggleNavigationMode(): void {
+    void this.commandDispatcher.execute(toggleNavigationMode());
   }
 
   private zoomDefault(): void {
-    this.viewportRenderer.zoomDefault();
+    void this.commandDispatcher.executeById('view.zoom-default');
   }
 
   private zoomAll(): void {
-    this.viewportRenderer.zoomAll();
+    void this.commandDispatcher.executeById('view.zoom-all');
   }
 
   private handleCanvasPointerDown = (event: PointerEvent): void => {

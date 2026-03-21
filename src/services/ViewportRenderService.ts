@@ -29,6 +29,8 @@ import { Camera3D } from '@pix3/runtime';
 import { MeshInstance } from '@pix3/runtime';
 import { Sprite3D } from '@pix3/runtime';
 import { Particles3D } from '@pix3/runtime';
+import { AmbientLightNode } from '@pix3/runtime';
+import { HemisphereLightNode } from '@pix3/runtime';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager, InputService } from '@pix3/runtime';
 import { OperationService } from '@/services/OperationService';
@@ -59,6 +61,13 @@ const LAYER_GIZMOS = 2;
 const TARGET_DIRECTION_RAY_LENGTH = 500;
 const DEFAULT_VIEWPORT_BASE_WIDTH = 1920;
 const DEFAULT_VIEWPORT_BASE_HEIGHT = 1080;
+const DEFAULT_3D_CAMERA_POSITION = new THREE.Vector3(5, 5, 5);
+const DEFAULT_3D_CAMERA_TARGET = new THREE.Vector3(0, 0, 0);
+const DEFAULT_2D_CAMERA_Z = 100;
+const DEFAULT_NODE_ICON_OPACITY = 0.95;
+const SELECTED_NODE_ICON_OPACITY = 0.38;
+const MIN_WORLD_BOUNDS_SIZE = 0.0001;
+const TWO_D_FIT_PADDING_MULTIPLIER = 1.15;
 
 @injectable()
 export class ViewportRendererService {
@@ -203,8 +212,8 @@ export class ViewportRendererService {
 
     // Create camera
     this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 10000);
-    this.camera.position.set(5, 5, 5);
-    this.camera.lookAt(0, 0, 0);
+    this.camera.position.copy(DEFAULT_3D_CAMERA_POSITION);
+    this.camera.lookAt(DEFAULT_3D_CAMERA_TARGET);
 
     // Set up camera layers: layer 0 for 3D nodes, layer 1 for 2D nodes, layer 2 for gizmos
     // Main perspective camera renders 3D layer and gizmos
@@ -214,7 +223,7 @@ export class ViewportRendererService {
 
     // Create orthographic camera for 2D layer overlay
     this.orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
-    this.orthographicCamera.position.z = 100;
+    this.orthographicCamera.position.z = DEFAULT_2D_CAMERA_Z;
     // Orthographic camera only renders 2D layer
     this.orthographicCamera.layers.disableAll();
     this.orthographicCamera.layers.enable(LAYER_2D);
@@ -640,19 +649,30 @@ export class ViewportRendererService {
         } else {
           icon.material.map = this.particlesIconTexture ?? null;
         }
+        icon.material.opacity = DEFAULT_NODE_ICON_OPACITY;
         icon.material.needsUpdate = true;
       }
     }
   }
 
   zoomDefault(): void {
+    if (appState.ui.navigationMode === '2d') {
+      this.reset2DView();
+      return;
+    }
+
     if (!this.camera || !this.orbitControls) return;
-    this.camera.position.set(5, 5, 5);
-    this.camera.lookAt(0, 0, 0);
+    this.camera.position.copy(DEFAULT_3D_CAMERA_POSITION);
+    this.camera.lookAt(DEFAULT_3D_CAMERA_TARGET);
     this.orbitControls.reset();
   }
 
   zoomAll(): void {
+    if (appState.ui.navigationMode === '2d') {
+      this.fit2DViewToSceneContent();
+      return;
+    }
+
     if (!this.camera || !this.scene || !this.orbitControls) return;
 
     const box = new THREE.Box3();
@@ -689,6 +709,146 @@ export class ViewportRendererService {
     this.camera.lookAt(center);
     this.orbitControls.target.copy(center);
     this.orbitControls.update();
+  }
+
+  private reset2DView(): void {
+    if (!this.orthographicCamera) {
+      return;
+    }
+
+    this.cancelPanMomentum();
+    this.panVelocity.x = 0;
+    this.panVelocity.y = 0;
+
+    this.orthographicCamera.position.set(0, 0, DEFAULT_2D_CAMERA_Z);
+    this.orthographicCamera.zoom = 1;
+    this.orthographicCamera.updateProjectionMatrix();
+
+    if (this.orthographicControls) {
+      this.orthographicControls.target.set(0, 0, 0);
+      this.orthographicControls.update();
+    }
+
+    this.sync2DServiceFrameThickness();
+    if (this.selection2DOverlay) {
+      this.refreshGizmoPositions();
+    }
+    this.saveZoomToState();
+    this.requestRender();
+  }
+
+  private fit2DViewToSceneContent(): void {
+    if (!this.orthographicCamera) {
+      return;
+    }
+
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      this.reset2DView();
+      return;
+    }
+
+    const contentBounds = this.collect2DContentBounds(sceneGraph.rootNodes);
+    if (!contentBounds || this.isDegenerateBounds(contentBounds)) {
+      this.reset2DView();
+      return;
+    }
+
+    const size = contentBounds.getSize(new THREE.Vector3());
+    const center = contentBounds.getCenter(new THREE.Vector3());
+    const paddedWidth = Math.max(size.x * TWO_D_FIT_PADDING_MULTIPLIER, 1);
+    const paddedHeight = Math.max(size.y * TWO_D_FIT_PADDING_MULTIPLIER, 1);
+    const baseWidth = Math.max(
+      Math.abs(this.orthographicCamera.right - this.orthographicCamera.left),
+      1
+    );
+    const baseHeight = Math.max(
+      Math.abs(this.orthographicCamera.top - this.orthographicCamera.bottom),
+      1
+    );
+    const targetZoom = Math.max(0.1, Math.min(baseWidth / paddedWidth, baseHeight / paddedHeight));
+
+    this.cancelPanMomentum();
+    this.panVelocity.x = 0;
+    this.panVelocity.y = 0;
+
+    this.orthographicCamera.position.set(center.x, center.y, DEFAULT_2D_CAMERA_Z);
+    this.orthographicCamera.zoom = targetZoom;
+    this.orthographicCamera.updateProjectionMatrix();
+
+    if (this.orthographicControls) {
+      this.orthographicControls.target.set(center.x, center.y, 0);
+      this.orthographicControls.update();
+    }
+
+    this.sync2DServiceFrameThickness();
+    if (this.selection2DOverlay) {
+      this.refreshGizmoPositions();
+    }
+    this.saveZoomToState();
+    this.requestRender();
+  }
+
+  private collect2DContentBounds(nodes: readonly NodeBase[]): THREE.Box3 | null {
+    let bounds: THREE.Box3 | null = null;
+    let fallbackLayoutBounds: THREE.Box3 | null = null;
+
+    const traverse = (currentNodes: readonly NodeBase[]) => {
+      for (const node of currentNodes) {
+        if (node instanceof Node2D && this.isVisibleInHierarchy(node)) {
+          const nodeBounds = this.getNodeOnlyBounds(node);
+          if (!this.isDegenerateBounds(nodeBounds)) {
+            if (node instanceof Layout2D && fallbackLayoutBounds === null) {
+              fallbackLayoutBounds = nodeBounds.clone();
+            } else {
+              bounds = bounds ? bounds.union(nodeBounds) : nodeBounds.clone();
+            }
+          }
+        }
+
+        if (node.children.length > 0) {
+          const childNodes = node.children.filter(
+            (child): child is NodeBase => child instanceof NodeBase
+          );
+          traverse(childNodes);
+        }
+      }
+    };
+
+    traverse(nodes);
+    return bounds ?? fallbackLayoutBounds;
+  }
+
+  private isDegenerateBounds(bounds: THREE.Box3): boolean {
+    if (bounds.isEmpty()) {
+      return true;
+    }
+
+    const size = bounds.getSize(new THREE.Vector3());
+    const maxSize = Math.max(size.x, size.y, size.z);
+    return !Number.isFinite(maxSize) || maxSize <= MIN_WORLD_BOUNDS_SIZE;
+  }
+
+  private shouldSkipSelectionBounds(node: Node3D): boolean {
+    return (
+      node instanceof Camera3D ||
+      node instanceof DirectionalLightNode ||
+      node instanceof PointLightNode ||
+      node instanceof SpotLightNode ||
+      node instanceof AmbientLightNode ||
+      node instanceof HemisphereLightNode
+    );
+  }
+
+  private shouldKeepSelectedNodeIcon(node: Node3D): boolean {
+    return (
+      node instanceof Camera3D ||
+      node instanceof DirectionalLightNode ||
+      node instanceof PointLightNode ||
+      node instanceof SpotLightNode ||
+      node instanceof AmbientLightNode ||
+      node instanceof HemisphereLightNode
+    );
   }
 
   resize(width: number, height: number): void {
@@ -1976,14 +2136,11 @@ export class ViewportRendererService {
           this.previewCamera = node.camera;
         }
 
-        const skipSelectionBox =
-          node instanceof Camera3D ||
-          node instanceof DirectionalLightNode ||
-          node instanceof PointLightNode ||
-          node instanceof SpotLightNode;
-
-        if (!skipSelectionBox) {
+        if (!this.shouldSkipSelectionBounds(node)) {
           const box = new THREE.Box3().setFromObject(node);
+          if (this.isDegenerateBounds(box)) {
+            continue;
+          }
           const helper = new THREE.Box3Helper(box, new THREE.Color(0x00ff00));
           helper.userData.selectionBoxId = nodeId;
           helper.userData.isSelectionBox = true;
@@ -2475,6 +2632,7 @@ export class ViewportRendererService {
             : (this.particlesIconTexture ?? null),
         color: 0xffffff,
         transparent: true,
+        opacity: DEFAULT_NODE_ICON_OPACITY,
         depthTest: false,
         depthWrite: false,
         sizeAttenuation: false,
@@ -2535,11 +2693,24 @@ export class ViewportRendererService {
     const selectedNodeIds = new Set(appState.selection.nodeIds);
     for (const [nodeId, icon] of this.nodeIcons.entries()) {
       const node = sceneGraph.nodeMap.get(nodeId);
-      icon.visible =
+      const isSelected = selectedNodeIds.has(nodeId);
+      const keepVisibleWhenSelected =
+        node instanceof Node3D && this.shouldKeepSelectedNodeIcon(node);
+      const shouldShow =
         appState.ui.showLayer3D &&
         node instanceof Node3D &&
         node.visible &&
-        !selectedNodeIds.has(nodeId);
+        (!isSelected || keepVisibleWhenSelected);
+
+      icon.visible = shouldShow;
+
+      if (icon.material instanceof THREE.SpriteMaterial) {
+        icon.material.opacity =
+          isSelected && keepVisibleWhenSelected
+            ? SELECTED_NODE_ICON_OPACITY
+            : DEFAULT_NODE_ICON_OPACITY;
+        icon.material.needsUpdate = true;
+      }
     }
   }
 

@@ -1,9 +1,15 @@
 import { vi, describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { ViewportRendererService } from './ViewportRenderService';
-import { Sprite2D } from '@pix3/runtime';
+import { AmbientLightNode, Camera3D, Group2D, Sprite2D } from '@pix3/runtime';
+import { appState, resetAppState } from '@/state';
 
 describe('ViewportRendererService', () => {
+  afterEach(() => {
+    resetAppState();
+    vi.restoreAllMocks();
+  });
+
   it('should offset Sprite2D mesh by anchor point', () => {
     const service = new ViewportRendererService();
 
@@ -121,7 +127,129 @@ describe('ViewportRendererService', () => {
     expect(loadSpy).not.toHaveBeenCalled();
   });
 
-  afterEach(() => {
-    vi.restoreAllMocks();
+  it('keeps selected camera icons visible with reduced opacity', () => {
+    resetAppState();
+    appState.ui.showLayer3D = true;
+
+    const service = new ViewportRendererService();
+    const cameraNode = new Camera3D({ id: 'camera-test', name: 'Camera' });
+    const icon = new THREE.Sprite(new THREE.SpriteMaterial({ transparent: true, opacity: 0.95 }));
+
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({
+          nodeMap: new Map([[cameraNode.nodeId, cameraNode]]),
+        }),
+      },
+      configurable: true,
+    });
+
+    (service as unknown as { nodeIcons: Map<string, THREE.Sprite> }).nodeIcons.set(
+      cameraNode.nodeId,
+      icon
+    );
+    appState.selection.nodeIds = [cameraNode.nodeId];
+
+    (
+      service as unknown as {
+        updateNodeIconVisibility: () => void;
+      }
+    ).updateNodeIconVisibility();
+
+    expect(icon.visible).toBe(true);
+    expect((icon.material as THREE.SpriteMaterial).opacity).toBeLessThan(0.95);
+  });
+
+  it('skips selection bounds for ambient lights', () => {
+    const service = new ViewportRendererService();
+    const ambientLight = new AmbientLightNode({ id: 'ambient-test', name: 'Ambient' });
+
+    const result = (
+      service as unknown as {
+        shouldSkipSelectionBounds: (node: AmbientLightNode) => boolean;
+      }
+    ).shouldSkipSelectionBounds(ambientLight);
+
+    expect(result).toBe(true);
+  });
+
+  it('resets the 2D camera without touching 3D orbit controls', () => {
+    resetAppState();
+    appState.ui.navigationMode = '2d';
+
+    const service = new ViewportRendererService();
+    const perspectiveCamera = new THREE.PerspectiveCamera();
+    perspectiveCamera.position.set(11, 12, 13);
+    const orthographicCamera = new THREE.OrthographicCamera(-960, 960, 540, -540, 0.1, 1000);
+    orthographicCamera.position.set(25, -40, 100);
+    orthographicCamera.zoom = 2.5;
+    const orbitControls = { reset: vi.fn(), target: new THREE.Vector3(), update: vi.fn() };
+    const orthographicControls = {
+      target: new THREE.Vector3(10, -10, 0),
+      update: vi.fn(),
+    };
+
+    Object.defineProperty(service, 'camera', { value: perspectiveCamera, configurable: true });
+    Object.defineProperty(service, 'orthographicCamera', {
+      value: orthographicCamera,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'orbitControls', { value: orbitControls, configurable: true });
+    Object.defineProperty(service, 'orthographicControls', {
+      value: orthographicControls,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'requestRender', { value: vi.fn(), configurable: true });
+
+    service.zoomDefault();
+
+    expect(orbitControls.reset).not.toHaveBeenCalled();
+    expect(orthographicCamera.position.x).toBe(0);
+    expect(orthographicCamera.position.y).toBe(0);
+    expect(orthographicCamera.zoom).toBe(1);
+    expect(orthographicControls.target.x).toBe(0);
+    expect(orthographicControls.target.y).toBe(0);
+    expect(perspectiveCamera.position.x).toBe(11);
+  });
+
+  it('falls back to 2D reset when zoom-all has no 2D content', () => {
+    resetAppState();
+    appState.ui.navigationMode = '2d';
+
+    const service = new ViewportRendererService();
+    const orthographicCamera = new THREE.OrthographicCamera(-960, 960, 540, -540, 0.1, 1000);
+    orthographicCamera.position.set(20, 30, 100);
+    orthographicCamera.zoom = 2;
+    const orbitControls = { reset: vi.fn(), target: new THREE.Vector3(), update: vi.fn() };
+    const orthographicControls = {
+      target: new THREE.Vector3(10, 12, 0),
+      update: vi.fn(),
+    };
+
+    Object.defineProperty(service, 'orthographicCamera', {
+      value: orthographicCamera,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'orthographicControls', {
+      value: orthographicControls,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'orbitControls', { value: orbitControls, configurable: true });
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({
+          rootNodes: [new Group2D({ id: 'empty-group', name: 'Group', width: 0, height: 0 })],
+        }),
+      },
+      configurable: true,
+    });
+    Object.defineProperty(service, 'requestRender', { value: vi.fn(), configurable: true });
+
+    service.zoomAll();
+
+    expect(orbitControls.reset).not.toHaveBeenCalled();
+    expect(orthographicCamera.position.x).toBe(0);
+    expect(orthographicCamera.position.y).toBe(0);
+    expect(orthographicCamera.zoom).toBe(1);
   });
 });

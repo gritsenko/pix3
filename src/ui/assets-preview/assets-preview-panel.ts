@@ -88,6 +88,9 @@ export class AssetsPreviewPanel extends ComponentBase {
             : html`<span class="icon">${this.iconService.getIcon(item.iconName, 24)}</span>`}
         </span>
         <span class="name">${item.name}</span>
+        ${item.kind === 'file' && item.sizeBytes !== null
+          ? html`<span class="meta">${this.formatFileSize(item.sizeBytes)}</span>`
+          : null}
       </button>
     `;
   }

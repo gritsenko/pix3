@@ -91,3 +91,9 @@ pix3-assets-preview-panel .name {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+pix3-assets-preview-panel .meta {
+  font-size: 0.66rem;
+  line-height: 1.1;
+  color: rgba(245, 247, 250, 0.56);
+}
