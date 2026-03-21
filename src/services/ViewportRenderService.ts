@@ -52,6 +52,7 @@ import {
   type Active2DTransform,
   type Selection2DOverlay,
 } from '@/services/TransformTool2d';
+import { isDocumentActive } from './page-activity';
 
 export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
 
@@ -112,7 +113,7 @@ export class ViewportRendererService {
   private hoverPreview2D?: { nodeId: string; frame: THREE.Group };
   private animationId?: number;
   private isPaused = true;
-  private isWindowFocused = true;
+  private isWindowFocused = isDocumentActive(document);
   private disposers: Array<() => void> = [];
   private gridHelper?: THREE.GridHelper;
   private editorAmbientLight?: THREE.AmbientLight;
@@ -359,16 +360,28 @@ export class ViewportRendererService {
       this.handleFocusPause();
     };
     const onVisibilityChange = () => {
-      this.isWindowFocused = document.visibilityState === 'visible' && document.hasFocus();
+      this.isWindowFocused = isDocumentActive(document);
+      this.handleFocusPause();
+    };
+    const onPageShow = () => {
+      this.isWindowFocused = isDocumentActive(document);
+      this.handleFocusPause();
+    };
+    const onPageHide = () => {
+      this.isWindowFocused = isDocumentActive(document);
       this.handleFocusPause();
     };
 
     window.addEventListener('focus', onFocus);
     window.addEventListener('blur', onBlur);
+    window.addEventListener('pageshow', onPageShow);
+    window.addEventListener('pagehide', onPageHide);
     document.addEventListener('visibilitychange', onVisibilityChange);
     this.disposers.push(() => {
       window.removeEventListener('focus', onFocus);
       window.removeEventListener('blur', onBlur);
+      window.removeEventListener('pageshow', onPageShow);
+      window.removeEventListener('pagehide', onPageHide);
       document.removeEventListener('visibilitychange', onVisibilityChange);
     });
 
@@ -467,6 +480,7 @@ export class ViewportRendererService {
       cancelAnimationFrame(this.animationId);
       this.animationId = undefined;
     }
+    this.cancelPanMomentum();
   }
 
   resume(): void {
@@ -477,6 +491,7 @@ export class ViewportRendererService {
 
     if (!this.isPaused) return;
     this.isPaused = false;
+    this.animationClock.getDelta();
     this.startRenderLoop();
   }
 
@@ -486,8 +501,10 @@ export class ViewportRendererService {
         cancelAnimationFrame(this.animationId);
         this.animationId = undefined;
       }
+      this.cancelPanMomentum();
     } else {
       if (!this.isPaused && !this.animationId) {
+        this.animationClock.getDelta();
         this.startRenderLoop();
       }
     }
@@ -1499,6 +1516,10 @@ export class ViewportRendererService {
    * Applies exponential damping to pan velocity over ~500ms.
    */
   startPanMomentum(): void {
+    if (appState.ui.pauseRenderingOnUnfocus && !this.isWindowFocused) {
+      return;
+    }
+
     if (this.momentumAnimationId) {
       cancelAnimationFrame(this.momentumAnimationId);
     }
@@ -1507,6 +1528,11 @@ export class ViewportRendererService {
     const minVelocity = 0.001; // Below this, stop animating
 
     const animate = () => {
+      if (this.isPaused || (appState.ui.pauseRenderingOnUnfocus && !this.isWindowFocused)) {
+        this.momentumAnimationId = undefined;
+        return;
+      }
+
       // Check if velocity is negligible
       const speed = Math.sqrt(
         this.panVelocity.x * this.panVelocity.x + this.panVelocity.y * this.panVelocity.y

@@ -6,6 +6,7 @@
  */
 
 import { injectable, inject } from '@/fw/di';
+import { appState } from '@/state';
 import {
   SceneManager,
   type SceneGraph,
@@ -15,6 +16,7 @@ import {
 } from '@pix3/runtime';
 import { NodeBase } from '@pix3/runtime';
 import { AutoloadService } from './AutoloadService';
+import { isDocumentActive } from './page-activity';
 
 interface NodeStateSnapshot {
   nodeId: string;
@@ -41,10 +43,20 @@ export class ScriptExecutionService {
   private animationFrameId: number | null = null;
   private lastTimestamp: number = 0;
   private isRunning: boolean = false;
+  private isPageActive: boolean = isDocumentActive(document);
   private currentSceneId: string | null = null;
   private nodeStateSnapshots: Map<string, NodeStateSnapshot[]> = new Map();
+  private readonly handlePageActivityEvent = (): void => {
+    this.updatePageActivity();
+  };
 
-  constructor() {}
+  constructor() {
+    window.addEventListener('focus', this.handlePageActivityEvent);
+    window.addEventListener('blur', this.handlePageActivityEvent);
+    window.addEventListener('pageshow', this.handlePageActivityEvent);
+    window.addEventListener('pagehide', this.handlePageActivityEvent);
+    document.addEventListener('visibilitychange', this.handlePageActivityEvent);
+  }
 
   /**
    * Start the script execution loop
@@ -64,7 +76,7 @@ export class ScriptExecutionService {
     }
 
     this.startAutoloadScripts();
-    this.scheduleNextFrame();
+    this.handlePageActivityChange();
 
     console.log('[ScriptExecutionService] Started script execution loop');
   }
@@ -128,7 +140,7 @@ export class ScriptExecutionService {
    * Schedule the next animation frame
    */
   private scheduleNextFrame(): void {
-    if (!this.isRunning) {
+    if (!this.isRunning || this.shouldPauseForBackgroundWork()) {
       return;
     }
 
@@ -141,7 +153,8 @@ export class ScriptExecutionService {
    * Main tick method called every frame
    */
   private tick(timestamp: number): void {
-    if (!this.isRunning) {
+    if (!this.isRunning || this.shouldPauseForBackgroundWork()) {
+      this.animationFrameId = null;
       return;
     }
 
@@ -311,6 +324,39 @@ export class ScriptExecutionService {
    */
   dispose(): void {
     this.stop();
+    window.removeEventListener('focus', this.handlePageActivityEvent);
+    window.removeEventListener('blur', this.handlePageActivityEvent);
+    window.removeEventListener('pageshow', this.handlePageActivityEvent);
+    window.removeEventListener('pagehide', this.handlePageActivityEvent);
+    document.removeEventListener('visibilitychange', this.handlePageActivityEvent);
+  }
+
+  private updatePageActivity(): void {
+    this.isPageActive = isDocumentActive(document);
+    this.handlePageActivityChange();
+  }
+
+  private handlePageActivityChange(): void {
+    if (!this.isRunning) {
+      return;
+    }
+
+    if (this.shouldPauseForBackgroundWork()) {
+      if (this.animationFrameId !== null) {
+        cancelAnimationFrame(this.animationFrameId);
+        this.animationFrameId = null;
+      }
+      return;
+    }
+
+    this.lastTimestamp = performance.now();
+    if (this.animationFrameId === null) {
+      this.scheduleNextFrame();
+    }
+  }
+
+  private shouldPauseForBackgroundWork(): boolean {
+    return appState.ui.pauseRenderingOnUnfocus && !this.isPageActive;
   }
 
   /**

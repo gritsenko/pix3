@@ -11,6 +11,7 @@ import { ScriptCompilerService } from './ScriptCompilerService';
 import type { CompilationError } from './ScriptCompilerService';
 import { LoggingService } from './LoggingService';
 import { FileWatchService } from './FileWatchService';
+import { isDocumentActive } from './page-activity';
 
 /**
  * ProjectScriptLoaderService
@@ -46,6 +47,17 @@ export class ProjectScriptLoaderService {
   private debounceTimer: number | null = null;
   private readonly debounceMs = 300;
   private readonly scriptDirectories = ['scripts', 'src/scripts'] as const;
+  private isPageActive = isDocumentActive(document);
+  private pendingBuildWhileHidden = false;
+  private readonly handlePageActivityChange = (): void => {
+    this.isPageActive = isDocumentActive(document);
+    if (!this.isPageActive || !this.pendingBuildWhileHidden) {
+      return;
+    }
+
+    this.pendingBuildWhileHidden = false;
+    void this.syncAndBuild();
+  };
 
   // Track scripts from this project for cleanup
   private registeredScriptIds = new Set<string>();
@@ -57,6 +69,12 @@ export class ProjectScriptLoaderService {
   enableAutoCompilation = true;
 
   constructor() {
+    window.addEventListener('focus', this.handlePageActivityChange);
+    window.addEventListener('blur', this.handlePageActivityChange);
+    window.addEventListener('pageshow', this.handlePageActivityChange);
+    window.addEventListener('pagehide', this.handlePageActivityChange);
+    document.addEventListener('visibilitychange', this.handlePageActivityChange);
+
     let lastStatus = appState.project.status;
 
     // Watch for project status changes to trigger initial compilation
@@ -74,6 +92,12 @@ export class ProjectScriptLoaderService {
    * This method is debounced to avoid excessive rebuilds.
    */
   async syncAndBuild(): Promise<void> {
+    if (!this.isPageActive) {
+      this.pendingBuildWhileHidden = true;
+      return;
+    }
+
+    this.pendingBuildWhileHidden = false;
     appState.project.scriptsStatus = 'loading';
 
     // Clear existing debounce timer
@@ -358,6 +382,11 @@ export class ProjectScriptLoaderService {
 
   dispose(): void {
     this.disposeSubscription?.();
+    window.removeEventListener('focus', this.handlePageActivityChange);
+    window.removeEventListener('blur', this.handlePageActivityChange);
+    window.removeEventListener('pageshow', this.handlePageActivityChange);
+    window.removeEventListener('pagehide', this.handlePageActivityChange);
+    document.removeEventListener('visibilitychange', this.handlePageActivityChange);
 
     if (this.debounceTimer !== null) {
       window.clearTimeout(this.debounceTimer);

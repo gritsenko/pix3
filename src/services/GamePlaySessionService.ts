@@ -13,6 +13,7 @@ import { OperationService } from '@/services/OperationService';
 import { UpdateEditorSettingsOperation } from '@/features/editor/UpdateEditorSettingsOperation';
 import { SetGamePopoutWindowOpenOperation } from '@/features/scripts/SetGamePopoutWindowOpenOperation';
 import { SetPlayModeOperation } from '@/features/scripts/SetPlayModeOperation';
+import { isDocumentActive } from './page-activity';
 
 type GameHostKind = 'tab' | 'popout';
 
@@ -277,14 +278,24 @@ export class GamePlaySessionService {
     const onVisibilityChange = (): void => {
       this.handleFocusPause();
     };
+    const onPageShow = (): void => {
+      this.handleFocusPause();
+    };
+    const onPageHide = (): void => {
+      this.handleFocusPause();
+    };
 
     windowRef.addEventListener('focus', onFocus);
     windowRef.addEventListener('blur', onBlur);
+    windowRef.addEventListener('pageshow', onPageShow);
+    windowRef.addEventListener('pagehide', onPageHide);
     windowRef.document.addEventListener('visibilitychange', onVisibilityChange);
 
     this.focusCleanup = () => {
       windowRef.removeEventListener('focus', onFocus);
       windowRef.removeEventListener('blur', onBlur);
+      windowRef.removeEventListener('pageshow', onPageShow);
+      windowRef.removeEventListener('pagehide', onPageHide);
       windowRef.document.removeEventListener('visibilitychange', onVisibilityChange);
     };
   }
@@ -300,8 +311,7 @@ export class GamePlaySessionService {
     }
 
     const documentRef = host.windowRef.document;
-    const isVisible =
-      documentRef.visibilityState === 'visible' && host.windowRef.document.hasFocus();
+    const isVisible = isDocumentActive(documentRef);
     const shouldPause = appState.ui.pauseRenderingOnUnfocus && !isVisible;
     if (shouldPause) {
       this.runner.pause();

@@ -1,4 +1,5 @@
 import { injectable } from '@/fw/di';
+import { isDocumentActive } from './page-activity';
 
 /**
  * FileWatchService monitors external changes to opened scene files using polling.
@@ -20,16 +21,28 @@ export class FileWatchService {
 
   /** Polling interval in milliseconds (default 500ms). */
   private readonly pollInterval: number = 500;
+  private isPageActive = isDocumentActive(document);
 
-  private readonly handleWindowFocus = () => {
-    // When window regains focus, immediately check all watched files
-    for (const [filePath, fileHandle] of this.fileHandles.entries()) {
-      void this.checkFileChange(filePath, fileHandle);
+  private readonly handlePageActivityChange = () => {
+    this.isPageActive = isDocumentActive(document);
+
+    if (this.isPageActive) {
+      this.resumePolling();
+      for (const [filePath, fileHandle] of this.fileHandles.entries()) {
+        void this.checkFileChange(filePath, fileHandle);
+      }
+      return;
     }
+
+    this.pausePolling();
   };
 
   constructor() {
-    window.addEventListener('focus', this.handleWindowFocus);
+    window.addEventListener('focus', this.handlePageActivityChange);
+    window.addEventListener('blur', this.handlePageActivityChange);
+    window.addEventListener('pageshow', this.handlePageActivityChange);
+    window.addEventListener('pagehide', this.handlePageActivityChange);
+    document.addEventListener('visibilitychange', this.handlePageActivityChange);
   }
 
   /**
@@ -83,20 +96,8 @@ export class FileWatchService {
       this.lastModifiedTimes.set(filePath, lastModifiedTime);
     }
 
-    // Start polling - use stored fileHandle to avoid context loss
-    const intervalId = window.setInterval(() => {
-      const handle = this.fileHandles.get(filePath);
-      if (!handle) {
-        this.unwatch(filePath);
-        return;
-      }
-      void this.checkFileChange(filePath, handle);
-    }, this.pollInterval);
-
-    this.watchers.set(filePath, intervalId);
-
-    if (import.meta.env.MODE === 'development') {
-      console.debug(`[FileWatchService] Started watching: ${filePath}`);
+    if (this.isPageActive) {
+      this.startPolling(filePath);
     }
   }
 
@@ -138,13 +139,45 @@ export class FileWatchService {
    * Stop watching all files.
    */
   unwatchAll(): void {
-    for (const intervalId of this.watchers.values()) {
-      window.clearInterval(intervalId);
-    }
+    this.pausePolling();
     this.watchers.clear();
     this.fileHandles.clear();
     this.lastModifiedTimes.clear();
     this.changeListeners.clear();
+  }
+
+  private startPolling(filePath: string): void {
+    if (this.watchers.has(filePath)) {
+      return;
+    }
+
+    const intervalId = window.setInterval(() => {
+      const handle = this.fileHandles.get(filePath);
+      if (!handle) {
+        this.unwatch(filePath);
+        return;
+      }
+      void this.checkFileChange(filePath, handle);
+    }, this.pollInterval);
+
+    this.watchers.set(filePath, intervalId);
+
+    if (import.meta.env.MODE === 'development') {
+      console.debug(`[FileWatchService] Started watching: ${filePath}`);
+    }
+  }
+
+  private pausePolling(): void {
+    for (const intervalId of this.watchers.values()) {
+      window.clearInterval(intervalId);
+    }
+    this.watchers.clear();
+  }
+
+  private resumePolling(): void {
+    for (const filePath of this.fileHandles.keys()) {
+      this.startPolling(filePath);
+    }
   }
 
   /**
@@ -193,7 +226,11 @@ export class FileWatchService {
   }
 
   dispose(): void {
-    window.removeEventListener('focus', this.handleWindowFocus);
+    window.removeEventListener('focus', this.handlePageActivityChange);
+    window.removeEventListener('blur', this.handlePageActivityChange);
+    window.removeEventListener('pageshow', this.handlePageActivityChange);
+    window.removeEventListener('pagehide', this.handlePageActivityChange);
+    document.removeEventListener('visibilitychange', this.handlePageActivityChange);
     this.unwatchAll();
   }
 }

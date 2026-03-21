@@ -7,6 +7,7 @@ import { ProjectService } from '@/services/ProjectService';
 import { TemplateService, DEFAULT_TEMPLATE_SCENE_ID } from '@/services/TemplateService';
 import { DialogService } from '@/services/DialogService';
 import { IconService } from '@/services/IconService';
+import { isDocumentActive } from '@/services/page-activity';
 import { appState } from '@/state';
 import { subscribe } from 'valtio/vanilla';
 import './asset-tree.ts.css';
@@ -66,15 +67,16 @@ export class AssetTree extends ComponentBase {
 
   private previousRootSignature: string | null = null;
   private treeRefreshQueue: Promise<void> = Promise.resolve();
+  private externalCheckPromise: Promise<void> | null = null;
+  private lastExternalCheckAt = 0;
+  private readonly externalCheckCooldownMs = 1000;
 
   private onWindowFocus = async (): Promise<void> => {
-    await this.checkForExternalChanges();
+    await this.maybeCheckForExternalChanges();
   };
 
   private onVisibilityChange = async (): Promise<void> => {
-    if (document.visibilityState === 'visible') {
-      await this.checkForExternalChanges();
-    }
+    await this.maybeCheckForExternalChanges();
   };
 
   public async createFolder(): Promise<void> {
@@ -116,6 +118,28 @@ export class AssetTree extends ComponentBase {
     } catch (err) {
       console.error('[AssetTree] Failed to check external changes', err);
     }
+  }
+
+  private async maybeCheckForExternalChanges(force = false): Promise<void> {
+    if (appState.project.status !== 'ready' || !isDocumentActive(document)) {
+      return;
+    }
+
+    const now = Date.now();
+    if (!force && now - this.lastExternalCheckAt < this.externalCheckCooldownMs) {
+      return;
+    }
+
+    if (this.externalCheckPromise) {
+      await this.externalCheckPromise;
+      return;
+    }
+
+    this.lastExternalCheckAt = now;
+    this.externalCheckPromise = this.checkForExternalChanges().finally(() => {
+      this.externalCheckPromise = null;
+    });
+    await this.externalCheckPromise;
   }
 
   public createScene(): void {

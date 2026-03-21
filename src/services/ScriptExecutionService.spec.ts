@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NodeBase, Script, type SceneGraph, type SceneManager } from '@pix3/runtime';
 import { ScriptExecutionService } from './ScriptExecutionService';
+import { appState, resetAppState } from '@/state';
 
 class LifecycleScript extends Script {
   detachCalls = 0;
@@ -37,12 +38,32 @@ const createService = (scene: SceneGraph): ScriptExecutionService => {
     value: sceneManagerMock,
     configurable: true,
   });
+  Object.defineProperty(service, 'input', {
+    value: { beginFrame: vi.fn() },
+    configurable: true,
+  });
+  Object.defineProperty(service, 'autoloadService', {
+    value: {
+      getGlobalRoot: () => new NodeBase({ id: 'autoload-root', name: 'Autoload Root' }),
+      getAutoloadInstances: () => [],
+    },
+    configurable: true,
+  });
+  Object.defineProperty(service, 'audioService', {
+    value: { stopAll: vi.fn() },
+    configurable: true,
+  });
 
   return service;
 };
 
 describe('ScriptExecutionService lifecycle teardown', () => {
   beforeEach(() => {
+    resetAppState();
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
     vi.stubGlobal(
       'requestAnimationFrame',
       vi.fn(() => 1)
@@ -52,6 +73,7 @@ describe('ScriptExecutionService lifecycle teardown', () => {
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    resetAppState();
   });
 
   it('detaches scripts and resets started state when stopping a known scene', () => {
@@ -79,5 +101,59 @@ describe('ScriptExecutionService lifecycle teardown', () => {
 
     expect(script.detachCalls).toBe(1);
     expect(script._started).toBe(false);
+  });
+
+  it('does not schedule frames while the page is hidden', () => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+
+    const { scene } = createSceneFixture();
+    const service = createService(scene);
+
+    service.start();
+
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+  });
+
+  it('resumes scheduling after the page becomes visible again', () => {
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+    const hasFocusSpy = vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+
+    const { scene } = createSceneFixture();
+    const service = createService(scene);
+
+    service.start();
+    expect(requestAnimationFrame).not.toHaveBeenCalled();
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'visible',
+    });
+    hasFocusSpy.mockReturnValue(true);
+    window.dispatchEvent(new Event('focus'));
+
+    expect(vi.mocked(requestAnimationFrame).mock.calls.length).toBeGreaterThan(0);
+  });
+
+  it('keeps running in background when pause-on-unfocus is disabled', () => {
+    appState.ui.pauseRenderingOnUnfocus = false;
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      value: 'hidden',
+    });
+    vi.spyOn(document, 'hasFocus').mockReturnValue(false);
+
+    const { scene } = createSceneFixture();
+    const service = createService(scene);
+
+    service.start();
+
+    expect(requestAnimationFrame).toHaveBeenCalledTimes(1);
   });
 });

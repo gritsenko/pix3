@@ -18,6 +18,12 @@ export class AudioService {
   private masterGain: GainNode | null = null;
   private readonly activePlaybacks = new Set<AudioPlayback>();
   private suspendedByFocusLoss = false;
+  private readonly unlockFromPointerDown = (): void => {
+    this.unlock();
+  };
+  private readonly unlockFromKeydown = (): void => {
+    this.unlock();
+  };
 
   constructor() {
     const audioWindow = window as WindowWithWebkitAudioContext;
@@ -41,12 +47,16 @@ export class AudioService {
     }
 
     // iOS Safari / Web Audio requirement: context must be resumed by user interaction
-    window.addEventListener('pointerdown', () => this.unlock(), { once: true });
-    window.addEventListener('keydown', () => this.unlock(), { once: true });
+    window.addEventListener('pointerdown', this.unlockFromPointerDown, { once: true });
+    window.addEventListener('keydown', this.unlockFromKeydown, { once: true });
 
     // Auto-mute on focus loss
-    window.addEventListener('blur', this.handleBlur);
-    window.addEventListener('focus', this.handleFocus);
+    window.addEventListener('blur', this.handleActivityChange);
+    window.addEventListener('focus', this.handleActivityChange);
+    window.addEventListener('pageshow', this.handleActivityChange);
+    window.addEventListener('pagehide', this.handleActivityChange);
+    document.addEventListener('visibilitychange', this.handleActivityChange);
+    this.handleActivityChange();
   }
 
   setVolume(value: number): void {
@@ -63,14 +73,19 @@ export class AudioService {
     this.setVolume(1);
   }
 
-  private handleBlur = (): void => {
-    if (this.context?.state === 'running') {
-      this.suspendedByFocusLoss = true;
-      void this.context.suspend();
-    }
-  };
+  private handleActivityChange = (): void => {
+    const isVisible = document.visibilityState === 'visible';
+    const hasFocus = typeof document.hasFocus === 'function' ? document.hasFocus() : true;
+    const isActive = isVisible && hasFocus;
 
-  private handleFocus = (): void => {
+    if (!isActive) {
+      if (this.context?.state === 'running') {
+        this.suspendedByFocusLoss = true;
+        void this.context.suspend();
+      }
+      return;
+    }
+
     if (this.suspendedByFocusLoss && this.context?.state === 'suspended') {
       this.suspendedByFocusLoss = false;
       void this.context.resume();
@@ -161,5 +176,21 @@ export class AudioService {
     }
 
     return this.context.decodeAudioData(audioData);
+  }
+
+  dispose(): void {
+    window.removeEventListener('pointerdown', this.unlockFromPointerDown);
+    window.removeEventListener('keydown', this.unlockFromKeydown);
+    window.removeEventListener('blur', this.handleActivityChange);
+    window.removeEventListener('focus', this.handleActivityChange);
+    window.removeEventListener('pageshow', this.handleActivityChange);
+    window.removeEventListener('pagehide', this.handleActivityChange);
+    document.removeEventListener('visibilitychange', this.handleActivityChange);
+
+    this.stopAll();
+    void this.context?.close();
+    this.context = null;
+    this.masterGain = null;
+    this.suspendedByFocusLoss = false;
   }
 }
