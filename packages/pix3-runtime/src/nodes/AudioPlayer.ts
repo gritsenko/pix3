@@ -100,6 +100,7 @@ export class AudioPlayer extends NodeBase {
             label: 'Audio Track',
             description: 'Asset URL (res://..., data:audio/..., or absolute URL)',
             group: 'Audio',
+            editor: 'audio-resource',
           },
           getValue: node => (node as AudioPlayer).audioTrack ?? '',
           setValue: (node, value) => {

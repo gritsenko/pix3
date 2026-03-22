@@ -10,7 +10,7 @@
 - [ ] generate asset manifest on project build (Сложность: M)
 - [ ] publish runtime package to the cloud, to optimize pipeline (Сложность: M)
 - [x] fix icons for global light nodes (Сложность: S)
-- [ ] add icon to audio nodes (Сложность: S)
+- [x] add icon to audio nodes (Сложность: S)
 - [x] remove bounding boxes from global objects without transform (Сложность: S)
 - [ ] version check and update functionality (Сложность: S)
 
@@ -21,7 +21,7 @@
 - [ ] update nodes properties and hot reload them in the game mode (Сложность: M)
 - [ ] unify scene objects addressing from custom scripts (Сложность: M)
 - [ ] add opacity to 3d sprite with fade in/out APIs (Сложность: M)
-- [ ] particle rotation toggle and saving fix (Сложность: S)
+- [x] particle rotation toggle and saving fix (Сложность: S)
 - [x] sprite color fix on editor mode (Сложность: S)
 
 ## UX / UI
@@ -35,7 +35,7 @@
 - [x] add show all and reset zoom in 2d navigation mode (Сложность: S)
 - [x] show anchor point of sprite in the editor (Сложность: S)
 - [x] allow to see file size in the asset preview/browser (Сложность: S)
-- [ ] add drag and drop support for audio files properties (Сложность: S)
+- [x] add drag and drop support for audio files properties (Сложность: S)
 - [ ] better control of camera and light directions (Сложность: S)
 - [x] update icons and layout of viewport toolbar (Сложность: S)
 - [x] not to hide camera/light icons on select, make semitransparent (Сложность: S)

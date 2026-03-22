@@ -540,6 +540,7 @@ export class SceneSaver {
       props.startAlpha = node.startAlpha;
       props.endAlpha = node.endAlpha;
       props.billboard = node.billboard;
+      props.disableRotation = node.disableRotation;
       props.playing = node.playing;
       props.loop = node.loop;
       props.prewarm = node.prewarm;

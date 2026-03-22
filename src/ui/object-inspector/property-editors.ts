@@ -625,6 +625,167 @@ export class TextureResourceEditor extends ComponentBase {
   }
 }
 
+@customElement('pix3-audio-resource-editor')
+export class AudioResourceEditor extends ComponentBase {
+  protected static useShadowDom = true;
+  @property({ type: String })
+  resourceUrl: string = '';
+
+  @property({ type: Boolean })
+  disabled: boolean = false;
+
+  @state()
+  private isDragOver = false;
+
+  static styles = css`
+    :host {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      width: 100%;
+    }
+
+    .drop-zone {
+      border: 1px dashed var(--color-border, #333);
+      border-radius: 0.375rem;
+      min-height: 3.5rem;
+      background: var(--color-input-bg, #222);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0.75rem;
+      box-sizing: border-box;
+      transition:
+        border-color 0.15s ease,
+        background 0.15s ease;
+    }
+
+    .drop-zone.is-dragover {
+      border-color: var(--pix3-accent-color, #ffcf33);
+      background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.08);
+    }
+
+    .drop-label {
+      color: var(--color-text-subtle, #888);
+      font-size: 0.75rem;
+      text-align: center;
+      line-height: 1.35;
+    }
+
+    .url-row {
+      display: flex;
+      gap: 0.4rem;
+      align-items: center;
+    }
+
+    input {
+      flex: 1;
+      min-width: 0;
+      background: var(--color-input-bg, #222);
+      color: var(--color-text-primary, #eee);
+      border: 1px solid var(--color-border, #333);
+      border-radius: 0.25rem;
+      padding: 0.25rem 0.5rem;
+      font-size: 0.8rem;
+      box-sizing: border-box;
+    }
+
+    input:focus {
+      outline: none;
+      border-color: var(--color-accent, #4e8df5);
+    }
+
+    button {
+      border: 1px solid var(--color-border, #333);
+      background: transparent;
+      color: var(--color-text-secondary, #aaa);
+      border-radius: 0.25rem;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    button:hover:not(:disabled) {
+      border-color: var(--pix3-accent-color, #ffcf33);
+      color: var(--color-text-primary, #eee);
+    }
+
+    button:disabled,
+    input:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+  `;
+
+  private emitChange(url: string): void {
+    this.dispatchEvent(
+      new CustomEvent('change', {
+        detail: { url },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private onDragOver(event: DragEvent): void {
+    if (this.disabled) {
+      return;
+    }
+    event.preventDefault();
+    this.isDragOver = true;
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  private onDragLeave(): void {
+    this.isDragOver = false;
+  }
+
+  private onDrop(event: DragEvent): void {
+    if (this.disabled) {
+      return;
+    }
+    event.preventDefault();
+    this.isDragOver = false;
+
+    this.dispatchEvent(
+      new CustomEvent('audio-drop', {
+        detail: { event },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  protected render() {
+    return html`
+      <div
+        class="drop-zone ${this.isDragOver ? 'is-dragover' : ''}"
+        @dragover=${(event: DragEvent) => this.onDragOver(event)}
+        @dragleave=${() => this.onDragLeave()}
+        @drop=${(event: DragEvent) => this.onDrop(event)}
+      >
+        <span class="drop-label">Drop audio from Assets here</span>
+      </div>
+
+      <div class="url-row">
+        <input
+          type="text"
+          .value=${this.resourceUrl}
+          ?disabled=${this.disabled}
+          placeholder="res://path/to/sound.wav"
+          @change=${(e: Event) => this.emitChange((e.target as HTMLInputElement).value)}
+        />
+        <button type="button" ?disabled=${this.disabled} @click=${() => this.emitChange('')}>
+          Clear
+        </button>
+      </div>
+    `;
+  }
+}
+
 export interface SizeValue {
   width: number;
   height: number;
@@ -1029,6 +1190,7 @@ declare global {
     'pix3-vector3-editor': Vector3Editor;
     'pix3-euler-editor': EulerEditor;
     'pix3-texture-resource-editor': TextureResourceEditor;
+    'pix3-audio-resource-editor': AudioResourceEditor;
     'pix3-size-editor': SizeEditor;
     'pix3-slider-number-editor': SliderNumberEditor;
   }

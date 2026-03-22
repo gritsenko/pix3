@@ -170,6 +170,7 @@ export interface Particles3DProperties {
   startAlpha?: number;
   endAlpha?: number;
   billboard?: boolean;
+  disableRotation?: boolean;
   playing?: boolean;
   loop?: boolean;
   prewarm?: boolean;
@@ -1528,6 +1529,8 @@ export class SceneLoader {
           startAlpha: this.asNumber(props.startAlpha, 1),
           endAlpha: this.asNumber(props.endAlpha, 0),
           billboard: typeof props.billboard === 'boolean' ? props.billboard : true,
+          disableRotation:
+            typeof props.disableRotation === 'boolean' ? props.disableRotation : false,
           playing: typeof props.playing === 'boolean' ? props.playing : true,
           loop: typeof props.loop === 'boolean' ? props.loop : true,
           prewarm: typeof props.prewarm === 'boolean' ? props.prewarm : false,

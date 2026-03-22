@@ -27,6 +27,7 @@ export class PlaySoundBehavior extends Script {
             label: 'Audio Track',
             description: 'Asset URL (res://..., data:audio/..., or absolute URL)',
             group: 'Audio',
+            editor: 'audio-resource',
           },
           getValue: component => (component as PlaySoundBehavior).getAudioTrack(),
           setValue: (component, value) => {

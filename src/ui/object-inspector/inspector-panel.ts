@@ -69,6 +69,7 @@ const IMAGE_EXTENSIONS = new Set([
   'tiff',
   'avif',
 ]);
+const AUDIO_EXTENSIONS = new Set(['wav', 'mp3', 'ogg']);
 
 @customElement('pix3-inspector-panel')
 export class InspectorPanel extends ComponentBase {
@@ -501,19 +502,30 @@ export class InspectorPanel extends ComponentBase {
   }
 
   private isImageResource(path: string): boolean {
-    const cleaned = path.split('?')[0].split('#')[0];
-    const extension = cleaned.includes('.') ? (cleaned.split('.').pop()?.toLowerCase() ?? '') : '';
-    return IMAGE_EXTENSIONS.has(extension);
+    return this.hasSupportedExtension(path, IMAGE_EXTENSIONS);
   }
 
-  private normalizeDroppedResource(rawValue: string): string | null {
+  private isAudioResource(path: string): boolean {
+    return this.hasSupportedExtension(path, AUDIO_EXTENSIONS);
+  }
+
+  private hasSupportedExtension(path: string, extensions: ReadonlySet<string>): boolean {
+    const cleaned = path.split('?')[0].split('#')[0];
+    const extension = cleaned.includes('.') ? (cleaned.split('.').pop()?.toLowerCase() ?? '') : '';
+    return extensions.has(extension);
+  }
+
+  private normalizeDroppedResource(
+    rawValue: string,
+    isSupportedResource: (path: string) => boolean
+  ): string | null {
     const value = rawValue.trim();
     if (!value) {
       return null;
     }
 
     if (value.startsWith('res://') || value.startsWith('http://') || value.startsWith('https://')) {
-      return this.isImageResource(value) ? value : null;
+      return isSupportedResource(value) ? value : null;
     }
 
     if (value.includes('://')) {
@@ -522,35 +534,46 @@ export class InspectorPanel extends ComponentBase {
 
     const normalized = value.replace(/^\.\//, '').replace(/^\/+/, '').replace(/\\+/g, '/');
     const resourcePath = `res://${normalized}`;
-    return this.isImageResource(resourcePath) ? resourcePath : null;
+    return isSupportedResource(resourcePath) ? resourcePath : null;
   }
 
-  private getDroppedTextureResource(event: DragEvent): string | null {
+  private getDroppedResource(
+    event: DragEvent,
+    isSupportedResource: (path: string) => boolean
+  ): string | null {
     const transfer = event.dataTransfer;
     if (!transfer) {
       return null;
     }
 
     const fromResource = transfer.getData(ASSET_RESOURCE_MIME);
-    const normalizedResource = this.normalizeDroppedResource(fromResource);
+    const normalizedResource = this.normalizeDroppedResource(fromResource, isSupportedResource);
     if (normalizedResource) {
       return normalizedResource;
     }
 
     const fromPath = transfer.getData(ASSET_PATH_MIME);
-    const normalizedPath = this.normalizeDroppedResource(fromPath);
+    const normalizedPath = this.normalizeDroppedResource(fromPath, isSupportedResource);
     if (normalizedPath) {
       return normalizedPath;
     }
 
     const fromUriList = transfer.getData('text/uri-list');
-    const normalizedUriList = this.normalizeDroppedResource(fromUriList);
+    const normalizedUriList = this.normalizeDroppedResource(fromUriList, isSupportedResource);
     if (normalizedUriList) {
       return normalizedUriList;
     }
 
     const plain = transfer.getData('text/plain');
-    return this.normalizeDroppedResource(plain);
+    return this.normalizeDroppedResource(plain, isSupportedResource);
+  }
+
+  private getDroppedTextureResource(event: DragEvent): string | null {
+    return this.getDroppedResource(event, path => this.isImageResource(path));
+  }
+
+  private getDroppedAudioResource(event: DragEvent): string | null {
+    return this.getDroppedResource(event, path => this.isAudioResource(path));
   }
 
   private onTextureResourceDrop(propertyName: string, event: DragEvent): void {
@@ -560,6 +583,28 @@ export class InspectorPanel extends ComponentBase {
     }
 
     void this.applyPropertyChange(propertyName, { type: 'texture', url: textureUrl });
+  }
+
+  private onAudioResourceDrop(propertyName: string, event: DragEvent): void {
+    const audioUrl = this.getDroppedAudioResource(event);
+    if (!audioUrl) {
+      return;
+    }
+
+    void this.applyPropertyChange(propertyName, audioUrl);
+  }
+
+  private onComponentAudioResourceDrop(
+    componentId: string,
+    prop: PropertyDefinition,
+    event: DragEvent
+  ): void {
+    const audioUrl = this.getDroppedAudioResource(event);
+    if (!audioUrl) {
+      return;
+    }
+
+    void this.applyComponentPropertyChange(componentId, prop, audioUrl);
   }
 
   private async handlePropertyInput(propName: string, e: Event) {
@@ -1673,6 +1718,22 @@ export class InspectorPanel extends ComponentBase {
     const label = prop.ui?.label || prop.name;
     const readOnly = prop.ui?.readOnly;
 
+    if (prop.type === 'string' && prop.ui?.editor === 'audio-resource') {
+      return html`
+        <div class="property-group component-property-group">
+          <span class="property-label">${label}</span>
+          <pix3-audio-resource-editor
+            .resourceUrl=${state.value}
+            ?disabled=${readOnly}
+            @change=${(event: CustomEvent<{ url: string }>) =>
+              this.applyComponentPropertyChange(component.id, prop, event.detail.url.trim())}
+            @audio-drop=${(event: CustomEvent<{ event: DragEvent }>) =>
+              this.onComponentAudioResourceDrop(component.id, prop, event.detail.event)}
+          ></pix3-audio-resource-editor>
+        </div>
+      `;
+    }
+
     if (prop.type === 'boolean') {
       return html`
         <div class="property-group component-property-group">
@@ -1928,6 +1989,22 @@ export class InspectorPanel extends ComponentBase {
             @texture-drop=${(event: CustomEvent<{ event: DragEvent }>) =>
               this.onTextureResourceDrop(prop.name, event.detail.event)}
           ></pix3-texture-resource-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'string' && prop.ui?.editor === 'audio-resource') {
+      return html`
+        <div class="property-group">
+          ${labelTemplate}
+          <pix3-audio-resource-editor
+            .resourceUrl=${state.value}
+            ?disabled=${readOnly}
+            @change=${(event: CustomEvent<{ url: string }>) =>
+              this.applyPropertyChange(prop.name, event.detail.url.trim())}
+            @audio-drop=${(event: CustomEvent<{ event: DragEvent }>) =>
+              this.onAudioResourceDrop(prop.name, event.detail.event)}
+          ></pix3-audio-resource-editor>
         </div>
       `;
     }

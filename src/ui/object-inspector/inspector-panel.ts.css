@@ -85,7 +85,8 @@ pix3-panel {
   padding: 0.25rem 0;
 }
 
-.property-group pix3-texture-resource-editor {
+.property-group pix3-texture-resource-editor,
+.property-group pix3-audio-resource-editor {
   flex: 1;
   min-width: 0;
 }
