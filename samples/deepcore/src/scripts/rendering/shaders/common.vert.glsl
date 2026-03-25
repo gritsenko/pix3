@@ -1,0 +1,2 @@
+vInstanceAlpha = instanceAlpha;
+vPosLocal = position;

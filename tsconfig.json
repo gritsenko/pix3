@@ -57,6 +57,6 @@
   "include": [
     "src",
     "packages/pix3-runtime/src",
-    "test_assets"
+    "samples"
   ]
 }
