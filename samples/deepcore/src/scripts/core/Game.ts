@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Renderer } from '../rendering/Renderer';
+import { Renderer, RendererOptions } from '../rendering/Renderer';
 import { InputManager } from '../input/InputManager';
 import { VoxelWorld, VoxelData } from '../world';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
@@ -72,9 +72,14 @@ interface QueuedExplosion {
   triggerTime: number;
 }
 
+export interface GameOptions {
+  /** Pass renderer options to enable embedded mode (external scene from pix3). */
+  renderer?: RendererOptions;
+}
+
 export class Game {
   private renderer: Renderer;
-  private inputManager: InputManager;
+  private inputManager: InputManager | null = null;
   private voxelWorld: VoxelWorld;
   private physicsWorld: PhysicsWorld;
   private stabilitySystem: StabilitySystem;
@@ -120,9 +125,9 @@ export class Game {
   private frameCount: number = 0;
   private isPaused: boolean = false;
 
-  constructor() {
-    // Initialize all systems
-    this.renderer = new Renderer();
+  constructor(options?: GameOptions) {
+    // Initialize renderer (embedded or standalone)
+    this.renderer = new Renderer(options?.renderer);
     this.physicsWorld = new PhysicsWorld();
     this.voxelWorld = new VoxelWorld();
     this.stabilitySystem = new StabilitySystem(this.voxelWorld);
@@ -133,13 +138,10 @@ export class Game {
       this.renderer.scene,
       this.renderer.cameraController.camera
     );
-    // LootSystem removed; use DroppableItemsSystem
-    // this.lootSystem = new LootSystem(this.renderer.scene, this.physicsWorld);
     this.feedbackSystem = new FeedbackSystem(
       this.renderer.scene,
       this.renderer.cameraController.camera
     );
-    // Temporarily leave resourceDropSystem uninitialized; it will be created in init()
     this.resourceDropSystem = null;
     this.clusterSystem = new ClusterSystem(this.renderer.scene, this.voxelWorld);
     
@@ -172,26 +174,24 @@ export class Game {
         if(this.inventoryUISystem) this.inventoryUISystem.setVisible(v);
         if(this.avatarUISystem) this.avatarUISystem.setVisible(v);
       },
-      // camera zoom callbacks
       () => this.renderer.cameraController.getZoomFactor(),
       (v: number) => this.renderer.cameraController.setZoomFactor(v),
-      // shadow toggle callback
       (enabled: boolean) => this.renderer.setShadowsEnabled(enabled)
     );
 
-    // LootSystem removed; DroppableItemsSystem will be instantiated in init()
-
-    // Set up input
-    const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
-    this.inputManager = new InputManager(canvas, {
-      onPointerDown: this.handlePointerDown.bind(this),
-      onPointerMove: this.handlePointerMove.bind(this),
-      onPointerUp: this.handlePointerUp.bind(this),
-      onHoldStart: this.handleHoldStart.bind(this),
-      onHoldEnd: this.handleHoldEnd.bind(this),
-      onRotateStep: this.handleRotateStep.bind(this),
-      onVerticalScroll: this.handleVerticalScroll.bind(this),
-    });
+    // Set up input — in embedded mode, skip canvas-based InputManager
+    if (!this.renderer.embedded) {
+      const canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
+      this.inputManager = new InputManager(canvas, {
+        onPointerDown: this.handlePointerDown.bind(this),
+        onPointerMove: this.handlePointerMove.bind(this),
+        onPointerUp: this.handlePointerUp.bind(this),
+        onHoldStart: this.handleHoldStart.bind(this),
+        onHoldEnd: this.handleHoldEnd.bind(this),
+        onRotateStep: this.handleRotateStep.bind(this),
+        onVerticalScroll: this.handleVerticalScroll.bind(this),
+      });
+    }
 
     // Listen for scene change events to update hover state
     // ResourceSettled event deprecated - ignore
@@ -334,20 +334,24 @@ export class Game {
   }
 
   async init(): Promise<void> {
+    const embedded = this.renderer.embedded;
+
     this.uiManager.setLoadingProgress(5, 'Loading atlas...');
     await atlasManager.loadAtlas(ATLAS_CONFIG.game.image, ATLAS_CONFIG.game.json);
     
-    // Initialize UI systems after atlas is loaded
-    this.inventoryUISystem = new InventoryUISystem(
-      this.renderer.uiScene,
-      this.renderer.uiCamera,
-      this.renderer.renderer
-    );
-    this.avatarUISystem = new AvatarUISystem(
-      this.renderer.uiScene,
-      this.renderer.uiCamera
-    );
-    this.uiManager.setAvatarUISystem(this.avatarUISystem);
+    // Initialize UI systems after atlas is loaded (skip in embedded mode — no WebGLRenderer)
+    if (!embedded) {
+      this.inventoryUISystem = new InventoryUISystem(
+        this.renderer.uiScene,
+        this.renderer.uiCamera,
+        this.renderer.renderer
+      );
+      this.avatarUISystem = new AvatarUISystem(
+        this.renderer.uiScene,
+        this.renderer.uiCamera
+      );
+      this.uiManager.setAvatarUISystem(this.avatarUISystem);
+    }
 
     this.uiManager.setLoadingProgress(10, 'Initializing physics...');
 
@@ -366,21 +370,21 @@ export class Game {
     await this.audioSystem.preload();
     this.uiManager.setLoadingProgress(80, 'Finalizing...');
 
-    // Set up renderer update callback
-    this.renderer.setUpdateCallback(this.update.bind(this));
+    // In standalone mode, renderer drives the loop via callback
+    if (!embedded) {
+      this.renderer.setUpdateCallback(this.update.bind(this));
+    }
 
-    // Initial UI update
     this.uiManager.update();
-
     this.uiManager.setLoadingProgress(100, 'Ready!');
 
-    // Short delay before hiding loading screen
-    await new Promise(resolve => setTimeout(resolve, 300));
+    if (!embedded) {
+      await new Promise(resolve => setTimeout(resolve, 300));
+      this.uiManager.hideLoading();
+    }
 
-    this.uiManager.hideLoading();
     this.isInitialized = true;
 
-    // Check if debug mode was already enabled (e.g. via URL)
     const debugState = useGameStore.getState();
     const showDebug = debugState.debugVisuals;
     const isDebugMode = debugState.debugMode;
@@ -392,21 +396,17 @@ export class Game {
     }
 
     if (showDebug) {
-      // Re-trigger visual setup without toggling the state again
       this.physicsWorld.createWallVisualization();
       if (this.resourceDropSystem) this.resourceDropSystem.createDebugGizmos();
     }
 
-    // Check if we should be paused immediately (e.g. tab opened in background or unfocused)
-    // This MUST happen BEFORE start() to prevent brief execution
     if (document.hidden || !document.hasFocus()) {
       this.setPaused(true);
     }
 
-    // Start render loop
+    // Start render loop (no-op in embedded mode)
     this.renderer.start();
 
-    // Start bot helper system if owned (only if not paused)
     if (this.botHelperSystem && useGameStore.getState().hasBot) {
       if (!this.isPaused) {
         this.botHelperSystem.start();
@@ -427,6 +427,8 @@ export class Game {
     if (this.botHelperSystem && this.resourceDropSystem) {
       this.botHelperSystem.setResourceDropSystem(this.resourceDropSystem);
     }
+
+    console.log(`[Game] Initialized successfully (embedded=${embedded})`);
   }
 
   private createPhysicsForBlocks(): void {
@@ -439,8 +441,8 @@ export class Game {
     }
   }
 
-  // Main update loop
-  private update(delta: number): void {
+  // Main update loop (public so pix3 DeepCoreRunnerScript can call it)
+  public update(delta: number): void {
     if (!this.isInitialized || this.isPaused) return;
 
     const isDebugMode = useGameStore.getState().debugMode;
@@ -1247,7 +1249,7 @@ export class Game {
   // Dispose
   dispose(): void {
     this.renderer.dispose();
-    this.inputManager.dispose();
+    if (this.inputManager) this.inputManager.dispose();
     this.voxelWorld.dispose();
     this.physicsWorld.dispose();
     this.toolSystem.dispose();

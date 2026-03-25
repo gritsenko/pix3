@@ -7,13 +7,18 @@ import './index.css';
 import * as EngineAPI from '@pix3/runtime';
 import * as THREE from 'three';
 
+// Game-specific dependencies exposed for project scripts (DeepCore)
+import RAPIER from '@dimforge/rapier3d-compat';
+
 interface WindowWithEngine extends Window {
   __PIX3_ENGINE__: typeof EngineAPI;
   __PIX3_THREE__: typeof THREE;
+  __RAPIER__: typeof RAPIER;
 }
 
 (window as unknown as WindowWithEngine).__PIX3_ENGINE__ = EngineAPI;
 (window as unknown as WindowWithEngine).__PIX3_THREE__ = THREE;
+(window as unknown as WindowWithEngine).__RAPIER__ = RAPIER;
 
 // Create dynamic import map for @pix3/runtime
 // This allows user scripts to import from '@pix3/runtime' at runtime

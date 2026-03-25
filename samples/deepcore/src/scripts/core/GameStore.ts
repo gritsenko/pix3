@@ -1,8 +1,48 @@
-import { create } from 'zustand';
 import { ToolType } from './Types';
 import { INITIAL_STATE, UPGRADES } from '../config';
 import { HapticSystem } from '../systems/HapticSystem';
 import { ADRENALINE_CONFIG } from '../config/gameplay';
+
+// ── Lightweight store (replaces zustand) ──────────────────────────────────────
+// Provides the same API surface: useGameStore.getState(), useGameStore.subscribe()
+
+type Listener<T> = (state: T, prevState: T) => void;
+
+interface Store<T> {
+  getState: () => T;
+  subscribe: (listener: Listener<T>) => () => void;
+}
+
+function createStore<T>(
+  initializer: (
+    set: (partial: Partial<T> | ((prev: T) => Partial<T>)) => void,
+    get: () => T,
+  ) => T,
+): Store<T> {
+  let state: T;
+  const listeners = new Set<Listener<T>>();
+
+  const get = (): T => state;
+
+  const set = (partial: Partial<T> | ((prev: T) => Partial<T>)): void => {
+    const prevState = state;
+    const nextPartial = typeof partial === 'function' ? (partial as (prev: T) => Partial<T>)(state) : partial;
+    state = { ...state, ...nextPartial };
+    listeners.forEach((l) => l(state, prevState));
+  };
+
+  state = initializer(set, get);
+
+  return {
+    getState: get,
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => { listeners.delete(listener); };
+    },
+  };
+}
+
+// ── Persistence helpers ───────────────────────────────────────────────────────
 
 const SOUND_STORAGE_KEY = 'deepcore.soundEnabled';
 
@@ -31,7 +71,8 @@ function storeSoundEnabled(enabled: boolean): void {
   }
 }
 
-// Game State Interface
+// ── Game State Interface ──────────────────────────────────────────────────────
+
 export interface GameState {
   // Resources
   gold: number;
@@ -89,7 +130,9 @@ export interface GameState {
   toggleSoundEnabled: () => void;
 }
 
-export const useGameStore = create<GameState>((set, get) => ({
+// ── Store instance ────────────────────────────────────────────────────────────
+
+export const useGameStore = createStore<GameState>((set, get) => ({
   // Initial state
   gold: INITIAL_STATE.gold,
   gems: INITIAL_STATE.gems,

@@ -4,15 +4,24 @@ import { RENDERER, LIGHTING, BLOCK_RENDERING } from '../config';
 import { TEXTURES } from '../assets/textures';
 import { assetDiagnostics } from '../utils/AssetDiagnostics';
 
+export interface RendererOptions {
+  /** When provided, Renderer runs in "embedded" mode: no WebGLRenderer, no canvas, no render loop.
+   *  All game objects are added as children of this Object3D (e.g. a pix3 Node3D). */
+  externalParent?: THREE.Object3D;
+}
+
 export class Renderer {
-  public renderer: THREE.WebGLRenderer;
+  public renderer!: THREE.WebGLRenderer;
   public scene: THREE.Scene;
   public uiScene: THREE.Scene;
   public uiCamera: THREE.OrthographicCamera;
   public cameraController: CameraController;
 
-  private canvas: HTMLCanvasElement;
-  private clock: THREE.Clock;
+  /** True when running inside an external engine (e.g. pix3) */
+  public readonly embedded: boolean;
+
+  private canvas!: HTMLCanvasElement;
+  private clock!: THREE.Clock;
   private animationId: number = 0;
   private updateCallback: ((delta: number) => void) | null = null;
 
@@ -33,7 +42,58 @@ export class Renderer {
   private readonly _raycaster = new THREE.Raycaster();
   private readonly _mouseVec = new THREE.Vector2();
 
-  constructor() {
+  constructor(options?: RendererOptions) {
+    this.embedded = !!options?.externalParent;
+
+    if (this.embedded) {
+      // --- Embedded mode: use external parent as scene root ---
+      const parent = options!.externalParent!;
+
+      // Use a virtual Scene wrapper backed by the external parent
+      this.scene = new THREE.Scene();
+      // Redirect: anything added to this.scene will also be added to the external parent
+      const origAdd = this.scene.add.bind(this.scene);
+      this.scene.add = (...objects: THREE.Object3D[]) => {
+        origAdd(...objects);
+        for (const obj of objects) parent.add(obj);
+        return this.scene;
+      };
+
+      // UI scene still useful for 2D overlays within game logic
+      this.uiScene = new THREE.Scene();
+      this.uiScene.background = null;
+
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      this.uiCamera = new THREE.OrthographicCamera(
+        -width / 2, width / 2, height / 2, -height / 2, 0.1, 1000
+      );
+      this.uiCamera.position.z = 10;
+
+      const aspect = width / height;
+      this.cameraController = new CameraController(aspect);
+      // Add camera pivot to external parent so it's part of the scene
+      parent.add(this.cameraController.pivotObject);
+
+      this.setupLighting();
+
+      // Fog on the real scene containing the parent (if it's a Scene)
+      let rootScene = parent as THREE.Object3D;
+      while (rootScene.parent) rootScene = rootScene.parent;
+      if (rootScene instanceof THREE.Scene) {
+        rootScene.fog = new THREE.FogExp2(LIGHTING.backgroundColor, LIGHTING.fogDensity);
+      }
+
+      this.currentEnvMapIntensity = BLOCK_RENDERING.envMapIntensity;
+      this.currentHemiGroundColor.setHex(LIGHTING.hemispheric.groundColor);
+      this.currentFogColor.setHex(LIGHTING.backgroundColor);
+      this.currentFogDensity = LIGHTING.fogDensity;
+
+      // No canvas, no WebGLRenderer, no clock, no resize listener in embedded mode
+      return;
+    }
+
+    // --- Standalone mode (original) ---
     // Get canvas
     this.canvas = document.getElementById('game-canvas') as HTMLCanvasElement;
     if (!this.canvas) {
@@ -176,6 +236,7 @@ export class Renderer {
 
   // Start render loop
   start(): void {
+    if (this.embedded) return; // Render loop owned by pix3 in embedded mode
     if (this.animationId) return;
     this.clock.start();
     this.animate(0);
@@ -183,6 +244,7 @@ export class Renderer {
 
   // Stop render loop
   stop(): void {
+    if (this.embedded) return;
     if (this.animationId) {
       cancelAnimationFrame(this.animationId);
       this.animationId = 0;
@@ -275,11 +337,13 @@ export class Renderer {
 
   // Enable bloom effect for turbo mode
   enableBloom(): void {
+    if (this.embedded) return;
     this.renderer.toneMappingExposure = RENDERER.bloomExposure;
   }
 
   // Disable bloom effect
   disableBloom(): void {
+    if (this.embedded) return;
     this.renderer.toneMappingExposure = RENDERER.toneMappingExposure;
   }
 
@@ -291,7 +355,7 @@ export class Renderer {
       hemiGroundColor: this.currentHemiGroundColor.getHex(),
       sunIntensity: this.sunLight.intensity,
       sunColor: this.sunLight.color.getHex(),
-      exposure: this.renderer.toneMappingExposure,
+      exposure: this.embedded ? 1.0 : this.renderer.toneMappingExposure,
       envMapIntensity: this.currentEnvMapIntensity,
       fogColor: this.currentFogColor.getHex(),
       fogDensity: this.currentFogDensity,
@@ -318,7 +382,7 @@ export class Renderer {
     }
     if (params.sunIntensity !== undefined) this.sunLight.intensity = params.sunIntensity;
     if (params.sunColor !== undefined) this.sunLight.color.setHex(params.sunColor);
-    if (params.exposure !== undefined) this.renderer.toneMappingExposure = params.exposure;
+    if (params.exposure !== undefined && !this.embedded) this.renderer.toneMappingExposure = params.exposure;
     if (params.fogColor !== undefined) {
       this.currentFogColor.setHex(params.fogColor);
       if (this.scene.fog instanceof THREE.FogExp2) {
@@ -347,6 +411,7 @@ export class Renderer {
 
   // Enable / disable shadow maps at runtime (useful for low-end devices and debug)
   setShadowsEnabled(enabled: boolean): void {
+    if (this.embedded) return;
     this.renderer.shadowMap.enabled = enabled;
     this.sunLight.castShadow = enabled;
     this.renderer.shadowMap.needsUpdate = true;
@@ -414,14 +479,16 @@ export class Renderer {
       meshes: this.computeMeshDraws(),
       triangles: this.computeTriangles(),
       memory: (window.performance as any).memory ? (window.performance as any).memory.usedJSHeapSize / 1048576 : 0,
-      renderTime: this.lastRenderTimeMs,
+      renderTime: this.embedded ? 0 : this.lastRenderTimeMs,
     };
   }
 
   // Dispose resources
   dispose(): void {
     this.stop();
-    this.renderer.dispose();
-    window.removeEventListener('resize', this.onResize.bind(this));
+    if (!this.embedded) {
+      this.renderer.dispose();
+      window.removeEventListener('resize', this.onResize.bind(this));
+    }
   }
 }

@@ -16,6 +16,7 @@
     "postinstall": "node -e \"require('fs').copyFileSync('node_modules/esbuild-wasm/esbuild.wasm', 'public/esbuild.wasm')\""
   },
   "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
     "@types/three": "^0.183.1",
     "esbuild-wasm": "^0.24.0",
     "feather-icons": "^4.29.2",
