@@ -8,6 +8,8 @@ export interface RendererOptions {
   /** When provided, Renderer runs in "embedded" mode: no WebGLRenderer, no canvas, no render loop.
    *  All game objects are added as children of this Object3D (e.g. a pix3 Node3D). */
   externalParent?: THREE.Object3D;
+  /** Whether the host renderer has shadows enabled in embedded mode. */
+  shadowsEnabled?: boolean;
 }
 
 export class Renderer {
@@ -19,6 +21,7 @@ export class Renderer {
 
   /** True when running inside an external engine (e.g. pix3) */
   public readonly embedded: boolean;
+  private readonly embeddedShadowsEnabled: boolean;
 
   private canvas!: HTMLCanvasElement;
   private clock!: THREE.Clock;
@@ -44,6 +47,7 @@ export class Renderer {
 
   constructor(options?: RendererOptions) {
     this.embedded = !!options?.externalParent;
+    this.embeddedShadowsEnabled = options?.shadowsEnabled ?? true;
 
     if (this.embedded) {
       // --- Embedded mode: use external parent as scene root ---
@@ -204,7 +208,9 @@ export class Renderer {
       LIGHTING.sun.position.y,
       LIGHTING.sun.position.z
     );
-    this.sunLight.castShadow = this.renderer.shadowMap.enabled;
+    this.sunLight.castShadow = this.embedded
+      ? this.embeddedShadowsEnabled
+      : this.renderer.shadowMap.enabled;
     this.sunLight.shadow.mapSize.set(LIGHTING.sun.shadowMapSize, LIGHTING.sun.shadowMapSize);
     this.sunLight.shadow.bias = LIGHTING.sun.shadowBias;
 

@@ -1,6 +1,3 @@
-# DeepCore — Main scene for pix3 editor
-# This scene contains the camera, lighting, and a root node with the DeepCoreRunner script.
-# The game logic (voxel world, physics, systems) is initialised by DeepCoreRunner on play.
 version: 1.0.0
 metadata:
   author: DeepCore Migration
@@ -38,9 +35,21 @@ root:
         name: Sun Light
         properties:
           intensity: 1.5
-          color: "#ffeedd"
+          color: "#ffdab8"
           transform:
             position: [10, 20, 10]
             rotationEuler: [-45, 35, 0]
+            scale: [1, 1, 1]
+          castShadow: true
+          shadowCameraSize: 20
+          shadowMapSize: 2048
+        children: []
+      - id: box-1774482285392-1qfl8pd
+        type: GeometryMesh
+        name: Box
+        properties:
+          transform:
+            position: [0, 0, 0]
+            rotationEuler: [0, 0, 0]
             scale: [1, 1, 1]
         children: []

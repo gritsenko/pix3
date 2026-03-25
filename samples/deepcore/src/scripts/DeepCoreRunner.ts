@@ -12,7 +12,6 @@ import { Game } from './core/Game';
  */
 export class DeepCoreRunner extends Script {
   private game: Game | null = null;
-  private initPromise: Promise<void> | null = null;
   private ready = false;
 
   constructor(id: string, type: string) {
@@ -44,11 +43,11 @@ export class DeepCoreRunner extends Script {
 
     // Create Game in embedded mode — the pix3 node acts as the scene root
     this.game = new Game({
-      renderer: { externalParent: this.node },
+      renderer: { externalParent: this.node, shadowsEnabled: true },
     });
 
     // init() is async (physics WASM, atlas loading) — run it and mark ready when done
-    this.initPromise = this.game
+    void this.game
       .init()
       .then(() => {
         this.ready = true;
@@ -70,7 +69,6 @@ export class DeepCoreRunner extends Script {
       this.game = null;
     }
     this.ready = false;
-    this.initPromise = null;
     console.log('[DeepCoreRunner] Disposed');
   }
 }

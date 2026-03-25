@@ -269,6 +269,10 @@ src/
 }
 ```
 
+### Samples Type Checking
+
+The `samples/` directory is excluded from the root `tsconfig.json` to prevent sample-specific scripts from being bundled with the editor. However, to maintain IDE diagnostics and type safety for sample scripts, a [samples/tsconfig.json](samples/tsconfig.json) is used to resolve `@pix3/runtime` aliases.
+
 ### Key Development Commands
 
 - `npm run dev` - Vite dev server with hot reload

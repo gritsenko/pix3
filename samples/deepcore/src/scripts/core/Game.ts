@@ -321,7 +321,7 @@ export class Game {
       this.isPaused = true;
       void this.audioSystem.setPaused(true);
       this.renderer.stop();
-      this.inputManager.reset();
+      this.inputManager?.reset();
       this.pointerInteractions.clear();
       this.toolSystem.stopDrill();
       console.log('Game paused');

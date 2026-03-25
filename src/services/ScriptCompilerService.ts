@@ -24,6 +24,8 @@ export interface CompilationResult {
   warnings: string[];
 }
 
+type VirtualNamespace = 'virtual-fs' | 'virtual-raw' | 'virtual-url' | 'virtual-css';
+
 export interface CompilationError {
   message: string;
   /** File where the error occurred */
@@ -81,7 +83,7 @@ export class ScriptCompilerService {
    * @param files Map of file paths to their TypeScript content
    * @returns Compilation result with bundled code or throws CompilationError
    */
-  async bundle(files: Map<string, string>): Promise<CompilationResult> {
+  async bundle(files: Map<string, string>, entryFiles?: string[]): Promise<CompilationResult> {
     if (!this.initialized) {
       await this.init();
     }
@@ -90,8 +92,15 @@ export class ScriptCompilerService {
       return { code: '', warnings: [] };
     }
 
-    // Create a virtual entry point that exports all files
-    const entryPoint = this.createEntryPoint(files);
+    const effectiveEntryFiles = (entryFiles ?? Array.from(files.keys()).filter(file => file.endsWith('.ts')))
+      .filter(file => files.has(file));
+
+    if (effectiveEntryFiles.length === 0) {
+      return { code: '', warnings: [] };
+    }
+
+    // Create a virtual entry point that exports all entry files
+    const entryPoint = this.createEntryPoint(effectiveEntryFiles);
 
     try {
       const result = await esbuild.build({
@@ -105,7 +114,19 @@ export class ScriptCompilerService {
         format: 'esm',
         platform: 'browser',
         target: 'es2022',
-        external: ['@pix3/runtime', 'three', '@dimforge/rapier3d-compat'],
+        define: {
+          'import.meta.env.BASE_URL': JSON.stringify('/'),
+          'import.meta.env.DEV': 'true',
+          'import.meta.env.PROD': 'false',
+        },
+        external: [
+          '@pix3/runtime',
+          'three',
+          'three/*',
+          '@dimforge/rapier3d-compat',
+          '@dimforge/*',
+          'ios-haptics',
+        ],
         write: false,
         logLevel: 'silent',
         plugins: [this.createVirtualFileSystemPlugin(files)],
@@ -131,18 +152,15 @@ export class ScriptCompilerService {
   /**
    * Create a virtual entry point that imports and re-exports all user scripts
    */
-  private createEntryPoint(files: Map<string, string>): string {
+  private createEntryPoint(entryFiles: string[]): string {
     const exports: string[] = [];
 
-    for (const [filePath] of files) {
-      // Convert file path to a valid import path
-      // Remove supported script-root prefixes and .ts extension
-      const importPath = filePath
-        .replace(/^scripts\//, './')
-        .replace(/^src\/scripts\//, './')
-        .replace(/\.ts$/, '');
-      const exportName = this.pathToExportName(filePath);
+    for (const filePath of entryFiles) {
+      // Preserve the full virtual path so entry imports resolve the same way as
+      // every other relative import inside the bundle.
+      const importPath = `./${filePath}`.replace(/\.ts$/, '');
 
+      const exportName = this.pathToExportName(filePath);
       exports.push(`export * as ${exportName} from '${importPath}';`);
     }
 
@@ -153,50 +171,34 @@ export class ScriptCompilerService {
    * Convert a file path to a valid JavaScript export name
    */
   private pathToExportName(filePath: string): string {
-    // Extract filename without extension
-    const filename = filePath.split('/').pop()?.replace(/\.ts$/, '') ?? 'script';
-    // Replace non-alphanumeric characters with underscores
-    return filename.replace(/[^a-zA-Z0-9_]/g, '_');
+    return filePath
+      .replace(/\.ts$/, '')
+      .replace(/[^a-zA-Z0-9_]/g, '_');
   }
 
   /**
    * Create esbuild plugin for virtual file system
    */
   private createVirtualFileSystemPlugin(files: Map<string, string>): esbuild.Plugin {
+    const service = this;
+
     return {
       name: 'virtual-fs',
       setup(build) {
-        // Resolve file paths
         build.onResolve({ filter: /.*/ }, args => {
-          // Skip external modules
-          if (args.path.startsWith('@pix3/') || args.path === 'three' ||
-              args.path.startsWith('@dimforge/')) {
+          if (service.isExternalModule(args.path)) {
             return { path: args.path, external: true };
           }
 
-          // Handle relative imports
+          // Resolve relative imports against the importing virtual file.
           if (args.path.startsWith('./') || args.path.startsWith('../')) {
-            // Normalize path and ensure it has .ts extension
-            let resolvedPath = args.path;
-            if (!resolvedPath.endsWith('.ts')) {
-              resolvedPath += '.ts';
-            }
-
-            // Remove leading ./
-            resolvedPath = resolvedPath.replace(/^\.\//, '');
-
-            // Check if file exists in our virtual FS
-            // Try with and without supported script-root prefixes
-            const paths = [resolvedPath, `scripts/${resolvedPath}`, `src/scripts/${resolvedPath}`];
-
-            for (const testPath of paths) {
-              if (files.has(testPath)) {
-                return { path: testPath, namespace: 'virtual-fs' };
-              }
+            const resolved = service.resolveVirtualImport(args.path, args.importer, files);
+            if (resolved) {
+              return resolved;
             }
 
             return {
-              path: resolvedPath,
+              path: service.resolveUnresolvedPath(args.path, args.importer),
               namespace: 'virtual-fs',
             };
           }
@@ -220,12 +222,174 @@ export class ScriptCompilerService {
           }
 
           return {
-            contents,
+            contents: service.rewriteVirtualAssetUrls(contents, args.path),
             loader: 'ts',
           };
         });
+
+        build.onLoad({ filter: /.*/, namespace: 'virtual-raw' }, args => {
+          const contents = files.get(args.path);
+
+          if (contents === undefined) {
+            return {
+              errors: [
+                {
+                  text: `File not found: ${args.path}`,
+                  location: null,
+                },
+              ],
+            };
+          }
+
+          return {
+            contents: `export default ${JSON.stringify(contents)};`,
+            loader: 'js',
+          };
+        });
+
+        build.onLoad({ filter: /.*/, namespace: 'virtual-url' }, args => ({
+          contents: `export default ${JSON.stringify(`res://${args.path}`)};`,
+          loader: 'js',
+        }));
+
+        build.onLoad({ filter: /.*/, namespace: 'virtual-css' }, () => ({
+          contents: 'export {};',
+          loader: 'js',
+        }));
       },
     };
+  }
+
+  private isExternalModule(path: string): boolean {
+    return (
+      path.startsWith('@pix3/') ||
+      path === 'three' ||
+      path.startsWith('three/') ||
+      path.startsWith('@dimforge/') ||
+      path === 'ios-haptics'
+    );
+  }
+
+  private resolveVirtualImport(
+    importPath: string,
+    importer: string,
+    files: Map<string, string>
+  ): { path: string; namespace: VirtualNamespace } | null {
+    const querySuffix = importPath.endsWith('?raw')
+      ? '?raw'
+      : importPath.endsWith('?url')
+        ? '?url'
+        : '';
+    const cleanImportPath = querySuffix ? importPath.slice(0, -querySuffix.length) : importPath;
+    const resolvedBasePath = this.resolveUnresolvedPath(cleanImportPath, importer);
+    const candidateBasePaths = this.getImportCandidateBasePaths(resolvedBasePath);
+
+    if (querySuffix === '?url') {
+      const assetPath = this.findExistingPath(candidateBasePaths[0] ?? resolvedBasePath, [''], files)
+        ?? this.findFirstExistingPath(candidateBasePaths, [''], files)
+        ?? resolvedBasePath;
+      return { path: assetPath, namespace: 'virtual-url' };
+    }
+
+    if (querySuffix === '?raw') {
+      const rawPath = this.findFirstExistingPath(candidateBasePaths, [''], files);
+      return rawPath ? { path: rawPath, namespace: 'virtual-raw' } : null;
+    }
+
+    if (cleanImportPath.endsWith('.css')) {
+      const cssPath = this.findFirstExistingPath(candidateBasePaths, [''], files) ?? resolvedBasePath;
+      return { path: cssPath, namespace: 'virtual-css' };
+    }
+
+    const resolvedTsPath = this.findFirstExistingPath(candidateBasePaths, ['', '.ts', '/index.ts'], files);
+    return resolvedTsPath ? { path: resolvedTsPath, namespace: 'virtual-fs' } : null;
+  }
+
+  private getImportCandidateBasePaths(basePath: string): string[] {
+    const candidates = [this.normalizePath(basePath)];
+
+    if (basePath.startsWith('src/scripts/')) {
+      candidates.push(this.normalizePath(`src/${basePath.slice('src/scripts/'.length)}`));
+    }
+
+    if (basePath.startsWith('scripts/')) {
+      candidates.push(this.normalizePath(basePath.slice('scripts/'.length)));
+    }
+
+    return Array.from(new Set(candidates));
+  }
+
+  private findFirstExistingPath(
+    basePaths: string[],
+    suffixes: string[],
+    files?: Map<string, string>
+  ): string | null {
+    for (const basePath of basePaths) {
+      const match = this.findExistingPath(basePath, suffixes, files);
+      if (match) {
+        return match;
+      }
+    }
+
+    return null;
+  }
+
+  private findExistingPath(
+    basePath: string,
+    suffixes: string[],
+    files?: Map<string, string>
+  ): string | null {
+    for (const suffix of suffixes) {
+      const candidate = this.normalizePath(`${basePath}${suffix}`);
+      if (!files || files.has(candidate)) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  private resolveUnresolvedPath(importPath: string, importer: string): string {
+    const importerDirectory = importer ? this.getDirectoryName(importer) : '';
+    return this.normalizePath(importerDirectory ? `${importerDirectory}/${importPath}` : importPath);
+  }
+
+  private rewriteVirtualAssetUrls(contents: string, filePath: string): string {
+    return contents.replace(
+      /new URL\((['"])([^'"]+)\1,\s*import\.meta\.url\)\.href/g,
+      (_match, _quote: string, relativePath: string) => {
+        const absolutePath = this.resolveUnresolvedPath(relativePath, filePath);
+        return JSON.stringify(`res://${absolutePath}`);
+      }
+    );
+  }
+
+  private getDirectoryName(filePath: string): string {
+    const normalizedPath = this.normalizePath(filePath);
+    const lastSlashIndex = normalizedPath.lastIndexOf('/');
+    return lastSlashIndex >= 0 ? normalizedPath.slice(0, lastSlashIndex) : '';
+  }
+
+  private normalizePath(path: string): string {
+    const segments = path
+      .replace(/\\/g, '/')
+      .split('/');
+    const normalizedSegments: string[] = [];
+
+    for (const segment of segments) {
+      if (!segment || segment === '.') {
+        continue;
+      }
+
+      if (segment === '..') {
+        normalizedSegments.pop();
+        continue;
+      }
+
+      normalizedSegments.push(segment);
+    }
+
+    return normalizedSegments.join('/');
   }
 
   /**

@@ -52,6 +52,13 @@ cd pix3
 npm install
 ```
 
+### Type Checking
+
+The project uses multiple `tsconfig` files to manage different scopes:
+- `tsconfig.json`: Main editor and core library configuration.
+- `samples/tsconfig.json`: configuration for standalone sample scripts to ensure they resolve `@pix3/runtime` correctly without being part of the main build.
+- `packages/pix3-runtime/tsconfig.json`: configuration for the runtime package.
+
 ### Run Dev Server
 
 ```bash
