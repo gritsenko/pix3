@@ -1,2 +1,0 @@
-vInstanceAlpha = instanceAlpha;
-vPosLocal = position;
