@@ -52,6 +52,14 @@ cd pix3
 npm install
 ```
 
+### yalc workflow
+
+# after changes in runtime 
+cd pix3/packages/pix3-runtime && npm run yalc:publish
+# in target game project:
+yalc update
+# или просто npm install - yalc обновит автоматически
+
 ### Type Checking
 
 The project uses multiple `tsconfig` files to manage different scopes:
