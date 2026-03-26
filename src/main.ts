@@ -34,13 +34,10 @@ interface WindowWithEngine extends Window {
 (window as unknown as WindowWithEngine).__PIX3_GLTFLoader__ = GLTFLoader;
 (window as unknown as WindowWithEngine).__PIX3_DRACOLoader__ = DRACOLoader;
 (window as unknown as WindowWithEngine).__PIX3_IOS_HAPTICS__ = {
-  haptic: Object.assign(
-    () => undefined,
-    {
-      confirm: () => undefined,
-      error: () => undefined,
-    }
-  ),
+  haptic: Object.assign(() => undefined, {
+    confirm: () => undefined,
+    error: () => undefined,
+  }),
 };
 
 // Create dynamic import map for @pix3/runtime

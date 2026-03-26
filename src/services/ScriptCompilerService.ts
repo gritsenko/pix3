@@ -92,8 +92,9 @@ export class ScriptCompilerService {
       return { code: '', warnings: [] };
     }
 
-    const effectiveEntryFiles = (entryFiles ?? Array.from(files.keys()).filter(file => file.endsWith('.ts')))
-      .filter(file => files.has(file));
+    const effectiveEntryFiles = (
+      entryFiles ?? Array.from(files.keys()).filter(file => file.endsWith('.ts'))
+    ).filter(file => files.has(file));
 
     if (effectiveEntryFiles.length === 0) {
       return { code: '', warnings: [] };
@@ -171,9 +172,7 @@ export class ScriptCompilerService {
    * Convert a file path to a valid JavaScript export name
    */
   private pathToExportName(filePath: string): string {
-    return filePath
-      .replace(/\.ts$/, '')
-      .replace(/[^a-zA-Z0-9_]/g, '_');
+    return filePath.replace(/\.ts$/, '').replace(/[^a-zA-Z0-9_]/g, '_');
   }
 
   /**
@@ -285,9 +284,10 @@ export class ScriptCompilerService {
     const candidateBasePaths = this.getImportCandidateBasePaths(resolvedBasePath);
 
     if (querySuffix === '?url') {
-      const assetPath = this.findExistingPath(candidateBasePaths[0] ?? resolvedBasePath, [''], files)
-        ?? this.findFirstExistingPath(candidateBasePaths, [''], files)
-        ?? resolvedBasePath;
+      const assetPath =
+        this.findExistingPath(candidateBasePaths[0] ?? resolvedBasePath, [''], files) ??
+        this.findFirstExistingPath(candidateBasePaths, [''], files) ??
+        resolvedBasePath;
       return { path: assetPath, namespace: 'virtual-url' };
     }
 
@@ -297,11 +297,16 @@ export class ScriptCompilerService {
     }
 
     if (cleanImportPath.endsWith('.css')) {
-      const cssPath = this.findFirstExistingPath(candidateBasePaths, [''], files) ?? resolvedBasePath;
+      const cssPath =
+        this.findFirstExistingPath(candidateBasePaths, [''], files) ?? resolvedBasePath;
       return { path: cssPath, namespace: 'virtual-css' };
     }
 
-    const resolvedTsPath = this.findFirstExistingPath(candidateBasePaths, ['', '.ts', '/index.ts'], files);
+    const resolvedTsPath = this.findFirstExistingPath(
+      candidateBasePaths,
+      ['', '.ts', '/index.ts'],
+      files
+    );
     return resolvedTsPath ? { path: resolvedTsPath, namespace: 'virtual-fs' } : null;
   }
 
@@ -351,7 +356,9 @@ export class ScriptCompilerService {
 
   private resolveUnresolvedPath(importPath: string, importer: string): string {
     const importerDirectory = importer ? this.getDirectoryName(importer) : '';
-    return this.normalizePath(importerDirectory ? `${importerDirectory}/${importPath}` : importPath);
+    return this.normalizePath(
+      importerDirectory ? `${importerDirectory}/${importPath}` : importPath
+    );
   }
 
   private rewriteVirtualAssetUrls(contents: string, filePath: string): string {
@@ -371,9 +378,7 @@ export class ScriptCompilerService {
   }
 
   private normalizePath(path: string): string {
-    const segments = path
-      .replace(/\\/g, '/')
-      .split('/');
+    const segments = path.replace(/\\/g, '/').split('/');
     const normalizedSegments: string[] = [];
 
     for (const segment of segments) {

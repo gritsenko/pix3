@@ -345,7 +345,10 @@ export class ProjectScriptLoaderService {
     sourceFiles: Array<{ name: string; kind: FileSystemHandleKind; path: string }>;
     checkedDirectories: readonly string[];
   }> {
-    const sourceFiles = new Map<string, { name: string; kind: FileSystemHandleKind; path: string }>();
+    const sourceFiles = new Map<
+      string,
+      { name: string; kind: FileSystemHandleKind; path: string }
+    >();
     const roots = new Set<string>();
 
     for (const directory of this.scriptDirectories) {
@@ -363,7 +366,6 @@ export class ProjectScriptLoaderService {
         throw error;
       }
     }
-
 
     for (const root of roots) {
       const entries = await this.collectFilesRecursively(root);
@@ -421,7 +423,9 @@ export class ProjectScriptLoaderService {
   }
 
   private isWithinScriptDirectory(filePath: string): boolean {
-    return this.scriptDirectories.some(directory => filePath === directory || filePath.startsWith(`${directory}/`));
+    return this.scriptDirectories.some(
+      directory => filePath === directory || filePath.startsWith(`${directory}/`)
+    );
   }
 
   private isDirectoryNotFoundError(error: unknown): boolean {

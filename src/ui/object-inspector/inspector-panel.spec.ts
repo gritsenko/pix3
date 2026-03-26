@@ -55,23 +55,29 @@ describe('InspectorPanel audio resource handling', () => {
       id: 'audio-player',
       name: 'Audio Player',
     });
-    (panel as unknown as { propertySchema: ReturnType<typeof AudioPlayer.getPropertySchema> | null }).propertySchema =
-      AudioPlayer.getPropertySchema();
+    (
+      panel as unknown as {
+        propertySchema: ReturnType<typeof AudioPlayer.getPropertySchema> | null;
+      }
+    ).propertySchema = AudioPlayer.getPropertySchema();
 
-    (panel as unknown as { onAudioResourceDrop: (propertyName: string, event: DragEvent) => void }).onAudioResourceDrop(
-      'audioTrack',
-      createDragEvent('res://assets/sfx/click.wav') as DragEvent
-    );
+    (
+      panel as unknown as { onAudioResourceDrop: (propertyName: string, event: DragEvent) => void }
+    ).onAudioResourceDrop('audioTrack', createDragEvent('res://assets/sfx/click.wav') as DragEvent);
     await Promise.resolve();
 
     expect(execute).toHaveBeenCalledTimes(1);
-    const objectCommand = execute.mock.calls[0]?.[0] as { params?: { propertyPath: string; value: string } };
+    const objectCommand = execute.mock.calls[0]?.[0] as {
+      params?: { propertyPath: string; value: string };
+    };
     expect(objectCommand.params?.propertyPath).toBe('audioTrack');
     expect(objectCommand.params?.value).toBe('res://assets/sfx/click.wav');
 
     execute.mockClear();
 
-    (panel as unknown as { onAudioResourceDrop: (propertyName: string, event: DragEvent) => void }).onAudioResourceDrop(
+    (
+      panel as unknown as { onAudioResourceDrop: (propertyName: string, event: DragEvent) => void }
+    ).onAudioResourceDrop(
       'audioTrack',
       createDragEvent('res://assets/images/icon.png') as DragEvent
     );
@@ -107,7 +113,11 @@ describe('InspectorPanel audio resource handling', () => {
           event: DragEvent
         ) => void;
       }
-    ).onComponentAudioResourceDrop(component.id, prop, createDragEvent('res://assets/sfx/ui.ogg') as DragEvent);
+    ).onComponentAudioResourceDrop(
+      component.id,
+      prop,
+      createDragEvent('res://assets/sfx/ui.ogg') as DragEvent
+    );
     await Promise.resolve();
 
     expect(execute).toHaveBeenCalledTimes(1);
