@@ -10,6 +10,8 @@ export interface RendererOptions {
   externalParent?: THREE.Object3D;
   /** Whether the host renderer has shadows enabled in embedded mode. */
   shadowsEnabled?: boolean;
+  /** Pass an existing THREE camera to take control over it instead of creating a new one. */
+  existingCamera?: THREE.OrthographicCamera;
 }
 
 export class Renderer {
@@ -75,7 +77,7 @@ export class Renderer {
       this.uiCamera.position.z = 10;
 
       const aspect = width / height;
-      this.cameraController = new CameraController(aspect);
+      this.cameraController = new CameraController(aspect, options?.existingCamera);
       // Add camera pivot to external parent so it's part of the scene
       parent.add(this.cameraController.pivotObject);
 

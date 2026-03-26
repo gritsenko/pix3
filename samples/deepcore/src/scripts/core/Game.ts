@@ -83,6 +83,8 @@ export interface GameOptions {
   resourceManager?: ResourceManager;
   /** Pass engine input service for interaction. */
   inputService?: InputService;
+  /** Pass an existing THREE camera for the engine to control. */
+  existingCamera?: THREE.OrthographicCamera;
 }
 
 export class Game {
@@ -152,7 +154,10 @@ export class Game {
     this.inputService = options?.inputService || null;
 
     // Initialize renderer (embedded or standalone)
-    this.renderer = new Renderer(options?.renderer);
+    this.renderer = new Renderer({
+      ...options?.renderer,
+      existingCamera: options?.existingCamera,
+    });
     this.physicsWorld = new PhysicsWorld();
     this.voxelWorld = new VoxelWorld();
     this.stabilitySystem = new StabilitySystem(this.voxelWorld);

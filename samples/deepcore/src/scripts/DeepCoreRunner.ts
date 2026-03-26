@@ -41,11 +41,31 @@ export class DeepCoreRunner extends Script {
 
     console.log('[DeepCoreRunner] Starting game on node:', this.node.name);
 
+    // Optional: Take control of a camera node in the scene if provided
+    let existingCamera: any = undefined;
+    if (this.config.cameraNodeId) {
+        // Find by ID is not exposed on SceneService directly, but we can search root nodes if needed.
+        // For now, let's just support the active camera or a fallback lookup.
+        const camNode = this.scene?.getActiveCamera();
+        if (camNode && camNode.camera) {
+            existingCamera = camNode.camera;
+            console.log(`[DeepCoreRunner] Taking control of active scene camera`);
+        }
+    } else {
+        // Fallback: use active camera if available
+        const camNode = this.scene?.getActiveCamera();
+        if (camNode && camNode.camera) {
+             existingCamera = camNode.camera;
+             console.log('[DeepCoreRunner] Taking control of active scene camera (fallback)');
+        }
+    }
+
     // Create Game in embedded mode — the pix3 node acts as the scene root
     this.game = new Game({
       renderer: { externalParent: this.node, shadowsEnabled: true },
       resourceManager: (this.scene as any)?.getAssetLoader()?.resources,
       inputService: this.input,
+      existingCamera: existingCamera,
     });
 
     // init() is async (physics WASM, atlas loading) — run it and mark ready when done

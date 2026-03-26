@@ -32,23 +32,28 @@ export class CameraController {
   private shakeDecay: number = 0.9;
   private shakeDuration: number = 0; // Current shake duration remaining (in seconds)
 
-  constructor(aspect: number) {
+  constructor(aspect: number, existingCamera?: THREE.OrthographicCamera) {
     // store current aspect for runtime recalcs (e.g. zoom updates)
     this.lastAspect = aspect;
 
-    // Create orthographic camera for true isometric view
-    this.frustumSize = this.computeFrustumSize(aspect);
-    const halfWidth = this.frustumSize * aspect / 2;
-    const halfHeight = this.frustumSize / 2;
+    if (existingCamera) {
+        this.camera = existingCamera;
+        // Don't re-init projection here, wait for resize()
+    } else {
+        // Create orthographic camera for true isometric view
+        this.frustumSize = this.computeFrustumSize(aspect);
+        const halfWidth = this.frustumSize * aspect / 2;
+        const halfHeight = this.frustumSize / 2;
 
-    this.camera = new THREE.OrthographicCamera(
-      -halfWidth,
-      halfWidth,
-      halfHeight,
-      -halfHeight,
-      CAMERA.near,
-      CAMERA.far
-    );
+        this.camera = new THREE.OrthographicCamera(
+            -halfWidth,
+            halfWidth,
+            halfHeight,
+            -halfHeight,
+            CAMERA.near,
+            CAMERA.far
+        );
+    }
 
     // Create pivot point for rotation
     this.pivot = new THREE.Object3D();

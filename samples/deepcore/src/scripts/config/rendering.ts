@@ -4,7 +4,7 @@ import wallTileUrl from '../../assets/models/walltile.glb?url';
 export const renderingConfig: RenderingFullConfig = {
   camera: {
     pitch: Math.PI / 5, // ~36 degrees - classic isometric
-    distance: 20,
+    distance: 8,
     fov: 25,
     frustumSize: 8,
     portraitFitMargin: 0.3,
@@ -65,7 +65,7 @@ export const renderingConfig: RenderingFullConfig = {
   blockRendering: {
     geometrySize: 1.0,
     maxVisibleDepth: 20, // Only render blocks within this vertical distance from camera
-    envMapIntensity: 1.6, 
+    envMapIntensity: 1.6,
   },
 
   wallPlanes: {
