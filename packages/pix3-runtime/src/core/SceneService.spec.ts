@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { AssetLoader } from './AssetLoader';
+import { AudioService } from './AudioService';
+import { ResourceManager } from './ResourceManager';
 import { SceneService } from './SceneService';
 
 describe('SceneService viewport API', () => {
@@ -79,5 +82,24 @@ describe('SceneService viewport API', () => {
     unsubscribe();
     service.setViewportSize(200, 100);
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('returns resource manager from the active delegate', () => {
+    const service = new SceneService();
+    const resources = new ResourceManager('/');
+    const assetLoader = new AssetLoader(resources, new AudioService());
+
+    service.setDelegate({
+      getActiveCameraNode: () => null,
+      getUICamera: () => null,
+      setActiveCameraNode: () => undefined,
+      findNodeById: () => null,
+      getAudioService: () => new AudioService(),
+      getAssetLoader: () => assetLoader,
+      getResourceManager: () => resources,
+    });
+
+    expect(service.getResourceManager()).toBe(resources);
+    expect(service.getAssetLoader()).toBe(assetLoader);
   });
 });

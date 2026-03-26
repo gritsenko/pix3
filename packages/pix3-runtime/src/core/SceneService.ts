@@ -3,6 +3,7 @@ import { NodeBase } from '../nodes/NodeBase';
 import { LAYER_3D } from '../constants';
 import type { AudioService } from './AudioService';
 import type { AssetLoader } from './AssetLoader';
+import type { ResourceManager } from './ResourceManager';
 
 export type ViewportOrientation = 'portrait' | 'landscape';
 
@@ -26,6 +27,7 @@ export interface SceneServiceDelegate {
   findNodeById(id: string): NodeBase | null;
   getAudioService(): AudioService;
   getAssetLoader(): AssetLoader;
+  getResourceManager(): ResourceManager;
 }
 
 /**
@@ -138,6 +140,10 @@ export class SceneService {
 
   getAssetLoader(): AssetLoader | null {
     return this.delegate?.getAssetLoader() ?? null;
+  }
+
+  getResourceManager(): ResourceManager | null {
+    return this.delegate?.getResourceManager() ?? null;
   }
 
   // ── Viewport APIs ───────────────────────────────────────────────────────────

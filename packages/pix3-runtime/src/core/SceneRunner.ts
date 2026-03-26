@@ -13,6 +13,7 @@ import { InputService } from './InputService';
 import { SceneService } from './SceneService';
 import { AudioService } from './AudioService';
 import { AssetLoader } from './AssetLoader';
+import { ResourceManager } from './ResourceManager';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
 import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
@@ -28,6 +29,7 @@ export class SceneRunner {
   private readonly inputService: InputService;
   private readonly sceneService: SceneService;
   private readonly audioService: AudioService;
+  private readonly resourceManager: ResourceManager;
   private readonly clock: Clock;
   private animationFrameId: number | null = null;
   private isRunning: boolean = false;
@@ -50,6 +52,7 @@ export class SceneRunner {
     this.inputService = new InputService();
     this.sceneService = new SceneService();
     this.audioService = audioService;
+    this.resourceManager = assetLoader.getResourceManager();
     this.clock = new Clock();
     this.scene = new Scene();
     // Default background
@@ -82,6 +85,9 @@ export class SceneRunner {
       },
       getAssetLoader(): AssetLoader {
         return assetLoader;
+      },
+      getResourceManager(): ResourceManager {
+        return runner.resourceManager;
       },
     });
   }

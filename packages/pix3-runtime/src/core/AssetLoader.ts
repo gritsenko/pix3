@@ -32,6 +32,10 @@ export class AssetLoader {
     this.textureLoader = new TextureLoader();
   }
 
+  getResourceManager(): ResourceManager {
+    return this.resources;
+  }
+
   /**
    * Load an asset file and return a NodeBase instance.
    * @param resourcePath Path to the asset file
