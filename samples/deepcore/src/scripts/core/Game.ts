@@ -39,6 +39,7 @@ import {
   type LootCollectedEvent,
   type ResourcesDroppedEvent,
 } from '../core/Types';
+import { type InputService } from '@pix3/runtime';
 import type { ClusterBlockData } from '../world/types';
 
 import { atlasManager } from '../utils/AtlasManager';
@@ -80,6 +81,8 @@ export interface GameOptions {
   renderer?: RendererOptions;
   /** Pass engine resource manager for project file access. */
   resourceManager?: ResourceManager;
+  /** Pass engine input service for interaction. */
+  inputService?: InputService;
 }
 
 export class Game {
@@ -104,6 +107,7 @@ export class Game {
   private uiManager: UIManager;
   private debugController: DebugController;
   private cameraDebugFrame: THREE.LineSegments | null = null;
+  private inputService: InputService | null = null;
 
   // Multi-pointer interaction tracking
   private pointerInteractions: Map<number, PointerInteraction> = new Map();
@@ -130,11 +134,22 @@ export class Game {
   private frameCount: number = 0;
   private isPaused: boolean = false;
 
+  // InputService bridge state
+  private lastInputServiceDown: boolean = false;
+  private inputServiceHoldTimer: number = 0;
+  private inputServiceIsHolding: boolean = false;
+  private lastInputServicePos: THREE.Vector2 = new THREE.Vector2();
+  private lastLeftDown: boolean = false;
+  private lastRightDown: boolean = false;
+  private lastWheelRotateFired: boolean = false;
+
   constructor(options?: GameOptions) {
     const baseUrl = import.meta.env.BASE_URL || '/';
     const resourceManager = options?.resourceManager || new ResourceManager(baseUrl);
     atlasManager.setResourceManager(resourceManager);
     ModelManager.getInstance().setResourceManager(resourceManager);
+
+    this.inputService = options?.inputService || null;
 
     // Initialize renderer (embedded or standalone)
     this.renderer = new Renderer(options?.renderer);
@@ -596,6 +611,11 @@ export class Game {
       this.uiManager.update(this.renderer.getFPS());
     });
 
+    // Update Input from Pix3 InputService in embedded mode
+    measurePhase('inputService', () => {
+      this.updateInputService();
+    });
+
     // Check floating origin
     measurePhase('floatingOrigin', () => {
       this.checkFloatingOrigin();
@@ -710,6 +730,91 @@ export class Game {
   private handleVerticalScroll(deltaY: number): void {
     if (!this.isInitialized) return;
     this.renderer.cameraController.scrollDepth(deltaY);
+  }
+
+  // ========================================
+  // InputService Bridge (for Pix3 Editor)
+  // ========================================
+
+  private updateInputService(): void {
+    if (!this.inputService) return;
+
+    const isDown = this.inputService.isPointerDown;
+    const pos = this.inputService.pointerPosition;
+    const now = performance.now();
+
+    // In Pix3, we might need to adjust coordinates if the canvas isn't full screen
+    // but typically InputService handles the rect relative to its attached element.
+    const screenX = pos.x;
+    const screenY = pos.y;
+
+    if (isDown && !this.lastInputServiceDown) {
+      // Pointer down
+      this.handlePointerDown(0, screenX, screenY);
+      this.inputServiceHoldTimer = now;
+      this.inputServiceIsHolding = false;
+      this.lastInputServicePos.set(screenX, screenY);
+    } else if (!isDown && this.lastInputServiceDown) {
+      // Pointer up
+      if (this.inputServiceIsHolding) {
+        this.handleHoldEnd(0);
+      }
+      this.handlePointerUp(0, screenX, screenY);
+      this.inputServiceIsHolding = false;
+    } else if (isDown && this.lastInputServiceDown) {
+      // Pointer move
+      if (Math.abs(screenX - this.lastInputServicePos.x) > 1 || Math.abs(screenY - this.lastInputServicePos.y) > 1) {
+        this.handlePointerMove(0, screenX, screenY);
+        this.lastInputServicePos.set(screenX, screenY);
+      }
+      
+      // Hold detection
+      if (!this.inputServiceIsHolding) {
+        const elapsed = now - this.inputServiceHoldTimer;
+        // Match standard game hold threshold (e.g. 300-500ms)
+        if (elapsed > 400) { 
+          this.inputServiceIsHolding = true;
+          this.handleHoldStart(0, screenX, screenY);
+        }
+      }
+    } else {
+        // Just hover
+        if (Math.abs(screenX - this.lastInputServicePos.x) > 1 || Math.abs(screenY - this.lastInputServicePos.y) > 1) {
+            this.handlePointerMove(0, screenX, screenY, 'mouse');
+            this.lastInputServicePos.set(screenX, screenY);
+        }
+    }
+
+    // Keyboard rotation
+    const leftDown = this.inputService.getButton('Key_KeyA') || this.inputService.getButton('Key_A') || this.inputService.getButton('Key_ArrowLeft') || this.inputService.getButton('Key_ARROWLEFT');
+    const rightDown = this.inputService.getButton('Key_KeyD') || this.inputService.getButton('Key_D') || this.inputService.getButton('Key_ArrowRight') || this.inputService.getButton('Key_ARROWRIGHT');
+    
+    if (leftDown && !this.lastLeftDown) {
+        this.handleRotateStep(-1);
+    } else if (rightDown && !this.lastRightDown) {
+        this.handleRotateStep(1);
+    }
+    this.lastLeftDown = leftDown;
+    this.lastRightDown = rightDown;
+
+    // Wheel scroll and rotation
+    const wheelX = this.inputService.wheelDelta.x;
+    const wheelY = this.inputService.wheelDelta.y;
+    
+    if (Math.abs(wheelY) > 0.1) {
+        this.handleVerticalScroll(-wheelY * 0.5); // Sensitivity adjustment
+    }
+    
+    if (Math.abs(wheelX) > 20) { // Increased threshold for rotation step
+        if (!this.lastWheelRotateFired) {
+            this.handleRotateStep(wheelX > 0 ? 1 : -1);
+            this.lastWheelRotateFired = true;
+        }
+    } else {
+        this.lastWheelRotateFired = false;
+    }
+
+    this.lastInputServiceDown = isDown;
   }
 
   // Pointer down - immediate interaction (collect items or damage blocks)

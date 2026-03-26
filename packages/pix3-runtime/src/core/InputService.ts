@@ -9,10 +9,10 @@ export class InputService {
     private axes = new Map<string, number>();
     private buttons = new Map<string, boolean>();
 
-    // Raw pointer state
     public readonly pointerPosition = new Vector2();
     public isPointerDown = false;
     public activePointerId: number | null = null;
+    public wheelDelta = new Vector2();
 
     public width = 0;
     public height = 0;
@@ -26,6 +26,7 @@ export class InputService {
      */
     beginFrame(): void {
         this.hoveredUIElements.clear();
+        this.wheelDelta.set(0, 0);
     }
 
     /**
@@ -98,6 +99,10 @@ export class InputService {
         element.addEventListener('pointerup', this.onPointerUp);
         element.addEventListener('pointercancel', this.onPointerUp);
         element.addEventListener('pointerleave', this.onPointerUp);
+        element.addEventListener('wheel', this.onWheel, { passive: false });
+
+        window.addEventListener('keydown', this.onKeyDown);
+        window.addEventListener('keyup', this.onKeyUp);
 
         // Prevent context menu on right click for better game experience
         element.addEventListener('contextmenu', this.onContextMenu);
@@ -114,7 +119,11 @@ export class InputService {
         this.element.removeEventListener('pointerup', this.onPointerUp);
         this.element.removeEventListener('pointercancel', this.onPointerUp);
         this.element.removeEventListener('pointerleave', this.onPointerUp);
+        this.element.removeEventListener('wheel', this.onWheel);
         this.element.removeEventListener('contextmenu', this.onContextMenu);
+
+        window.removeEventListener('keydown', this.onKeyDown);
+        window.removeEventListener('keyup', this.onKeyUp);
 
         this.element = null;
         this.isPointerDown = false;
@@ -157,6 +166,23 @@ export class InputService {
 
     private onContextMenu = (event: Event): void => {
         event.preventDefault();
+    };
+
+    private onWheel = (event: WheelEvent): void => {
+        this.wheelDelta.x += event.deltaX;
+        this.wheelDelta.y += event.deltaY;
+        // Optional: event.preventDefault() if we want to swallow scrolling
+        // event.preventDefault();
+    };
+
+    private onKeyDown = (event: KeyboardEvent): void => {
+        this.setButton(`Key_${event.code}`, true);
+        this.setButton(`Key_${event.key.toUpperCase()}`, true);
+    };
+
+    private onKeyUp = (event: KeyboardEvent): void => {
+        this.setButton(`Key_${event.code}`, false);
+        this.setButton(`Key_${event.key.toUpperCase()}`, false);
     };
 
     private updatePointerPosition(event: PointerEvent): void {

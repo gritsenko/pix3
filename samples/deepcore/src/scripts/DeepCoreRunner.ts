@@ -45,6 +45,7 @@ export class DeepCoreRunner extends Script {
     this.game = new Game({
       renderer: { externalParent: this.node, shadowsEnabled: true },
       resourceManager: (this.scene as any)?.getAssetLoader()?.resources,
+      inputService: this.input,
     });
 
     // init() is async (physics WASM, atlas loading) — run it and mark ready when done

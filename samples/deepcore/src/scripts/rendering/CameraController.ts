@@ -10,6 +10,7 @@ export class CameraController {
   private isRotating: boolean = false;
   private pivotY: number = 0; // Current base camera depth
   private targetPivotY: number = 0; // Target base camera depth
+  private pitch: number = CAMERA.pitch; // Use pitch from config
   private baseFrustumSize: number = CAMERA.frustumSize;
   private frustumSize: number = CAMERA.frustumSize;
   private lastAspect: number = 1; // stored so runtime updates (zoom) can recalc projection
@@ -55,12 +56,11 @@ export class CameraController {
 
     // Position camera for isometric view (matching reference image)
     // ~35 degrees down from horizontal, looking at center
-    const distance = 20;
-    const pitch = Math.PI / 5; // ~36 degrees - classic isometric
+    const distance = CAMERA.distance;
     this.camera.position.set(
       0,
-      distance * Math.sin(pitch),
-      distance * Math.cos(pitch)
+      distance * Math.sin(this.pitch),
+      distance * Math.cos(this.pitch)
     );
     this.camera.lookAt(0, 0, 0);
 
@@ -226,8 +226,8 @@ export class CameraController {
 
     if (this.shakeIntensity > 0.001) {
       // Base position for isometric camera (must match constructor)
-      const distance = 20;
-      const pitch = Math.PI / 5;
+      const distance = CAMERA.distance;
+      const pitch = this.pitch;
       const baseX = 0;
       const baseY = distance * Math.sin(pitch);
       const baseZ = distance * Math.cos(pitch);
@@ -241,8 +241,8 @@ export class CameraController {
     } else if (this.shakeIntensity > 0) {
       this.shakeIntensity = 0;
       // Reset position to remove offset drift
-      const distance = 20;
-      const pitch = Math.PI / 5;
+      const distance = CAMERA.distance;
+      const pitch = this.pitch;
       this.camera.position.set(0, distance * Math.sin(pitch), distance * Math.cos(pitch));
     }
 

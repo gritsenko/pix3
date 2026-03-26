@@ -3,8 +3,8 @@ import wallTileUrl from '../../assets/models/walltile.glb?url';
 
 export const renderingConfig: RenderingFullConfig = {
   camera: {
-    pitch: Math.PI / 4,
-    distance: 15,
+    pitch: Math.PI / 5, // ~36 degrees - classic isometric
+    distance: 20,
     fov: 25,
     frustumSize: 8,
     portraitFitMargin: 0.3,

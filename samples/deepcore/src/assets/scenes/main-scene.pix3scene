@@ -35,7 +35,7 @@ root:
         name: Sun Light
         properties:
           intensity: 1.5
-          color: "#ffb37a"
+          color: "#ff7332"
           castShadow: true
           shadowCameraSize: 20
           shadowMapSize: 2048
@@ -51,5 +51,5 @@ root:
           transform:
             position: [0, 0, 0]
             rotationEuler: [0, 0, 0]
-            scale: [1, 1, 1]
+            scale: [9.567467268507382, 1, 7.935036268296475]
         children: []

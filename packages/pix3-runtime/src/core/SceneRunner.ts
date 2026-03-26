@@ -205,6 +205,7 @@ export class SceneRunner {
 
     const dt = this.clock.getDelta();
 
+    this.inputService.beginFrame();
     this.updateNodes(dt);
     this.render();
 
