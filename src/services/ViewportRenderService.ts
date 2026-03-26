@@ -205,7 +205,7 @@ export class ViewportRendererService {
     this.renderer.setClearColor(0x13161b, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.shadowMap.enabled = appState.ui.showLighting;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     // Create scene
     this.scene = new THREE.Scene();

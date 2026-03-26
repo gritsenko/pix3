@@ -1,12 +1,13 @@
 import * as THREE from 'three';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { ResourceManager } from '@pix3/runtime';
 import { BlockType, BLOCK_PROPERTIES } from '../core/Types';
 import { assetDiagnostics } from '../utils/AssetDiagnostics';
 import { botConfig } from '../config/bot';
 import { WALL_PLANES } from '../config';
 import { createBlockMaterial } from './BlockShader';
-import colormapUrl from '../assets/models/colormap.png?url';
+import { TEXTURES } from '../assets/textures';
 
 export interface BlockRenderResources {
     geometry: THREE.BufferGeometry;
@@ -18,32 +19,31 @@ const DEBUG_MODELS = import.meta.env.DEV;
 
 export class ModelManager {
     private static instance: ModelManager;
-    private geometries: Map<BlockType, THREE.BufferGeometry> = new Map();
-    private textures: Map<BlockType, THREE.Texture> = new Map();
-    private sourceMaterials: Map<BlockType, THREE.Material> = new Map();
-    // private materialCache: Map<string, THREE.Material> = new Map(); // Removed unused
-    private materials: Map<BlockType, THREE.Material> = new Map(); // Keep this for compatibility
+    private readonly geometries: Map<BlockType, THREE.BufferGeometry> = new Map();
+    private readonly textures: Map<BlockType, THREE.Texture> = new Map();
+    private readonly sourceMaterials: Map<BlockType, THREE.Material> = new Map();
+    private readonly materials: Map<BlockType, THREE.Material> = new Map();
     private colormapTexture: THREE.Texture | null = null;
     private botModel: THREE.Group | null = null;
     private wallGeometry: THREE.BufferGeometry | null = null;
     private wallTexture: THREE.Texture | null = null;
-    private loader: GLTFLoader;
-    private defaultGeometry: THREE.BoxGeometry;
+    private readonly loader: GLTFLoader;
+    private readonly textureLoader: THREE.TextureLoader;
+    private readonly defaultGeometry: THREE.BoxGeometry;
+    private readonly textureCache: Map<string, THREE.Texture> = new Map();
+    private readonly textureLoadInFlight: Map<string, Promise<THREE.Texture>> = new Map();
     private loadingPromise: Promise<void> | null = null;
-    private listeners: (() => void)[] = [];
+    private readonly listeners: Array<() => void> = [];
+    private resourceManager: ResourceManager | null = null;
 
     private constructor() {
         this.loader = new GLTFLoader();
+        this.textureLoader = new THREE.TextureLoader();
 
-        // Setup DRACO decoder to support Draco-compressed GLTF models
         const dracoLoader = new DRACOLoader();
-        // Use local decoder files (served from /public/draco) to avoid remote 404s/CORS issues
-        // Use Vite base URL so files load correctly when site is hosted on a subpath
         const baseUrl = import.meta.env.BASE_URL || './';
-        const dracoPath = baseUrl.endsWith('/') ? baseUrl + 'draco/' : baseUrl + '/draco/';
+        const dracoPath = baseUrl.endsWith('/') ? `${baseUrl}draco/` : `${baseUrl}/draco/`;
         dracoLoader.setDecoderPath(dracoPath);
-        // Prefer WASM decoder when available (default). If you need a JS-only fallback, set:
-        // dracoLoader.setDecoderConfig({ type: 'js' });
         this.loader.setDRACOLoader(dracoLoader);
 
         this.defaultGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -56,209 +56,68 @@ export class ModelManager {
         return ModelManager.instance;
     }
 
-    public loadAll(): Promise<void> {
+    public setResourceManager(resourceManager: ResourceManager): void {
+        this.resourceManager = resourceManager;
+    }
+
+    public async loadAll(): Promise<void> {
         if (this.loadingPromise) return this.loadingPromise;
 
-        const promises: Promise<void>[] = [];
+        const loads: Array<Promise<void>> = [];
 
-        // Load shared colormap texture once
-        const texturePromise = new Promise<void>((resolve) => {
-            const textureLoader = new THREE.TextureLoader();
-            textureLoader.load(colormapUrl, (texture) => {
-                texture.colorSpace = THREE.SRGBColorSpace;
-                texture.flipY = false; // Important for GLTF compatibility
-                this.colormapTexture = texture;
-                if (DEBUG_MODELS) console.log('[ModelManager] Loaded shared colormap');
-                resolve();
-            }, undefined, (err) => {
-                console.error('[ModelManager] Failed to load colormap:', err);
-                resolve();
-            });
-        });
-        promises.push(texturePromise);
+        loads.push(this.loadTextureResource(TEXTURES.colormap).then((texture) => {
+          this.colormapTexture = texture;
+          if (DEBUG_MODELS) console.log('[ModelManager] Loaded shared colormap');
+        }).catch((error: unknown) => {
+          console.error('[ModelManager] Failed to load colormap:', error);
+        }));
 
-        // Iterate over all block types
         for (const key of Object.keys(BLOCK_PROPERTIES)) {
             const type = Number(key) as BlockType;
             const props = BLOCK_PROPERTIES[type];
-
-            if (props.modelPath) {
-                // Track model loading start
-                const startTime = performance.now();
-                assetDiagnostics.trackModelStart(type.toString(), props.modelPath);
-
-                // Load model
-                const p = new Promise<void>((resolve) => {
-                    this.loader.load(
-                        props.modelPath!,
-                        (gltf: any) => {
-                            // Debug: check if any mesh is an InstancedMesh
-                            gltf.scene.traverse((child: THREE.Object3D) => {
-                                if (child instanceof THREE.Mesh) {
-                                    if (DEBUG_MODELS) {
-                                        const isInstanced = (child as any).isInstancedMesh;
-                                        const instanceCount = isInstanced ? (child as THREE.InstancedMesh).count : 1;
-                                        console.log(`[ModelLoad] ${props.modelPath}: isInstancedMesh=${isInstanced}, instanceCount=${instanceCount}`);
-
-                                        // Check geometry attributes
-                                        const posAttr = child.geometry.attributes.position;
-                                        if (posAttr) {
-                                            console.log(`[ModelLoad] Geometry: ${posAttr.count} vertices, ${Math.floor(posAttr.count / 3)} triangles`);
-                                        }
-                                    }
-                                }
-                            });
-
-                            // Find the first mesh
-                            let mesh: THREE.Mesh | undefined;
-                            gltf.scene.traverse((child: THREE.Object3D) => {
-                                if (!mesh && child instanceof THREE.Mesh) {
-                                    mesh = child;
-                                }
-                            });
-
-                            if (mesh) {
-                                const geometry = mesh.geometry.clone();
-                                const sourceMaterial = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
-
-                                if (DEBUG_MODELS) {
-                                    const verticesAfter = geometry.attributes.position?.count || 0;
-                                    console.log(`[ModelLoad] ${props.modelPath}: ${Math.floor(verticesAfter / 3)} triangles`);
-                                }
-
-                                const loadTime = performance.now() - startTime;
-
-                                // Track model loaded
-                                assetDiagnostics.trackModelLoaded(type.toString(), props.modelPath!, geometry, loadTime);
-
-                                // Apply optional scale
-                                if (props.scale) {
-                                    geometry.scale(props.scale, props.scale, props.scale);
-                                }
-
-                                this.geometries.set(type, geometry);
-                                if (sourceMaterial instanceof THREE.Material) {
-                                    this.sourceMaterials.set(type, sourceMaterial.clone());
-                                }
-
-                                // Extract texture if available and track it
-                                if (sourceMaterial) {
-                                    const material = sourceMaterial as any;
-                                    if (material.map) {
-                                        this.textures.set(type, material.map);
-                                        assetDiagnostics.trackTextureStart(`block_${type}`, props.modelPath!);
-                                        assetDiagnostics.trackTextureLoaded(
-                                            `block_${type}`,
-                                            props.modelPath!,
-                                            material.map,
-                                            0,
-                                            loadTime
-                                        );
-                                    }
-                                }
-
-                                if (DEBUG_MODELS) console.log(`Loaded model for block type ${type}`);
-                            }
-                            resolve();
-                        },
-                        undefined,
-                        (error: unknown) => {
-                            // Track model failure
-                            assetDiagnostics.trackModelFailed(type.toString(), props.modelPath!);
-                            console.error(`Failed to load model for block type ${type}:`, error);
-                            resolve();
-                        }
-                    );
-                });
-                promises.push(p);
+            if (!props.modelPath) {
+                continue;
             }
+
+            const startTime = performance.now();
+            assetDiagnostics.trackModelStart(type.toString(), props.modelPath);
+            loads.push(
+                this.loadGltfFromResource(props.modelPath)
+                    .then((gltf) => this.applyBlockModel(type, props.modelPath!, gltf, startTime))
+                    .catch((error: unknown) => {
+                        assetDiagnostics.trackModelFailed(type.toString(), props.modelPath!);
+                        console.error(`Failed to load model for block type ${type}:`, error);
+                    })
+            );
         }
 
-        // Load bot model
         if (botConfig.visual.modelPath) {
             const startTime = performance.now();
             assetDiagnostics.trackModelStart('bot', botConfig.visual.modelPath);
-            const p = new Promise<void>((resolve) => {
-                this.loader.load(
-                    botConfig.visual.modelPath,
-                    (gltf) => {
-                        this.botModel = gltf.scene;
-                        
-                        // Find first mesh for diagnostics
-                        let mesh: THREE.Mesh | undefined;
-                        gltf.scene.traverse((child: THREE.Object3D) => {
-                            if (!mesh && child instanceof THREE.Mesh) mesh = child;
-                        });
-                        
-                        if (mesh) {
-                            assetDiagnostics.trackModelLoaded('bot', botConfig.visual.modelPath, mesh.geometry, performance.now() - startTime);
-                        }
-
-                        // Apply initial scale to the group so we don't have to scale everywhere
-                        const scale = botConfig.visual.scale;
-                        this.botModel.scale.set(scale, scale, scale);
-                        if (DEBUG_MODELS) console.log('[ModelManager] Bot model loaded from', botConfig.visual.modelPath);
-                        resolve();
-                    },
-                    undefined,
-                    (err) => {
+            loads.push(
+                this.loadGltfFromResource(botConfig.visual.modelPath)
+                    .then((gltf) => this.applyBotModel(botConfig.visual.modelPath, gltf, startTime))
+                    .catch((error: unknown) => {
                         assetDiagnostics.trackModelFailed('bot', botConfig.visual.modelPath);
-                        console.error('[ModelManager] Failed to load bot model:', err);
-                        resolve();
-                    }
-                );
-            });
-            promises.push(p);
+                        console.error('[ModelManager] Failed to load bot model:', error);
+                    })
+            );
         }
 
-        // Load wall model
         if (WALL_PLANES.modelPath) {
             const startTime = performance.now();
             assetDiagnostics.trackModelStart('wall', WALL_PLANES.modelPath);
-            const p = new Promise<void>((resolve) => {
-                this.loader.load(
-                    WALL_PLANES.modelPath,
-                    (gltf) => {
-                        let mesh: THREE.Mesh | undefined;
-                        gltf.scene.traverse((child: THREE.Object3D) => {
-                            if (!mesh && child instanceof THREE.Mesh) {
-                                mesh = child;
-                            }
-                        });
-
-                        if (mesh) {
-                            assetDiagnostics.trackModelLoaded('wall', WALL_PLANES.modelPath, mesh.geometry, performance.now() - startTime);
-                            this.wallGeometry = mesh.geometry.clone();
-                            if (mesh.material) {
-                                const material = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as any;
-                                if (material.map) {
-                                    this.wallTexture = material.map;
-                                    assetDiagnostics.trackTextureStart('wall_texture', WALL_PLANES.modelPath);
-                                    assetDiagnostics.trackTextureLoaded(
-                                        'wall_texture',
-                                        WALL_PLANES.modelPath,
-                                        material.map,
-                                        0,
-                                        performance.now() - startTime
-                                    );
-                                }
-                            }
-                            if (DEBUG_MODELS) console.log('[ModelManager] Wall model loaded from', WALL_PLANES.modelPath);
-                        }
-                        resolve();
-                    },
-                    undefined,
-                    (err) => {
+            loads.push(
+                this.loadGltfFromResource(WALL_PLANES.modelPath)
+                    .then((gltf) => this.applyWallModel(WALL_PLANES.modelPath, gltf, startTime))
+                    .catch((error: unknown) => {
                         assetDiagnostics.trackModelFailed('wall', WALL_PLANES.modelPath);
-                        console.error('[ModelManager] Failed to load wall model:', err);
-                        resolve();
-                    }
-                );
-            });
-            promises.push(p);
+                        console.error('[ModelManager] Failed to load wall model:', error);
+                    })
+            );
         }
 
-        this.loadingPromise = Promise.all(promises).then(() => {
+        this.loadingPromise = Promise.all(loads).then(() => {
             assetDiagnostics.logReport();
             this.notifyListeners();
         });
@@ -315,32 +174,221 @@ export class ModelManager {
         return { geometry, material };
     }
 
-    public onModelsLoaded(callback: () => void): void {
-        this.listeners.push(callback);
-    }
-
-    /**
-     * Get cached material for block type (creates if not cached)
-     */
     public getMaterial(type: BlockType): THREE.Material {
         let material = this.materials.get(type);
         if (!material) {
             const props = BLOCK_PROPERTIES[type];
             const sourceMaterial = this.sourceMaterials.get(type);
-            
-            console.log(`[ModelManager] Creating material for type=${type}, modelPath=${props.modelPath}, color=${props.color}`);
-            
             const texture = props.modelPath ? this.getTexture(type) || this.colormapTexture || undefined : undefined;
             const baseColor = sourceMaterial && 'color' in sourceMaterial
                 ? ((sourceMaterial as THREE.MeshStandardMaterial).color?.getHex?.() ?? 0xffffff)
                 : texture ? 0xffffff : props.color;
-            
-            console.log(`[ModelManager] Material color=${baseColor}, texture=${!!texture}`);
-            
+
             material = createBlockMaterial(baseColor, texture, undefined, sourceMaterial);
             this.materials.set(type, material);
         }
         return material;
+    }
+
+    public onModelsLoaded(callback: () => void): void {
+        this.listeners.push(callback);
+    }
+
+    public dispose(): void {
+        for (const geometry of this.geometries.values()) {
+            geometry.dispose();
+        }
+        for (const texture of this.textures.values()) {
+            texture.dispose();
+        }
+        for (const texture of this.textureCache.values()) {
+            texture.dispose();
+        }
+        this.colormapTexture?.dispose();
+        this.wallTexture?.dispose();
+        this.geometries.clear();
+        this.textures.clear();
+        this.textureCache.clear();
+        this.sourceMaterials.clear();
+        this.materials.clear();
+        this.textureLoadInFlight.clear();
+        this.botModel = null;
+        this.wallGeometry = null;
+        this.wallTexture = null;
+        this.colormapTexture = null;
+        this.loadingPromise = null;
+    }
+
+    private async loadGltfFromResource(resourcePath: string): Promise<GLTF> {
+        const blob = await this.readBlob(resourcePath);
+        const arrayBuffer = await blob.arrayBuffer();
+
+        return await new Promise<GLTF>((resolve, reject) => {
+            this.loader.parse(
+                arrayBuffer,
+                '',
+                (gltf: GLTF) => resolve(gltf),
+                (error: unknown) => reject(error)
+            );
+        });
+    }
+
+    private async loadTextureResource(resourcePath: string): Promise<THREE.Texture> {
+        const cachedTexture = this.textureCache.get(resourcePath);
+        if (cachedTexture) {
+            return cachedTexture;
+        }
+
+        const inFlight = this.textureLoadInFlight.get(resourcePath);
+        if (inFlight) {
+            return inFlight;
+        }
+
+        const loadPromise = (async (): Promise<THREE.Texture> => {
+            const blob = await this.readBlob(resourcePath);
+            const objectUrl = URL.createObjectURL(blob);
+
+            try {
+                const texture = await new Promise<THREE.Texture>((resolve, reject) => {
+                    this.textureLoader.load(
+                        objectUrl,
+                        (texture) => {
+                            texture.colorSpace = THREE.SRGBColorSpace;
+                            texture.magFilter = THREE.LinearFilter;
+                            texture.minFilter = THREE.LinearFilter;
+                            resolve(texture);
+                        },
+                        undefined,
+                        (error: unknown) => reject(error)
+                    );
+                });
+
+                this.textureCache.set(resourcePath, texture);
+                return texture;
+            } finally {
+                URL.revokeObjectURL(objectUrl);
+            }
+        })();
+
+        this.textureLoadInFlight.set(resourcePath, loadPromise);
+        loadPromise.finally(() => {
+            this.textureLoadInFlight.delete(resourcePath);
+        });
+
+        return loadPromise;
+    }
+
+    private async applyBlockModel(
+        type: BlockType,
+        modelPath: string,
+        gltf: GLTF,
+        startTime: number
+    ): Promise<void> {
+        let mesh: THREE.Mesh | undefined;
+        gltf.scene.traverse((child: THREE.Object3D) => {
+            if (!mesh && child instanceof THREE.Mesh) {
+                mesh = child;
+            }
+        });
+
+        if (!mesh) {
+            console.warn(`[ModelManager] No mesh found in block model ${modelPath}`);
+            return;
+        }
+
+        const geometry = mesh.geometry.clone();
+        const sourceMaterial = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+
+        if (DEBUG_MODELS) {
+            const verticesAfter = geometry.attributes.position?.count || 0;
+            console.log(`[ModelLoad] ${modelPath}: ${Math.floor(verticesAfter / 3)} triangles`);
+        }
+
+        const loadTime = performance.now() - startTime;
+        assetDiagnostics.trackModelLoaded(type.toString(), modelPath, geometry, loadTime);
+
+        const scale = BLOCK_PROPERTIES[type].scale;
+        if (typeof scale === 'number') {
+            geometry.scale(scale, scale, scale);
+        }
+
+        this.geometries.set(type, geometry);
+        if (sourceMaterial instanceof THREE.Material) {
+            this.sourceMaterials.set(type, sourceMaterial.clone());
+        }
+
+        const mappedMaterial = sourceMaterial as (THREE.Material & { map?: THREE.Texture | null }) | null;
+        if (mappedMaterial?.map) {
+            this.textures.set(type, mappedMaterial.map);
+            assetDiagnostics.trackTextureStart(`block_${type}`, modelPath);
+            assetDiagnostics.trackTextureLoaded(`block_${type}`, modelPath, mappedMaterial.map, 0, loadTime);
+        }
+
+        if (DEBUG_MODELS) console.log(`Loaded model for block type ${type}`);
+    }
+
+    private async applyBotModel(modelPath: string, gltf: GLTF, startTime: number): Promise<void> {
+        this.botModel = gltf.scene;
+
+        let mesh: THREE.Mesh | undefined;
+        gltf.scene.traverse((child: THREE.Object3D) => {
+            if (!mesh && child instanceof THREE.Mesh) {
+                mesh = child;
+            }
+        });
+
+        if (mesh) {
+            assetDiagnostics.trackModelLoaded('bot', modelPath, mesh.geometry, performance.now() - startTime);
+        }
+
+        const scale = botConfig.visual.scale;
+        this.botModel.scale.set(scale, scale, scale);
+        if (DEBUG_MODELS) console.log('[ModelManager] Bot model loaded from', modelPath);
+    }
+
+    private async applyWallModel(modelPath: string, gltf: GLTF, startTime: number): Promise<void> {
+        let mesh: THREE.Mesh | undefined;
+        gltf.scene.traverse((child: THREE.Object3D) => {
+            if (!mesh && child instanceof THREE.Mesh) {
+                mesh = child;
+            }
+        });
+
+        if (!mesh) {
+            console.warn(`[ModelManager] No mesh found in wall model ${modelPath}`);
+            return;
+        }
+
+        assetDiagnostics.trackModelLoaded('wall', modelPath, mesh.geometry, performance.now() - startTime);
+        this.wallGeometry = mesh.geometry.clone();
+
+        const sourceMaterial = Array.isArray(mesh.material) ? mesh.material[0] : mesh.material;
+        const mappedMaterial = sourceMaterial as (THREE.Material & { map?: THREE.Texture | null }) | null;
+        if (mappedMaterial?.map) {
+            this.wallTexture = mappedMaterial.map;
+            assetDiagnostics.trackTextureStart('wall_texture', modelPath);
+            assetDiagnostics.trackTextureLoaded(
+                'wall_texture',
+                modelPath,
+                mappedMaterial.map,
+                0,
+                performance.now() - startTime
+            );
+        }
+
+        if (DEBUG_MODELS) console.log('[ModelManager] Wall model loaded from', modelPath);
+    }
+
+    private async readBlob(resourcePath: string): Promise<Blob> {
+        if (this.resourceManager) {
+            return await this.resourceManager.readBlob(resourcePath);
+        }
+
+        const response = await fetch(resourcePath);
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status} while fetching ${resourcePath}`);
+        }
+        return await response.blob();
     }
 
     private notifyListeners(): void {
@@ -349,4 +397,3 @@ export class ModelManager {
         }
     }
 }
-

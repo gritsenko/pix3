@@ -118,7 +118,7 @@ export class Renderer {
     // Allow ?noShadows=true URL parameter to disable shadows at startup (useful for low-end iOS devices)
     const noShadowsParam = new URLSearchParams(window.location.search).get('noShadows');
     this.renderer.shadowMap.enabled = RENDERER.shadowMapEnabled && noShadowsParam !== 'true';
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = RENDERER.toneMappingExposure;
@@ -225,7 +225,7 @@ export class Renderer {
     this.sunLight.shadow.camera.right = LIGHTING.sun.shadowCamera.right;
     this.sunLight.shadow.camera.top = LIGHTING.sun.shadowCamera.top;
     this.sunLight.shadow.camera.bottom = LIGHTING.sun.shadowCamera.bottom;
-    (this.sunLight.shadow as any).intensity = 0.15; // r155+ shadow softness
+    (this.sunLight.shadow as THREE.DirectionalLightShadow & { intensity?: number }).intensity = 0.15; // r155+ shadow softness
 
     // Pin sun light to camera controller's pivot or camera itself
     // User wants "directional light pinned to camera so all sides will be playable good"
@@ -404,12 +404,18 @@ export class Renderer {
     if (params.envMapIntensity !== undefined) {
       // Store the value and update only block materials (tagged with userData.isBlockMaterial)
       this.currentEnvMapIntensity = params.envMapIntensity;
-      this.scene.traverse((obj) => {
-        if ((obj as THREE.Mesh).isMesh && (obj as any).material) {
-          const mat = (obj as any).material;
-          if (mat.userData?.isBlockMaterial && mat.envMapIntensity !== undefined) {
-            mat.envMapIntensity = params.envMapIntensity;
-          }
+      this.scene.traverse((object: THREE.Object3D) => {
+        if (!(object instanceof THREE.Mesh)) {
+          return;
+        }
+
+        const material = object.material;
+        if (Array.isArray(material)) {
+          return;
+        }
+
+        if (material.userData?.isBlockMaterial && material.envMapIntensity !== undefined) {
+          material.envMapIntensity = params.envMapIntensity;
         }
       });
     }
@@ -480,11 +486,15 @@ export class Renderer {
 
   // Get renderer-level metrics
   public getMetrics() {
+    const performanceMemory = (window.performance as Performance & {
+      memory?: { usedJSHeapSize: number };
+    }).memory;
+
     return {
       fps: this.fps,
       meshes: this.computeMeshDraws(),
       triangles: this.computeTriangles(),
-      memory: (window.performance as any).memory ? (window.performance as any).memory.usedJSHeapSize / 1048576 : 0,
+      memory: performanceMemory ? performanceMemory.usedJSHeapSize / 1048576 : 0,
       renderTime: this.embedded ? 0 : this.lastRenderTimeMs,
     };
   }

@@ -20,6 +20,7 @@ import { BotHelperSystem } from '../systems/BotHelperSystem';
 import { AudioSystem } from '../systems/AudioSystem';
 import { UIManager } from '../ui/UIManager';
 import { DebugController } from '../ui/DebugController';
+import { ResourceManager } from '@pix3/runtime';
 import {
   BLOCK_PROPERTIES,
   BlockType,
@@ -38,9 +39,11 @@ import {
   LootCollectedEvent,
   ResourcesDroppedEvent,
 } from '../core/Types';
+import type { ClusterBlockData } from '../world/types';
 
 import { atlasManager } from '../utils/AtlasManager';
-import { ATLAS_CONFIG } from '../assets/textures';
+import { TEXTURES } from '../assets/textures';
+import { ModelManager } from '../rendering/ModelManager';
 import { useGameStore } from '../core/GameStore';
 import { gameplayConfig } from '../config/gameplay';
 
@@ -88,10 +91,10 @@ export class Game {
   private impactSparkSystem: ImpactSparkSystem;
   // lootSystem removed; unified droppable items live in resourceDropSystem
   private feedbackSystem: FeedbackSystem;
-  private resourceDropSystem: any;
+  private resourceDropSystem: import('../systems/DroppableItemsSystem').DroppableItemsSystem | null;
   private clusterSystem: ClusterSystem;
-  private inventoryUISystem: InventoryUISystem;
-  private avatarUISystem: AvatarUISystem;
+  private inventoryUISystem: InventoryUISystem | null;
+  private avatarUISystem: AvatarUISystem | null;
   private wallPlaneSystem: WallPlaneSystem;
   private depthMarkerSystem: DepthMarkerSystem;
   private botHelperSystem: BotHelperSystem;
@@ -126,6 +129,11 @@ export class Game {
   private isPaused: boolean = false;
 
   constructor(options?: GameOptions) {
+    const baseUrl = import.meta.env.BASE_URL || '/';
+    const resourceManager = new ResourceManager(baseUrl);
+    atlasManager.setResourceManager(resourceManager);
+    ModelManager.getInstance().setResourceManager(resourceManager);
+
     // Initialize renderer (embedded or standalone)
     this.renderer = new Renderer(options?.renderer);
     this.physicsWorld = new PhysicsWorld();
@@ -145,9 +153,9 @@ export class Game {
     this.resourceDropSystem = null;
     this.clusterSystem = new ClusterSystem(this.renderer.scene, this.voxelWorld);
     
-    // UI systems will be initialized in init() after texture atlas is loaded
-    this.inventoryUISystem = null as any;
-    this.avatarUISystem = null as any;
+    // UI systems will be initialized in init() after sprite textures are loaded
+    this.inventoryUISystem = null;
+    this.avatarUISystem = null;
 
     this.wallPlaneSystem = new WallPlaneSystem(this.renderer.scene);
     this.depthMarkerSystem = new DepthMarkerSystem(this.renderer.scene);
@@ -257,7 +265,7 @@ export class Game {
       }
     });
     // Handle cluster landing - wake up droppables
-    onGameEvent<{ blocks: any[], landingY: number }>(GameEvents.CLUSTER_LANDED, (data) => {
+    onGameEvent<{ blocks: ClusterBlockData[]; landingY: number }>(GameEvents.CLUSTER_LANDED, (data) => {
       this.audioSystem.handleClusterLanded(data.blocks.length);
       if (this.resourceDropSystem && this.resourceDropSystem.wakeDroppablesInColumn) {
         // Wake up droppables in columns where blocks landed
@@ -336,8 +344,19 @@ export class Game {
   async init(): Promise<void> {
     const embedded = this.renderer.embedded;
 
-    this.uiManager.setLoadingProgress(5, 'Loading atlas...');
-    await atlasManager.loadAtlas(ATLAS_CONFIG.game.image, ATLAS_CONFIG.game.json);
+    this.uiManager.setLoadingProgress(5, 'Loading sprites...');
+    await atlasManager.loadAtlas([
+      TEXTURES.inventory_bg,
+      TEXTURES.items.axe,
+      TEXTURES.items.shovel,
+      TEXTURES.items.jackhammer,
+      TEXTURES.avatar,
+      TEXTURES.droppables.gold,
+      TEXTURES.droppables.stone,
+      TEXTURES.droppables.iron,
+      TEXTURES.droppables.diamond,
+      TEXTURES.droppables.gem,
+    ]);
     
     // Initialize UI systems after atlas is loaded (skip in embedded mode — no WebGLRenderer)
     if (!embedded) {
@@ -1256,15 +1275,17 @@ export class Game {
     this.particleSystem.dispose();
     this.impactSparkSystem.dispose();
     this.botHelperSystem.dispose();
-    if (this.resourceDropSystem && this.resourceDropSystem.dispose) {
+    if (this.resourceDropSystem) {
       this.resourceDropSystem.dispose();
     }
     this.feedbackSystem.dispose();
-    this.inventoryUISystem.dispose();
-    this.avatarUISystem.dispose();
+    this.inventoryUISystem?.dispose();
+    this.avatarUISystem?.dispose();
     this.wallPlaneSystem.dispose();
     this.uiManager.dispose();
     this.debugController.dispose();
+    atlasManager.dispose();
+    ModelManager.getInstance().dispose();
 
     window.removeEventListener('upgrade:purchased', this.handleUpgrade.bind(this));
   }

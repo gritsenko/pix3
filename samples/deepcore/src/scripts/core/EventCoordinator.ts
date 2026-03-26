@@ -7,6 +7,7 @@ import {
   BlockPlacedEvent,
   GameEventType,
 } from './Types';
+import type { ClusterBlockData } from '../world/types';
 
 export type EventHandler<T> = (detail: T) => void;
 
@@ -80,7 +81,7 @@ export class EventCoordinator {
     return this.subscribe(GameEvents.STABILITY_CHECK, handler);
   }
 
-  onClusterLanded(handler: EventHandler<{ blocks: any[]; landingY: number }>): () => void {
+  onClusterLanded(handler: EventHandler<{ blocks: ClusterBlockData[]; landingY: number }>): () => void {
     return this.subscribe(GameEvents.CLUSTER_LANDED, handler);
   }
 

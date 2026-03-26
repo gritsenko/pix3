@@ -22,7 +22,7 @@ export const renderingConfig: RenderingFullConfig = {
     shadowMapEnabled: true,
     clusterShadows: false,
     droppableShadows: false,
-    shadowMapType: "PCFSoftShadowMap",
+    shadowMapType: "PCFShadowMap",
     outputColorSpace: "SRGBColorSpace",
     toneMapping: "ACESFilmicToneMapping",
     toneMappingExposure: 1,

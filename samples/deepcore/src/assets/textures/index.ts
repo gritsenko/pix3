@@ -1,53 +1,41 @@
 /**
- * Centralized texture asset registry
- * Uses URL imports (Vite-compatible) for texture path resolution
+ * Centralized texture asset registry.
+ * These are direct asset URLs, not atlas frame references.
  */
 
-// Helper to get public assets path respecting subfolder deployments
-const getPublicUrl = (path: string): string => {
-  const baseUrl = import.meta.env.BASE_URL || './';
-  // Ensure we don't end up with // if path starts with /
-  const normalizedBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
-  const normalizedPath = path.startsWith('/') ? path.slice(1) : path;
-  return normalizedBase + normalizedPath;
-};
-
-// Atlas configuration
-export const ATLAS_CONFIG = {
-  game: {
-    image: getPublicUrl('textures/game_atlas.png'),
-    json: getPublicUrl('textures/game_atlas.json')
-  }
-};
+const assetUrl = (path: string): string => new URL(path, import.meta.url).href;
 
 export const TEXTURES = {
-  // Background - Using new URL() directly with string literals so Vite can analyze and bundle them
-  backGradient: new URL('./back_gradient.jpg', import.meta.url).href,
+  // Background
+  backGradient: assetUrl('./back_gradient.jpg'),
 
   // Environment map for reflections/ambient
-  envMap: getPublicUrl('textures/env.jpg'),
+  envMap: assetUrl('./background.jpg'),
+
+  // Shared color lookup texture for block materials
+  colormap: new URL('../models/colormap.png', import.meta.url).href,
 
 
   // Walls
-  wallTexture: new URL('./wall_texture.jpg', import.meta.url).href,
-  wallNormal: new URL('./wall_normal.jpg', import.meta.url).href,
+  wallTexture: assetUrl('./wall_texture.jpg'),
+  wallNormal: assetUrl('./wall_normal.jpg'),
 
-  // UI (from atlas)
-  inventory_bg: new URL('./ui/inventory.jpg', import.meta.url).href, // JPG not in atlas
+  // UI
+  inventory_bg: assetUrl('./ui/inventory.jpg'),
   items: {
-    axe: 'ui/item_axe.png',
-    shovel: 'ui/item_showel.png',
-    jackhammer: 'ui/item_jackhammer.png',
+    axe: assetUrl('./ui/item_axe.png'),
+    shovel: assetUrl('./ui/item_showel.png'),
+    jackhammer: assetUrl('./ui/item_jackhammer.png'),
   },
-  avatar: 'avatar.png',
+  avatar: assetUrl('./avatar.png'),
 
-  // Droppable items (from atlas)
+  // Droppable items
   droppables: {
-    gold: 'gold_1.png',
-    stone: 'stone_1.png',
-    iron: 'stone_3.png',
-    diamond: 'stone_5.png',
-    gem: 'gem_1.png',
+    gold: assetUrl('./gold_1.png'),
+    stone: assetUrl('./stone_1.png'),
+    iron: assetUrl('./stone_3.png'),
+    diamond: assetUrl('./stone_5.png'),
+    gem: assetUrl('./stone_6.png'),
   },
 };
 
