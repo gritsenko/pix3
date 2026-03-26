@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Cluster, ClusterBlock, BlockType, BLOCK_PROPERTIES, GameEvents, emitGameEvent } from '../core/Types';
+import { type Cluster, type ClusterBlock, BlockType, BLOCK_PROPERTIES, GameEvents, emitGameEvent } from '../core/Types';
 import { RENDERER } from '../config';
 import { VoxelWorld } from '../world';
 import { physicsConfig } from '../config/physics';

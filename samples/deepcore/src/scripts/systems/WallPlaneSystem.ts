@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { GRID, WALL_PLANES } from '../config';
-import { ISystem } from '../core/ISystem';
+import { type ISystem } from '../core/ISystem';
 import { ModelManager } from '../rendering/ModelManager';
 
 /**

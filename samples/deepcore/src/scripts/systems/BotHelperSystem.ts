@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { ISystem } from '../core/ISystem';
-import { BotEntity, BotConfig, BotState, BotStateType, BlockType, GRID } from '../core/Types';
+import { type ISystem } from '../core/ISystem';
+import { type BotEntity, type BotConfig, type BotState, BotStateType, BlockType, GRID } from '../core/Types';
 import { VoxelWorld } from '../world';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { ToolSystem } from './ToolSystem';

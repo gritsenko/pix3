@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ObjectPool, PoolConfig } from './ObjectPool';
+import { ObjectPool, type PoolConfig } from './ObjectPool';
 
 export interface SpritePoolConfig extends PoolConfig {
   renderOrder?: number;

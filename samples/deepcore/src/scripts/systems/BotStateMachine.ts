@@ -1,7 +1,7 @@
 import {
   BotStateType,
-  BotEntity,
-  BotConfig,
+  type BotEntity,
+  type BotConfig,
   BlockType,
   GameEvents,
   emitGameEvent,

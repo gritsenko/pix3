@@ -1,10 +1,10 @@
-import { BlocksConfig } from './types';
-import blockDirtUrl from '../assets/models/blockdirt.glb?url';
-import blockStoneUrl from '../assets/models/blockstone.glb?url';
-import blockIronUrl from '../assets/models/blockiron.glb?url';
-import blockGoldUrl from '../assets/models/blockgold.glb?url';
-import blockSilverUrl from '../assets/models/blocksilver.glb?url';
-import blockDiamondUrl from '../assets/models/blockdiamond.glb?url';
+import { type BlocksConfig } from './types';
+import blockDirtUrl from '../../assets/models/blockdirt.glb?url';
+import blockStoneUrl from '../../assets/models/blockstone.glb?url';
+import blockIronUrl from '../../assets/models/blockiron.glb?url';
+import blockGoldUrl from '../../assets/models/blockgold.glb?url';
+import blockSilverUrl from '../../assets/models/blocksilver.glb?url';
+import blockDiamondUrl from '../../assets/models/blockdiamond.glb?url';
 
 export const blocksConfig: BlocksConfig = {
   // Типы блоков и их идентификаторы

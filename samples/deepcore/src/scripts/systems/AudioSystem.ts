@@ -1,4 +1,4 @@
-import { ISystem } from '../core/ISystem';
+import { type ISystem } from '../core/ISystem';
 import { AUDIO, AUDIO_CUES } from '../config';
 import {
   getBreakCueForBlock,
@@ -7,13 +7,13 @@ import {
   type AudioCueId,
 } from '../config/audio';
 import {
-  BlockDamagedEvent,
-  BlockDestroyedEvent,
-  BotStateChangedEvent,
+  type BlockDamagedEvent,
+  type BlockDestroyedEvent,
+  type BotStateChangedEvent,
   BotStateType,
   BlockType,
-  LootCollectedEvent,
-  ResourcesDroppedEvent,
+  type LootCollectedEvent,
+  type ResourcesDroppedEvent,
 } from '../core/Types';
 
 type AudioContextCtor = typeof AudioContext;

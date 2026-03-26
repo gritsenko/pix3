@@ -6,12 +6,12 @@ import {
   UNSTABLE_BLOCKS,
   emitGameEvent,
   GameEvents,
-  BlockDamagedEvent,
-  BlockDestroyedEvent,
-  DamageSource,
+  type BlockDamagedEvent,
+  type BlockDestroyedEvent,
+  type DamageSource,
 } from '../core/Types';
 import { VoxelDataStore } from './VoxelDataStore';
-import { VoxelData, DamageResult, ClusterBlockData } from './types';
+import { type VoxelData, type DamageResult, type ClusterBlockData } from './types';
 
 /**
  * Facade for game systems to interact with voxel world

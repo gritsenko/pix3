@@ -1,5 +1,5 @@
-import { GameplayFullConfig } from './types';
-import { TEXTURES } from '../assets/textures';
+import { type GameplayFullConfig } from './types';
+import { TEXTURES } from '../../assets/textures';
 
 export interface ItemConfig {
   sprite: string;

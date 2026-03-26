@@ -1,4 +1,4 @@
-import { MiningConfig } from '../config/types';
+import { type MiningConfig } from '../config/types';
 
 export interface MiningStats {
   damageMultiplier: number;

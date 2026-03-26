@@ -1,11 +1,11 @@
 import {
   GameEvents,
   onGameEvent,
-  BlockDestroyedEvent,
-  BlockDamagedEvent,
-  BlockFallingEvent,
-  BlockPlacedEvent,
-  GameEventType,
+  type BlockDestroyedEvent,
+  type BlockDamagedEvent,
+  type BlockFallingEvent,
+  type BlockPlacedEvent,
+  type GameEventType,
 } from './Types';
 import type { ClusterBlockData } from '../world/types';
 

@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { ToolType, GameEvents, onGameEvent } from '../core/Types';
 import { useGameStore } from '../core/GameStore';
-import { ISystem } from '../core/ISystem';
-import { TEXTURES } from '../assets/textures';
+import { type ISystem } from '../core/ISystem';
+import { TEXTURES } from '../../assets/textures';
 import { assetDiagnostics } from '../utils/AssetDiagnostics';
 import { atlasManager } from '../utils/AtlasManager';
 

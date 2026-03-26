@@ -1,5 +1,5 @@
 import { BlockType, BLOCK_PROPERTIES, GRID, EXPOSURE } from '../core/Types';
-import { VoxelData, voxelKey, NEIGHBOR_OFFSETS, SIDE_OFFSETS } from './types';
+import { type VoxelData, voxelKey, NEIGHBOR_OFFSETS, SIDE_OFFSETS } from './types';
 import { BLOCK_DROPPED_ITEMS } from '../config/blocks';
 
 const MAX_EXPOSURE_DISTANCE = EXPOSURE.maxDistance;

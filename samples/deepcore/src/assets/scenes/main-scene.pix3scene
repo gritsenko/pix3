@@ -13,7 +13,7 @@ root:
         rotationEuler: [0, 0, 0]
         scale: [1, 1, 1]
     components:
-      - id: user:DeepCoreRunner-main
+      - id: user:DeepCoreRunner-1774521666360-4hxy8r7
         type: user:DeepCoreRunner
         enabled: true
     children:
@@ -35,14 +35,14 @@ root:
         name: Sun Light
         properties:
           intensity: 1.5
-          color: "#ffdab8"
+          color: "#ffb37a"
+          castShadow: true
+          shadowCameraSize: 20
+          shadowMapSize: 2048
           transform:
             position: [10, 20, 10]
             rotationEuler: [-45, 35, 0]
             scale: [1, 1, 1]
-          castShadow: true
-          shadowCameraSize: 20
-          shadowMapSize: 2048
         children: []
       - id: box-1774482285392-1qfl8pd
         type: GeometryMesh

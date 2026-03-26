@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { BotEntity, BotConfig, BotStateType } from '../core/Types';
+import { type BotEntity, type BotConfig, BotStateType } from '../core/Types';
 import { ModelManager } from './ModelManager';
 
 export class BotRenderer {

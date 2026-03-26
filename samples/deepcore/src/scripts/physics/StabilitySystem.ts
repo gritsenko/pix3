@@ -1,4 +1,4 @@
-import { VoxelWorld, VoxelData } from "../world";
+import { VoxelWorld, type VoxelData } from "../world";
 import { BlockType } from "../core/Types";
 
 export interface UnstableBlock {

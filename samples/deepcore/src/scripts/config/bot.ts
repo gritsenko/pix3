@@ -1,5 +1,5 @@
-import { BotConfig } from '../core/Types';
-import vacubotUrl from '../assets/models/vacubot.glb?url';
+import { type BotConfig } from '../core/Types';
+import vacubotUrl from '../../assets/models/vacubot.glb?url';
 
 export const botConfig: BotConfig = {
   // Navigation and movement settings

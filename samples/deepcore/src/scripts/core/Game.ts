@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { Renderer, RendererOptions } from '../rendering/Renderer';
+import { Renderer, type RendererOptions } from '../rendering/Renderer';
 import { InputManager } from '../input/InputManager';
-import { VoxelWorld, VoxelData } from '../world';
+import { VoxelWorld, type VoxelData } from '../world';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { StabilitySystem } from '../physics/StabilitySystem';
 import { ToolSystem } from '../systems/ToolSystem';
@@ -31,18 +31,18 @@ import {
   GameEvents,
   onGameEvent,
   // ResourceSettledEvent,
-  BlockDestroyedEvent,
-  BlockDamagedEvent,
-  BlockFallingEvent,
-  BlockPlacedEvent,
-  BotStateChangedEvent,
-  LootCollectedEvent,
-  ResourcesDroppedEvent,
+  type BlockDestroyedEvent,
+  type BlockDamagedEvent,
+  type BlockFallingEvent,
+  type BlockPlacedEvent,
+  type BotStateChangedEvent,
+  type LootCollectedEvent,
+  type ResourcesDroppedEvent,
 } from '../core/Types';
 import type { ClusterBlockData } from '../world/types';
 
 import { atlasManager } from '../utils/AtlasManager';
-import { TEXTURES } from '../assets/textures';
+import { TEXTURES } from '../../assets/textures';
 import { ModelManager } from '../rendering/ModelManager';
 import { useGameStore } from '../core/GameStore';
 import { gameplayConfig } from '../config/gameplay';
@@ -78,6 +78,8 @@ interface QueuedExplosion {
 export interface GameOptions {
   /** Pass renderer options to enable embedded mode (external scene from pix3). */
   renderer?: RendererOptions;
+  /** Pass engine resource manager for project file access. */
+  resourceManager?: ResourceManager;
 }
 
 export class Game {
@@ -130,7 +132,7 @@ export class Game {
 
   constructor(options?: GameOptions) {
     const baseUrl = import.meta.env.BASE_URL || '/';
-    const resourceManager = new ResourceManager(baseUrl);
+    const resourceManager = options?.resourceManager || new ResourceManager(baseUrl);
     atlasManager.setResourceManager(resourceManager);
     ModelManager.getInstance().setResourceManager(resourceManager);
 
@@ -168,9 +170,9 @@ export class Game {
     this.audioSystem = new AudioSystem(useGameStore.getState().soundEnabled);
     this.uiManager = new UIManager();
     this.debugController = new DebugController(
-      () => this.renderer.getLightParams(),
+      () => this.renderer.getLightParams() as any,
       (params) => {
-        this.renderer.setLightParams(params);
+        this.renderer.setLightParams(params as any);
       },
       () => this.toggleDebugVisuals(),
       (v: boolean) => {
@@ -527,7 +529,7 @@ export class Game {
 
     // Update inventory UI
     measurePhase('inventoryUI', () => {
-      this.inventoryUISystem.update();
+      this.inventoryUISystem?.update();
     });
 
     // Update stability recovery
@@ -719,7 +721,7 @@ export class Game {
     this.lastPointerY = screenY;
 
     // Check if clicking on inventory UI first - if so, don't process block interactions
-    const inventoryIntercepted = this.inventoryUISystem.handlePointerClick(screenX, screenY);
+    const inventoryIntercepted = this.inventoryUISystem?.handlePointerClick(screenX, screenY);
     if (inventoryIntercepted) return;
 
     // Create/update pointer interaction state
@@ -745,7 +747,7 @@ export class Game {
     // Try to collect hovered resource
     const hoveredResource = this.resourceDropSystem ? this.resourceDropSystem.getHoveredResource() : null;
     if (hoveredResource) {
-      this.resourceDropSystem.collectResource(hoveredResource);
+      this.resourceDropSystem?.collectResource(hoveredResource);
       this.particleSystem.spawnCollectSparkle(
         hoveredResource.sprite.position.x,
         hoveredResource.sprite.position.y,
@@ -968,7 +970,7 @@ export class Game {
       );
 
       const chunkId = this.voxelWorld.getChunkId(hitBlock.y);
-      this.uiManager.updateBlockDebugInfo(hitBlock, chunkId);
+      this.uiManager.updateBlockDebugInfo(hitBlock, chunkId.toString());
     } else {
       if (this.hoveredBlock) {
         this.voxelWorld.resetBlockColor(this.hoveredBlock.x, this.hoveredBlock.y, this.hoveredBlock.z);

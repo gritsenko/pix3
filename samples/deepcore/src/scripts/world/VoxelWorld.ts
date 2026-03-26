@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { BlockType, GRID, DamageSource } from '../core/Types';
+import { BlockType, GRID, type DamageSource } from '../core/Types';
 import { VoxelDataStore } from './VoxelDataStore';
 import { VoxelWorldProxy } from './VoxelWorldProxy';
 import { WorldGenerator } from './WorldGenerator';
 import { VoxelRenderer } from '../rendering/VoxelRenderer';
-import { VoxelData, ClusterBlockData, DamageResult } from './types';
+import { type VoxelData, type ClusterBlockData, type DamageResult } from './types';
 import { getExposureBrightness } from './exposure';
 
 /**

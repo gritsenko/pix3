@@ -1,5 +1,5 @@
-import { RenderingFullConfig, ExposureConfig } from './types';
-import wallTileUrl from '../assets/models/walltile.glb?url';
+import { type RenderingFullConfig, type ExposureConfig } from './types';
+import wallTileUrl from '../../assets/models/walltile.glb?url';
 
 export const renderingConfig: RenderingFullConfig = {
   camera: {

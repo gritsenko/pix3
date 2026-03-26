@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { PhysicsWorld, PhysicsBody } from '../physics/PhysicsWorld';
+import { PhysicsWorld, type PhysicsBody } from '../physics/PhysicsWorld';
 import { VoxelWorld } from '../world';
-import { GameEvents, onGameEvent, emitGameEvent, BlockDestroyedEvent, BlockType } from '../core/Types';
+import { GameEvents, onGameEvent, emitGameEvent, type BlockDestroyedEvent, BlockType } from '../core/Types';
 import { RENDERER } from '../config';
 import { useGameStore } from '../core/GameStore';
 import { ADRENALINE_CONFIG, DROPPABLE_EMBEDDING_RULES, DROPPABLE_ITEMS } from '../config/gameplay';

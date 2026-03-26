@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { BlockType, BLOCK_PROPERTIES, GRID, BLOCK_RENDERING, UNSTABLE_BLOCKS } from '../core/Types';
 import { VoxelDataStore } from '../world/VoxelDataStore';
 
-import { VoxelData, voxelKey, getBlockRotationAngles } from '../world/types';
+import { type VoxelData, voxelKey, getBlockRotationAngles } from '../world/types';
 import { getExposureBrightness } from '../world/exposure';
 import { ModelManager } from './ModelManager';
 

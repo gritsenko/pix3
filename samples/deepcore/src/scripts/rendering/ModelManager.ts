@@ -7,7 +7,7 @@ import { assetDiagnostics } from '../utils/AssetDiagnostics';
 import { botConfig } from '../config/bot';
 import { WALL_PLANES } from '../config';
 import { createBlockMaterial } from './BlockShader';
-import { TEXTURES } from '../assets/textures';
+import { TEXTURES } from '../../assets/textures';
 
 export interface BlockRenderResources {
     geometry: THREE.BufferGeometry;

@@ -1,6 +1,6 @@
 import RAPIER from '@dimforge/rapier3d-compat';
 import * as THREE from 'three';
-import { VoxelData } from '../world';
+import { type VoxelData } from '../world';
 import { PHYSICS } from '../config';
 import { BLOCK_PROPERTIES, GRID } from '../core/Types';
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { VoxelWorld } from '../world';
-import { BotEntity, BotConfig, BlockType, GRID } from '../core/Types';
+import { type BotEntity, type BotConfig, BlockType, GRID } from '../core/Types';
 
 type PathNode = {
   pos: THREE.Vector3;

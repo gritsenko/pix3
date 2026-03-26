@@ -1,4 +1,4 @@
-import { PhysicsFullConfig } from './types';
+import { type PhysicsFullConfig } from './types';
 
 export const physicsConfig: PhysicsFullConfig = {
   physics: {

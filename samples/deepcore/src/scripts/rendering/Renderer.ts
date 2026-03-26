@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { CameraController } from './CameraController';
 import { RENDERER, LIGHTING, BLOCK_RENDERING } from '../config';
-import { TEXTURES } from '../assets/textures';
+import { TEXTURES } from '../../assets/textures';
 import { assetDiagnostics } from '../utils/AssetDiagnostics';
 
 export interface RendererOptions {

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { ISystem } from '../core/ISystem';
-import { TEXTURES } from '../assets/textures';
+import { type ISystem } from '../core/ISystem';
+import { TEXTURES } from '../../assets/textures';
 import { atlasManager } from '../utils/AtlasManager';
 
 export class AvatarUISystem implements ISystem {

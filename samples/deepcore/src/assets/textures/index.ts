@@ -3,39 +3,37 @@
  * These are direct asset URLs, not atlas frame references.
  */
 
-const assetUrl = (path: string): string => new URL(path, import.meta.url).href;
-
 export const TEXTURES = {
   // Background
-  backGradient: assetUrl('./back_gradient.jpg'),
+  backGradient: new URL('./back_gradient.jpg', import.meta.url).href,
 
   // Environment map for reflections/ambient
-  envMap: assetUrl('./background.jpg'),
+  envMap: new URL('./background.jpg', import.meta.url).href,
 
   // Shared color lookup texture for block materials
   colormap: new URL('../models/colormap.png', import.meta.url).href,
 
 
   // Walls
-  wallTexture: assetUrl('./wall_texture.jpg'),
-  wallNormal: assetUrl('./wall_normal.jpg'),
+  wallTexture: new URL('./wall_texture.jpg', import.meta.url).href,
+  wallNormal: new URL('./wall_normal.jpg', import.meta.url).href,
 
   // UI
-  inventory_bg: assetUrl('./ui/inventory.jpg'),
+  inventory_bg: new URL('./ui/inventory.jpg', import.meta.url).href,
   items: {
-    axe: assetUrl('./ui/item_axe.png'),
-    shovel: assetUrl('./ui/item_showel.png'),
-    jackhammer: assetUrl('./ui/item_jackhammer.png'),
+    axe: new URL('./ui/item_axe.png', import.meta.url).href,
+    shovel: new URL('./ui/item_showel.png', import.meta.url).href,
+    jackhammer: new URL('./ui/item_jackhammer.png', import.meta.url).href,
   },
-  avatar: assetUrl('./avatar.png'),
+  avatar: new URL('./avatar.png', import.meta.url).href,
 
   // Droppable items
   droppables: {
-    gold: assetUrl('./gold_1.png'),
-    stone: assetUrl('./stone_1.png'),
-    iron: assetUrl('./stone_3.png'),
-    diamond: assetUrl('./stone_5.png'),
-    gem: assetUrl('./stone_6.png'),
+    gold: new URL('./gold_1.png', import.meta.url).href,
+    stone: new URL('./stone_1.png', import.meta.url).href,
+    iron: new URL('./stone_3.png', import.meta.url).href,
+    diamond: new URL('./stone_5.png', import.meta.url).href,
+    gem: new URL('./stone_6.png', import.meta.url).href,
   },
 };
 

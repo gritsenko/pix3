@@ -44,6 +44,7 @@ export class DeepCoreRunner extends Script {
     // Create Game in embedded mode — the pix3 node acts as the scene root
     this.game = new Game({
       renderer: { externalParent: this.node, shadowsEnabled: true },
+      resourceManager: (this.scene as any)?.getAssetLoader()?.resources,
     });
 
     // init() is async (physics WASM, atlas loading) — run it and mark ready when done

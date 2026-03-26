@@ -9,7 +9,7 @@ import {
   emitGameEvent,
 } from '../core/Types';
 import { useGameStore, getTotalDamageMultiplier } from '../core/GameStore';
-import { VoxelWorld, VoxelData } from '../world';
+import { VoxelWorld, type VoxelData } from '../world';
 import { HapticSystem } from './HapticSystem';
 import { GAMEPLAY_CONFIG } from '../config';
 import { calculateMiningStats } from '../utils/MiningCalculator';

@@ -1,4 +1,4 @@
-import { VoxelData } from '../world';
+import { type VoxelData } from '../world';
 import { TOOL_PROPERTIES } from '../config';
 import { ToolType } from './Types';
 

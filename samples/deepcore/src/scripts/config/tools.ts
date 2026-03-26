@@ -1,4 +1,4 @@
-import { ToolsConfig } from './types';
+import { type ToolsConfig } from './types';
 
 export const toolsConfig: ToolsConfig = {
   // Список доступных инструментов
