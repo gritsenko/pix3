@@ -144,6 +144,8 @@ export class InspectorPanel extends ComponentBase {
     { width: number; height: number; size: number }
   >();
   private readonly texturePreviewLoads = new Set<string>();
+  private readonly propertyPreviewStartValues = new Map<string, unknown>();
+  private readonly componentPropertyPreviewStartValues = new Map<string, unknown>();
 
   connectedCallback() {
     super.connectedCallback();
@@ -282,6 +284,7 @@ export class InspectorPanel extends ComponentBase {
   }
 
   private updateSelectedNodes(): void {
+    const previousPrimaryNodeId = this.primaryNode?.nodeId ?? null;
     const { nodeIds, primaryNodeId } = appState.selection;
     const activeSceneId = appState.scenes.activeSceneId;
 
@@ -316,12 +319,17 @@ export class InspectorPanel extends ComponentBase {
         ? this.selectedNodes[0]
         : null;
 
+    const nextPrimaryNodeId = this.primaryNode?.nodeId ?? null;
+    if (previousPrimaryNodeId !== nextPrimaryNodeId) {
+      this.propertyPreviewStartValues.clear();
+      this.componentPropertyPreviewStartValues.clear();
+    }
+
     // Reset animation preview when selection changes
-    const prevPrimaryId = this.primaryNode?.nodeId;
     const newPrimaryId = primaryNodeId ?? nodeIds[0] ?? null;
-    if (prevPrimaryId !== newPrimaryId && this.activePreviewAnimation !== null) {
-      if (prevPrimaryId) {
-        this.viewportService.setPreviewAnimation(prevPrimaryId, null);
+    if (previousPrimaryNodeId !== newPrimaryId && this.activePreviewAnimation !== null) {
+      if (previousPrimaryNodeId) {
+        this.viewportService.setPreviewAnimation(previousPrimaryNodeId, null);
       }
       this.activePreviewAnimation = null;
     }
@@ -348,6 +356,8 @@ export class InspectorPanel extends ComponentBase {
       this.propertyValues = {};
       this.componentPropertyValues = {};
       this.expandedComponentIds = [];
+      this.propertyPreviewStartValues.clear();
+      this.componentPropertyPreviewStartValues.clear();
       return;
     }
 
@@ -624,9 +634,8 @@ export class InspectorPanel extends ComponentBase {
       [propName]: { value: rawValue, isValid },
     };
 
-    // Apply if valid and node selected
-    if (isValid && this.primaryNode && this.propertySchema) {
-      await this.applyPropertyChange(propName, parsedValue);
+    if (isValid) {
+      await this.previewPropertyChange(propName, parsedValue);
     }
   }
 
@@ -647,12 +656,129 @@ export class InspectorPanel extends ComponentBase {
       [propName]: { value, isValid: true },
     };
 
-    if (this.primaryNode && this.propertySchema) {
-      await this.applyPropertyChange(propName, value);
+    await this.commitPropertyChange(propName, value);
+  }
+
+  private normalizeColorValue(value: string): string | null {
+    const normalized = value.trim().toLowerCase();
+    const hexMatch = normalized.match(/^#([0-9a-f]{3}|[0-9a-f]{6})$/i);
+    if (!hexMatch) {
+      return null;
+    }
+
+    const hex = hexMatch[1];
+    if (hex.length === 3) {
+      return `#${hex
+        .split('')
+        .map(char => `${char}${char}`)
+        .join('')}`;
+    }
+
+    return `#${hex}`;
+  }
+
+  private getColorPickerValue(rawValue: string): string {
+    return this.normalizeColorValue(rawValue) ?? '#ffffff';
+  }
+
+  private async handleColorPickerInput(propName: string, nextColor: string): Promise<void> {
+    const normalized = this.normalizeColorValue(nextColor);
+    if (!normalized) {
+      return;
+    }
+
+    this.propertyValues = {
+      ...this.propertyValues,
+      [propName]: { value: normalized, isValid: true },
+    };
+
+    await this.previewPropertyChange(propName, normalized);
+  }
+
+  private async handleColorPickerCommit(propName: string, nextColor: string): Promise<void> {
+    const normalized = this.normalizeColorValue(nextColor);
+    if (!normalized) {
+      return;
+    }
+
+    this.propertyValues = {
+      ...this.propertyValues,
+      [propName]: { value: normalized, isValid: true },
+    };
+
+    await this.commitPropertyChange(propName, normalized);
+  }
+
+  private async handleSliderPreview(propName: string, nextValue: number): Promise<void> {
+    this.propertyValues = {
+      ...this.propertyValues,
+      [propName]: { value: String(nextValue), isValid: true },
+    };
+
+    await this.previewPropertyChange(propName, nextValue);
+  }
+
+  private async handleSliderCommit(propName: string, nextValue: number): Promise<void> {
+    this.propertyValues = {
+      ...this.propertyValues,
+      [propName]: { value: String(nextValue), isValid: true },
+    };
+
+    await this.commitPropertyChange(propName, nextValue);
+  }
+
+  private async previewPropertyChange(propertyName: string, value: unknown): Promise<void> {
+    if (!this.primaryNode || !this.propertySchema) {
+      return;
+    }
+
+    const propDef = this.propertySchema.properties.find(p => p.name === propertyName);
+    if (!propDef) {
+      return;
+    }
+
+    if (!this.propertyPreviewStartValues.has(propertyName)) {
+      this.propertyPreviewStartValues.set(propertyName, propDef.getValue(this.primaryNode));
+    }
+
+    const command = new UpdateObjectPropertyCommand({
+      nodeId: this.primaryNode.nodeId,
+      propertyPath: propertyName,
+      value,
+      historyMode: 'preview',
+    });
+
+    try {
+      await this.commandDispatcher.execute(command);
+    } catch (error) {
+      console.error('[InspectorPanel] Failed to preview property', propertyName, error);
+      const displayValue = getPropertyDisplayValue(this.primaryNode, propDef);
+      this.propertyValues = {
+        ...this.propertyValues,
+        [propertyName]: { value: displayValue, isValid: true },
+      };
+      this.propertyPreviewStartValues.delete(propertyName);
     }
   }
 
-  private async applyPropertyChange(propertyName: string, value: unknown) {
+  private async commitPropertyChange(propertyName: string, value: unknown): Promise<void> {
+    if (!this.primaryNode || !this.propertySchema) {
+      return;
+    }
+
+    const hasPreviousValueOverride = this.propertyPreviewStartValues.has(propertyName);
+    const previousValue = this.propertyPreviewStartValues.get(propertyName);
+    this.propertyPreviewStartValues.delete(propertyName);
+
+    await this.applyPropertyChange(propertyName, value, previousValue, hasPreviousValueOverride);
+  }
+
+  private async applyPropertyChange(
+    propertyName: string,
+    value: unknown,
+    previousValue?: unknown,
+    hasPreviousValueOverride: boolean = false
+  ) {
     if (!this.primaryNode || !this.propertySchema) return;
 
     // Find the property definition
@@ -663,6 +789,8 @@ export class InspectorPanel extends ComponentBase {
       nodeId: this.primaryNode.nodeId,
       propertyPath: propertyName,
       value,
+      ...(hasPreviousValueOverride ? { previousValue } : {}),
+      historyMode: 'commit',
     });
 
     try {
@@ -723,7 +851,7 @@ export class InspectorPanel extends ComponentBase {
     };
 
     if (isValid) {
-      await this.applyComponentPropertyChange(componentId, prop, parsedValue);
+      await this.previewComponentPropertyChange(componentId, prop, parsedValue);
     }
   }
 
@@ -747,13 +875,140 @@ export class InspectorPanel extends ComponentBase {
       [key]: { value, isValid: true },
     };
 
-    await this.applyComponentPropertyChange(componentId, prop, value);
+    await this.commitComponentPropertyChange(componentId, prop, value);
+  }
+
+  private async previewComponentPropertyChange(
+    componentId: string,
+    propDef: PropertyDefinition,
+    value: unknown
+  ): Promise<void> {
+    if (!this.primaryNode) return;
+
+    const component = this.primaryNode.components.find(c => c.id === componentId);
+    if (!component) {
+      return;
+    }
+
+    const key = this.getComponentPropertyKey(componentId, propDef.name);
+    if (!this.componentPropertyPreviewStartValues.has(key)) {
+      this.componentPropertyPreviewStartValues.set(key, propDef.getValue(component));
+    }
+
+    const command = new UpdateComponentPropertyCommand({
+      nodeId: this.primaryNode.nodeId,
+      componentId,
+      propertyName: propDef.name,
+      value,
+      historyMode: 'preview',
+    });
+
+    try {
+      await this.commandDispatcher.execute(command);
+    } catch (error) {
+      console.error('[InspectorPanel] Failed to preview component property', propDef.name, error);
+      this.componentPropertyValues = {
+        ...this.componentPropertyValues,
+        [key]: {
+          value: this.getPropertyDisplayValue(component, propDef),
+          isValid: true,
+        },
+      };
+      this.componentPropertyPreviewStartValues.delete(key);
+    }
+  }
+
+  private async commitComponentPropertyChange(
+    componentId: string,
+    propDef: PropertyDefinition,
+    value: unknown
+  ): Promise<void> {
+    const key = this.getComponentPropertyKey(componentId, propDef.name);
+    const hasPreviousValueOverride = this.componentPropertyPreviewStartValues.has(key);
+    const previousValue = this.componentPropertyPreviewStartValues.get(key);
+    this.componentPropertyPreviewStartValues.delete(key);
+
+    await this.applyComponentPropertyChange(
+      componentId,
+      propDef,
+      value,
+      previousValue,
+      hasPreviousValueOverride
+    );
+  }
+
+  private async handleComponentSliderPreview(
+    componentId: string,
+    propDef: PropertyDefinition,
+    nextValue: number
+  ): Promise<void> {
+    const key = this.getComponentPropertyKey(componentId, propDef.name);
+    this.componentPropertyValues = {
+      ...this.componentPropertyValues,
+      [key]: { value: String(nextValue), isValid: true },
+    };
+
+    await this.previewComponentPropertyChange(componentId, propDef, nextValue);
+  }
+
+  private async handleComponentSliderCommit(
+    componentId: string,
+    propDef: PropertyDefinition,
+    nextValue: number
+  ): Promise<void> {
+    const key = this.getComponentPropertyKey(componentId, propDef.name);
+    this.componentPropertyValues = {
+      ...this.componentPropertyValues,
+      [key]: { value: String(nextValue), isValid: true },
+    };
+
+    await this.commitComponentPropertyChange(componentId, propDef, nextValue);
+  }
+
+  private async handleComponentColorPickerInput(
+    componentId: string,
+    propDef: PropertyDefinition,
+    nextColor: string
+  ): Promise<void> {
+    const normalized = this.normalizeColorValue(nextColor);
+    if (!normalized) {
+      return;
+    }
+
+    const key = this.getComponentPropertyKey(componentId, propDef.name);
+    this.componentPropertyValues = {
+      ...this.componentPropertyValues,
+      [key]: { value: normalized, isValid: true },
+    };
+
+    await this.previewComponentPropertyChange(componentId, propDef, normalized);
+  }
+
+  private async handleComponentColorPickerCommit(
+    componentId: string,
+    propDef: PropertyDefinition,
+    nextColor: string
+  ): Promise<void> {
+    const normalized = this.normalizeColorValue(nextColor);
+    if (!normalized) {
+      return;
+    }
+
+    const key = this.getComponentPropertyKey(componentId, propDef.name);
+    this.componentPropertyValues = {
+      ...this.componentPropertyValues,
+      [key]: { value: normalized, isValid: true },
+    };
+
+    await this.commitComponentPropertyChange(componentId, propDef, normalized);
   }
 
   private async applyComponentPropertyChange(
     componentId: string,
     propDef: PropertyDefinition,
-    value: unknown
+    value: unknown,
+    previousValue?: unknown,
+    hasPreviousValueOverride: boolean = false
   ): Promise<void> {
     if (!this.primaryNode) return;
 
@@ -762,6 +1017,8 @@ export class InspectorPanel extends ComponentBase {
       componentId,
       propertyName: propDef.name,
       value,
+      ...(hasPreviousValueOverride ? { previousValue } : {}),
+      historyMode: 'commit',
     });
 
     try {
@@ -1915,8 +2172,10 @@ export class InspectorPanel extends ComponentBase {
               .step=${prop.ui?.step ?? 0.01}
               .precision=${prop.ui?.precision ?? 2}
               ?disabled=${readOnly}
-              @change=${(e: CustomEvent<{ value: number }>) =>
-                this.applyComponentPropertyChange(component.id, prop, e.detail.value)}
+              @preview-change=${(e: CustomEvent<{ value: number }>) =>
+                this.handleComponentSliderPreview(component.id, prop, e.detail.value)}
+              @commit-change=${(e: CustomEvent<{ value: number }>) =>
+                this.handleComponentSliderCommit(component.id, prop, e.detail.value)}
             ></pix3-slider-number-editor>
           </div>
         `;
@@ -1936,6 +2195,45 @@ export class InspectorPanel extends ComponentBase {
             @input=${(e: Event) => this.handleComponentPropertyInput(component.id, prop, e)}
             @blur=${(e: Event) => this.handleComponentPropertyBlur(component.id, prop, e)}
           />
+        </div>
+      `;
+    }
+
+    if (prop.type === 'color') {
+      const pickerValue = this.getColorPickerValue(state.value);
+
+      return html`
+        <div class="property-group component-property-group">
+          <span class="property-label">${label}</span>
+          <div class="property-color-editor">
+            <input
+              type="color"
+              class="property-color-picker"
+              .value=${pickerValue}
+              ?disabled=${readOnly}
+              @input=${(e: Event) =>
+                this.handleComponentColorPickerInput(
+                  component.id,
+                  prop,
+                  (e.target as HTMLInputElement).value
+                )}
+              @change=${async (e: Event) => {
+                const input = e.target as HTMLInputElement;
+                await this.handleComponentColorPickerCommit(component.id, prop, input.value);
+                input.blur();
+              }}
+            />
+            <input
+              type="text"
+              class="property-input property-input--text ${state.isValid
+                ? ''
+                : 'property-input--invalid'}"
+              .value=${state.value}
+              ?disabled=${readOnly}
+              @input=${(e: Event) => this.handleComponentPropertyInput(component.id, prop, e)}
+              @blur=${(e: Event) => this.handleComponentPropertyBlur(component.id, prop, e)}
+            />
+          </div>
         </div>
       `;
     }
@@ -2236,8 +2534,10 @@ export class InspectorPanel extends ComponentBase {
               .step=${prop.ui?.step ?? 0.01}
               .precision=${prop.ui?.precision ?? 2}
               ?disabled=${readOnly}
-              @change=${(e: CustomEvent<{ value: number }>) =>
-                this.applyPropertyChange(prop.name, e.detail.value)}
+              @preview-change=${(e: CustomEvent<{ value: number }>) =>
+                this.handleSliderPreview(prop.name, e.detail.value)}
+              @commit-change=${(e: CustomEvent<{ value: number }>) =>
+                this.handleSliderCommit(prop.name, e.detail.value)}
             ></pix3-slider-number-editor>
           </div>
         `;
@@ -2261,6 +2561,41 @@ export class InspectorPanel extends ComponentBase {
             @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
             @blur=${(e: Event) => this.handlePropertyBlur(prop.name, e)}
           />
+        </div>
+      `;
+    }
+
+    if (prop.type === 'color') {
+      const pickerValue = this.getColorPickerValue(state.value);
+
+      return html`
+        <div class="property-group">
+          ${labelTemplate}
+          <div class="property-color-editor">
+            <input
+              type="color"
+              class="property-color-picker"
+              .value=${pickerValue}
+              ?disabled=${readOnly}
+              @input=${(e: Event) =>
+                this.handleColorPickerInput(prop.name, (e.target as HTMLInputElement).value)}
+              @change=${async (e: Event) => {
+                const input = e.target as HTMLInputElement;
+                await this.handleColorPickerCommit(prop.name, input.value);
+                input.blur();
+              }}
+            />
+            <input
+              type="text"
+              class="property-input property-input--text ${state.isValid
+                ? ''
+                : 'property-input--invalid'}"
+              .value=${state.value}
+              ?disabled=${readOnly}
+              @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
+              @blur=${(e: Event) => this.handlePropertyBlur(prop.name, e)}
+            />
+          </div>
         </div>
       `;
     }

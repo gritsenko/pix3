@@ -19,6 +19,7 @@ export interface UpdateObjectPropertyParams {
   nodeId: string;
   propertyPath: string;
   value: unknown;
+  previousValue?: unknown;
 }
 
 export class UpdateObjectPropertyOperation implements Operation<OperationInvokeResult> {
@@ -114,14 +115,24 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       return { didMutate: false };
     }
 
-    const previousValue = propDef.getValue(node);
-    // Compare values as JSON strings to handle objects
-    if (JSON.stringify(previousValue) === JSON.stringify(value)) {
+    const currentValue = propDef.getValue(node);
+    const hasPreviousValueOverride = Object.prototype.hasOwnProperty.call(
+      this.params,
+      'previousValue'
+    );
+    const previousValue = hasPreviousValueOverride ? this.params.previousValue : currentValue;
+    const currentValueJson = JSON.stringify(currentValue);
+    const previousValueJson = JSON.stringify(previousValue);
+    const nextValueJson = JSON.stringify(value);
+
+    if (currentValueJson === nextValueJson && previousValueJson === nextValueJson) {
       return { didMutate: false };
     }
 
-    // Set the property value using the schema's setValue method
-    propDef.setValue(node, value);
+    if (currentValueJson !== nextValueJson) {
+      // Set the property value using the schema's setValue method
+      propDef.setValue(node, value);
+    }
 
     const activeSceneId = state.scenes.activeSceneId;
     if (activeSceneId) {

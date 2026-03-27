@@ -12,6 +12,11 @@ import {
 import { SceneManager } from '@pix3/runtime';
 
 export type UpdateObjectPropertyExecutePayload = object;
+export type UpdateObjectPropertyHistoryMode = 'immediate' | 'preview' | 'commit';
+
+export interface UpdateObjectPropertyCommandParams extends UpdateObjectPropertyParams {
+  historyMode?: UpdateObjectPropertyHistoryMode;
+}
 
 export class UpdateObjectPropertyCommand extends CommandBase<
   UpdateObjectPropertyExecutePayload,
@@ -24,9 +29,9 @@ export class UpdateObjectPropertyCommand extends CommandBase<
     keywords: ['update', 'property', 'object', 'node', 'transform'],
   };
 
-  private readonly params: UpdateObjectPropertyParams;
+  private readonly params: UpdateObjectPropertyCommandParams;
 
-  constructor(params: UpdateObjectPropertyParams) {
+  constructor(params: UpdateObjectPropertyCommandParams) {
     super();
     this.params = params;
   }
@@ -45,6 +50,13 @@ export class UpdateObjectPropertyCommand extends CommandBase<
       context.container.getOrCreateToken(OperationService)
     );
     const op = new UpdateObjectPropertyOperation(this.params);
+    const historyMode = this.params.historyMode ?? 'immediate';
+
+    if (historyMode === 'preview') {
+      const result = await operations.invoke(op);
+      return { didMutate: result.didMutate, payload: {} };
+    }
+
     const pushed = await operations.invokeAndPush(op);
     return { didMutate: pushed, payload: {} };
   }

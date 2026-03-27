@@ -11,6 +11,12 @@ import {
   type UpdateComponentPropertyParams,
 } from './UpdateComponentPropertyOperation';
 
+export type UpdateComponentPropertyHistoryMode = 'immediate' | 'preview' | 'commit';
+
+export interface UpdateComponentPropertyCommandParams extends UpdateComponentPropertyParams {
+  historyMode?: UpdateComponentPropertyHistoryMode;
+}
+
 export class UpdateComponentPropertyCommand extends CommandBase<object, void> {
   readonly metadata: CommandMetadata = {
     id: 'scripts.update-component-property',
@@ -19,9 +25,9 @@ export class UpdateComponentPropertyCommand extends CommandBase<object, void> {
     keywords: ['update', 'script', 'component', 'property'],
   };
 
-  private readonly params: UpdateComponentPropertyParams;
+  private readonly params: UpdateComponentPropertyCommandParams;
 
-  constructor(params: UpdateComponentPropertyParams) {
+  constructor(params: UpdateComponentPropertyCommandParams) {
     super();
     this.params = params;
   }
@@ -41,6 +47,13 @@ export class UpdateComponentPropertyCommand extends CommandBase<object, void> {
       context.container.getOrCreateToken(OperationService)
     );
     const op = new UpdateComponentPropertyOperation(this.params);
+    const historyMode = this.params.historyMode ?? 'immediate';
+
+    if (historyMode === 'preview') {
+      const result = await operations.invoke(op);
+      return { didMutate: result.didMutate, payload: {} };
+    }
+
     const pushed = await operations.invokeAndPush(op);
     return { didMutate: pushed, payload: {} };
   }

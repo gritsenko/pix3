@@ -1093,7 +1093,17 @@ export class SliderNumberEditor extends ComponentBase {
 
   private emitChange(nextValue: number): void {
     this.dispatchEvent(
-      new CustomEvent('change', {
+      new CustomEvent('preview-change', {
+        detail: { value: nextValue },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private emitCommit(nextValue: number): void {
+    this.dispatchEvent(
+      new CustomEvent('commit-change', {
         detail: { value: nextValue },
         bubbles: true,
         composed: true,
@@ -1115,6 +1125,22 @@ export class SliderNumberEditor extends ComponentBase {
       return;
     }
     this.emitChange(this.clamp(raw));
+  }
+
+  private onSliderCommit(event: Event): void {
+    const raw = Number.parseFloat((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(raw)) {
+      return;
+    }
+    this.emitCommit(this.clamp(raw));
+  }
+
+  private onNumberCommit(event: Event): void {
+    const raw = Number.parseFloat((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(raw)) {
+      return;
+    }
+    this.emitCommit(this.clamp(raw));
   }
 
   static styles = css`
@@ -1169,6 +1195,8 @@ export class SliderNumberEditor extends ComponentBase {
         step=${safeStep.toString()}
         ?disabled=${this.disabled}
         @input=${(event: Event) => this.onSliderInput(event)}
+        @change=${(event: Event) => this.onSliderCommit(event)}
+        @pointerup=${(event: Event) => this.onSliderCommit(event)}
       />
       <input
         class="number-input"
@@ -1179,6 +1207,8 @@ export class SliderNumberEditor extends ComponentBase {
         step=${safeStep.toString()}
         ?disabled=${this.disabled}
         @input=${(event: Event) => this.onNumberInput(event)}
+        @change=${(event: Event) => this.onNumberCommit(event)}
+        @blur=${(event: Event) => this.onNumberCommit(event)}
       />
     `;
   }

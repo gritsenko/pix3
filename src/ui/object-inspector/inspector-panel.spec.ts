@@ -1,6 +1,11 @@
-import { beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 
-import { AudioPlayer, PlaySoundBehavior, type PropertyDefinition } from '@pix3/runtime';
+import {
+  AmbientLightNode,
+  AudioPlayer,
+  PlaySoundBehavior,
+  type PropertyDefinition,
+} from '@pix3/runtime';
 
 type DragLike = Pick<DragEvent, 'dataTransfer'>;
 let InspectorPanel: typeof import('./inspector-panel').InspectorPanel;
@@ -31,6 +36,11 @@ function getAudioTrackProperty(schemaOwner: {
 beforeAll(async () => {
   vi.mock('golden-layout', () => ({}));
   ({ InspectorPanel } = await import('./inspector-panel'));
+});
+
+afterEach(() => {
+  document.body.innerHTML = '';
+  vi.restoreAllMocks();
 });
 
 describe('InspectorPanel audio resource handling', () => {
@@ -129,3 +139,147 @@ describe('InspectorPanel audio resource handling', () => {
     expect(componentCommand.params?.value).toBe('res://assets/sfx/ui.ogg');
   });
 });
+
+describe('InspectorPanel color property editor', () => {
+  it('renders a color picker and a text input for color properties', async () => {
+    const node = new AmbientLightNode({
+      id: 'ambient-light',
+      name: 'Ambient Light',
+      color: '#336699',
+    });
+    const { panel } = await setupInspectorForNode(node);
+
+    const colorInput = panel.querySelector('input[type="color"]') as HTMLInputElement | null;
+    const textInput = panel.querySelector(
+      '.property-color-editor input[type="text"]'
+    ) as HTMLInputElement | null;
+    const expectedColor = `#${node.light.color.getHexString()}`;
+
+    expect(colorInput).not.toBeNull();
+    expect(textInput).not.toBeNull();
+    expect(colorInput?.value).toBe(expectedColor);
+    expect(textInput?.value).toBe(expectedColor);
+  });
+
+  it('dispatches UpdateObjectPropertyCommand when the color picker changes', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const { panel } = await setupInspectorForNode(
+      new AmbientLightNode({
+        id: 'ambient-light',
+        name: 'Ambient Light',
+        color: '#336699',
+      }),
+      execute
+    );
+
+    const colorInput = panel.querySelector('input[type="color"]') as HTMLInputElement;
+    colorInput.value = '#ff8800';
+    colorInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    await Promise.resolve();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    const command = execute.mock.calls[0]?.[0] as {
+      params?: { propertyPath: string; value: string };
+    };
+    expect(command.params?.propertyPath).toBe('color');
+    expect(command.params?.value).toBe('#ff8800');
+  });
+
+  it('dispatches UpdateObjectPropertyCommand when typing a valid hex color', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const { panel } = await setupInspectorForNode(
+      new AmbientLightNode({
+        id: 'ambient-light',
+        name: 'Ambient Light',
+        color: '#336699',
+      }),
+      execute
+    );
+
+    const textInput = panel.querySelector(
+      '.property-color-editor input[type="text"]'
+    ) as HTMLInputElement;
+    textInput.value = '#123abc';
+    textInput.dispatchEvent(new Event('input', { bubbles: true, composed: true }));
+    await Promise.resolve();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    const command = execute.mock.calls[0]?.[0] as {
+      params?: { propertyPath: string; value: string };
+    };
+    expect(command.params?.propertyPath).toBe('color');
+    expect(command.params?.value).toBe('#123abc');
+  });
+});
+
+async function setupInspectorForNode(
+  node: AmbientLightNode,
+  execute = vi.fn().mockResolvedValue(undefined)
+): Promise<{ panel: InstanceType<typeof InspectorPanel>; execute: typeof execute }> {
+  const panel = document.createElement('pix3-inspector-panel') as InstanceType<typeof InspectorPanel>;
+
+  Object.defineProperty(panel, 'sceneManager', {
+    value: { getSceneGraph: vi.fn(() => null), getActiveSceneGraph: vi.fn(() => null) },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'commandDispatcher', {
+    value: { execute },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'behaviorPickerService', {
+    value: { showPicker: vi.fn() },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'scriptCreatorService', {
+    value: { showCreator: vi.fn(), createScript: vi.fn(), checkIfScriptExists: vi.fn() },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'scriptRegistry', {
+    value: { getComponentPropertySchema: vi.fn(() => null), getComponentType: vi.fn(() => null) },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'iconService', {
+    value: { getIcon: vi.fn(() => 'icon') },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'dialogService', {
+    value: { showConfirmation: vi.fn() },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'fileSystemAPI', {
+    value: { readBlob: vi.fn(), listDirectory: vi.fn(async () => []) },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'assetsPreviewService', {
+    value: { subscribe: (listener: (snapshot: { selectedItem: null }) => void) => {
+      listener({ selectedItem: null });
+      return () => undefined;
+    } },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'viewportService', {
+    value: { setPreviewAnimation: vi.fn() },
+    configurable: true,
+  });
+
+  document.body.appendChild(panel);
+
+  (
+    panel as unknown as {
+      selectedNodes: AmbientLightNode[];
+      primaryNode: AmbientLightNode;
+      syncValuesFromNode: () => void;
+    }
+  ).selectedNodes = [node];
+  (panel as unknown as { primaryNode: AmbientLightNode }).primaryNode = node;
+  (
+    panel as unknown as {
+      syncValuesFromNode: () => void;
+    }
+  ).syncValuesFromNode();
+
+  panel.requestUpdate();
+  await panel.updateComplete;
+
+  return { panel, execute };
+}

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CommandContext } from '@/core/command';
 import { OperationService } from '@/services/OperationService';
-import { UpdateComponentPropertyCommand } from './UpdateComponentPropertyCommand';
-import { UpdateComponentPropertyOperation } from './UpdateComponentPropertyOperation';
+import { UpdateObjectPropertyCommand } from './UpdateObjectPropertyCommand';
+import { UpdateObjectPropertyOperation } from './UpdateObjectPropertyOperation';
 
 const createContext = (
   invokeAndPushResult: boolean,
@@ -19,25 +19,29 @@ const createContext = (
       if (token === OperationService) {
         return operationServiceMock as T;
       }
+      if (typeof token === 'function') {
+        return {
+          getActiveSceneGraph: () => ({ id: 'scene-1' }),
+        } as T;
+      }
       throw new Error(`Unexpected token: ${String(token)}`);
     },
   };
 
   return {
     state: {} as CommandContext['state'],
-    snapshot: {} as CommandContext['snapshot'],
+    snapshot: { scenes: { activeSceneId: 'scene-1' } } as CommandContext['snapshot'],
     container: container as CommandContext['container'],
     requestedAt: Date.now(),
   };
 };
 
-describe('UpdateComponentPropertyCommand', () => {
-  it('executes UpdateComponentPropertyOperation through OperationService', async () => {
+describe('UpdateObjectPropertyCommand', () => {
+  it('executes UpdateObjectPropertyOperation through OperationService.invokeAndPush', async () => {
     const context = createContext(true);
-    const command = new UpdateComponentPropertyCommand({
+    const command = new UpdateObjectPropertyCommand({
       nodeId: 'node-1',
-      componentId: 'component-1',
-      propertyName: 'rotationSpeed',
+      propertyPath: 'intensity',
       value: 2.5,
     });
 
@@ -49,17 +53,14 @@ describe('UpdateComponentPropertyCommand', () => {
 
     expect(result.didMutate).toBe(true);
     expect(service.invokeAndPush).toHaveBeenCalledTimes(1);
-    expect(service.invokeAndPush).toHaveBeenCalledWith(
-      expect.any(UpdateComponentPropertyOperation)
-    );
+    expect(service.invokeAndPush).toHaveBeenCalledWith(expect.any(UpdateObjectPropertyOperation));
   });
 
   it('uses OperationService.invoke for preview updates', async () => {
     const context = createContext(true);
-    const command = new UpdateComponentPropertyCommand({
+    const command = new UpdateObjectPropertyCommand({
       nodeId: 'node-1',
-      componentId: 'component-1',
-      propertyName: 'rotationSpeed',
+      propertyPath: 'intensity',
       value: 2.5,
       historyMode: 'preview',
     });
@@ -75,17 +76,31 @@ describe('UpdateComponentPropertyCommand', () => {
     expect(service.invokeAndPush).not.toHaveBeenCalled();
   });
 
-  it('returns didMutate=false when operation was not pushed', async () => {
-    const context = createContext(false);
-    const command = new UpdateComponentPropertyCommand({
+  it('passes previousValue through to the operation for commit history', async () => {
+    const context = createContext(true);
+    const command = new UpdateObjectPropertyCommand({
       nodeId: 'node-1',
-      componentId: 'component-1',
-      propertyName: 'rotationSpeed',
+      propertyPath: 'intensity',
       value: 2.5,
+      historyMode: 'commit',
+      previousValue: 1.25,
     });
 
-    const result = await command.execute(context);
+    await command.execute(context);
 
-    expect(result.didMutate).toBe(false);
+    const service = context.container.getService<Pick<OperationService, 'invokeAndPush'>>(
+      context.container.getOrCreateToken(OperationService)
+    );
+    const operation = (service.invokeAndPush as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as
+      | UpdateObjectPropertyOperation
+      | undefined;
+
+    expect(operation).toBeInstanceOf(UpdateObjectPropertyOperation);
+    const params = operation as unknown as {
+      params: { previousValue?: unknown; value: unknown; propertyPath: string };
+    };
+    expect(params.params.previousValue).toBe(1.25);
+    expect(params.params.value).toBe(2.5);
+    expect(params.params.propertyPath).toBe('intensity');
   });
 });
