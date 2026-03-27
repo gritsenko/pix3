@@ -1,15 +1,22 @@
 import { ComponentBase, customElement, html, inject, subscribe, state, css, unsafeCSS } from '@/fw';
-import { appState } from '@/state';
+import { appState, type EditorCameraProjection } from '@/state';
 import styles from './viewport-panel.ts.css?raw';
+import dropdownButtonStyles from '@/ui/shared/pix3-dropdown-button.ts.css?raw';
+import visibilityPopoverStyles from './viewport-visibility-popover.ts.css?raw';
 import { ViewportRendererService, type TransformMode } from '@/services/ViewportRenderService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { IconService } from '@/services/IconService';
 import { Navigation2DController } from '@/services/Navigation2DController';
+import { SceneManager, Camera3D, NodeBase } from '@pix3/runtime';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
 import { CreatePrefabInstanceCommand } from '@/features/scene/CreatePrefabInstanceCommand';
 import { CreateSprite2DCommand } from '@/features/scene/CreateSprite2DCommand';
 import { toggleNavigationMode } from '@/features/viewport/ToggleNavigationModeCommand';
+import { setEditorCameraProjection } from '@/features/viewport/SetEditorCameraProjectionCommand';
+import { setPreviewCamera } from '@/features/viewport/SetPreviewCameraCommand';
 import { renderViewportToolbar } from './viewport-toolbar';
+import '../shared/pix3-dropdown-button';
+import './viewport-visibility-popover';
 
 @customElement('pix3-viewport-panel')
 export class ViewportPanel extends ComponentBase {
@@ -26,6 +33,9 @@ export class ViewportPanel extends ComponentBase {
 
   @inject(Navigation2DController)
   private readonly navigation2D!: Navigation2DController;
+
+  @inject(SceneManager)
+  private readonly sceneManager!: SceneManager;
 
   @state()
   private transformMode: TransformMode = 'select';
@@ -45,6 +55,9 @@ export class ViewportPanel extends ComponentBase {
   @state()
   private navigationMode = appState.ui.navigationMode;
 
+  @state()
+  private editorCameraProjection: EditorCameraProjection = appState.ui.editorCameraProjection;
+
   private readonly resizeObserver = new ResizeObserver(entries => {
     const entry = entries[0];
     if (!entry) {
@@ -61,6 +74,7 @@ export class ViewportPanel extends ComponentBase {
 
   private canvas?: HTMLCanvasElement;
   private disposeSceneSubscription?: () => void;
+  private disposeUiSubscription?: () => void;
   private pointerDownPos?: { x: number; y: number };
   private pointerDownTime?: number;
   private isDragging = false;
@@ -90,6 +104,7 @@ export class ViewportPanel extends ComponentBase {
     // ResizeObserver will be set up in firstUpdated when host element is available
     this.disposeSceneSubscription = subscribe(appState.scenes, () => {
       this.syncViewportScene();
+      this.requestUpdate();
     });
     this.syncViewportScene();
 
@@ -99,13 +114,16 @@ export class ViewportPanel extends ComponentBase {
     this.showLayer3D = appState.ui.showLayer3D;
     this.showLighting = appState.ui.showLighting;
     this.navigationMode = appState.ui.navigationMode;
+    this.editorCameraProjection = appState.ui.editorCameraProjection;
 
-    subscribe(appState.ui, () => {
+    this.disposeUiSubscription = subscribe(appState.ui, () => {
       this.showGrid = appState.ui.showGrid;
       this.showLayer2D = appState.ui.showLayer2D;
       this.showLayer3D = appState.ui.showLayer3D;
       this.showLighting = appState.ui.showLighting;
       this.navigationMode = appState.ui.navigationMode;
+      this.editorCameraProjection = appState.ui.editorCameraProjection;
+      this.requestUpdate();
     });
 
     // Track focus for context-aware shortcuts
@@ -129,6 +147,8 @@ export class ViewportPanel extends ComponentBase {
     this.resizeObserver.disconnect();
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
+    this.disposeUiSubscription?.();
+    this.disposeUiSubscription = undefined;
     this.removeEventListener('pointerdown', this.handleCanvasPointerDown);
     this.removeEventListener('pointermove', this.handleCanvasPointerMove);
     this.removeEventListener('pointerup', this.handleCanvasPointerUp);
@@ -169,6 +189,12 @@ export class ViewportPanel extends ComponentBase {
   }
 
   protected render() {
+    const {
+      items: previewCameraItems,
+      label: previewCameraLabel,
+      isActive: isPreviewCameraActive,
+    } = this.getPreviewCameraDropdownState();
+
     return html`
       <section
         class="panel ${this.isAssetDragOver ? 'panel--asset-dragover' : ''}"
@@ -185,16 +211,22 @@ export class ViewportPanel extends ComponentBase {
               navigationMode: this.navigationMode,
               showLayer3D: this.showLayer3D,
               showLayer2D: this.showLayer2D,
+              previewCameraLabel,
+              previewCameraItems,
+              isPreviewCameraActive,
+              editorCameraProjection: this.editorCameraProjection,
             },
             {
               onTransformModeChange: m => this.handleTransformModeChange(m),
-              onToggleGrid: () => this.toggleGrid(),
-              onToggleLighting: () => this.toggleLighting(),
               onToggleNavigationMode: () => this.toggleNavigationMode(),
-              onToggleLayer3D: () => this.toggleLayer3D(),
-              onToggleLayer2D: () => this.toggleLayer2D(),
               onZoomDefault: () => this.zoomDefault(),
               onZoomAll: () => this.zoomAll(),
+              onSelectPreviewCamera: itemId => this.handlePreviewCameraSelect(itemId),
+              onToggleGrid: () => this.toggleGrid(),
+              onToggleLighting: () => this.toggleLighting(),
+              onToggleLayer3D: () => this.toggleLayer3D(),
+              onToggleLayer2D: () => this.toggleLayer2D(),
+              onSetEditorCameraProjection: projection => this.setEditorCameraProjection(projection),
             },
             this.iconService
           )}
@@ -292,6 +324,84 @@ export class ViewportPanel extends ComponentBase {
 
   private syncViewportScene(): void {
     // Renderer now auto-attaches active scene via subscription; nothing to do here
+  }
+
+  private handlePreviewCameraSelect(itemId: string): void {
+    const cameraNodeId = itemId === 'hide' ? null : itemId;
+    void this.commandDispatcher.execute(setPreviewCamera(cameraNodeId)).then(() => {
+      this.viewportRenderer.updateSelection();
+      this.viewportRenderer.requestRender();
+    });
+  }
+
+  private setEditorCameraProjection(projection: EditorCameraProjection): void {
+    void this.commandDispatcher.execute(setEditorCameraProjection(projection)).then(() => {
+      this.viewportRenderer.requestRender();
+    });
+  }
+
+  private getPreviewCameraDropdownState(): {
+    items: Array<{ id: string; label: string }>;
+    label: string;
+    isActive: boolean;
+  } {
+    const activeSceneId = appState.scenes.activeSceneId;
+    const selectedCameraNodeId = activeSceneId
+      ? (appState.scenes.previewCameraNodeIds[activeSceneId] ?? null)
+      : null;
+    const items = [{ id: 'hide', label: selectedCameraNodeId === null ? 'Hide (Active)' : 'Hide' }];
+
+    if (!activeSceneId) {
+      return {
+        items,
+        label: 'Hide',
+        isActive: false,
+      };
+    }
+
+    const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
+    if (!sceneGraph) {
+      return {
+        items,
+        label: 'Hide',
+        isActive: false,
+      };
+    }
+
+    const cameras = this.collectCameraNodes(sceneGraph.rootNodes);
+    for (const camera of cameras) {
+      const cameraLabel = camera.name || camera.nodeId;
+      items.push({
+        id: camera.nodeId,
+        label: camera.nodeId === selectedCameraNodeId ? `${cameraLabel} (Active)` : cameraLabel,
+      });
+    }
+
+    const selectedCamera = selectedCameraNodeId
+      ? (cameras.find(camera => camera.nodeId === selectedCameraNodeId) ?? null)
+      : null;
+
+    return {
+      items,
+      label: selectedCamera?.name || 'Hide',
+      isActive: selectedCamera !== null,
+    };
+  }
+
+  private collectCameraNodes(nodes: NodeBase[]): Camera3D[] {
+    const cameras: Camera3D[] = [];
+
+    for (const node of nodes) {
+      if (node instanceof Camera3D) {
+        cameras.push(node);
+      }
+
+      if (node.children.length > 0) {
+        cameras.push(...this.collectCameraNodes(node.children));
+      }
+    }
+
+    return cameras;
   }
 
   private handleTransformModeChange(mode: TransformMode): void {
@@ -504,6 +614,8 @@ export class ViewportPanel extends ComponentBase {
 
   static styles = css`
     ${unsafeCSS(styles)}
+    ${unsafeCSS(dropdownButtonStyles)}
+    ${unsafeCSS(visibilityPopoverStyles)}
   `;
 }
 

@@ -1,14 +1,21 @@
 import { ComponentBase, customElement, html, inject, property, state, css, unsafeCSS } from '@/fw';
 import { subscribe } from 'valtio/vanilla';
-import { appState, type NavigationMode } from '@/state';
+import { appState, type EditorCameraProjection, type NavigationMode } from '@/state';
 import styles from './editor-tab.ts.css?raw';
+import dropdownButtonStyles from '@/ui/shared/pix3-dropdown-button.ts.css?raw';
+import visibilityPopoverStyles from './viewport-visibility-popover.ts.css?raw';
 import { ViewportRendererService, type TransformMode } from '@/services/ViewportRenderService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { IconService } from '@/services/IconService';
 import { Navigation2DController } from '@/services/Navigation2DController';
+import { SceneManager, Camera3D, NodeBase } from '@pix3/runtime';
 import { selectObject } from '@/features/selection/SelectObjectCommand';
 import { toggleNavigationMode } from '@/features/viewport/ToggleNavigationModeCommand';
+import { setEditorCameraProjection } from '@/features/viewport/SetEditorCameraProjectionCommand';
+import { setPreviewCamera } from '@/features/viewport/SetPreviewCameraCommand';
 import { renderViewportToolbar } from './viewport-toolbar';
+import '../shared/pix3-dropdown-button';
+import './viewport-visibility-popover';
 
 @customElement('pix3-editor-tab')
 export class EditorTabComponent extends ComponentBase {
@@ -25,6 +32,9 @@ export class EditorTabComponent extends ComponentBase {
 
   @inject(Navigation2DController)
   private readonly navigation2D!: Navigation2DController;
+
+  @inject(SceneManager)
+  private readonly sceneManager!: SceneManager;
 
   @property({ type: String, reflect: true, attribute: 'tab-id' })
   tabId: string = '';
@@ -47,9 +57,13 @@ export class EditorTabComponent extends ComponentBase {
   @state()
   private navigationMode: NavigationMode = '3d';
 
+  @state()
+  private editorCameraProjection: EditorCameraProjection = 'perspective';
+
   private canvasHost?: HTMLElement;
   private disposeUiSubscription?: () => void;
   private disposeTabsSubscription?: () => void;
+  private disposeScenesSubscription?: () => void;
   private pointerDownPos?: { x: number; y: number };
   private pointerDownTime?: number;
   private isDragging = false;
@@ -73,6 +87,7 @@ export class EditorTabComponent extends ComponentBase {
     this.showLayer3D = appState.ui.showLayer3D;
     this.showLighting = appState.ui.showLighting;
     this.navigationMode = appState.ui.navigationMode;
+    this.editorCameraProjection = appState.ui.editorCameraProjection;
 
     this.disposeUiSubscription = subscribe(appState.ui, () => {
       this.showGrid = appState.ui.showGrid;
@@ -80,11 +95,16 @@ export class EditorTabComponent extends ComponentBase {
       this.showLayer3D = appState.ui.showLayer3D;
       this.showLighting = appState.ui.showLighting;
       this.navigationMode = appState.ui.navigationMode;
+      this.editorCameraProjection = appState.ui.editorCameraProjection;
       this.requestUpdate();
     });
 
     this.disposeTabsSubscription = subscribe(appState.tabs, () => {
       this.syncActiveState();
+    });
+
+    this.disposeScenesSubscription = subscribe(appState.scenes, () => {
+      this.requestUpdate();
     });
 
     this.addEventListener('wheel', this.handleWheel as EventListener, {
@@ -113,6 +133,8 @@ export class EditorTabComponent extends ComponentBase {
     this.disposeUiSubscription = undefined;
     this.disposeTabsSubscription?.();
     this.disposeTabsSubscription = undefined;
+    this.disposeScenesSubscription?.();
+    this.disposeScenesSubscription = undefined;
     this.removeEventListener('wheel', this.handleWheel as EventListener, true);
     this.renderRoot.removeEventListener('wheel', this.handleWheel as EventListener, true);
     this.wheelCanvas?.removeEventListener('wheel', this.handleWheel as EventListener, true);
@@ -143,6 +165,11 @@ export class EditorTabComponent extends ComponentBase {
   protected render() {
     const tab = appState.tabs.tabs.find(t => t.id === this.tabId);
     const isSceneTab = tab?.type === 'scene';
+    const {
+      items: previewCameraItems,
+      label: previewCameraLabel,
+      isActive: isPreviewCameraActive,
+    } = this.getPreviewCameraDropdownState();
 
     return html`
       <section
@@ -161,16 +188,22 @@ export class EditorTabComponent extends ComponentBase {
               navigationMode: this.navigationMode,
               showLayer3D: this.showLayer3D,
               showLayer2D: this.showLayer2D,
+              previewCameraLabel,
+              previewCameraItems,
+              isPreviewCameraActive,
+              editorCameraProjection: this.editorCameraProjection,
             },
             {
               onTransformModeChange: m => this.handleTransformModeChange(m),
-              onToggleGrid: () => this.toggleGrid(),
-              onToggleLighting: () => this.toggleLighting(),
               onToggleNavigationMode: () => this.toggleNavigationMode(),
-              onToggleLayer3D: () => this.toggleLayer3D(),
-              onToggleLayer2D: () => this.toggleLayer2D(),
               onZoomDefault: () => this.zoomDefault(),
               onZoomAll: () => this.zoomAll(),
+              onSelectPreviewCamera: itemId => this.handlePreviewCameraSelect(itemId),
+              onToggleGrid: () => this.toggleGrid(),
+              onToggleLighting: () => this.toggleLighting(),
+              onToggleLayer3D: () => this.toggleLayer3D(),
+              onToggleLayer2D: () => this.toggleLayer2D(),
+              onSetEditorCameraProjection: projection => this.setEditorCameraProjection(projection),
             },
             this.iconService
           )}
@@ -239,6 +272,84 @@ export class EditorTabComponent extends ComponentBase {
 
   private zoomDefault(): void {
     void this.commandDispatcher.executeById('view.zoom-default');
+  }
+
+  private handlePreviewCameraSelect(itemId: string): void {
+    const cameraNodeId = itemId === 'hide' ? null : itemId;
+    void this.commandDispatcher.execute(setPreviewCamera(cameraNodeId)).then(() => {
+      this.viewportRenderer.updateSelection();
+      this.viewportRenderer.requestRender();
+    });
+  }
+
+  private setEditorCameraProjection(projection: EditorCameraProjection): void {
+    void this.commandDispatcher.execute(setEditorCameraProjection(projection)).then(() => {
+      this.viewportRenderer.requestRender();
+    });
+  }
+
+  private getPreviewCameraDropdownState(): {
+    items: Array<{ id: string; label: string }>;
+    label: string;
+    isActive: boolean;
+  } {
+    const activeSceneId = appState.scenes.activeSceneId;
+    const selectedCameraNodeId = activeSceneId
+      ? (appState.scenes.previewCameraNodeIds[activeSceneId] ?? null)
+      : null;
+    const items = [{ id: 'hide', label: selectedCameraNodeId === null ? 'Hide (Active)' : 'Hide' }];
+
+    if (!activeSceneId) {
+      return {
+        items,
+        label: 'Hide',
+        isActive: false,
+      };
+    }
+
+    const sceneGraph = this.sceneManager.getSceneGraph(activeSceneId);
+    if (!sceneGraph) {
+      return {
+        items,
+        label: 'Hide',
+        isActive: false,
+      };
+    }
+
+    const cameras = this.collectCameraNodes(sceneGraph.rootNodes);
+    for (const camera of cameras) {
+      const cameraLabel = camera.name || camera.nodeId;
+      items.push({
+        id: camera.nodeId,
+        label: camera.nodeId === selectedCameraNodeId ? `${cameraLabel} (Active)` : cameraLabel,
+      });
+    }
+
+    const selectedCamera = selectedCameraNodeId
+      ? (cameras.find(camera => camera.nodeId === selectedCameraNodeId) ?? null)
+      : null;
+
+    return {
+      items,
+      label: selectedCamera?.name || 'Hide',
+      isActive: selectedCamera !== null,
+    };
+  }
+
+  private collectCameraNodes(nodes: NodeBase[]): Camera3D[] {
+    const cameras: Camera3D[] = [];
+
+    for (const node of nodes) {
+      if (node instanceof Camera3D) {
+        cameras.push(node);
+      }
+
+      if (node.children.length > 0) {
+        cameras.push(...this.collectCameraNodes(node.children));
+      }
+    }
+
+    return cameras;
   }
 
   private zoomAll(): void {
@@ -402,6 +513,8 @@ export class EditorTabComponent extends ComponentBase {
 
   static styles = css`
     ${unsafeCSS(styles)}
+    ${unsafeCSS(dropdownButtonStyles)}
+    ${unsafeCSS(visibilityPopoverStyles)}
   `;
 }
 
