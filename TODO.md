@@ -1,5 +1,8 @@
 # TODO
 
+## all
+- [ ] move to constuctor injection in classes
+
 ## Редактор (Editor)
 - [ ] add transform animation timeline editor for nodes and tween animation support (Сложность: L)
 - [ ] add animation editor for animated sprites (Сложность: L)
