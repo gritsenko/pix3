@@ -55,6 +55,8 @@ interface TextureResourceValue {
   url: string;
 }
 
+type ReadOnlyValue = boolean | ((target: unknown) => boolean) | undefined;
+
 const ASSET_RESOURCE_MIME = 'application/x-pix3-asset-resource';
 const ASSET_PATH_MIME = 'application/x-pix3-asset-path';
 const IMAGE_EXTENSIONS = new Set([
@@ -368,8 +370,8 @@ export class InspectorPanel extends ComponentBase {
     // Initialize UI values from node properties
     const values: Record<string, PropertyUIState> = {};
     for (const prop of this.propertySchema.properties) {
-      if (prop.ui?.hidden || prop.ui?.readOnly) {
-        continue; // Skip hidden or read-only properties
+      if (prop.ui?.hidden) {
+        continue;
       }
       const displayValue = getPropertyDisplayValue(this.primaryNode, prop);
       values[prop.name] = {
@@ -394,7 +396,7 @@ export class InspectorPanel extends ComponentBase {
         continue;
       }
       for (const prop of schema.properties) {
-        if (prop.ui?.hidden || prop.ui?.readOnly) {
+        if (prop.ui?.hidden) {
           continue;
         }
         const key = this.getComponentPropertyKey(component.id, prop.name);
@@ -1614,7 +1616,7 @@ export class InspectorPanel extends ComponentBase {
 
     const state = this.propertyValues[prop.name];
     const label = prop.ui?.label || prop.name;
-    const readOnly = prop.ui?.readOnly;
+    const readOnly = this.isPropertyReadOnly(prop.ui?.readOnly, this.primaryNode);
 
     // For vector properties, render as grid
     if (prop.type === 'vector2' || prop.type === 'vector3' || prop.type === 'euler') {
@@ -1813,7 +1815,7 @@ export class InspectorPanel extends ComponentBase {
 
     const widthState = this.propertyValues[widthProp.name];
     const heightState = this.propertyValues[heightProp.name];
-    const readOnly = widthProp.ui?.readOnly;
+    const readOnly = this.isPropertyReadOnly(widthProp.ui?.readOnly, this.primaryNode);
 
     const width = widthState ? parseFloat(widthState.value) : 64;
     const height = heightState ? parseFloat(heightState.value) : 64;
@@ -1965,6 +1967,17 @@ export class InspectorPanel extends ComponentBase {
     return [];
   }
 
+  private isPropertyReadOnly(
+    readOnly: ReadOnlyValue,
+    target: NodeBase | ScriptComponent | null | undefined
+  ): boolean {
+    if (typeof readOnly === 'function') {
+      return Boolean(target ? readOnly(target) : false);
+    }
+
+    return Boolean(readOnly);
+  }
+
   private renderComponentPropertyInput(component: ScriptComponent, prop: PropertyDefinition) {
     const key = this.getComponentPropertyKey(component.id, prop.name);
     const state = this.componentPropertyValues[key];
@@ -1973,7 +1986,7 @@ export class InspectorPanel extends ComponentBase {
     }
 
     const label = prop.ui?.label || prop.name;
-    const readOnly = prop.ui?.readOnly;
+    const readOnly = this.isPropertyReadOnly(prop.ui?.readOnly, component);
 
     if (prop.type === 'string' && prop.ui?.editor === 'audio-resource') {
       return html`
@@ -2260,7 +2273,7 @@ export class InspectorPanel extends ComponentBase {
 
     const state = this.propertyValues[prop.name];
     const label = prop.ui?.label || prop.name;
-    const readOnly = prop.ui?.readOnly;
+    const readOnly = this.isPropertyReadOnly(prop.ui?.readOnly, this.primaryNode);
     const isOverridden = this.isPropertyOverriddenForPrimaryNode(prop);
     const labelTemplate = this.renderPropertyLabel(prop, label, isOverridden);
 

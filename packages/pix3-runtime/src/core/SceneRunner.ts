@@ -2,7 +2,6 @@ import {
   Camera,
   Clock,
   Scene,
-  PerspectiveCamera,
   OrthographicCamera,
   Color,
   Quaternion,
@@ -318,14 +317,8 @@ export class SceneRunner {
     }
 
     if (this.activeCamera) {
-      // Use CSS pixel aspect ratio for correct visual perspective.
       const aspect = cssWidth / cssHeight;
-      if (this.activeCamera.camera instanceof PerspectiveCamera) {
-        if (this.activeCamera.camera.aspect !== aspect) {
-          this.activeCamera.camera.aspect = aspect;
-          this.activeCamera.camera.updateProjectionMatrix();
-        }
-      }
+      this.activeCamera.updateAspectRatio(aspect);
     }
 
     // 2D Camera - use the adaptive logical camera dimensions so the ortho camera

@@ -14,6 +14,7 @@ export interface CreateCamera3DOperationParams {
   cameraName?: string;
   projection?: 'perspective' | 'orthographic';
   fov?: number;
+  orthographicSize?: number;
   position?: Vector3;
 }
 
@@ -55,12 +56,14 @@ export class CreateCamera3DOperation implements Operation<OperationInvokeResult>
     const cameraName = this.params.cameraName || 'Camera3D';
     const projection = this.params.projection ?? 'perspective';
     const fov = this.params.fov ?? 60;
+    const orthographicSize = this.params.orthographicSize ?? 5;
 
     const node = new Camera3D({
       id: nodeId,
       name: cameraName,
       projection,
       fov,
+      orthographicSize,
     });
 
     const targetParent = resolveDefault3DParent(sceneGraph);

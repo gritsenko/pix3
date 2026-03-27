@@ -502,13 +502,14 @@ export class SceneSaver {
     } else if (node instanceof Camera3D) {
       if (node.camera instanceof PerspectiveCamera) {
         props.projection = 'perspective';
-        props.fov = node.camera.fov;
-        props.near = node.camera.near;
-        props.far = node.camera.far;
+        props.fov = node.fov;
+        props.near = node.near;
+        props.far = node.far;
       } else if (node.camera instanceof OrthographicCamera) {
         props.projection = 'orthographic';
-        props.near = node.camera.near;
-        props.far = node.camera.far;
+        props.orthographicSize = node.orthographicSize;
+        props.near = node.near;
+        props.far = node.far;
       }
     } else if (node instanceof MeshInstance) {
       const inst = node as MeshInstance;

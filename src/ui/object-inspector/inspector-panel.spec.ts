@@ -3,6 +3,8 @@ import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import {
   AmbientLightNode,
   AudioPlayer,
+  Camera3D,
+  type NodeBase,
   PlaySoundBehavior,
   type PropertyDefinition,
 } from '@pix3/runtime';
@@ -212,8 +214,39 @@ describe('InspectorPanel color property editor', () => {
   });
 });
 
+describe('InspectorPanel camera projection editor', () => {
+  it('renders projection select and disables fov for orthographic cameras', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const { panel } = await setupInspectorForNode(
+      new Camera3D({
+        id: 'camera-ortho',
+        name: 'Camera',
+        projection: 'orthographic',
+        orthographicSize: 6,
+      }),
+      execute
+    );
+
+    const selects = Array.from(
+      panel.querySelectorAll('select.property-select')
+    ) as HTMLSelectElement[];
+    const projectionSelect = selects.find(select =>
+      Array.from(select.options).some(option => option.value === 'orthographic')
+    );
+    const numberInputs = Array.from(
+      panel.querySelectorAll('input[type="number"]')
+    ) as HTMLInputElement[];
+    const fovInput = numberInputs.find(input => input.value === '60');
+
+    expect(projectionSelect).toBeInstanceOf(HTMLSelectElement);
+    expect((projectionSelect as HTMLSelectElement).value).toBe('orthographic');
+    expect(fovInput).toBeInstanceOf(HTMLInputElement);
+    expect((fovInput as HTMLInputElement).disabled).toBe(true);
+  });
+});
+
 async function setupInspectorForNode(
-  node: AmbientLightNode,
+  node: NodeBase,
   execute = vi.fn().mockResolvedValue(undefined)
 ): Promise<{ panel: InstanceType<typeof InspectorPanel>; execute: typeof execute }> {
   const panel = document.createElement('pix3-inspector-panel') as InstanceType<typeof InspectorPanel>;
@@ -266,12 +299,12 @@ async function setupInspectorForNode(
 
   (
     panel as unknown as {
-      selectedNodes: AmbientLightNode[];
-      primaryNode: AmbientLightNode;
+      selectedNodes: NodeBase[];
+      primaryNode: NodeBase;
       syncValuesFromNode: () => void;
     }
   ).selectedNodes = [node];
-  (panel as unknown as { primaryNode: AmbientLightNode }).primaryNode = node;
+  (panel as unknown as { primaryNode: NodeBase }).primaryNode = node;
   (
     panel as unknown as {
       syncValuesFromNode: () => void;

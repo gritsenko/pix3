@@ -102,6 +102,7 @@ export interface Camera3DProperties {
   fov?: number;
   near?: number;
   far?: number;
+  orthographicSize?: number;
 }
 
 export interface InstancedMesh3DProperties {
@@ -1394,6 +1395,7 @@ export class SceneLoader {
           fov: props.fov ?? 60,
           near: props.near ?? 0.1,
           far: props.far ?? 1000,
+          orthographicSize: props.orthographicSize ?? 5,
         });
       }
       case 'MeshInstance': {
