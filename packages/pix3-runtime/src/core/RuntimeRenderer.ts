@@ -37,6 +37,15 @@ export class RuntimeRenderer {
     return this.canvas;
   }
 
+  attachToDocument(containerId: string = 'app'): void {
+    const container = document.getElementById(containerId);
+    if (!(container instanceof HTMLElement)) {
+      throw new Error(`Missing #${containerId} container`);
+    }
+
+    this.attach(container);
+  }
+
   attach(container: HTMLElement): void {
     container.appendChild(this.canvas);
     this.resize();

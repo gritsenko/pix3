@@ -7,7 +7,6 @@ import './index.css';
 import * as EngineAPI from '@pix3/runtime';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 // Game-specific dependencies exposed for project scripts (DeepCore)
 import RAPIER from '@dimforge/rapier3d-compat';
@@ -22,7 +21,6 @@ interface WindowWithEngine extends Window {
   __PIX3_THREE__: typeof THREE;
   __RAPIER__: typeof RAPIER;
   __PIX3_GLTFLoader__: typeof GLTFLoader;
-  __PIX3_DRACOLoader__: typeof DRACOLoader;
   __PIX3_IOS_HAPTICS__: {
     haptic: HapticFunction;
   };
@@ -32,7 +30,6 @@ interface WindowWithEngine extends Window {
 (window as unknown as WindowWithEngine).__PIX3_THREE__ = THREE;
 (window as unknown as WindowWithEngine).__RAPIER__ = RAPIER;
 (window as unknown as WindowWithEngine).__PIX3_GLTFLoader__ = GLTFLoader;
-(window as unknown as WindowWithEngine).__PIX3_DRACOLoader__ = DRACOLoader;
 (window as unknown as WindowWithEngine).__PIX3_IOS_HAPTICS__ = {
   haptic: Object.assign(() => undefined, {
     confirm: () => undefined,
@@ -84,14 +81,6 @@ const createImportMapShim = () => {
   const gltfLoaderBlob = new Blob([gltfLoaderModuleCode], { type: 'application/javascript' });
   const gltfLoaderBlobUrl = URL.createObjectURL(gltfLoaderBlob);
 
-  const dracoLoaderModuleCode = `
-    const api = window.__PIX3_DRACOLoader__;
-    export const DRACOLoader = api;
-    export default api;
-  `;
-  const dracoLoaderBlob = new Blob([dracoLoaderModuleCode], { type: 'application/javascript' });
-  const dracoLoaderBlobUrl = URL.createObjectURL(dracoLoaderBlob);
-
   const iosHapticsModuleCode = `
     const api = window.__PIX3_IOS_HAPTICS__;
     export const haptic = api.haptic;
@@ -109,7 +98,6 @@ const createImportMapShim = () => {
       three: threeBlobUrl,
       '@dimforge/rapier3d-compat': rapierBlobUrl,
       'three/examples/jsm/loaders/GLTFLoader.js': gltfLoaderBlobUrl,
-      'three/examples/jsm/loaders/DRACOLoader.js': dracoLoaderBlobUrl,
       'ios-haptics': iosHapticsBlobUrl,
     },
   });
