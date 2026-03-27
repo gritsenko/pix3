@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AssetLoader } from './AssetLoader';
 import { AudioService } from './AudioService';
+import { ECSService } from './ECSService';
 import { ResourceManager } from './ResourceManager';
 import { SceneService } from './SceneService';
 
@@ -97,9 +98,38 @@ describe('SceneService viewport API', () => {
       getAudioService: () => new AudioService(),
       getAssetLoader: () => assetLoader,
       getResourceManager: () => resources,
+      getECSService: () => null,
+      raycastViewport: () => null,
     });
 
     expect(service.getResourceManager()).toBe(resources);
     expect(service.getAssetLoader()).toBe(assetLoader);
+  });
+
+  it('forwards ECS and raycast APIs to the active delegate', () => {
+    const service = new SceneService();
+    const ecsService = new ECSService();
+    const hit = {
+      node: null,
+      distance: 1,
+      point: { x: 0, y: 0, z: 0 },
+      object: null,
+      instanceId: 3,
+    };
+
+    service.setDelegate({
+      getActiveCameraNode: () => null,
+      getUICamera: () => null,
+      setActiveCameraNode: () => undefined,
+      findNodeById: () => null,
+      getAudioService: () => new AudioService(),
+      getAssetLoader: () => new AssetLoader(new ResourceManager('/'), new AudioService()),
+      getResourceManager: () => new ResourceManager('/'),
+      getECSService: () => ecsService,
+      raycastViewport: () => hit as never,
+    });
+
+    expect(service.getECSService()).toBe(ecsService);
+    expect(service.raycastViewport(0, 0)).toBe(hit);
   });
 });

@@ -3,7 +3,9 @@ import { NodeBase } from '../nodes/NodeBase';
 import { LAYER_3D } from '../constants';
 import type { AudioService } from './AudioService';
 import type { AssetLoader } from './AssetLoader';
+import type { ECSService } from './ECSService';
 import type { ResourceManager } from './ResourceManager';
+import type { SceneRaycastHit } from './raycast';
 
 export type ViewportOrientation = 'portrait' | 'landscape';
 
@@ -28,6 +30,8 @@ export interface SceneServiceDelegate {
   getAudioService(): AudioService;
   getAssetLoader(): AssetLoader;
   getResourceManager(): ResourceManager;
+  getECSService(): ECSService | null;
+  raycastViewport(normalizedX: number, normalizedY: number): SceneRaycastHit | null;
 }
 
 /**
@@ -144,6 +148,14 @@ export class SceneService {
 
   getResourceManager(): ResourceManager | null {
     return this.delegate?.getResourceManager() ?? null;
+  }
+
+  getECSService(): ECSService | null {
+    return this.delegate?.getECSService() ?? null;
+  }
+
+  raycastViewport(normalizedX: number, normalizedY: number): SceneRaycastHit | null {
+    return this.delegate?.raycastViewport(normalizedX, normalizedY) ?? null;
   }
 
   // ── Viewport APIs ───────────────────────────────────────────────────────────

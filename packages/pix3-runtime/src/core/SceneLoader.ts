@@ -28,6 +28,7 @@ import { AudioPlayer } from '../nodes/AudioPlayer';
 import type { SceneGraph } from './SceneManager';
 
 import { GeometryMesh } from '../nodes/3D/GeometryMesh';
+import { InstancedMesh3D } from '../nodes/3D/InstancedMesh3D';
 
 import { Camera3D } from '../nodes/3D/Camera3D';
 
@@ -101,6 +102,14 @@ export interface Camera3DProperties {
   fov?: number;
   near?: number;
   far?: number;
+}
+
+export interface InstancedMesh3DProperties {
+  maxInstances?: number;
+  castShadow?: boolean;
+  receiveShadow?: boolean;
+  enablePerInstanceColor?: boolean;
+  frustumCulled?: boolean;
 }
 
 export interface DirectionalLightNodeProperties {
@@ -1262,6 +1271,33 @@ export class SceneLoader {
           material: { color: materialColor },
         });
       }
+      case 'InstancedMesh3D': {
+        const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
+        const props = baseProps.properties as InstancedMesh3DProperties;
+        const maxInstances = this.asPositiveInteger(props.maxInstances);
+
+        if (maxInstances === null) {
+          throw new SceneValidationError(
+            `Node "${definition.id}" has invalid InstancedMesh3D.maxInstances value.`,
+            ['maxInstances must be a positive integer.']
+          );
+        }
+
+        return new InstancedMesh3D({
+          ...baseProps,
+          properties: parsed.restProps,
+          position: parsed.position,
+          rotation: parsed.rotation,
+          rotationOrder: parsed.rotationOrder,
+          scale: parsed.scale,
+          maxInstances,
+          castShadow: typeof props.castShadow === 'boolean' ? props.castShadow : false,
+          receiveShadow: typeof props.receiveShadow === 'boolean' ? props.receiveShadow : false,
+          enablePerInstanceColor:
+            typeof props.enablePerInstanceColor === 'boolean' ? props.enablePerInstanceColor : false,
+          frustumCulled: typeof props.frustumCulled === 'boolean' ? props.frustumCulled : undefined,
+        });
+      }
       case 'DirectionalLightNode': {
         const parsed = this.parseNode3DTransforms(baseProps.properties as Record<string, unknown>);
         const props = baseProps.properties as DirectionalLightNodeProperties;
@@ -1687,6 +1723,15 @@ export class SceneLoader {
 
   private asNumber<T>(value: unknown, fallback: T): number | T {
     return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+  }
+
+  private asPositiveInteger(value: unknown): number | null {
+    if (typeof value !== 'number' || !Number.isFinite(value)) {
+      return null;
+    }
+
+    const normalized = Math.floor(value);
+    return normalized > 0 ? normalized : null;
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {
