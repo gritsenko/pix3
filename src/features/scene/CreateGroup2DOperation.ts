@@ -1,18 +1,6 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { Group2D } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
 import { Vector2 } from 'three';
-import {
-  attachNode,
-  detachNode,
-  resolve2DParentForCreation,
-} from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateGroup2DOperationParams {
   groupName?: string;
@@ -22,81 +10,38 @@ export interface CreateGroup2DOperationParams {
   parentNodeId?: string | null;
 }
 
-export class CreateGroup2DOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-group2d',
-    title: 'Create Group2D',
-    description: 'Create a 2D group container in the scene',
-    tags: ['scene', '2d', 'group', 'node', 'container'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateGroup2DOperationParams;
-
-  constructor(params: CreateGroup2DOperationParams = {}) {
-    this.params = params;
+export class CreateGroup2DOperation extends CreateNodeOperationBase<CreateGroup2DOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-group2d';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create Group2D';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create a 2D group container in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '2d', 'group', 'node', 'container'];
+  }
 
-    // Generate a unique node ID
-    const nodeId = `group2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  protected getNodeTypeName(): string {
+    return 'Group2D';
+  }
 
-    // Create the Group2D node
-    const groupName = this.params.groupName || 'Group2D';
-    const width = this.params.width ?? 100;
-    const height = this.params.height ?? 100;
-
+  protected createNode(params: CreateGroup2DOperationParams, nodeId: string) {
+    const groupName = params.groupName || 'Group2D';
+    const width = params.width ?? 100;
+    const height = params.height ?? 100;
     const node = new Group2D({
       id: nodeId,
       name: groupName,
       width,
       height,
-      position: this.params.position,
+      position: params.position,
     });
-
-    const targetParent = resolve2DParentForCreation(
-      sceneGraph,
-      this.params.parentNodeId ?? null,
-      state.selection.primaryNodeId
-    );
-    attachNode(sceneGraph, node, targetParent);
-
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${groupName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }

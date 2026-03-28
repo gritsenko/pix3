@@ -1,7 +1,15 @@
 import { vi, describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { ViewportRendererService } from './ViewportRenderService';
-import { AmbientLightNode, Camera3D, DirectionalLightNode, Group2D, Sprite2D } from '@pix3/runtime';
+import {
+  AmbientLightNode,
+  Camera3D,
+  DirectionalLightNode,
+  Group2D,
+  Node3D,
+  Script,
+  Sprite2D,
+} from '@pix3/runtime';
 import { appState, resetAppState } from '@/state';
 
 describe('ViewportRendererService', () => {
@@ -334,5 +342,83 @@ describe('ViewportRendererService', () => {
     expect(orthographicCamera.position.x).toBe(0);
     expect(orthographicCamera.position.y).toBe(0);
     expect(orthographicCamera.zoom).toBe(1);
+  });
+
+  it('ticks previewable components in editor mode', () => {
+    resetAppState();
+    appState.ui.isPlaying = false;
+
+    class PreviewScript extends Script {
+      readonly tickSpy = vi.fn();
+
+      override tickEditorPreview(dt: number): void {
+        this.tickSpy(dt);
+      }
+    }
+
+    const service = new ViewportRendererService();
+    const node = new Node3D({ id: 'preview-root', name: 'Preview Root' });
+    const component = new PreviewScript('preview-script', 'user:PreviewScript');
+    const assetLoader = { loadInstancingModel: vi.fn() };
+
+    node.addComponent(component);
+
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({ rootNodes: [node] }),
+      },
+      configurable: true,
+    });
+    Object.defineProperty(service, 'assetLoader', {
+      value: assetLoader,
+      configurable: true,
+    });
+
+    (
+      service as unknown as {
+        tickComponentPreview: (dt: number) => void;
+      }
+    ).tickComponentPreview(0.25);
+
+    expect(component.tickSpy).toHaveBeenCalledTimes(1);
+    expect(component.tickSpy).toHaveBeenCalledWith(0.25);
+  });
+
+  it('skips previewable components while play mode is active', () => {
+    resetAppState();
+    appState.ui.isPlaying = true;
+
+    class PreviewScript extends Script {
+      readonly tickSpy = vi.fn();
+
+      override tickEditorPreview(dt: number): void {
+        this.tickSpy(dt);
+      }
+    }
+
+    const service = new ViewportRendererService();
+    const node = new Node3D({ id: 'preview-root-play', name: 'Preview Root Play' });
+    const component = new PreviewScript('preview-script-play', 'user:PreviewScript');
+
+    node.addComponent(component);
+
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({ rootNodes: [node] }),
+      },
+      configurable: true,
+    });
+    Object.defineProperty(service, 'assetLoader', {
+      value: { loadInstancingModel: vi.fn() },
+      configurable: true,
+    });
+
+    (
+      service as unknown as {
+        tickComponentPreview: (dt: number) => void;
+      }
+    ).tickComponentPreview(0.25);
+
+    expect(component.tickSpy).not.toHaveBeenCalled();
   });
 });

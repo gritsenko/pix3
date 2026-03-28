@@ -385,7 +385,8 @@ export class SceneTreePanel extends ComponentBase {
         instancePath: node.instancePath,
         properties: node.properties,
         isContainer: node.isContainer,
-        scripts: node.components.map(c => c.type),
+        scripts:
+          node.components && Array.isArray(node.components) ? node.components.map(c => c.type) : [],
         isPrefabNode: isPrefabNode(node),
         isPrefabRoot: isPrefabInstanceRoot(node),
         isPrefabChild: isPrefabChildNode(node),

@@ -217,17 +217,21 @@ export class ScriptExecutionService {
    */
   private attachScriptsToNode(node: NodeBase): void {
     // Attach unified script components
-    for (const component of node.components) {
-      component.node = node;
-      if (component.onAttach) {
-        component.onAttach(node);
+    if (node.components && Array.isArray(node.components)) {
+      for (const component of node.components) {
+        component.node = node;
+        if (component.onAttach) {
+          component.onAttach(node);
+        }
       }
     }
 
     // Recursively attach to children
-    for (const child of node.children) {
-      if (child instanceof NodeBase) {
-        this.attachScriptsToNode(child);
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        if (child instanceof NodeBase) {
+          this.attachScriptsToNode(child);
+        }
       }
     }
   }
@@ -243,12 +247,14 @@ export class ScriptExecutionService {
       return;
     }
 
-    for (const rootNode of scene.rootNodes) {
-      this.detachScriptsFromNode(rootNode);
-    }
+    if (scene.rootNodes && Array.isArray(scene.rootNodes)) {
+      for (const rootNode of scene.rootNodes) {
+        this.detachScriptsFromNode(rootNode);
+      }
 
-    for (const rootNode of scene.rootNodes) {
-      this.resetScriptStartedState(rootNode);
+      for (const rootNode of scene.rootNodes) {
+        this.resetScriptStartedState(rootNode);
+      }
     }
   }
 
@@ -256,24 +262,28 @@ export class ScriptExecutionService {
    * Recursively detach scripts from a node and its children
    */
   private detachScriptsFromNode(node: NodeBase): void {
-    for (const component of node.components) {
-      if (component.onDetach) {
-        try {
-          component.onDetach();
-        } catch (error) {
-          console.error('[ScriptExecutionService] Component onDetach failed', {
-            componentId: component.id,
-            nodeId: node.nodeId,
-            error,
-          });
+    if (node.components && Array.isArray(node.components)) {
+      for (const component of node.components) {
+        if (component.onDetach) {
+          try {
+            component.onDetach();
+          } catch (error) {
+            console.error('[ScriptExecutionService] Component onDetach failed', {
+              componentId: component.id,
+              nodeId: node.nodeId,
+              error,
+            });
+          }
         }
       }
     }
 
     // Recursively detach from children
-    for (const child of node.children) {
-      if (child instanceof NodeBase) {
-        this.detachScriptsFromNode(child);
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        if (child instanceof NodeBase) {
+          this.detachScriptsFromNode(child);
+        }
       }
     }
   }
@@ -282,18 +292,22 @@ export class ScriptExecutionService {
    * Recursively reset started state for all scripts in a node and its children
    */
   private resetScriptStartedState(node: NodeBase): void {
-    for (const component of node.components) {
-      if (component.resetStartedState) {
-        component.resetStartedState();
-      } else {
-        component._started = false;
+    if (node.components && Array.isArray(node.components)) {
+      for (const component of node.components) {
+        if (component.resetStartedState) {
+          component.resetStartedState();
+        } else {
+          component._started = false;
+        }
       }
     }
 
     // Recursively reset children
-    for (const child of node.children) {
-      if (child instanceof NodeBase) {
-        this.resetScriptStartedState(child);
+    if (node.children && Array.isArray(node.children)) {
+      for (const child of node.children) {
+        if (child instanceof NodeBase) {
+          this.resetScriptStartedState(child);
+        }
       }
     }
   }

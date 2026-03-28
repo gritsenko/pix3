@@ -1,18 +1,36 @@
 import type { SceneGraph } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
-import type { AppState } from '@/state';
-import { ServiceContainer } from '@/fw/di';
 import { SceneStateUpdater } from './SceneStateUpdater';
+import type {
+  Operation,
+  OperationContext,
+  OperationInvokeResult,
+  OperationMetadata,
+} from '@/core/Operation';
 
-export abstract class CreateNodeOperationBase<TParams> {
+export abstract class CreateNodeOperationBase<TParams> implements Operation<OperationInvokeResult> {
   protected abstract getMetadataId(): string;
   protected abstract getMetadataTitle(): string;
   protected abstract getMetadataDescription(): string;
   protected abstract getMetadataTags(): string[];
   protected abstract getNodeTypeName(): string;
-  protected abstract createNode(params: TParams, nodeId: string): SceneGraph['rootNodes'][0];
+  protected abstract createNode(
+    params: TParams,
+    nodeId: string,
+    context: OperationContext
+  ): SceneGraph['rootNodes'][0] | Promise<SceneGraph['rootNodes'][0]>;
 
   constructor(protected readonly params: TParams = {} as TParams) {}
+
+  get metadata(): OperationMetadata {
+    return {
+      id: this.getMetadataId(),
+      title: this.getMetadataTitle(),
+      description: this.getMetadataDescription(),
+      tags: this.getMetadataTags(),
+      affectsNodeStructure: true,
+    };
+  }
 
   protected getNodeIdPrefix(): string {
     return this.getNodeTypeName()
@@ -29,8 +47,9 @@ export abstract class CreateNodeOperationBase<TParams> {
     return this.getNodeTypeName();
   }
 
-  async perform(context: { state: AppState; container: ServiceContainer }, sceneId: string) {
+  async perform(context: OperationContext): Promise<OperationInvokeResult> {
     const { state, container } = context;
+    const sceneId = state.scenes.activeSceneId;
 
     if (!sceneId) {
       return { didMutate: false };
@@ -50,7 +69,7 @@ export abstract class CreateNodeOperationBase<TParams> {
     }
 
     const nodeId = this.generateNodeId();
-    const node = this.createNode(this.params, nodeId);
+    const node = await this.createNode(this.params, nodeId, context);
 
     sceneGraph.rootNodes.push(node);
     sceneGraph.nodeMap.set(nodeId, node);

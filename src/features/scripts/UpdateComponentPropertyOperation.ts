@@ -46,7 +46,7 @@ export class UpdateComponentPropertyOperation implements Operation<OperationInvo
     }
 
     const node = scene.nodeMap.get(this.params.nodeId);
-    if (!node) {
+    if (!node || !node.components || !Array.isArray(node.components)) {
       return { didMutate: false };
     }
 

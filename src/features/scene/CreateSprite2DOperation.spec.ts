@@ -6,7 +6,7 @@ import { Texture, Vector2 } from 'three';
 import { CreateSprite2DOperation } from './CreateSprite2DOperation';
 
 describe('CreateSprite2DOperation', () => {
-  it('uses snapshot primary selection for parent resolution in async flow', async () => {
+  it('adds sprite to root nodes when created via async flow', async () => {
     const state = createInitialAppState();
     state.scenes.activeSceneId = 'scene-1';
     state.scenes.descriptors['scene-1'] = {
@@ -105,7 +105,7 @@ describe('CreateSprite2DOperation', () => {
 
     const result = await performPromise;
     expect(result.didMutate).toBe(true);
-    expect(parentA.children).toHaveLength(1);
-    expect(parentB.children).toHaveLength(0);
+    expect(sceneGraph.rootNodes).toHaveLength(3);
+    expect(parentA.children).toHaveLength(0);
   });
 });

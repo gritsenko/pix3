@@ -1,13 +1,5 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { AmbientLightNode } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
-import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateAmbientLightOperationParams {
   lightName?: string;
@@ -15,68 +7,32 @@ export interface CreateAmbientLightOperationParams {
   intensity?: number;
 }
 
-export class CreateAmbientLightOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-ambient-light',
-    title: 'Create Ambient Light',
-    description: 'Create an ambient light in the scene',
-    tags: ['scene', '3d', 'light', 'node'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateAmbientLightOperationParams;
-
-  constructor(params: CreateAmbientLightOperationParams = {}) {
-    this.params = params;
+export class CreateAmbientLightOperation extends CreateNodeOperationBase<CreateAmbientLightOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-ambient-light';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create Ambient Light';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create an ambient light in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '3d', 'light', 'node'];
+  }
 
-    const nodeId = `ambientlight-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const lightName = this.params.lightName ?? 'Ambient Light';
-    const color = this.params.color ?? '#ffffff';
-    const intensity = this.params.intensity ?? 0.5;
+  protected getNodeTypeName(): string {
+    return 'AmbientLight';
+  }
 
+  protected createNode(params: CreateAmbientLightOperationParams, nodeId: string) {
+    const lightName = params.lightName ?? 'Ambient Light';
+    const color = params.color ?? '#ffffff';
+    const intensity = params.intensity ?? 0.5;
     const node = new AmbientLightNode({ id: nodeId, name: lightName, color, intensity });
-
-    const targetParent = resolveDefault3DParent(sceneGraph);
-    attachNode(sceneGraph, node, targetParent);
-
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${lightName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }

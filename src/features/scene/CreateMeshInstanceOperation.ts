@@ -1,87 +1,40 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { MeshInstance } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
-import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateMeshInstanceOperationParams {
   meshName?: string;
   src?: string | null; // res:// or templ:// path to .glb/.gltf
 }
 
-export class CreateMeshInstanceOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-mesh-instance',
-    title: 'Create Mesh Instance',
-    description: 'Create a 3D mesh instance in the scene',
-    tags: ['scene', '3d', 'mesh', 'node', 'model'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateMeshInstanceOperationParams;
-
-  constructor(params: CreateMeshInstanceOperationParams = {}) {
-    this.params = params;
+export class CreateMeshInstanceOperation extends CreateNodeOperationBase<CreateMeshInstanceOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-mesh-instance';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create Mesh Instance';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create a 3D mesh instance in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '3d', 'mesh', 'node', 'model'];
+  }
 
-    // Generate a unique node ID
-    const nodeId = `meshinstance-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  protected getNodeTypeName(): string {
+    return 'MeshInstance';
+  }
 
-    // Create the MeshInstance node
-    const meshName = this.params.meshName || 'Mesh Instance';
-    const src = this.params.src ?? null;
-
+  protected createNode(params: CreateMeshInstanceOperationParams, nodeId: string) {
+    const meshName = params.meshName || 'Mesh Instance';
+    const src = params.src ?? null;
     const node = new MeshInstance({
       id: nodeId,
       name: meshName,
       src,
     });
-
-    const targetParent = resolveDefault3DParent(sceneGraph);
-    attachNode(sceneGraph, node, targetParent);
-
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${meshName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }

@@ -1,14 +1,6 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { SpotLightNode } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
 import { Vector3 } from 'three';
-import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateSpotLightOperationParams {
   lightName?: string;
@@ -21,49 +13,35 @@ export interface CreateSpotLightOperationParams {
   position?: Vector3;
 }
 
-export class CreateSpotLightOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-spot-light',
-    title: 'Create Spot Light',
-    description: 'Create a spot light in the scene',
-    tags: ['scene', '3d', 'light', 'node'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateSpotLightOperationParams;
-
-  constructor(params: CreateSpotLightOperationParams = {}) {
-    this.params = params;
+export class CreateSpotLightOperation extends CreateNodeOperationBase<CreateSpotLightOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-spot-light';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create Spot Light';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create a spot light in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '3d', 'light', 'node'];
+  }
 
-    // Generate a unique node ID
-    const nodeId = `spotlight-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  protected getNodeTypeName(): string {
+    return 'SpotLight';
+  }
 
-    // Create the SpotLight node
-    const lightName = this.params.lightName || 'Spot Light';
-    const color = this.params.color ?? '#ffffff';
-    const intensity = this.params.intensity ?? 1;
-    const distance = this.params.distance ?? 0;
-    const angle = this.params.angle ?? Math.PI / 3;
-    const penumbra = this.params.penumbra ?? 0;
-    const decay = this.params.decay ?? 2;
-
+  protected createNode(params: CreateSpotLightOperationParams, nodeId: string) {
+    const lightName = params.lightName || 'Spot Light';
+    const color = params.color ?? '#ffffff';
+    const intensity = params.intensity ?? 1;
+    const distance = params.distance ?? 0;
+    const angle = params.angle ?? Math.PI / 3;
+    const penumbra = params.penumbra ?? 0;
+    const decay = params.decay ?? 2;
     const node = new SpotLightNode({
       id: nodeId,
       name: lightName,
@@ -74,35 +52,6 @@ export class CreateSpotLightOperation implements Operation<OperationInvokeResult
       penumbra,
       decay,
     });
-
-    if (this.params.position) {
-      node.position.copy(this.params.position);
-    }
-
-    const targetParent = resolveDefault3DParent(sceneGraph);
-    attachNode(sceneGraph, node, targetParent);
-
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${lightName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }

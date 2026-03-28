@@ -1,14 +1,6 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { Camera3D } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
 import { Vector3 } from 'three';
-import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateCamera3DOperationParams {
   cameraName?: string;
@@ -18,46 +10,32 @@ export interface CreateCamera3DOperationParams {
   position?: Vector3;
 }
 
-export class CreateCamera3DOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-camera3d',
-    title: 'Create Camera3D',
-    description: 'Create a 3D camera in the scene',
-    tags: ['scene', '3d', 'camera', 'node'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateCamera3DOperationParams;
-
-  constructor(params: CreateCamera3DOperationParams = {}) {
-    this.params = params;
+export class CreateCamera3DOperation extends CreateNodeOperationBase<CreateCamera3DOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-camera3d';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create Camera3D';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create a 3D camera in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '3d', 'camera', 'node'];
+  }
 
-    // Generate a unique node ID
-    const nodeId = `camera3d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+  protected getNodeTypeName(): string {
+    return 'Camera3D';
+  }
 
-    // Create the Camera3D node
-    const cameraName = this.params.cameraName || 'Camera3D';
-    const projection = this.params.projection ?? 'perspective';
-    const fov = this.params.fov ?? 60;
-    const orthographicSize = this.params.orthographicSize ?? 5;
-
+  protected createNode(params: CreateCamera3DOperationParams, nodeId: string) {
+    const cameraName = params.cameraName || 'Camera3D';
+    const projection = params.projection ?? 'perspective';
+    const fov = params.fov ?? 60;
+    const orthographicSize = params.orthographicSize ?? 5;
     const node = new Camera3D({
       id: nodeId,
       name: cameraName,
@@ -65,31 +43,6 @@ export class CreateCamera3DOperation implements Operation<OperationInvokeResult>
       fov,
       orthographicSize,
     });
-
-    const targetParent = resolveDefault3DParent(sceneGraph);
-    attachNode(sceneGraph, node, targetParent);
-
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${cameraName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }

@@ -31,6 +31,8 @@ import { Sprite3D } from '@pix3/runtime';
 import { Particles3D } from '@pix3/runtime';
 import { AmbientLightNode } from '@pix3/runtime';
 import { HemisphereLightNode } from '@pix3/runtime';
+import { AssetLoader } from '@pix3/runtime';
+import type { EditorPreviewContext, ScriptComponent } from '@pix3/runtime';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager, InputService } from '@pix3/runtime';
 import { OperationService } from '@/services/OperationService';
@@ -85,6 +87,9 @@ export class ViewportRendererService {
   @inject(ResourceManager)
   private readonly resourceManager!: ResourceManager;
 
+  @inject(AssetLoader)
+  private readonly assetLoader!: AssetLoader;
+
   private renderer?: THREE.WebGLRenderer;
   private canvas?: HTMLCanvasElement;
   private canvasHost?: HTMLElement;
@@ -138,7 +143,7 @@ export class ViewportRendererService {
 
   // Animation preview
   private animationMixers = new Map<string, THREE.AnimationMixer>();
-  private animationClock = new THREE.Clock();
+  private animationTimer = new THREE.Timer();
   private previewAnimationActions = new Map<string, THREE.AnimationAction>();
 
   // Gesture handling for 2D navigation
@@ -466,7 +471,7 @@ export class ViewportRendererService {
 
     if (!this.isPaused) return;
     this.isPaused = false;
-    this.animationClock.getDelta();
+    this.animationTimer.update();
     this.startRenderLoop();
   }
 
@@ -479,7 +484,7 @@ export class ViewportRendererService {
       this.cancelPanMomentum();
     } else {
       if (!this.isPaused && !this.animationId) {
-        this.animationClock.getDelta();
+        this.animationTimer.update();
         this.startRenderLoop();
       }
     }
@@ -1117,12 +1122,14 @@ export class ViewportRendererService {
     if (!this.renderer || !this.scene || !this.camera) return;
 
     // Advance animation mixers
-    const delta = this.animationClock.getDelta();
+    this.animationTimer.update();
+    const delta = this.animationTimer.getDelta();
     for (const mixer of this.animationMixers.values()) {
       mixer.update(delta);
     }
 
     this.tickParticlePreview(delta);
+    this.tickComponentPreview(delta);
 
     // Update controls once before rendering if they exist
     const is2DMode = appState.ui.navigationMode === '2d';
@@ -3479,6 +3486,52 @@ export class ViewportRendererService {
     };
 
     visit(sceneGraph.rootNodes);
+  }
+
+  private tickComponentPreview(dt: number): void {
+    if (dt <= 0 || appState.ui.isPlaying) {
+      return;
+    }
+
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return;
+    }
+
+    const previewContext: EditorPreviewContext = {
+      assetLoader: this.assetLoader,
+      requestRender: () => {
+        queueMicrotask(() => this.requestRender());
+      },
+    };
+
+    const visit = (nodes: NodeBase[]) => {
+      for (const node of nodes) {
+        if (node.components && Array.isArray(node.components)) {
+          for (const component of node.components) {
+            this.tickPreviewComponent(component, dt, previewContext);
+          }
+        }
+
+        if (node.children && node.children.length > 0) {
+          visit(node.children);
+        }
+      }
+    };
+
+    visit(sceneGraph.rootNodes);
+  }
+
+  private tickPreviewComponent(
+    component: ScriptComponent,
+    dt: number,
+    context: EditorPreviewContext
+  ): void {
+    if (!component.enabled || !component.tickEditorPreview) {
+      return;
+    }
+
+    component.tickEditorPreview(dt, context);
   }
 
   private syncSprite3DTexture(node: Sprite3D): void {

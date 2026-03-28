@@ -1,18 +1,6 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { Label2D } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
 import { Vector2 } from 'three';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
-import {
-  attachNode,
-  detachNode,
-  resolve2DParentForCreation,
-} from '@/features/scene/node-placement';
 
 export interface CreateLabel2DOperationParams {
   labelName?: string;
@@ -21,75 +9,35 @@ export interface CreateLabel2DOperationParams {
   parentNodeId?: string | null;
 }
 
-export class CreateLabel2DOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-label2d',
-    title: 'Create Label2D',
-    description: 'Create a 2D label in the scene',
-    tags: ['scene', '2d', 'label', 'node', 'ui'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateLabel2DOperationParams;
-
-  constructor(params: CreateLabel2DOperationParams = {}) {
-    this.params = params;
+export class CreateLabel2DOperation extends CreateNodeOperationBase<CreateLabel2DOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-label2d';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create Label2D';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create a 2D label in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '2d', 'label', 'node', 'ui'];
+  }
 
-    const nodeId = `label2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const labelName = this.params.labelName || 'Label2D';
+  protected getNodeTypeName(): string {
+    return 'Label2D';
+  }
 
+  protected createNode(params: CreateLabel2DOperationParams, nodeId: string) {
+    const labelName = params.labelName || 'Label2D';
     const node = new Label2D({
       id: nodeId,
       name: labelName,
-      label: this.params.text || 'New Label',
-      position: this.params.position || new Vector2(100, 100),
+      label: params.text || 'New Label',
+      position: params.position || new Vector2(100, 100),
     });
-
-    const targetParent = resolve2DParentForCreation(
-      sceneGraph,
-      this.params.parentNodeId ?? null,
-      state.selection.primaryNodeId
-    );
-
-    attachNode(sceneGraph, node, targetParent);
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${labelName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }
