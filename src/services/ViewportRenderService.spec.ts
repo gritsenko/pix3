@@ -247,7 +247,9 @@ describe('ViewportRendererService', () => {
 
     const result = (
       service as unknown as {
-        containsExplicitLights: (nodes: readonly AmbientLightNode[] | readonly Group2D[]) => boolean;
+        containsExplicitLights: (
+          nodes: readonly AmbientLightNode[] | readonly Group2D[]
+        ) => boolean;
       }
     ).containsExplicitLights([root]);
 

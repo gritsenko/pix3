@@ -179,25 +179,23 @@ export class ScriptCompilerService {
    * Create esbuild plugin for virtual file system
    */
   private createVirtualFileSystemPlugin(files: Map<string, string>): esbuild.Plugin {
-    const service = this;
-
     return {
       name: 'virtual-fs',
-      setup(build) {
+      setup: build => {
         build.onResolve({ filter: /.*/ }, args => {
-          if (service.isExternalModule(args.path)) {
+          if (this.isExternalModule(args.path)) {
             return { path: args.path, external: true };
           }
 
           // Resolve relative imports against the importing virtual file.
           if (args.path.startsWith('./') || args.path.startsWith('../')) {
-            const resolved = service.resolveVirtualImport(args.path, args.importer, files);
+            const resolved = this.resolveVirtualImport(args.path, args.importer, files);
             if (resolved) {
               return resolved;
             }
 
             return {
-              path: service.resolveUnresolvedPath(args.path, args.importer),
+              path: this.resolveUnresolvedPath(args.path, args.importer),
               namespace: 'virtual-fs',
             };
           }
@@ -221,7 +219,7 @@ export class ScriptCompilerService {
           }
 
           return {
-            contents: service.rewriteVirtualAssetUrls(contents, args.path),
+            contents: this.rewriteVirtualAssetUrls(contents, args.path),
             loader: 'ts',
           };
         });

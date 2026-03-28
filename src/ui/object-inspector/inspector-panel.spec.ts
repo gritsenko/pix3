@@ -160,7 +160,9 @@ describe('InspectorPanel audio resource handling', () => {
 
 describe('InspectorPanel model resource handling', () => {
   it('marks modelPath with the model editor', () => {
-    const prop = ModelConsumer.getPropertySchema().properties.find(property => property.name === 'modelPath');
+    const prop = ModelConsumer.getPropertySchema().properties.find(
+      property => property.name === 'modelPath'
+    );
 
     expect(prop).toBeDefined();
     expect(prop?.ui?.editor).toBe('model-resource');
@@ -179,12 +181,18 @@ describe('InspectorPanel model resource handling', () => {
       id: 'audio-player',
       name: 'Audio Player',
     });
-    (panel as unknown as { propertySchema: ReturnType<typeof ModelConsumer.getPropertySchema> | null }).propertySchema =
-      ModelConsumer.getPropertySchema();
+    (
+      panel as unknown as {
+        propertySchema: ReturnType<typeof ModelConsumer.getPropertySchema> | null;
+      }
+    ).propertySchema = ModelConsumer.getPropertySchema();
 
     (
       panel as unknown as { onModelResourceDrop: (propertyName: string, event: DragEvent) => void }
-    ).onModelResourceDrop('modelPath', createDragEvent('res://assets/models/wall.glb') as DragEvent);
+    ).onModelResourceDrop(
+      'modelPath',
+      createDragEvent('res://assets/models/wall.glb') as DragEvent
+    );
     await Promise.resolve();
 
     expect(execute).toHaveBeenCalledTimes(1);
@@ -198,7 +206,10 @@ describe('InspectorPanel model resource handling', () => {
 
     (
       panel as unknown as { onModelResourceDrop: (propertyName: string, event: DragEvent) => void }
-    ).onModelResourceDrop('modelPath', createDragEvent('res://assets/audio/click.wav') as DragEvent);
+    ).onModelResourceDrop(
+      'modelPath',
+      createDragEvent('res://assets/audio/click.wav') as DragEvent
+    );
     await Promise.resolve();
 
     expect(execute).not.toHaveBeenCalled();
@@ -312,7 +323,9 @@ async function setupInspectorForNode(
   node: NodeBase,
   execute = vi.fn().mockResolvedValue(undefined)
 ): Promise<{ panel: InstanceType<typeof InspectorPanel>; execute: typeof execute }> {
-  const panel = document.createElement('pix3-inspector-panel') as InstanceType<typeof InspectorPanel>;
+  const panel = document.createElement('pix3-inspector-panel') as InstanceType<
+    typeof InspectorPanel
+  >;
 
   Object.defineProperty(panel, 'sceneManager', {
     value: { getSceneGraph: vi.fn(() => null), getActiveSceneGraph: vi.fn(() => null) },
@@ -347,10 +360,12 @@ async function setupInspectorForNode(
     configurable: true,
   });
   Object.defineProperty(panel, 'assetsPreviewService', {
-    value: { subscribe: (listener: (snapshot: { selectedItem: null }) => void) => {
-      listener({ selectedItem: null });
-      return () => undefined;
-    } },
+    value: {
+      subscribe: (listener: (snapshot: { selectedItem: null }) => void) => {
+        listener({ selectedItem: null });
+        return () => undefined;
+      },
+    },
     configurable: true,
   });
   Object.defineProperty(panel, 'viewportService', {

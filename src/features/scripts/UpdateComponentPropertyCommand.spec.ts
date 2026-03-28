@@ -66,9 +66,9 @@ describe('UpdateComponentPropertyCommand', () => {
 
     const result = await command.execute(context);
 
-    const service = context.container.getService<Pick<OperationService, 'invoke' | 'invokeAndPush'>>(
-      context.container.getOrCreateToken(OperationService)
-    );
+    const service = context.container.getService<
+      Pick<OperationService, 'invoke' | 'invokeAndPush'>
+    >(context.container.getOrCreateToken(OperationService));
 
     expect(result.didMutate).toBe(true);
     expect(service.invoke).toHaveBeenCalledTimes(1);
