@@ -12,6 +12,7 @@ export interface UpdateComponentPropertyParams {
   componentId: string;
   propertyName: string;
   value: unknown;
+  previousValue?: unknown;
 }
 
 export class UpdateComponentPropertyOperation implements Operation<OperationInvokeResult> {
@@ -45,7 +46,7 @@ export class UpdateComponentPropertyOperation implements Operation<OperationInvo
     }
 
     const node = scene.nodeMap.get(this.params.nodeId);
-    if (!node) {
+    if (!node || !node.components || !Array.isArray(node.components)) {
       return { didMutate: false };
     }
 
@@ -68,13 +69,24 @@ export class UpdateComponentPropertyOperation implements Operation<OperationInvo
       return { didMutate: false };
     }
 
-    const previousValue = propDef.getValue(component);
-    if (JSON.stringify(previousValue) === JSON.stringify(this.params.value)) {
+    const currentValue = propDef.getValue(component);
+    const hasPreviousValueOverride = Object.prototype.hasOwnProperty.call(
+      this.params,
+      'previousValue'
+    );
+    const previousValue = hasPreviousValueOverride ? this.params.previousValue : currentValue;
+    const currentValueJson = JSON.stringify(currentValue);
+    const previousValueJson = JSON.stringify(previousValue);
+    const nextValueJson = JSON.stringify(this.params.value);
+
+    if (currentValueJson === nextValueJson && previousValueJson === nextValueJson) {
       return { didMutate: false };
     }
 
-    propDef.setValue(component, this.params.value);
-    component.config[this.params.propertyName] = this.params.value;
+    if (currentValueJson !== nextValueJson) {
+      propDef.setValue(component, this.params.value);
+      component.config[this.params.propertyName] = this.params.value;
+    }
 
     const activeSceneId = state.scenes.activeSceneId;
     this.markSceneDirty(state, activeSceneId);

@@ -1,13 +1,5 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { HemisphereLightNode } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
-import { attachNode, detachNode, resolveDefault3DParent } from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateHemisphereLightOperationParams {
   lightName?: string;
@@ -16,43 +8,32 @@ export interface CreateHemisphereLightOperationParams {
   intensity?: number;
 }
 
-export class CreateHemisphereLightOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-hemisphere-light',
-    title: 'Create Hemisphere Light',
-    description: 'Create a hemisphere light in the scene',
-    tags: ['scene', '3d', 'light', 'node'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateHemisphereLightOperationParams;
-
-  constructor(params: CreateHemisphereLightOperationParams = {}) {
-    this.params = params;
+export class CreateHemisphereLightOperation extends CreateNodeOperationBase<CreateHemisphereLightOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-hemisphere-light';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create Hemisphere Light';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create a hemisphere light in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '3d', 'light', 'node'];
+  }
 
-    const nodeId = `hemispherelight-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const lightName = this.params.lightName ?? 'Hemisphere Light';
-    const skyColor = this.params.skyColor ?? '#ffffff';
-    const groundColor = this.params.groundColor ?? '#444444';
-    const intensity = this.params.intensity ?? 0.5;
+  protected getNodeTypeName(): string {
+    return 'HemisphereLight';
+  }
 
+  protected createNode(params: CreateHemisphereLightOperationParams, nodeId: string) {
+    const lightName = params.lightName ?? 'Hemisphere Light';
+    const skyColor = params.skyColor ?? '#ffffff';
+    const groundColor = params.groundColor ?? '#444444';
+    const intensity = params.intensity ?? 0.5;
     const node = new HemisphereLightNode({
       id: nodeId,
       name: lightName,
@@ -60,31 +41,6 @@ export class CreateHemisphereLightOperation implements Operation<OperationInvoke
       groundColor,
       intensity,
     });
-
-    const targetParent = resolveDefault3DParent(sceneGraph);
-    attachNode(sceneGraph, node, targetParent);
-
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${lightName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }

@@ -77,7 +77,9 @@ export class ResourceManager {
     const embeddedEntry = this.getEmbeddedEntry(resource);
     if (embeddedEntry) {
       const bytes = this.decodeBase64ToBytes(embeddedEntry.base64);
-      return new Blob([bytes], {
+      const blobBytes = new Uint8Array(bytes.byteLength);
+      blobBytes.set(bytes);
+      return new Blob([blobBytes], {
         type: embeddedEntry.mimeType ?? 'application/octet-stream',
       });
     }

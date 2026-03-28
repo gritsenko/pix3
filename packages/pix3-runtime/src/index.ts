@@ -13,6 +13,9 @@ export * from './core/RuntimeRenderer';
 export * from './core/InputService';
 export * from './core/SceneService';
 export * from './core/TextureResource';
+export * from './core/ecs';
+export * from './core/ECSService';
+export * from './core/raycast';
 
 // Nodes
 export * from './nodes/NodeBase';
@@ -39,6 +42,7 @@ export * from './nodes/2D/UI/InventorySlot2D';
 export * from './nodes/3D/Camera3D';
 export * from './nodes/3D/DirectionalLightNode';
 export * from './nodes/3D/GeometryMesh';
+export * from './nodes/3D/InstancedMesh3D';
 export * from './nodes/3D/MeshInstance';
 export * from './nodes/3D/Sprite3D';
 export * from './nodes/3D/AnimatedSprite3D';

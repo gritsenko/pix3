@@ -22,6 +22,7 @@ import { AmbientLightNode } from '../nodes/3D/AmbientLightNode';
 import { HemisphereLightNode } from '../nodes/3D/HemisphereLightNode';
 import { GeometryMesh } from '../nodes/3D/GeometryMesh';
 import { Camera3D } from '../nodes/3D/Camera3D';
+import { InstancedMesh3D } from '../nodes/3D/InstancedMesh3D';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { Particles3D } from '../nodes/3D/Particles3D';
@@ -460,6 +461,17 @@ export class SceneSaver {
           metalness?: number;
         };
       }
+    } else if (node instanceof InstancedMesh3D) {
+      props.maxInstances = node.maxInstances;
+      props.castShadow = node.mesh.castShadow;
+      props.receiveShadow = node.mesh.receiveShadow;
+      props.enablePerInstanceColor = node.enablePerInstanceColor;
+      if (node.mesh.frustumCulled) {
+        props.frustumCulled = true;
+      } else {
+        delete props.frustumCulled;
+      }
+      delete props.visibleInstanceCount;
     } else if (node instanceof DirectionalLightNode) {
       props.color = '#' + node.light.color.getHexString();
       props.intensity = node.light.intensity;
@@ -490,13 +502,14 @@ export class SceneSaver {
     } else if (node instanceof Camera3D) {
       if (node.camera instanceof PerspectiveCamera) {
         props.projection = 'perspective';
-        props.fov = node.camera.fov;
-        props.near = node.camera.near;
-        props.far = node.camera.far;
+        props.fov = node.fov;
+        props.near = node.near;
+        props.far = node.far;
       } else if (node.camera instanceof OrthographicCamera) {
         props.projection = 'orthographic';
-        props.near = node.camera.near;
-        props.far = node.camera.far;
+        props.orthographicSize = node.orthographicSize;
+        props.near = node.near;
+        props.far = node.far;
       }
     } else if (node instanceof MeshInstance) {
       const inst = node as MeshInstance;

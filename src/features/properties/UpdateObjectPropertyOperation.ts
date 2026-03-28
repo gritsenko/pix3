@@ -19,6 +19,7 @@ export interface UpdateObjectPropertyParams {
   nodeId: string;
   propertyPath: string;
   value: unknown;
+  previousValue?: unknown;
 }
 
 export class UpdateObjectPropertyOperation implements Operation<OperationInvokeResult> {
@@ -114,14 +115,30 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       return { didMutate: false };
     }
 
-    const previousValue = propDef.getValue(node);
-    // Compare values as JSON strings to handle objects
-    if (JSON.stringify(previousValue) === JSON.stringify(value)) {
+    const currentValue = propDef.getValue(node);
+    const visibilityPreservation = this.createVisibilityPreservationState(
+      node,
+      propertyPath,
+      currentValue
+    );
+    const hasPreviousValueOverride = Object.prototype.hasOwnProperty.call(
+      this.params,
+      'previousValue'
+    );
+    const previousValue = hasPreviousValueOverride ? this.params.previousValue : currentValue;
+    const currentValueJson = JSON.stringify(currentValue);
+    const previousValueJson = JSON.stringify(previousValue);
+    const nextValueJson = JSON.stringify(value);
+
+    if (currentValueJson === nextValueJson && previousValueJson === nextValueJson) {
       return { didMutate: false };
     }
 
-    // Set the property value using the schema's setValue method
-    propDef.setValue(node, value);
+    if (currentValueJson !== nextValueJson) {
+      this.applyVisibilityPreservation(node, visibilityPreservation);
+      // Set the property value using the schema's setValue method
+      propDef.setValue(node, value);
+    }
 
     const activeSceneId = state.scenes.activeSceneId;
     if (activeSceneId) {
@@ -139,6 +156,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
         label: `Update ${propDef.ui?.label || propertyPath}`,
         beforeSnapshot: context.snapshot,
         undo: async () => {
+          this.restoreVisibilityPreservation(node, visibilityPreservation);
           propDef.setValue(node, previousValue);
           if (activeSceneId) {
             state.scenes.lastLoadedAt = Date.now();
@@ -148,6 +166,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
           this.updateViewport(container, propertyPath, node);
         },
         redo: async () => {
+          this.applyVisibilityPreservation(node, visibilityPreservation);
           propDef.setValue(node, value);
           if (activeSceneId) {
             state.scenes.lastLoadedAt = Date.now();
@@ -184,6 +203,47 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     } catch {
       // Silently ignore viewport renderer errors
     }
+  }
+
+  private createVisibilityPreservationState(
+    node: NodeBase,
+    propertyPath: string,
+    currentValue: unknown
+  ): { shouldPreserve: boolean; initialValue: boolean } {
+    if (propertyPath !== 'visible' || typeof currentValue !== 'boolean') {
+      return { shouldPreserve: false, initialValue: false };
+    }
+
+    const hasInitialVisibility =
+      Object.prototype.hasOwnProperty.call(node.properties, 'initiallyVisible') ||
+      Object.prototype.hasOwnProperty.call(node.properties, 'initially_visible');
+
+    return {
+      shouldPreserve: !hasInitialVisibility,
+      initialValue: currentValue,
+    };
+  }
+
+  private applyVisibilityPreservation(
+    node: NodeBase,
+    preservation: { shouldPreserve: boolean; initialValue: boolean }
+  ): void {
+    if (!preservation.shouldPreserve) {
+      return;
+    }
+
+    node.properties.initiallyVisible = preservation.initialValue;
+  }
+
+  private restoreVisibilityPreservation(
+    node: NodeBase,
+    preservation: { shouldPreserve: boolean; initialValue: boolean }
+  ): void {
+    if (!preservation.shouldPreserve) {
+      return;
+    }
+
+    delete node.properties.initiallyVisible;
   }
 
   private isTransformProperty(propertyPath: string): boolean {

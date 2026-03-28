@@ -152,6 +152,50 @@ pix3-panel {
   outline: none;
   border-color: var(--color-accent, #4e8df5);
 }
+
+.property-color-editor {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.property-color-picker {
+  width: 2.25rem;
+  min-width: 2.25rem;
+  height: 2rem;
+  padding: 0.125rem;
+  background: var(--color-input-bg, #222);
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0.35rem;
+  box-sizing: border-box;
+  cursor: pointer;
+}
+
+.property-color-picker:focus {
+  outline: none;
+  border-color: var(--color-accent, #4e8df5);
+}
+
+.property-color-picker:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.property-color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.property-color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 0.2rem;
+}
+
+.property-color-picker::-moz-color-swatch {
+  border: none;
+  border-radius: 0.2rem;
+}
 /* Scripts Section */
 .scripts-section {
   margin-top: 0.5rem;

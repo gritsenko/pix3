@@ -1,4 +1,4 @@
-import { WebGLRenderer, Scene, Camera, PCFSoftShadowMap } from 'three';
+import { WebGLRenderer, Scene, Camera, PCFShadowMap } from 'three';
 
 export interface RuntimeRendererOptions {
   antialias?: boolean;
@@ -29,12 +29,21 @@ export class RuntimeRenderer {
 
     if (options.shadows) {
       this.renderer.shadowMap.enabled = true;
-      this.renderer.shadowMap.type = PCFSoftShadowMap;
+      this.renderer.shadowMap.type = PCFShadowMap;
     }
   }
 
   get domElement(): HTMLCanvasElement {
     return this.canvas;
+  }
+
+  attachToDocument(containerId: string = 'app'): void {
+    const container = document.getElementById(containerId);
+    if (!(container instanceof HTMLElement)) {
+      throw new Error(`Missing #${containerId} container`);
+    }
+
+    this.attach(container);
   }
 
   attach(container: HTMLElement): void {

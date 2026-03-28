@@ -786,6 +786,88 @@ export class AudioResourceEditor extends ComponentBase {
   }
 }
 
+@customElement('pix3-model-resource-editor')
+export class ModelResourceEditor extends ComponentBase {
+  protected static useShadowDom = true;
+  @property({ type: String })
+  resourceUrl: string = '';
+
+  @property({ type: Boolean })
+  disabled: boolean = false;
+
+  @state()
+  private isDragOver = false;
+
+  static styles = AudioResourceEditor.styles;
+
+  private emitChange(url: string): void {
+    this.dispatchEvent(
+      new CustomEvent('change', {
+        detail: { url },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private onDragOver(event: DragEvent): void {
+    if (this.disabled) {
+      return;
+    }
+    event.preventDefault();
+    this.isDragOver = true;
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  private onDragLeave(): void {
+    this.isDragOver = false;
+  }
+
+  private onDrop(event: DragEvent): void {
+    if (this.disabled) {
+      return;
+    }
+    event.preventDefault();
+    this.isDragOver = false;
+
+    this.dispatchEvent(
+      new CustomEvent('model-drop', {
+        detail: { event },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  protected render() {
+    return html`
+      <div
+        class="drop-zone ${this.isDragOver ? 'is-dragover' : ''}"
+        @dragover=${(event: DragEvent) => this.onDragOver(event)}
+        @dragleave=${() => this.onDragLeave()}
+        @drop=${(event: DragEvent) => this.onDrop(event)}
+      >
+        <span class="drop-label">Drop GLB/GLTF model from Assets here</span>
+      </div>
+
+      <div class="url-row">
+        <input
+          type="text"
+          .value=${this.resourceUrl}
+          ?disabled=${this.disabled}
+          placeholder="res://path/to/model.glb"
+          @change=${(e: Event) => this.emitChange((e.target as HTMLInputElement).value)}
+        />
+        <button type="button" ?disabled=${this.disabled} @click=${() => this.emitChange('')}>
+          Clear
+        </button>
+      </div>
+    `;
+  }
+}
+
 export interface SizeValue {
   width: number;
   height: number;
@@ -1093,7 +1175,17 @@ export class SliderNumberEditor extends ComponentBase {
 
   private emitChange(nextValue: number): void {
     this.dispatchEvent(
-      new CustomEvent('change', {
+      new CustomEvent('preview-change', {
+        detail: { value: nextValue },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private emitCommit(nextValue: number): void {
+    this.dispatchEvent(
+      new CustomEvent('commit-change', {
         detail: { value: nextValue },
         bubbles: true,
         composed: true,
@@ -1115,6 +1207,22 @@ export class SliderNumberEditor extends ComponentBase {
       return;
     }
     this.emitChange(this.clamp(raw));
+  }
+
+  private onSliderCommit(event: Event): void {
+    const raw = Number.parseFloat((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(raw)) {
+      return;
+    }
+    this.emitCommit(this.clamp(raw));
+  }
+
+  private onNumberCommit(event: Event): void {
+    const raw = Number.parseFloat((event.target as HTMLInputElement).value);
+    if (!Number.isFinite(raw)) {
+      return;
+    }
+    this.emitCommit(this.clamp(raw));
   }
 
   static styles = css`
@@ -1169,6 +1277,8 @@ export class SliderNumberEditor extends ComponentBase {
         step=${safeStep.toString()}
         ?disabled=${this.disabled}
         @input=${(event: Event) => this.onSliderInput(event)}
+        @change=${(event: Event) => this.onSliderCommit(event)}
+        @pointerup=${(event: Event) => this.onSliderCommit(event)}
       />
       <input
         class="number-input"
@@ -1179,6 +1289,8 @@ export class SliderNumberEditor extends ComponentBase {
         step=${safeStep.toString()}
         ?disabled=${this.disabled}
         @input=${(event: Event) => this.onNumberInput(event)}
+        @change=${(event: Event) => this.onNumberCommit(event)}
+        @blur=${(event: Event) => this.onNumberCommit(event)}
       />
     `;
   }
@@ -1191,6 +1303,7 @@ declare global {
     'pix3-euler-editor': EulerEditor;
     'pix3-texture-resource-editor': TextureResourceEditor;
     'pix3-audio-resource-editor': AudioResourceEditor;
+    'pix3-model-resource-editor': ModelResourceEditor;
     'pix3-size-editor': SizeEditor;
     'pix3-slider-number-editor': SliderNumberEditor;
   }

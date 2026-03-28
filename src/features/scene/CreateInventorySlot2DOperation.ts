@@ -1,18 +1,6 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { InventorySlot2D } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
 import { Vector2 } from 'three';
-import {
-  attachNode,
-  detachNode,
-  resolve2DParentForCreation,
-} from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 
 export interface CreateInventorySlot2DOperationParams {
   slotName?: string;
@@ -22,76 +10,36 @@ export interface CreateInventorySlot2DOperationParams {
   parentNodeId?: string | null;
 }
 
-export class CreateInventorySlot2DOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-inventoryslot2d',
-    title: 'Create InventorySlot2D',
-    description: 'Create a 2D inventory slot in the scene',
-    tags: ['scene', '2d', 'inventory', 'slot', 'node', 'ui'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateInventorySlot2DOperationParams;
-
-  constructor(params: CreateInventorySlot2DOperationParams = {}) {
-    this.params = params;
+export class CreateInventorySlot2DOperation extends CreateNodeOperationBase<CreateInventorySlot2DOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-inventoryslot2d';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create InventorySlot2D';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create a 2D inventory slot in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '2d', 'inventory', 'slot', 'node', 'ui'];
+  }
 
-    const nodeId = `inventoryslot2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const slotName = this.params.slotName || 'InventorySlot2D';
+  protected getNodeTypeName(): string {
+    return 'InventorySlot2D';
+  }
 
+  protected createNode(params: CreateInventorySlot2DOperationParams, nodeId: string) {
+    const slotName = params.slotName || 'InventorySlot2D';
     const node = new InventorySlot2D({
       id: nodeId,
       name: slotName,
-      position: this.params.position || new Vector2(100, 100),
-      width: this.params.width,
-      height: this.params.height,
+      position: params.position || new Vector2(100, 100),
+      width: params.width,
+      height: params.height,
     });
-
-    const targetParent = resolve2DParentForCreation(
-      sceneGraph,
-      this.params.parentNodeId ?? null,
-      state.selection.primaryNodeId
-    );
-
-    attachNode(sceneGraph, node, targetParent);
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${slotName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }

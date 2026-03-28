@@ -10,31 +10,33 @@ export interface Camera3DProps extends Omit<Node3DProps, 'type'> {
   fov?: number;
   near?: number;
   far?: number;
+  orthographicSize?: number;
 }
 
 export class Camera3D extends Node3D {
-  readonly camera: Camera;
+  camera: Camera;
   private targetDistance = TARGET_DISTANCE;
   private shakeRafId: number | null = null;
+  private projectionMode: 'perspective' | 'orthographic';
+  private perspectiveFov: number;
+  private orthographicSizeValue: number;
 
   constructor(props: Camera3DProps) {
     super(props, 'Camera3D');
 
-    const projection = props.projection ?? 'perspective';
-    const near = props.near ?? 0.1;
-    const far = props.far ?? 1000;
+    this.projectionMode = props.projection ?? 'perspective';
+    this.perspectiveFov = props.fov ?? 60;
+    this.orthographicSizeValue = props.orthographicSize ?? 5;
 
-    if (projection === 'perspective') {
-      const fov = props.fov ?? 60;
-      this.camera = new PerspectiveCamera(fov, 1, near, far); // aspect will be set by viewport
-    } else {
-      // For orthographic, need left, right, top, bottom – for now, default
-      this.camera = new OrthographicCamera(-1, 1, 1, -1, near, far);
-    }
-
+    this.camera = new PerspectiveCamera();
     this.add(this.camera);
-    this.camera.position.set(0, 0, 0);
-    this.camera.rotation.set(0, 0, 0);
+    this.rebuildCamera({
+      projection: this.projectionMode,
+      fov: this.perspectiveFov,
+      near: props.near ?? 0.1,
+      far: props.far ?? 1000,
+      orthographicSize: this.orthographicSizeValue,
+    });
   }
 
   getTargetPosition(): Vector3 {
@@ -75,24 +77,94 @@ export class Camera3D extends Node3D {
   }
 
   /**
-   * Get the field of view in degrees (perspective cameras only).
-   * Returns 0 for orthographic cameras.
+   * Get the stored field of view in degrees.
+   * Orthographic mode preserves the value so switching back restores it.
    */
   get fov(): number {
-    if (this.camera instanceof PerspectiveCamera) {
-      return this.camera.fov;
-    }
-    return 0;
+    return this.perspectiveFov;
   }
 
   /**
-   * Set the field of view in degrees (perspective cameras only).
-   * Has no effect on orthographic cameras.
+   * Set the stored field of view in degrees.
+   * In orthographic mode the value is preserved for later perspective use.
    */
   set fov(value: number) {
+    this.perspectiveFov = Number(value);
     if (this.camera instanceof PerspectiveCamera) {
-      this.camera.fov = value;
+      this.camera.fov = this.perspectiveFov;
       this.camera.updateProjectionMatrix();
+    }
+  }
+
+  get projection(): 'perspective' | 'orthographic' {
+    return this.projectionMode;
+  }
+
+  set projection(value: 'perspective' | 'orthographic') {
+    this.rebuildCamera({ projection: value });
+  }
+
+  get near(): number {
+    return (this.camera as PerspectiveCamera | OrthographicCamera).near;
+  }
+
+  set near(value: number) {
+    const nextValue = Number(value);
+    if (this.camera instanceof PerspectiveCamera || this.camera instanceof OrthographicCamera) {
+      this.camera.near = nextValue;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  get far(): number {
+    return (this.camera as PerspectiveCamera | OrthographicCamera).far;
+  }
+
+  set far(value: number) {
+    const nextValue = Number(value);
+    if (this.camera instanceof PerspectiveCamera || this.camera instanceof OrthographicCamera) {
+      this.camera.far = nextValue;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  get orthographicSize(): number {
+    return this.orthographicSizeValue;
+  }
+
+  set orthographicSize(value: number) {
+    const nextValue = Math.max(0.0001, Number(value));
+    this.orthographicSizeValue = nextValue;
+    if (this.camera instanceof OrthographicCamera) {
+      this.applyOrthographicSize(this.camera, nextValue);
+    }
+  }
+
+  updateAspectRatio(aspect: number): void {
+    if (this.camera instanceof PerspectiveCamera) {
+      if (this.camera.aspect !== aspect) {
+        this.camera.aspect = aspect;
+        this.camera.updateProjectionMatrix();
+      }
+      return;
+    }
+
+    if (this.camera instanceof OrthographicCamera) {
+      const safeAspect = Number.isFinite(aspect) && aspect > 0 ? aspect : 1;
+      const halfHeight = this.orthographicSize / 2;
+      const halfWidth = halfHeight * safeAspect;
+      if (
+        this.camera.left !== -halfWidth ||
+        this.camera.right !== halfWidth ||
+        this.camera.top !== halfHeight ||
+        this.camera.bottom !== -halfHeight
+      ) {
+        this.camera.left = -halfWidth;
+        this.camera.right = halfWidth;
+        this.camera.top = halfHeight;
+        this.camera.bottom = -halfHeight;
+        this.camera.updateProjectionMatrix();
+      }
     }
   }
 
@@ -136,49 +208,134 @@ export class Camera3D extends Node3D {
     this.camera.position.set(0, 0, 0);
   }
 
+  private rebuildCamera(next: {
+    projection?: 'perspective' | 'orthographic';
+    fov?: number;
+    near?: number;
+    far?: number;
+    orthographicSize?: number;
+  }): void {
+    const projection = next.projection ?? this.projectionMode;
+    const near = next.near ?? this.near ?? 0.1;
+    const far = next.far ?? this.far ?? 1000;
+
+    this.projectionMode = projection;
+    this.perspectiveFov = next.fov ?? this.perspectiveFov ?? 60;
+    this.orthographicSizeValue = Math.max(
+      0.0001,
+      next.orthographicSize ?? this.orthographicSizeValue ?? 5
+    );
+
+    const previousCamera = this.camera;
+    const nextCamera =
+      projection === 'perspective'
+        ? new PerspectiveCamera(this.perspectiveFov, 1, near, far)
+        : new OrthographicCamera(-1, 1, 1, -1, near, far);
+
+    nextCamera.layers.mask = previousCamera.layers.mask;
+    nextCamera.position.copy(previousCamera.position);
+    nextCamera.quaternion.copy(previousCamera.quaternion);
+    nextCamera.scale.copy(previousCamera.scale);
+    nextCamera.visible = previousCamera.visible;
+    nextCamera.name = previousCamera.name;
+    nextCamera.matrixAutoUpdate = previousCamera.matrixAutoUpdate;
+    nextCamera.matrix.copy(previousCamera.matrix);
+    nextCamera.matrixWorld.copy(previousCamera.matrixWorld);
+    nextCamera.matrixWorldAutoUpdate = previousCamera.matrixWorldAutoUpdate;
+    nextCamera.matrixWorldNeedsUpdate = previousCamera.matrixWorldNeedsUpdate;
+
+    this.remove(previousCamera);
+    this.camera = nextCamera;
+    this.add(this.camera);
+    this.camera.position.set(0, 0, 0);
+    this.camera.rotation.set(0, 0, 0);
+
+    if (this.camera instanceof OrthographicCamera) {
+      this.applyOrthographicSize(this.camera, this.orthographicSizeValue);
+    } else if (this.camera instanceof PerspectiveCamera) {
+      this.camera.fov = this.perspectiveFov;
+      this.camera.updateProjectionMatrix();
+    }
+  }
+
+  private applyOrthographicSize(camera: OrthographicCamera, size: number): void {
+    const halfHeight = Math.max(0.0001, size) / 2;
+    camera.left = -halfHeight;
+    camera.right = halfHeight;
+    camera.top = halfHeight;
+    camera.bottom = -halfHeight;
+    camera.updateProjectionMatrix();
+  }
+
   static override getPropertySchema(): PropertySchema {
     const base = super.getPropertySchema();
 
     const cameraProps = {
       nodeType: 'Camera3D',
       properties: [
-        defineProperty('fov', 'number', {
-          ui: { label: 'Field of View', group: 'Camera', unit: '°', step: 0.1, precision: 1 },
-          getValue: (node: unknown) => ((node as Camera3D).camera as PerspectiveCamera).fov ?? 60,
+        defineProperty('projection', 'enum', {
+          ui: {
+            label: 'Projection',
+            group: 'Camera',
+            options: ['perspective', 'orthographic'],
+          },
+          getValue: (node: unknown) => (node as Camera3D).projection,
           setValue: (node: unknown, value: unknown) => {
-            const n = node as Camera3D;
-            if (n.camera instanceof PerspectiveCamera) {
-              n.camera.fov = Number(value);
-              (n.camera as PerspectiveCamera).updateProjectionMatrix();
-            }
+            (node as Camera3D).projection =
+              value === 'orthographic' ? 'orthographic' : 'perspective';
+          },
+        }),
+        defineProperty('fov', 'number', {
+          getValue: (node: unknown) => (node as Camera3D).fov,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Camera3D).fov = Number(value);
+          },
+          validation: {
+            validate: value => Number.isFinite(Number(value)) && Number(value) > 0,
+          },
+          ui: {
+            label: 'Field of View',
+            group: 'Camera',
+            unit: '°',
+            step: 0.1,
+            precision: 1,
+            readOnly: target => (target as Camera3D).projection !== 'perspective',
+          },
+        }),
+        defineProperty('orthographicSize', 'number', {
+          ui: {
+            label: 'Orthographic Size',
+            group: 'Camera',
+            step: 0.1,
+            precision: 2,
+            readOnly: target => (target as Camera3D).projection !== 'orthographic',
+          },
+          getValue: (node: unknown) => (node as Camera3D).orthographicSize,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Camera3D).orthographicSize = Number(value);
+          },
+          validation: {
+            validate: value => Number.isFinite(Number(value)) && Number(value) > 0,
           },
         }),
         defineProperty('near', 'number', {
           ui: { label: 'Near Plane', group: 'Camera', step: 0.01, precision: 2 },
-          getValue: (node: unknown) => {
-            const n = node as Camera3D;
-            return (n.camera as PerspectiveCamera | OrthographicCamera).near;
-          },
+          getValue: (node: unknown) => (node as Camera3D).near,
           setValue: (node: unknown, value: unknown) => {
-            const n = node as Camera3D;
-            if (n.camera instanceof PerspectiveCamera || n.camera instanceof OrthographicCamera) {
-              (n.camera as PerspectiveCamera | OrthographicCamera).near = Number(value);
-              (n.camera as PerspectiveCamera | OrthographicCamera).updateProjectionMatrix?.();
-            }
+            (node as Camera3D).near = Number(value);
+          },
+          validation: {
+            validate: value => Number.isFinite(Number(value)) && Number(value) > 0,
           },
         }),
         defineProperty('far', 'number', {
           ui: { label: 'Far Plane', group: 'Camera', step: 1, precision: 0 },
-          getValue: (node: unknown) => {
-            const n = node as Camera3D;
-            return (n.camera as PerspectiveCamera | OrthographicCamera).far;
-          },
+          getValue: (node: unknown) => (node as Camera3D).far,
           setValue: (node: unknown, value: unknown) => {
-            const n = node as Camera3D;
-            if (n.camera instanceof PerspectiveCamera || n.camera instanceof OrthographicCamera) {
-              (n.camera as PerspectiveCamera | OrthographicCamera).far = Number(value);
-              (n.camera as PerspectiveCamera | OrthographicCamera).updateProjectionMatrix?.();
-            }
+            (node as Camera3D).far = Number(value);
+          },
+          validation: {
+            validate: value => Number.isFinite(Number(value)) && Number(value) > 0,
           },
         }),
       ],

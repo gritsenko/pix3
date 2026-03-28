@@ -1,14 +1,7 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
-import { AssetLoader, type NodeBase, SceneManager, Sprite2D } from '@pix3/runtime';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
+import type { OperationContext } from '@/core/Operation';
+import { AssetLoader, Sprite2D } from '@pix3/runtime';
 import { Vector2 } from 'three';
-import { resolve2DParentForCreation } from '@/features/scene/node-placement';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
-import { ViewportRendererService } from '@/services/ViewportRenderService';
 
 export interface CreateSprite2DOperationParams {
   spriteName?: string;
@@ -20,49 +13,40 @@ export interface CreateSprite2DOperationParams {
   insertIndex?: number;
 }
 
-export class CreateSprite2DOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-sprite2d',
-    title: 'Create Sprite2D',
-    description: 'Create a 2D sprite in the scene',
-    tags: ['scene', '2d', 'sprite', 'node'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateSprite2DOperationParams;
-
-  constructor(params: CreateSprite2DOperationParams = {}) {
-    this.params = params;
+export class CreateSprite2DOperation extends CreateNodeOperationBase<CreateSprite2DOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-sprite2d';
+  }
+  protected getMetadataTitle(): string {
+    return 'Create Sprite2D';
+  }
+  protected getMetadataDescription(): string {
+    return 'Create a 2D sprite in the scene';
+  }
+  protected getMetadataTags(): string[] {
+    return ['scene', '2d', 'sprite', 'node'];
+  }
+  protected getNodeTypeName(): string {
+    return 'Sprite2D';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container, snapshot } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected async createNode(
+    params: CreateSprite2DOperationParams,
+    nodeId: string,
+    context: OperationContext
+  ) {
+    const { container } = context;
+    const spriteName = params.spriteName || 'Sprite2D';
+    const texturePath = params.texturePath ?? 'https://placehold.co/100x100.png';
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
-
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
-
-    const nodeId = `sprite2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const spriteName = this.params.spriteName || 'Sprite2D';
-    const texturePath = this.params.texturePath ?? null;
-    const selectedParentAtInvoke = snapshot.selection.primaryNodeId;
     const textureSize = await this.resolveTextureSize(container, texturePath);
-    const initialWidth = this.params.width ?? textureSize?.width;
-    const initialHeight = this.params.height ?? textureSize?.height;
+    const initialWidth = params.width ?? textureSize?.width;
+    const initialHeight = params.height ?? textureSize?.height;
 
     const node = new Sprite2D({
       id: nodeId,
       name: spriteName,
-      position: this.params.position,
+      position: params.position,
       texturePath,
       width: initialWidth,
       height: initialHeight,
@@ -73,47 +57,7 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
       node.originalHeight = textureSize.height;
       node.textureAspectRatio = textureSize.width / textureSize.height;
     }
-
-    const targetParent = resolve2DParentForCreation(
-      sceneGraph,
-      this.params.parentNodeId ?? null,
-      selectedParentAtInvoke
-    );
-
-    const insertIndex = this.resolveInsertIndex(
-      sceneGraph.rootNodes,
-      targetParent,
-      this.params.insertIndex
-    );
-    this.insertNode(sceneGraph.rootNodes, node, targetParent, insertIndex);
-    sceneGraph.nodeMap.set(node.nodeId, node);
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-    this.invalidateViewport(container, node);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${spriteName}`,
-        undo: () => {
-          this.removeNode(sceneGraph.rootNodes, node);
-          sceneGraph.nodeMap.delete(node.nodeId);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-          this.invalidateViewport(container, node);
-        },
-        redo: () => {
-          this.insertNode(sceneGraph.rootNodes, node, targetParent, insertIndex);
-          sceneGraph.nodeMap.set(node.nodeId, node);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-          this.invalidateViewport(container, node);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 
   private async resolveTextureSize(
@@ -149,63 +93,5 @@ export class CreateSprite2DOperation implements Operation<OperationInvokeResult>
   private isImageResource(path: string): boolean {
     const normalized = path.toLowerCase().split('?')[0].split('#')[0];
     return /\.(png|jpe?g|gif|webp|bmp|svg|tiff?|avif)$/.test(normalized);
-  }
-
-  private resolveInsertIndex(
-    rootNodes: NodeBase[],
-    parentNode: NodeBase | null,
-    requestedIndex: number | undefined
-  ): number {
-    if (requestedIndex === undefined || requestedIndex < 0) {
-      return parentNode ? parentNode.children.length : rootNodes.length;
-    }
-    return requestedIndex;
-  }
-
-  private insertNode(
-    rootNodes: NodeBase[],
-    node: NodeBase,
-    parentNode: NodeBase | null,
-    insertIndex: number
-  ): void {
-    if (parentNode) {
-      parentNode.add(node);
-      const boundedIndex = Math.max(0, Math.min(insertIndex, parentNode.children.length - 1));
-      if (boundedIndex < parentNode.children.length - 1) {
-        parentNode.children.splice(boundedIndex, 0, parentNode.children.pop() as NodeBase);
-      }
-      return;
-    }
-
-    if (node.parentNode) {
-      node.removeFromParent();
-    }
-
-    const boundedIndex = Math.max(0, Math.min(insertIndex, rootNodes.length));
-    rootNodes.splice(boundedIndex, 0, node);
-  }
-
-  private removeNode(rootNodes: NodeBase[], node: NodeBase): void {
-    if (node.parentNode) {
-      node.removeFromParent();
-      return;
-    }
-    const index = rootNodes.indexOf(node);
-    if (index >= 0) {
-      rootNodes.splice(index, 1);
-    }
-  }
-
-  private invalidateViewport(container: OperationContext['container'], node: Sprite2D): void {
-    try {
-      const viewport = container.getService<ViewportRendererService>(
-        container.getOrCreateToken(ViewportRendererService)
-      );
-      viewport.updateNodeTransform(node);
-      viewport.updateSelection();
-      viewport.requestRender();
-    } catch {
-      // Ignore viewport invalidation failures.
-    }
   }
 }

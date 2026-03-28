@@ -1,7 +1,15 @@
 import { vi, describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { ViewportRendererService } from './ViewportRenderService';
-import { AmbientLightNode, Camera3D, Group2D, Sprite2D } from '@pix3/runtime';
+import {
+  AmbientLightNode,
+  Camera3D,
+  DirectionalLightNode,
+  Group2D,
+  Node3D,
+  Script,
+  Sprite2D,
+} from '@pix3/runtime';
 import { appState, resetAppState } from '@/state';
 
 describe('ViewportRendererService', () => {
@@ -173,6 +181,89 @@ describe('ViewportRendererService', () => {
     expect(result).toBe(true);
   });
 
+  it('keeps fallback editor lighting enabled when the active scene has no explicit lights', () => {
+    resetAppState();
+    appState.ui.showLighting = true;
+
+    const service = new ViewportRendererService();
+    const renderer = { shadowMap: { enabled: false } } as THREE.WebGLRenderer;
+    const editorAmbientLight = new THREE.AmbientLight();
+    const editorDirectionalLight = new THREE.DirectionalLight();
+
+    Object.defineProperty(service, 'renderer', { value: renderer, configurable: true });
+    Object.defineProperty(service, 'editorAmbientLight', {
+      value: editorAmbientLight,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'editorDirectionalLight', {
+      value: editorDirectionalLight,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({ rootNodes: [new Group2D({ id: 'group', name: 'Group' })] }),
+      },
+      configurable: true,
+    });
+
+    (service as unknown as { syncLighting: () => void }).syncLighting();
+
+    expect(renderer.shadowMap.enabled).toBe(true);
+    expect(editorAmbientLight.visible).toBe(true);
+    expect(editorDirectionalLight.visible).toBe(true);
+  });
+
+  it('disables fallback editor lighting when the active scene contains explicit lights', () => {
+    resetAppState();
+    appState.ui.showLighting = true;
+
+    const service = new ViewportRendererService();
+    const renderer = { shadowMap: { enabled: false } } as THREE.WebGLRenderer;
+    const editorAmbientLight = new THREE.AmbientLight();
+    const editorDirectionalLight = new THREE.DirectionalLight();
+    const lightNode = new DirectionalLightNode({ id: 'dir-light', name: 'Sun' });
+
+    Object.defineProperty(service, 'renderer', { value: renderer, configurable: true });
+    Object.defineProperty(service, 'editorAmbientLight', {
+      value: editorAmbientLight,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'editorDirectionalLight', {
+      value: editorDirectionalLight,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({ rootNodes: [lightNode] }),
+      },
+      configurable: true,
+    });
+
+    (service as unknown as { syncLighting: () => void }).syncLighting();
+
+    expect(renderer.shadowMap.enabled).toBe(true);
+    expect(editorAmbientLight.visible).toBe(false);
+    expect(editorDirectionalLight.visible).toBe(false);
+  });
+
+  it('detects explicit lights in nested scene nodes', () => {
+    const service = new ViewportRendererService();
+    const nestedLight = new DirectionalLightNode({ id: 'nested-light', name: 'Nested Light' });
+    const root = new Group2D({ id: 'root-group', name: 'Root Group' });
+
+    root.adoptChild(nestedLight);
+
+    const result = (
+      service as unknown as {
+        containsExplicitLights: (
+          nodes: readonly AmbientLightNode[] | readonly Group2D[]
+        ) => boolean;
+      }
+    ).containsExplicitLights([root]);
+
+    expect(result).toBe(true);
+  });
+
   it('resets the 2D camera without touching 3D orbit controls', () => {
     resetAppState();
     appState.ui.navigationMode = '2d';
@@ -251,5 +342,83 @@ describe('ViewportRendererService', () => {
     expect(orthographicCamera.position.x).toBe(0);
     expect(orthographicCamera.position.y).toBe(0);
     expect(orthographicCamera.zoom).toBe(1);
+  });
+
+  it('ticks previewable components in editor mode', () => {
+    resetAppState();
+    appState.ui.isPlaying = false;
+
+    class PreviewScript extends Script {
+      readonly tickSpy = vi.fn();
+
+      override tickEditorPreview(dt: number): void {
+        this.tickSpy(dt);
+      }
+    }
+
+    const service = new ViewportRendererService();
+    const node = new Node3D({ id: 'preview-root', name: 'Preview Root' });
+    const component = new PreviewScript('preview-script', 'user:PreviewScript');
+    const assetLoader = { loadInstancingModel: vi.fn() };
+
+    node.addComponent(component);
+
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({ rootNodes: [node] }),
+      },
+      configurable: true,
+    });
+    Object.defineProperty(service, 'assetLoader', {
+      value: assetLoader,
+      configurable: true,
+    });
+
+    (
+      service as unknown as {
+        tickComponentPreview: (dt: number) => void;
+      }
+    ).tickComponentPreview(0.25);
+
+    expect(component.tickSpy).toHaveBeenCalledTimes(1);
+    expect(component.tickSpy).toHaveBeenCalledWith(0.25);
+  });
+
+  it('skips previewable components while play mode is active', () => {
+    resetAppState();
+    appState.ui.isPlaying = true;
+
+    class PreviewScript extends Script {
+      readonly tickSpy = vi.fn();
+
+      override tickEditorPreview(dt: number): void {
+        this.tickSpy(dt);
+      }
+    }
+
+    const service = new ViewportRendererService();
+    const node = new Node3D({ id: 'preview-root-play', name: 'Preview Root Play' });
+    const component = new PreviewScript('preview-script-play', 'user:PreviewScript');
+
+    node.addComponent(component);
+
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({ rootNodes: [node] }),
+      },
+      configurable: true,
+    });
+    Object.defineProperty(service, 'assetLoader', {
+      value: { loadInstancingModel: vi.fn() },
+      configurable: true,
+    });
+
+    (
+      service as unknown as {
+        tickComponentPreview: (dt: number) => void;
+      }
+    ).tickComponentPreview(0.25);
+
+    expect(component.tickSpy).not.toHaveBeenCalled();
   });
 });

@@ -2,10 +2,12 @@ import {
   Camera,
   Clock,
   Scene,
-  PerspectiveCamera,
   OrthographicCamera,
   Color,
   Quaternion,
+  Raycaster,
+  Vector2,
+  type Object3D,
 } from 'three';
 import { SceneManager } from './SceneManager';
 import { RuntimeRenderer } from './RuntimeRenderer';
@@ -13,24 +15,36 @@ import { InputService } from './InputService';
 import { SceneService } from './SceneService';
 import { AudioService } from './AudioService';
 import { AssetLoader } from './AssetLoader';
+import { ResourceManager } from './ResourceManager';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
 import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { AnimatedSprite3D } from '../nodes/3D/AnimatedSprite3D';
 import { Particles3D } from '../nodes/3D/Particles3D';
+import { InstancedMesh3D } from '../nodes/3D/InstancedMesh3D';
 import { AudioPlayer } from '../nodes/AudioPlayer';
 import { LAYER_3D, LAYER_2D } from '../constants';
+import { ECSService } from './ECSService';
+import type { SceneRaycastHit } from './raycast';
 
 export class SceneRunner {
   private readonly sceneManager: SceneManager;
   private readonly renderer: RuntimeRenderer;
+  private readonly assetLoader: AssetLoader;
   private readonly inputService: InputService;
   private readonly sceneService: SceneService;
+  private readonly ecsService: ECSService;
   private readonly audioService: AudioService;
+  private readonly resourceManager: ResourceManager;
   private readonly clock: Clock;
+  private readonly raycaster = new Raycaster();
+  private readonly raycastPointer = new Vector2();
   private animationFrameId: number | null = null;
   private isRunning: boolean = false;
+  private fixedTimeAccumulator = 0;
+  private elapsedTime = 0;
+  private frameNumber = 0;
 
   private scene: Scene;
   private activeCamera: Camera3D | null = null;
@@ -47,9 +61,12 @@ export class SceneRunner {
   ) {
     this.sceneManager = sceneManager;
     this.renderer = renderer;
+    this.assetLoader = assetLoader;
     this.inputService = new InputService();
     this.sceneService = new SceneService();
+    this.ecsService = new ECSService();
     this.audioService = audioService;
+    this.resourceManager = assetLoader.getResourceManager();
     this.clock = new Clock();
     this.scene = new Scene();
     // Default background
@@ -62,28 +79,7 @@ export class SceneRunner {
     this.orthographicCamera.layers.disableAll();
     this.orthographicCamera.layers.enable(LAYER_2D);
 
-    // Wire SceneService delegate
-    const runner = this;
-    this.sceneService.setDelegate({
-      getActiveCameraNode(): Camera3D | null {
-        return runner.activeCamera;
-      },
-      getUICamera(): Camera | null {
-        return runner.orthographicCamera;
-      },
-      setActiveCameraNode(camera: Camera3D | null): void {
-        runner.activeCamera = camera;
-      },
-      findNodeById(id: string): NodeBase | null {
-        return runner.findNodeById(id);
-      },
-      getAudioService(): AudioService {
-        return audioService;
-      },
-      getAssetLoader(): AssetLoader {
-        return assetLoader;
-      },
-    });
+    this.bindSceneServiceDelegate();
   }
 
   /**
@@ -100,6 +96,7 @@ export class SceneRunner {
     }
 
     this.stop();
+    this.bindSceneServiceDelegate();
 
     // Ensure fade overlay is positioned over the correct canvas
     this.sceneService.attachCanvas(this.renderer.domElement);
@@ -144,9 +141,15 @@ export class SceneRunner {
     // the new scene's Layout2D authored dimensions on the first tick.
     this.viewportSize = { width: 0, height: 0 };
     this.logicalCameraSize = { width: 1, height: 1 };
+    this.fixedTimeAccumulator = 0;
+    this.elapsedTime = 0;
+    this.frameNumber = 0;
+
+    this.ecsService.beginScene(this.sceneService, this.inputService);
 
     // Initial tick to update transforms before render
     this.updateNodes(0);
+    this.flushInstancedNodes();
 
     this.isRunning = true;
     this.clock.start();
@@ -162,6 +165,12 @@ export class SceneRunner {
       cancelAnimationFrame(this.animationFrameId);
       this.animationFrameId = null;
     }
+
+    this.ecsService.endScene();
+    this.ecsService.clear();
+    this.fixedTimeAccumulator = 0;
+    this.elapsedTime = 0;
+    this.frameNumber = 0;
 
     // Clear the runtime scene to release resources
     if (this.runtimeGraph) {
@@ -205,7 +214,23 @@ export class SceneRunner {
 
     const dt = this.clock.getDelta();
 
+    this.inputService.beginFrame();
+    this.frameNumber += 1;
+    this.elapsedTime += dt;
+    this.fixedTimeAccumulator += dt;
+
+    this.runFixedUpdates();
+
+    const alpha =
+      this.ecsService.fixedTimeStep > 0
+        ? Math.min(this.fixedTimeAccumulator / this.ecsService.fixedTimeStep, 1)
+        : 0;
+    this.ecsService.setFrameMetrics(this.elapsedTime, this.frameNumber);
+    this.ecsService.setInterpolationAlpha(alpha);
+    this.ecsService.update(dt, alpha);
+
     this.updateNodes(dt);
+    this.flushInstancedNodes();
     this.render();
 
     this.animationFrameId = requestAnimationFrame(this.tick);
@@ -292,14 +317,8 @@ export class SceneRunner {
     }
 
     if (this.activeCamera) {
-      // Use CSS pixel aspect ratio for correct visual perspective.
       const aspect = cssWidth / cssHeight;
-      if (this.activeCamera.camera instanceof PerspectiveCamera) {
-        if (this.activeCamera.camera.aspect !== aspect) {
-          this.activeCamera.camera.aspect = aspect;
-          this.activeCamera.camera.updateProjectionMatrix();
-        }
-      }
+      this.activeCamera.updateAspectRatio(aspect);
     }
 
     // 2D Camera - use the adaptive logical camera dimensions so the ortho camera
@@ -377,6 +396,149 @@ export class SceneRunner {
       const found = node.findById(id);
       if (found) return found;
     }
+    return null;
+  }
+
+  private bindSceneServiceDelegate(): void {
+    const runner = this;
+    this.sceneService.setDelegate({
+      getActiveCameraNode(): Camera3D | null {
+        return runner.activeCamera;
+      },
+      getUICamera(): Camera | null {
+        return runner.orthographicCamera;
+      },
+      setActiveCameraNode(camera: Camera3D | null): void {
+        runner.activeCamera = camera;
+      },
+      findNodeById(id: string): NodeBase | null {
+        return runner.findNodeById(id);
+      },
+      getAudioService(): AudioService {
+        return runner.audioService;
+      },
+      getAssetLoader(): AssetLoader {
+        return runner.assetLoader;
+      },
+      getResourceManager(): ResourceManager {
+        return runner.resourceManager;
+      },
+      getECSService(): ECSService | null {
+        return runner.runtimeGraph ? runner.ecsService : null;
+      },
+      raycastViewport(normalizedX: number, normalizedY: number): SceneRaycastHit | null {
+        return runner.raycastViewport(normalizedX, normalizedY);
+      },
+    });
+  }
+
+  private runFixedUpdates(): void {
+    const fixedTimeStep = this.ecsService.fixedTimeStep;
+    if (fixedTimeStep <= 0 || this.fixedTimeAccumulator < fixedTimeStep) {
+      return;
+    }
+
+    let executedSteps = 0;
+    let simulatedTime = this.elapsedTime - this.fixedTimeAccumulator;
+
+    while (
+      this.fixedTimeAccumulator >= fixedTimeStep &&
+      executedSteps < this.ecsService.maxFixedStepsPerFrame
+    ) {
+      this.fixedTimeAccumulator -= fixedTimeStep;
+      simulatedTime += fixedTimeStep;
+      this.ecsService.setFrameMetrics(simulatedTime, this.frameNumber);
+      this.ecsService.fixedUpdate(fixedTimeStep);
+      executedSteps += 1;
+    }
+
+    if (executedSteps === this.ecsService.maxFixedStepsPerFrame) {
+      this.fixedTimeAccumulator = Math.min(this.fixedTimeAccumulator, fixedTimeStep);
+    }
+  }
+
+  private flushInstancedNodes(): void {
+    const graph = this.runtimeGraph;
+    if (!graph) {
+      return;
+    }
+
+    const stack = [...graph.rootNodes];
+    while (stack.length > 0) {
+      const node = stack.pop();
+      if (!node) {
+        continue;
+      }
+
+      if (node instanceof InstancedMesh3D) {
+        node.flush();
+      }
+
+      for (const child of node.children) {
+        if (child instanceof NodeBase) {
+          stack.push(child);
+        }
+      }
+    }
+  }
+
+  private raycastViewport(normalizedX: number, normalizedY: number): SceneRaycastHit | null {
+    if (!this.runtimeGraph) {
+      return null;
+    }
+
+    const uiHit = this.raycastWithCamera(normalizedX, normalizedY, this.orthographicCamera, LAYER_2D);
+    if (uiHit) {
+      return uiHit;
+    }
+
+    if (!this.activeCamera) {
+      return null;
+    }
+
+    return this.raycastWithCamera(normalizedX, normalizedY, this.activeCamera.camera, LAYER_3D);
+  }
+
+  private raycastWithCamera(
+    normalizedX: number,
+    normalizedY: number,
+    camera: Camera,
+    layer: number
+  ): SceneRaycastHit | null {
+    this.raycastPointer.set(normalizedX, normalizedY);
+    this.raycaster.layers.set(layer);
+    this.raycaster.setFromCamera(this.raycastPointer, camera);
+
+    const intersections = this.raycaster.intersectObjects(this.scene.children, true);
+    for (const intersection of intersections) {
+      const node = this.resolveNodeFromObject(intersection.object);
+      if (!node) {
+        continue;
+      }
+
+      return {
+        node,
+        distance: intersection.distance,
+        point: intersection.point.clone(),
+        object: intersection.object,
+        instanceId:
+          typeof intersection.instanceId === 'number' ? intersection.instanceId : undefined,
+      };
+    }
+
+    return null;
+  }
+
+  private resolveNodeFromObject(object: Object3D): NodeBase | null {
+    let current: Object3D | null = object;
+
+    while (current) {
+      if (current instanceof NodeBase) {
+        return current;
+      }
+      current = current.parent;
+    }
+
     return null;
   }
 

@@ -43,8 +43,10 @@ export class RemoveComponentOperation implements Operation<OperationInvokeResult
     }
 
     const node = scene.nodeMap.get(this.params.nodeId);
-    if (!node) {
-      console.error(`[RemoveComponentOperation] Node "${this.params.nodeId}" not found`);
+    if (!node || !node.components || !Array.isArray(node.components)) {
+      console.error(
+        `[RemoveComponentOperation] Node "${this.params.nodeId}" not found or has no components`
+      );
       return { didMutate: false };
     }
 

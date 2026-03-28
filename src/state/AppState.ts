@@ -81,6 +81,8 @@ export interface ScenesState {
 
   /** Per-scene camera state keyed by scene id. */
   cameraStates: Record<string, CameraState>;
+  /** Per-scene camera node used for the viewport preview inset. */
+  previewCameraNodeIds: Record<string, string | null>;
 }
 
 export type ProjectStatus = 'idle' | 'selecting' | 'ready' | 'error';
@@ -151,6 +153,7 @@ export interface PanelVisibilityState {
 }
 
 export type NavigationMode = '2d' | '3d';
+export type EditorCameraProjection = 'perspective' | 'orthographic';
 
 export interface Navigation2DSettings {
   /** Pan sensitivity for mouse/trackpad scrolling in 2D mode */
@@ -174,9 +177,11 @@ export interface UIState {
   showLayer2D: boolean;
   /** Toggle for showing the 3D perspective layer */
   showLayer3D: boolean;
+  /** Projection mode of the editor-controlled 3D camera */
+  editorCameraProjection: EditorCameraProjection;
   /** Toggle for showing the 3D grid helper */
   showGrid: boolean;
-  /** Toggle for editor viewport lighting and shadow preview */
+  /** Toggle for editor fallback lighting used when the scene has no explicit light sources */
   showLighting: boolean;
   /** Warn before leaving the page with unsaved changes */
   warnOnUnsavedUnload: boolean;
@@ -246,6 +251,7 @@ export const createInitialAppState = (): AppState => ({
     pendingScenePaths: [],
     nodeDataChangeSignal: 0,
     cameraStates: {},
+    previewCameraNodeIds: {},
   },
   tabs: {
     tabs: [],
@@ -281,6 +287,7 @@ export const createInitialAppState = (): AppState => ({
     },
     showLayer2D: true,
     showLayer3D: true,
+    editorCameraProjection: 'perspective',
     showGrid: true,
     showLighting: true,
     warnOnUnsavedUnload: true,

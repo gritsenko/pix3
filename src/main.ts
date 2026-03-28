@@ -6,14 +6,36 @@ import './index.css';
 // Expose Engine API for user scripts
 import * as EngineAPI from '@pix3/runtime';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+// Game-specific dependencies exposed for project scripts (DeepCore)
+import RAPIER from '@dimforge/rapier3d-compat';
+
+type HapticFunction = (() => void) & {
+  confirm: () => void;
+  error: () => void;
+};
 
 interface WindowWithEngine extends Window {
   __PIX3_ENGINE__: typeof EngineAPI;
   __PIX3_THREE__: typeof THREE;
+  __RAPIER__: typeof RAPIER;
+  __PIX3_GLTFLoader__: typeof GLTFLoader;
+  __PIX3_IOS_HAPTICS__: {
+    haptic: HapticFunction;
+  };
 }
 
 (window as unknown as WindowWithEngine).__PIX3_ENGINE__ = EngineAPI;
 (window as unknown as WindowWithEngine).__PIX3_THREE__ = THREE;
+(window as unknown as WindowWithEngine).__RAPIER__ = RAPIER;
+(window as unknown as WindowWithEngine).__PIX3_GLTFLoader__ = GLTFLoader;
+(window as unknown as WindowWithEngine).__PIX3_IOS_HAPTICS__ = {
+  haptic: Object.assign(() => undefined, {
+    confirm: () => undefined,
+    error: () => undefined,
+  }),
+};
 
 // Create dynamic import map for @pix3/runtime
 // This allows user scripts to import from '@pix3/runtime' at runtime
@@ -41,6 +63,32 @@ const createImportMapShim = () => {
   const threeBlob = new Blob([threeModuleCode], { type: 'application/javascript' });
   const threeBlobUrl = URL.createObjectURL(threeBlob);
 
+  const rapierModuleCode = `
+    const api = window.__RAPIER__;
+    export default api;
+    ${Object.keys(RAPIER)
+      .map(key => `export const ${key} = api.${key};`)
+      .join('\n')}
+  `;
+  const rapierBlob = new Blob([rapierModuleCode], { type: 'application/javascript' });
+  const rapierBlobUrl = URL.createObjectURL(rapierBlob);
+
+  const gltfLoaderModuleCode = `
+    const api = window.__PIX3_GLTFLoader__;
+    export const GLTFLoader = api;
+    export default api;
+  `;
+  const gltfLoaderBlob = new Blob([gltfLoaderModuleCode], { type: 'application/javascript' });
+  const gltfLoaderBlobUrl = URL.createObjectURL(gltfLoaderBlob);
+
+  const iosHapticsModuleCode = `
+    const api = window.__PIX3_IOS_HAPTICS__;
+    export const haptic = api.haptic;
+    export default api;
+  `;
+  const iosHapticsBlob = new Blob([iosHapticsModuleCode], { type: 'application/javascript' });
+  const iosHapticsBlobUrl = URL.createObjectURL(iosHapticsBlob);
+
   // Inject import map into document
   const importMap = document.createElement('script');
   importMap.type = 'importmap';
@@ -48,6 +96,9 @@ const createImportMapShim = () => {
     imports: {
       '@pix3/runtime': blobUrl,
       three: threeBlobUrl,
+      '@dimforge/rapier3d-compat': rapierBlobUrl,
+      'three/examples/jsm/loaders/GLTFLoader.js': gltfLoaderBlobUrl,
+      'ios-haptics': iosHapticsBlobUrl,
     },
   });
   document.head.appendChild(importMap);

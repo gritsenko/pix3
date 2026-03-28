@@ -4,9 +4,13 @@ import { OperationService } from '@/services/OperationService';
 import { UpdateComponentPropertyCommand } from './UpdateComponentPropertyCommand';
 import { UpdateComponentPropertyOperation } from './UpdateComponentPropertyOperation';
 
-const createContext = (invokeAndPushResult: boolean): CommandContext => {
-  const operationServiceMock: Pick<OperationService, 'invokeAndPush'> = {
+const createContext = (
+  invokeAndPushResult: boolean,
+  invokeResult = { didMutate: true }
+): CommandContext => {
+  const operationServiceMock: Pick<OperationService, 'invokeAndPush' | 'invoke'> = {
     invokeAndPush: vi.fn(async () => invokeAndPushResult),
+    invoke: vi.fn(async () => invokeResult),
   };
 
   const container = {
@@ -48,6 +52,27 @@ describe('UpdateComponentPropertyCommand', () => {
     expect(service.invokeAndPush).toHaveBeenCalledWith(
       expect.any(UpdateComponentPropertyOperation)
     );
+  });
+
+  it('uses OperationService.invoke for preview updates', async () => {
+    const context = createContext(true);
+    const command = new UpdateComponentPropertyCommand({
+      nodeId: 'node-1',
+      componentId: 'component-1',
+      propertyName: 'rotationSpeed',
+      value: 2.5,
+      historyMode: 'preview',
+    });
+
+    const result = await command.execute(context);
+
+    const service = context.container.getService<
+      Pick<OperationService, 'invoke' | 'invokeAndPush'>
+    >(context.container.getOrCreateToken(OperationService));
+
+    expect(result.didMutate).toBe(true);
+    expect(service.invoke).toHaveBeenCalledTimes(1);
+    expect(service.invokeAndPush).not.toHaveBeenCalled();
   });
 
   it('returns didMutate=false when operation was not pushed', async () => {

@@ -316,7 +316,7 @@ export class DuplicateNodesOperation implements Operation<OperationInvokeResult>
     const typeHint = typeof node.type === 'string' ? node.type : 'node';
     node.id = this.generateUniqueNodeId(typeHint, reservedIds);
 
-    if (Array.isArray(node.components)) {
+    if (node.components && Array.isArray(node.components)) {
       for (const component of node.components) {
         const componentType =
           typeof component.type === 'string' && component.type.length > 0
@@ -326,7 +326,7 @@ export class DuplicateNodesOperation implements Operation<OperationInvokeResult>
       }
     }
 
-    if (Array.isArray(node.children)) {
+    if (node.children && Array.isArray(node.children)) {
       for (const child of node.children) {
         this.rewriteIdsRecursively(child, reservedIds);
       }

@@ -6,7 +6,7 @@ export const ServiceLifetime = {
 export type ServiceLifetimeOption = (typeof ServiceLifetime)[keyof typeof ServiceLifetime];
 
 /** Generic constructor type for dependency injection */
-type Constructor<T = unknown> = new (...args: unknown[]) => T;
+type Constructor<T = unknown> = new (...args: never[]) => T;
 
 // Base service interface
 export interface IService {

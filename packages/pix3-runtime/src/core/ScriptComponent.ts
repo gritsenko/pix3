@@ -7,7 +7,13 @@
 
 import type { PropertySchema } from '../fw/property-schema';
 import type { NodeBase } from '../nodes/NodeBase';
+import type { AssetLoader } from './AssetLoader';
 import type { SceneService } from './SceneService';
+
+export interface EditorPreviewContext {
+  assetLoader: AssetLoader;
+  requestRender: () => void;
+}
 
 /**
  * Type helper for constructors
@@ -55,6 +61,12 @@ export interface ScriptComponent {
    * Use this to update state and animate properties.
    */
   onUpdate?(dt: number): void;
+
+  /**
+   * Called by the editor viewport render loop when a component wants to show
+   * editor-only preview state without entering play mode.
+   */
+  tickEditorPreview?(dt: number, context: EditorPreviewContext): void;
 
   /**
    * Called when the script component is detached from a node or the scene is unloaded.
@@ -115,6 +127,7 @@ export abstract class Script implements ScriptComponent {
   onAttach?(node: NodeBase): void;
   onStart?(): void;
   onUpdate?(dt: number): void;
+  tickEditorPreview?(dt: number, context: EditorPreviewContext): void;
   onDetach(): void {
     if (this.node) {
       this.node.disconnectAllFromTarget(this);

@@ -63,16 +63,16 @@ export interface PropertyUIHints {
   hidden?: boolean;
 
   /** Property is read-only */
-  readOnly?: boolean;
+  readOnly?: boolean | ((target: unknown) => boolean);
 
   /** For 'node' type - array of allowed node types (e.g. ['MeshInstance', 'Node3D']) */
   nodeTypes?: string[];
 
   /** Optional specialized editor kind for custom inspector widgets */
-  editor?: 'texture-resource' | 'audio-resource' | 'sprite-size';
+  editor?: 'texture-resource' | 'audio-resource' | 'model-resource' | 'sprite-size';
 
   /** Optional resource subtype for object-like values */
-  resourceType?: 'texture';
+  resourceType?: 'texture' | 'model';
 }
 
 /** Validation rule for a property */

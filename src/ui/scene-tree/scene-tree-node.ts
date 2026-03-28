@@ -131,8 +131,8 @@ export class SceneTreeNodeComponent extends ComponentBase {
     super.disconnectedCallback();
   }
 
-  updated(changedProperties: Map<string, unknown>): void {
-    super.updated(changedProperties as Map<string, unknown>);
+  willUpdate(changedProperties: Map<string, unknown>): void {
+    super.willUpdate(changedProperties as Map<string, unknown>);
     if (changedProperties.has('node') || changedProperties.has('collapsedNodeIds')) {
       this.isCollapsed = this.collapsedNodeIds.has(this.node.id);
     }
@@ -488,10 +488,10 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
   private onToggleNode(event: Event): void {
     event.stopPropagation();
-    this.isCollapsed = !this.isCollapsed;
+    const nextCollapsedState = !this.isCollapsed;
     this.dispatchEvent(
       new CustomEvent('toggle-node', {
-        detail: { nodeId: this.node.id, isCollapsed: this.isCollapsed },
+        detail: { nodeId: this.node.id, isCollapsed: nextCollapsedState },
         bubbles: true,
         composed: true,
       })
@@ -784,7 +784,6 @@ export class SceneTreeNodeComponent extends ComponentBase {
       });
 
       await this.commandDispatcher.execute(command);
-      this.isVisible = newVisibleState;
     } catch (error) {
       console.error('[SceneTreeNode] Failed to toggle visibility:', error);
     }
@@ -802,7 +801,6 @@ export class SceneTreeNodeComponent extends ComponentBase {
       });
 
       await this.commandDispatcher.execute(command);
-      this.isLocked = newLockedState;
     } catch (error) {
       console.error('[SceneTreeNode] Failed to toggle lock:', error);
     }

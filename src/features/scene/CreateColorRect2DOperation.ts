@@ -1,18 +1,6 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { ColorRect2D } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
 import { Vector2 } from 'three';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
-import {
-  attachNode,
-  detachNode,
-  resolve2DParentForCreation,
-} from '@/features/scene/node-placement';
 
 export interface CreateColorRect2DOperationParams {
   nodeName?: string;
@@ -20,77 +8,37 @@ export interface CreateColorRect2DOperationParams {
   parentNodeId?: string | null;
 }
 
-export class CreateColorRect2DOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-colorrect2d',
-    title: 'Create ColorRect2D',
-    description: 'Create a 2D color rectangle in the scene',
-    tags: ['scene', '2d', 'color', 'rect', 'node', 'ui'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateColorRect2DOperationParams;
-
-  constructor(params: CreateColorRect2DOperationParams = {}) {
-    this.params = params;
+export class CreateColorRect2DOperation extends CreateNodeOperationBase<CreateColorRect2DOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-colorrect2d';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create ColorRect2D';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create a 2D color rectangle in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '2d', 'color', 'rect', 'node', 'ui'];
+  }
 
-    const nodeId = `colorrect2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const nodeName = this.params.nodeName || 'ColorRect2D';
+  protected getNodeTypeName(): string {
+    return 'ColorRect2D';
+  }
 
+  protected createNode(params: CreateColorRect2DOperationParams, nodeId: string) {
+    const nodeName = params.nodeName || 'ColorRect2D';
     const node = new ColorRect2D({
       id: nodeId,
       name: nodeName,
-      position: this.params.position || new Vector2(100, 100),
+      position: params.position || new Vector2(100, 100),
       width: 100,
       height: 100,
       color: '#ffffff',
     });
-
-    const targetParent = resolve2DParentForCreation(
-      sceneGraph,
-      this.params.parentNodeId ?? null,
-      state.selection.primaryNodeId
-    );
-
-    attachNode(sceneGraph, node, targetParent);
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${nodeName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }

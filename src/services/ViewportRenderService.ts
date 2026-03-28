@@ -31,6 +31,8 @@ import { Sprite3D } from '@pix3/runtime';
 import { Particles3D } from '@pix3/runtime';
 import { AmbientLightNode } from '@pix3/runtime';
 import { HemisphereLightNode } from '@pix3/runtime';
+import { AssetLoader } from '@pix3/runtime';
+import type { EditorPreviewContext, ScriptComponent } from '@pix3/runtime';
 import { injectable, inject } from '@/fw/di';
 import { SceneManager, InputService } from '@pix3/runtime';
 import { OperationService } from '@/services/OperationService';
@@ -55,6 +57,7 @@ import {
 import { isDocumentActive } from './page-activity';
 
 export type TransformMode = 'select' | 'translate' | 'rotate' | 'scale';
+const EDITOR_ORTHOGRAPHIC_FRUSTUM_HEIGHT = 12;
 
 const LAYER_3D = 0;
 const LAYER_2D = 1;
@@ -84,11 +87,16 @@ export class ViewportRendererService {
   @inject(ResourceManager)
   private readonly resourceManager!: ResourceManager;
 
+  @inject(AssetLoader)
+  private readonly assetLoader!: AssetLoader;
+
   private renderer?: THREE.WebGLRenderer;
   private canvas?: HTMLCanvasElement;
   private canvasHost?: HTMLElement;
   private scene?: THREE.Scene;
-  private camera?: THREE.PerspectiveCamera;
+  private camera?: THREE.PerspectiveCamera | THREE.OrthographicCamera;
+  private perspectiveCamera?: THREE.PerspectiveCamera;
+  private editorOrthographicCamera?: THREE.OrthographicCamera;
   private orthographicCamera?: THREE.OrthographicCamera;
   private orbitControls?: OrbitControls;
   private orthographicControls?: OrbitControls;
@@ -135,7 +143,7 @@ export class ViewportRendererService {
 
   // Animation preview
   private animationMixers = new Map<string, THREE.AnimationMixer>();
-  private animationClock = new THREE.Clock();
+  private animationTimer = new THREE.Timer();
   private previewAnimationActions = new Map<string, THREE.AnimationAction>();
 
   // Gesture handling for 2D navigation
@@ -204,23 +212,31 @@ export class ViewportRendererService {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(0x13161b, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.shadowMap.enabled = appState.ui.showLighting;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.enabled = this.shouldEnableRendererShadowMap();
+    this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     // Create scene
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x13161b);
 
     // Create camera
-    this.camera = new THREE.PerspectiveCamera(75, 1, 0.1, 10000);
-    this.camera.position.copy(DEFAULT_3D_CAMERA_POSITION);
-    this.camera.lookAt(DEFAULT_3D_CAMERA_TARGET);
+    this.perspectiveCamera = new THREE.PerspectiveCamera(75, 1, 0.1, 10000);
+    this.perspectiveCamera.position.copy(DEFAULT_3D_CAMERA_POSITION);
+    this.perspectiveCamera.lookAt(DEFAULT_3D_CAMERA_TARGET);
+    this.camera = this.perspectiveCamera;
+
+    this.editorOrthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10000);
+    this.editorOrthographicCamera.position.copy(DEFAULT_3D_CAMERA_POSITION);
+    this.editorOrthographicCamera.lookAt(DEFAULT_3D_CAMERA_TARGET);
 
     // Set up camera layers: layer 0 for 3D nodes, layer 1 for 2D nodes, layer 2 for gizmos
     // Main perspective camera renders 3D layer and gizmos
-    this.camera.layers.disableAll();
-    this.camera.layers.enable(LAYER_3D);
-    this.camera.layers.enable(LAYER_GIZMOS);
+    this.perspectiveCamera.layers.disableAll();
+    this.perspectiveCamera.layers.enable(LAYER_3D);
+    this.perspectiveCamera.layers.enable(LAYER_GIZMOS);
+    this.editorOrthographicCamera.layers.disableAll();
+    this.editorOrthographicCamera.layers.enable(LAYER_3D);
+    this.editorOrthographicCamera.layers.enable(LAYER_GIZMOS);
 
     // Create orthographic camera for 2D layer overlay
     this.orthographicCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000);
@@ -243,12 +259,7 @@ export class ViewportRendererService {
     this.scene.add(this.gridHelper);
 
     // Initialize OrbitControls
-    this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
-    this.orbitControls.enableDamping = true;
-    this.orbitControls.dampingFactor = 0.3;
-    this.orbitControls.autoRotate = false;
-    this.orbitControls.enableZoom = true;
-    this.orbitControls.enablePan = true;
+    this.createEditorOrbitControls();
 
     // Initialize 2D controls for the orthographic camera
     if (this.orthographicCamera) {
@@ -265,43 +276,7 @@ export class ViewportRendererService {
     }
 
     // Initialize TransformControls for object manipulation
-    this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
-    this.transformControls.setMode('translate'); // Default to translate mode
-    this.transformControls.size = 0.6; // Make gizmos smaller/thinner (default is 1)
-
-    // Ensure the internal raycaster can intersect with the gizmo, which we place on LAYER_GIZMOS
-    this.transformControls.getRaycaster().layers.enable(LAYER_GIZMOS);
-
-    // When dragging with transform controls, disable orbit controls
-    this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
-      if (event.value) {
-        this.setOrbitEnabled(false);
-        // Track transform start state when dragging begins
-        if (this.transformControls?.object) {
-          this.captureTransformStartState(this.transformControls.object);
-        }
-      } else {
-        // Reset OrbitControls' stuck internal state before re-enabling.
-        // OrbitControls processes the same pointerdown as TransformControls
-        // (both listen on the canvas), entering ROTATE state and tracking
-        // the pointer before we disable it. Its pointerup cleanup doesn't
-        // fire properly when TransformControls captures the pointer,
-        // leaving state/pointers stuck.
-        this.resetOrbitInternalState();
-        this.setOrbitEnabled(true);
-      }
-    });
-
-    // Update selection box when transform control object changes
-    this.transformControls.addEventListener('objectChange', () => {
-      this.updateSelectionBoxes();
-      this.updateTargetTransformFromControl();
-    });
-
-    // Handle transform completion (when mouse is released)
-    this.transformControls.addEventListener('mouseUp', () => {
-      this.handleTransformCompleted();
-    });
+    this.createTransformControls();
 
     // Render loop will start on first attach/resume
 
@@ -315,12 +290,15 @@ export class ViewportRendererService {
 
     const unsubscribeScenes = subscribe(appState.scenes, () => {
       syncIfActiveSceneChanged();
+      this.updateSelection();
+      this.requestRender();
     });
     this.disposers.push(unsubscribeScenes);
 
     // Subscribe to selection changes
     const unsubscribeSelection = subscribe(appState.selection, () => {
       this.updateSelection();
+      this.requestRender();
     });
     this.disposers.push(unsubscribeSelection);
 
@@ -336,6 +314,7 @@ export class ViewportRendererService {
       this.toggleGrid();
       this.syncNavigationMode();
       this.syncLighting();
+      this.syncEditorCameraProjection();
       this.syncBaseViewportFrame();
       this.updateNodeIconVisibility();
       this.handleFocusPause();
@@ -387,6 +366,7 @@ export class ViewportRendererService {
 
     this.syncNavigationMode();
     this.syncLighting();
+    this.syncEditorCameraProjection();
     this.syncBaseViewportFrame();
 
     // Initial sync
@@ -491,7 +471,7 @@ export class ViewportRendererService {
 
     if (!this.isPaused) return;
     this.isPaused = false;
-    this.animationClock.getDelta();
+    this.animationTimer.update();
     this.startRenderLoop();
   }
 
@@ -504,7 +484,7 @@ export class ViewportRendererService {
       this.cancelPanMomentum();
     } else {
       if (!this.isPaused && !this.animationId) {
-        this.animationClock.getDelta();
+        this.animationTimer.update();
         this.startRenderLoop();
       }
     }
@@ -596,6 +576,107 @@ export class ViewportRendererService {
     }
   }
 
+  private createEditorOrbitControls(): void {
+    if (!this.camera || !this.renderer) {
+      return;
+    }
+
+    this.orbitControls?.dispose();
+    this.orbitControls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.orbitControls.enableDamping = true;
+    this.orbitControls.dampingFactor = 0.3;
+    this.orbitControls.autoRotate = false;
+    this.orbitControls.enableZoom = true;
+    this.orbitControls.enablePan = true;
+  }
+
+  private createTransformControls(): void {
+    if (!this.camera || !this.renderer) {
+      return;
+    }
+
+    const attachedObject = this.transformControls?.object ?? null;
+    const existingMode = this.transformControls?.getMode() ?? this.currentTransformMode;
+
+    if (this.transformControls && this.scene) {
+      this.scene.remove(this.transformControls as unknown as THREE.Object3D);
+      this.transformControls.detach();
+      this.transformControls.dispose();
+    }
+
+    this.transformControls = new TransformControls(this.camera, this.renderer.domElement);
+    this.transformControls.setMode(existingMode === 'select' ? 'translate' : existingMode);
+    this.transformControls.size = 0.6;
+    this.transformControls.getRaycaster().layers.enable(LAYER_GIZMOS);
+
+    this.transformControls.addEventListener('dragging-changed', (event: { value: unknown }) => {
+      if (event.value) {
+        this.setOrbitEnabled(false);
+        if (this.transformControls?.object) {
+          this.captureTransformStartState(this.transformControls.object);
+        }
+      } else {
+        this.resetOrbitInternalState();
+        this.setOrbitEnabled(true);
+      }
+    });
+
+    this.transformControls.addEventListener('objectChange', () => {
+      this.updateSelectionBoxes();
+      this.updateTargetTransformFromControl();
+    });
+
+    this.transformControls.addEventListener('mouseUp', () => {
+      this.handleTransformCompleted();
+    });
+
+    if (attachedObject) {
+      this.transformControls.attach(attachedObject);
+    }
+
+    if (this.scene && this.currentTransformMode !== 'select' && this.transformControls.object) {
+      this.scene.add(this.transformControls as unknown as THREE.Object3D);
+    }
+  }
+
+  private syncEditorCameraProjection(): void {
+    this.ensureInitialized();
+    if (!this.renderer || !this.perspectiveCamera || !this.editorOrthographicCamera) {
+      return;
+    }
+
+    const targetProjection = appState.ui.editorCameraProjection;
+    const nextCamera =
+      targetProjection === 'orthographic' ? this.editorOrthographicCamera : this.perspectiveCamera;
+
+    if (this.camera === nextCamera) {
+      return;
+    }
+
+    const previousCamera = this.camera ?? this.perspectiveCamera;
+    const target = this.orbitControls?.target.clone() ?? DEFAULT_3D_CAMERA_TARGET.clone();
+    const position = previousCamera.position.clone();
+    const zoom = previousCamera.zoom;
+
+    nextCamera.position.copy(position);
+    nextCamera.zoom = zoom;
+    nextCamera.lookAt(target);
+    nextCamera.updateProjectionMatrix();
+    this.camera = nextCamera;
+
+    this.createEditorOrbitControls();
+    if (this.orbitControls) {
+      this.orbitControls.target.copy(target);
+      this.orbitControls.update();
+    }
+
+    this.createTransformControls();
+    this.syncNavigationMode();
+    this.resize(this.viewportSize.width || 1, this.viewportSize.height || 1);
+    this.attachTransformControlsForSelection();
+    this.requestRender();
+  }
+
   begin2DInteraction(): void {
     this.setOrbitEnabled(false);
     if (this.orthographicControls) {
@@ -614,9 +695,9 @@ export class ViewportRendererService {
   }
 
   private syncLighting(): void {
-    const enabled = appState.ui.showLighting;
+    const enabled = this.isEditorFallbackLightingEnabled();
     if (this.renderer) {
-      this.renderer.shadowMap.enabled = enabled;
+      this.renderer.shadowMap.enabled = this.shouldEnableRendererShadowMap();
     }
     if (this.editorAmbientLight) {
       this.editorAmbientLight.visible = enabled;
@@ -624,6 +705,54 @@ export class ViewportRendererService {
     if (this.editorDirectionalLight) {
       this.editorDirectionalLight.visible = enabled;
     }
+  }
+
+  private isEditorFallbackLightingEnabled(): boolean {
+    return appState.ui.showLighting && !this.activeSceneHasExplicitLights();
+  }
+
+  private shouldEnableRendererShadowMap(): boolean {
+    return appState.ui.showLighting || this.activeSceneHasExplicitLights();
+  }
+
+  private activeSceneHasExplicitLights(): boolean {
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return false;
+    }
+
+    return this.containsExplicitLights(sceneGraph.rootNodes);
+  }
+
+  private containsExplicitLights(nodes: readonly NodeBase[]): boolean {
+    for (const node of nodes) {
+      if (this.isExplicitLightNode(node)) {
+        return true;
+      }
+
+      if (node.children.length > 0 && this.containsExplicitLights(node.children)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private isExplicitLightNode(
+    node: NodeBase
+  ): node is
+    | DirectionalLightNode
+    | PointLightNode
+    | SpotLightNode
+    | AmbientLightNode
+    | HemisphereLightNode {
+    return (
+      node instanceof DirectionalLightNode ||
+      node instanceof PointLightNode ||
+      node instanceof SpotLightNode ||
+      node instanceof AmbientLightNode ||
+      node instanceof HemisphereLightNode
+    );
   }
 
   private ensureNodeIconTextures(): void {
@@ -680,8 +809,12 @@ export class ViewportRendererService {
 
     if (!this.camera || !this.orbitControls) return;
     this.camera.position.copy(DEFAULT_3D_CAMERA_POSITION);
+    this.camera.zoom = 1;
     this.camera.lookAt(DEFAULT_3D_CAMERA_TARGET);
-    this.orbitControls.reset();
+    this.orbitControls.target.copy(DEFAULT_3D_CAMERA_TARGET);
+    this.camera.updateProjectionMatrix();
+    this.orbitControls.update();
+    this.requestRender();
   }
 
   zoomAll(): void {
@@ -719,13 +852,34 @@ export class ViewportRendererService {
     const size = box.getSize(new THREE.Vector3());
     const maxDim = Math.max(size.x, size.y, size.z);
 
-    const fov = (this.camera as THREE.PerspectiveCamera).fov * (Math.PI / 180);
-    const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 2;
+    if (this.camera instanceof THREE.PerspectiveCamera) {
+      const fov = this.camera.fov * (Math.PI / 180);
+      const cameraZ = Math.abs(maxDim / 2 / Math.tan(fov / 2)) * 2;
 
-    this.camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
+      this.camera.position.set(center.x + cameraZ, center.y + cameraZ, center.z + cameraZ);
+    } else {
+      const direction = this.camera.position.clone().sub(this.orbitControls.target);
+      const distance = Math.max(direction.length(), 10);
+      if (direction.lengthSq() === 0) {
+        direction.set(1, 1, 1);
+      }
+      direction.normalize();
+      this.camera.position.copy(center).add(direction.multiplyScalar(distance));
+
+      const viewHeight = EDITOR_ORTHOGRAPHIC_FRUSTUM_HEIGHT;
+      const viewWidth =
+        viewHeight * Math.max(this.viewportSize.width / this.viewportSize.height, 1);
+      const targetZoom =
+        Math.max(0.1, Math.min(viewWidth / Math.max(size.x, 1), viewHeight / Math.max(size.y, 1))) *
+        0.9;
+      this.camera.zoom = targetZoom;
+      this.camera.updateProjectionMatrix();
+    }
+
     this.camera.lookAt(center);
     this.orbitControls.target.copy(center);
     this.orbitControls.update();
+    this.requestRender();
   }
 
   private reset2DView(): void {
@@ -847,25 +1001,11 @@ export class ViewportRendererService {
   }
 
   private shouldSkipSelectionBounds(node: Node3D): boolean {
-    return (
-      node instanceof Camera3D ||
-      node instanceof DirectionalLightNode ||
-      node instanceof PointLightNode ||
-      node instanceof SpotLightNode ||
-      node instanceof AmbientLightNode ||
-      node instanceof HemisphereLightNode
-    );
+    return node instanceof Camera3D || this.isExplicitLightNode(node);
   }
 
   private shouldKeepSelectedNodeIcon(node: Node3D): boolean {
-    return (
-      node instanceof Camera3D ||
-      node instanceof DirectionalLightNode ||
-      node instanceof PointLightNode ||
-      node instanceof SpotLightNode ||
-      node instanceof AmbientLightNode ||
-      node instanceof HemisphereLightNode
-    );
+    return node instanceof Camera3D || this.isExplicitLightNode(node);
   }
 
   resize(width: number, height: number): void {
@@ -877,8 +1017,19 @@ export class ViewportRendererService {
     const pixelHeight = Math.ceil(height * window.devicePixelRatio);
 
     this.renderer.setSize(pixelWidth, pixelHeight, false);
-    this.camera.aspect = width / height;
-    this.camera.updateProjectionMatrix();
+    if (this.perspectiveCamera) {
+      this.perspectiveCamera.aspect = width / height;
+      this.perspectiveCamera.updateProjectionMatrix();
+    }
+    if (this.editorOrthographicCamera) {
+      const halfHeight = EDITOR_ORTHOGRAPHIC_FRUSTUM_HEIGHT / 2;
+      const halfWidth = halfHeight * (width / height);
+      this.editorOrthographicCamera.left = -halfWidth;
+      this.editorOrthographicCamera.right = halfWidth;
+      this.editorOrthographicCamera.top = halfHeight;
+      this.editorOrthographicCamera.bottom = -halfHeight;
+      this.editorOrthographicCamera.updateProjectionMatrix();
+    }
 
     const viewportBaseSize = this.getProjectViewportBaseSize();
     const baseAspect = viewportBaseSize.width / viewportBaseSize.height;
@@ -971,12 +1122,14 @@ export class ViewportRendererService {
     if (!this.renderer || !this.scene || !this.camera) return;
 
     // Advance animation mixers
-    const delta = this.animationClock.getDelta();
+    this.animationTimer.update();
+    const delta = this.animationTimer.getDelta();
     for (const mixer of this.animationMixers.values()) {
       mixer.update(delta);
     }
 
     this.tickParticlePreview(delta);
+    this.tickComponentPreview(delta);
 
     // Update controls once before rendering if they exist
     const is2DMode = appState.ui.navigationMode === '2d';
@@ -1011,13 +1164,53 @@ export class ViewportRendererService {
     if (this.previewCamera) {
       const savedBackground = this.scene.background;
       this.scene.background = null;
-
-      const insetWidth = this.viewportSize.width * 0.25;
-      const insetHeight = this.viewportSize.height * 0.25;
-      const insetX = this.viewportSize.width - insetWidth - 20;
-      const insetY = 20;
-
       const pixelRatio = this.renderer.getPixelRatio();
+      const previewAspect = this.getPreviewInsetAspect(this.previewCamera);
+      const margin = 16;
+      const borderWidth = 2;
+      const maxInsetWidth = Math.min(this.viewportSize.width * 0.28, 360);
+      const maxInsetHeight = Math.min(this.viewportSize.height * 0.28, 220);
+      const widthFromHeight = maxInsetHeight * previewAspect;
+      const insetWidth = Math.min(
+        maxInsetWidth,
+        widthFromHeight,
+        this.viewportSize.width - margin * 2
+      );
+      const insetHeight = Math.min(
+        insetWidth / previewAspect,
+        maxInsetHeight,
+        this.viewportSize.height - margin * 2
+      );
+      const insetX = Math.max(margin, this.viewportSize.width - insetWidth - margin);
+      const insetY = Math.max(margin, this.viewportSize.height - insetHeight - margin);
+      const outerX = Math.max(0, insetX - borderWidth);
+      const outerY = Math.max(0, insetY - borderWidth);
+      const outerWidth = Math.min(this.viewportSize.width - outerX, insetWidth + borderWidth * 2);
+      const outerHeight = Math.min(
+        this.viewportSize.height - outerY,
+        insetHeight + borderWidth * 2
+      );
+      const outerColor = new THREE.Color(0xe8edf6);
+      const innerBackground = new THREE.Color(0x090b10);
+      const savedClearColor = this.renderer.getClearColor(new THREE.Color());
+      const savedClearAlpha = this.renderer.getClearAlpha();
+
+      this.renderer.setViewport(
+        outerX * pixelRatio,
+        outerY * pixelRatio,
+        outerWidth * pixelRatio,
+        outerHeight * pixelRatio
+      );
+      this.renderer.setScissor(
+        outerX * pixelRatio,
+        outerY * pixelRatio,
+        outerWidth * pixelRatio,
+        outerHeight * pixelRatio
+      );
+      this.renderer.setScissorTest(true);
+      this.renderer.setClearColor(outerColor, 1);
+      this.renderer.clear(true, true, false);
+
       this.renderer.setViewport(
         insetX * pixelRatio,
         insetY * pixelRatio,
@@ -1030,7 +1223,8 @@ export class ViewportRendererService {
         insetWidth * pixelRatio,
         insetHeight * pixelRatio
       );
-      this.renderer.setScissorTest(true);
+      this.renderer.setClearColor(innerBackground, 1);
+      this.renderer.clear(true, true, false);
       this.renderer.clearDepth();
 
       const savedMask = this.previewCamera.layers.mask;
@@ -1038,6 +1232,7 @@ export class ViewportRendererService {
       this.renderer.render(this.scene, this.previewCamera);
 
       this.previewCamera.layers.mask = savedMask;
+      this.renderer.setClearColor(savedClearColor, savedClearAlpha);
       this.renderer.setScissorTest(false);
       this.renderer.setViewport(
         0,
@@ -1049,6 +1244,28 @@ export class ViewportRendererService {
     }
 
     this.renderer.autoClear = true;
+  }
+
+  private getPreviewInsetAspect(camera: THREE.Camera): number {
+    if (
+      camera instanceof THREE.PerspectiveCamera &&
+      Number.isFinite(camera.aspect) &&
+      camera.aspect > 0
+    ) {
+      return camera.aspect;
+    }
+
+    if (camera instanceof THREE.OrthographicCamera) {
+      const width = Math.abs(camera.right - camera.left);
+      const height = Math.abs(camera.top - camera.bottom);
+      if (height > 0) {
+        return width / height;
+      }
+    }
+
+    const viewportAspect =
+      this.viewportSize.height > 0 ? this.viewportSize.width / this.viewportSize.height : 16 / 9;
+    return Number.isFinite(viewportAspect) && viewportAspect > 0 ? viewportAspect : 16 / 9;
   }
 
   private getProjectViewportBaseSize(): { width: number; height: number } {
@@ -2134,16 +2351,21 @@ export class ViewportRendererService {
       return;
     }
 
+    const previewCameraNodeId = appState.scenes.previewCameraNodeIds[activeSceneId] ?? null;
+
     // Clear previous selection object tracking
     this.selectedObjects.clear();
-    this.previewCamera = null;
+    this.previewCamera =
+      previewCameraNodeId !== null
+        ? (() => {
+            const previewNode = sceneGraph.nodeMap.get(previewCameraNodeId);
+            return previewNode instanceof Camera3D ? previewNode.camera : null;
+          })()
+        : null;
 
     // Add selection boxes for selected nodes and attach transform controls to the first one
     let firstSelectedNode: Node3D | null = null;
     const selected2DNodeIds: string[] = [];
-
-    // Primary selection for camera preview
-    const primaryNodeId = appState.selection.primaryNodeId;
 
     for (const nodeId of nodeIds) {
       const node = this.findNodeById(nodeId, sceneGraph.rootNodes);
@@ -2156,10 +2378,6 @@ export class ViewportRendererService {
 
         if (!firstSelectedNode) {
           firstSelectedNode = node;
-        }
-
-        if (nodeId === primaryNodeId && node instanceof Camera3D) {
-          this.previewCamera = node.camera;
         }
 
         if (!this.shouldSkipSelectionBounds(node)) {
@@ -2361,6 +2579,7 @@ export class ViewportRendererService {
       sceneGraph.rootNodes.forEach(node => {
         this.processNodeForRendering(node);
       });
+      this.syncLighting();
       this.syncBaseViewportFrame();
       this.buildNodeIcons(sceneGraph.rootNodes);
 
@@ -3267,6 +3486,52 @@ export class ViewportRendererService {
     };
 
     visit(sceneGraph.rootNodes);
+  }
+
+  private tickComponentPreview(dt: number): void {
+    if (dt <= 0 || appState.ui.isPlaying) {
+      return;
+    }
+
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return;
+    }
+
+    const previewContext: EditorPreviewContext = {
+      assetLoader: this.assetLoader,
+      requestRender: () => {
+        queueMicrotask(() => this.requestRender());
+      },
+    };
+
+    const visit = (nodes: NodeBase[]) => {
+      for (const node of nodes) {
+        if (node.components && Array.isArray(node.components)) {
+          for (const component of node.components) {
+            this.tickPreviewComponent(component, dt, previewContext);
+          }
+        }
+
+        if (node.children && node.children.length > 0) {
+          visit(node.children);
+        }
+      }
+    };
+
+    visit(sceneGraph.rootNodes);
+  }
+
+  private tickPreviewComponent(
+    component: ScriptComponent,
+    dt: number,
+    context: EditorPreviewContext
+  ): void {
+    if (!component.enabled || !component.tickEditorPreview) {
+      return;
+    }
+
+    component.tickEditorPreview(dt, context);
   }
 
   private syncSprite3DTexture(node: Sprite3D): void {

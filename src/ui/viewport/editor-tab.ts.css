@@ -132,6 +132,16 @@
   letter-spacing: 0.04em;
 }
 
+.top-toolbar pix3-dropdown-button.toolbar-dropdown-button--active {
+  --pix3-toolbar-button-background: rgba(var(--pix3-accent-rgb), 0.8);
+  --pix3-toolbar-button-foreground: rgba(255, 255, 255, 1);
+  box-shadow: 0 0 0 2px rgba(var(--pix3-accent-rgb), 0.3);
+}
+
+.top-toolbar pix3-dropdown-button.toolbar-dropdown-button--active:hover {
+  background: rgba(var(--pix3-accent-rgb), 1);
+}
+
 .viewport-host {
   flex: 1;
   width: 100%;

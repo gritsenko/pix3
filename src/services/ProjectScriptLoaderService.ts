@@ -47,6 +47,7 @@ export class ProjectScriptLoaderService {
   private debounceTimer: number | null = null;
   private readonly debounceMs = 300;
   private readonly scriptDirectories = ['scripts', 'src/scripts'] as const;
+  private readonly supportedSourceExtensions = ['.ts', '.css', '.glsl'] as const;
   private isPageActive = isDocumentActive(document);
   private pendingBuildWhileHidden = false;
   private readonly handlePageActivityChange = (): void => {
@@ -120,9 +121,9 @@ export class ProjectScriptLoaderService {
       this.logger.info('Compiling project scripts...');
 
       // Step 1: List all .ts files in supported script directories
-      const { tsFiles, checkedDirectories } = await this.collectScriptFiles();
+      const { sourceFiles, checkedDirectories } = await this.collectScriptFiles();
 
-      if (tsFiles.length === 0) {
+      if (sourceFiles.length === 0) {
         this.logger.info(
           `No TypeScript files found in any script directory (${checkedDirectories.join(', ')})`
         );
@@ -132,11 +133,11 @@ export class ProjectScriptLoaderService {
         return;
       }
 
-      this.logger.info(`Found ${tsFiles.length} script file(s), compiling...`);
+      this.logger.info(`Found ${sourceFiles.length} project source file(s), compiling...`);
 
       // Step 2: Read file contents into a Map and register watchers
       const filesMap = new Map<string, string>();
-      const currentFiles = new Set(tsFiles.map(f => f.path));
+      const currentFiles = new Set(sourceFiles.map(f => f.path));
 
       // Remove watchers for files that are no longer present
       for (const watchedPath of this.watchedFilePaths) {
@@ -146,7 +147,7 @@ export class ProjectScriptLoaderService {
         }
       }
 
-      for (const file of tsFiles) {
+      for (const file of sourceFiles) {
         // Register watcher if not already watching
         if (!this.watchedFilePaths.has(file.path)) {
           try {
@@ -174,10 +175,20 @@ export class ProjectScriptLoaderService {
         return;
       }
 
+      const entryFiles = this.findComponentEntryFiles(filesMap);
+
+      if (entryFiles.length === 0) {
+        this.logger.info('No project Script components found to register');
+        this.clearRegisteredScripts();
+        appState.project.errorMessage = null;
+        appState.project.scriptsStatus = 'ready';
+        return;
+      }
+
       // Step 3: Compile scripts using ScriptCompilerService
       let compilationResult;
       try {
-        compilationResult = await this.compiler.bundle(filesMap);
+        compilationResult = await this.compiler.bundle(filesMap, entryFiles);
       } catch (error) {
         const userError = this.handleCompilationError(
           error as CompilationError,
@@ -331,15 +342,23 @@ export class ProjectScriptLoaderService {
     this.watchedFilePaths.clear();
   }
   private async collectScriptFiles(): Promise<{
-    tsFiles: Array<{ name: string; kind: FileSystemHandleKind; path: string }>;
+    sourceFiles: Array<{ name: string; kind: FileSystemHandleKind; path: string }>;
     checkedDirectories: readonly string[];
   }> {
-    const tsFiles: Array<{ name: string; kind: FileSystemHandleKind; path: string }> = [];
+    const sourceFiles = new Map<
+      string,
+      { name: string; kind: FileSystemHandleKind; path: string }
+    >();
+    const roots = new Set<string>();
 
     for (const directory of this.scriptDirectories) {
       try {
-        const entries = await this.fs.listDirectory(directory);
-        tsFiles.push(...entries.filter(e => e.kind === 'file' && e.name.endsWith('.ts')));
+        await this.fs.listDirectory(directory);
+        roots.add(directory);
+
+        if (directory === 'src/scripts') {
+          roots.add('src');
+        }
       } catch (error) {
         if (this.isDirectoryNotFoundError(error)) {
           continue;
@@ -348,10 +367,65 @@ export class ProjectScriptLoaderService {
       }
     }
 
+    for (const root of roots) {
+      const entries = await this.collectFilesRecursively(root);
+      for (const entry of entries) {
+        if (this.isSupportedSourceFile(entry.name)) {
+          sourceFiles.set(entry.path, entry);
+        }
+      }
+    }
+
     return {
-      tsFiles,
+      sourceFiles: Array.from(sourceFiles.values()),
       checkedDirectories: this.scriptDirectories,
     };
+  }
+
+  private async collectFilesRecursively(
+    directory: string
+  ): Promise<Array<{ name: string; kind: FileSystemHandleKind; path: string }>> {
+    const entries = await this.fs.listDirectory(directory);
+    const collected: Array<{ name: string; kind: FileSystemHandleKind; path: string }> = [];
+
+    for (const entry of entries) {
+      if (entry.kind === 'file') {
+        collected.push(entry);
+        continue;
+      }
+
+      if (entry.kind === 'directory') {
+        collected.push(...(await this.collectFilesRecursively(entry.path)));
+      }
+    }
+
+    return collected;
+  }
+
+  private isSupportedSourceFile(fileName: string): boolean {
+    return this.supportedSourceExtensions.some(extension => fileName.endsWith(extension));
+  }
+
+  private findComponentEntryFiles(files: Map<string, string>): string[] {
+    const entryFiles: string[] = [];
+
+    for (const [filePath, content] of files) {
+      if (!filePath.endsWith('.ts') || !this.isWithinScriptDirectory(filePath)) {
+        continue;
+      }
+
+      if (/extends\s+Script\b/.test(content)) {
+        entryFiles.push(filePath);
+      }
+    }
+
+    return entryFiles;
+  }
+
+  private isWithinScriptDirectory(filePath: string): boolean {
+    return this.scriptDirectories.some(
+      directory => filePath === directory || filePath.startsWith(`${directory}/`)
+    );
   }
 
   private isDirectoryNotFoundError(error: unknown): boolean {

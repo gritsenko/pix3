@@ -56,7 +56,9 @@
   },
   "include": [
     "src",
-    "packages/pix3-runtime/src",
-    "test_assets"
+    "packages/pix3-runtime/src"
+  ],
+  "exclude": [
+    "samples"
   ]
 }

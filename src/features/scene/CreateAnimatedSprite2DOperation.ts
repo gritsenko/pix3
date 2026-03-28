@@ -1,18 +1,6 @@
-import type {
-  Operation,
-  OperationContext,
-  OperationInvokeResult,
-  OperationMetadata,
-} from '@/core/Operation';
+import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import { AnimatedSprite2D } from '@pix3/runtime';
-import { SceneManager } from '@pix3/runtime';
 import { Vector2 } from 'three';
-import { SceneStateUpdater } from '@/core/SceneStateUpdater';
-import {
-  attachNode,
-  detachNode,
-  resolve2DParentForCreation,
-} from '@/features/scene/node-placement';
 
 export interface CreateAnimatedSprite2DOperationParams {
   nodeName?: string;
@@ -20,76 +8,36 @@ export interface CreateAnimatedSprite2DOperationParams {
   parentNodeId?: string | null;
 }
 
-export class CreateAnimatedSprite2DOperation implements Operation<OperationInvokeResult> {
-  readonly metadata: OperationMetadata = {
-    id: 'scene.create-animatedsprite2d',
-    title: 'Create AnimatedSprite2D',
-    description: 'Create a 2D animated sprite in the scene',
-    tags: ['scene', '2d', 'animated', 'sprite', 'node', 'ui'],
-    affectsNodeStructure: true,
-  };
-
-  private readonly params: CreateAnimatedSprite2DOperationParams;
-
-  constructor(params: CreateAnimatedSprite2DOperationParams = {}) {
-    this.params = params;
+export class CreateAnimatedSprite2DOperation extends CreateNodeOperationBase<CreateAnimatedSprite2DOperationParams> {
+  protected getMetadataId(): string {
+    return 'scene.create-animatedsprite2d';
   }
 
-  async perform(context: OperationContext): Promise<OperationInvokeResult> {
-    const { state, container } = context;
-    const activeSceneId = state.scenes.activeSceneId;
+  protected getMetadataTitle(): string {
+    return 'Create AnimatedSprite2D';
+  }
 
-    if (!activeSceneId) {
-      return { didMutate: false };
-    }
+  protected getMetadataDescription(): string {
+    return 'Create a 2D animated sprite in the scene';
+  }
 
-    const sceneManager = container.getService<SceneManager>(
-      container.getOrCreateToken(SceneManager)
-    );
-    const sceneGraph = sceneManager.getSceneGraph(activeSceneId);
-    if (!sceneGraph) {
-      return { didMutate: false };
-    }
+  protected getMetadataTags(): string[] {
+    return ['scene', '2d', 'animated', 'sprite', 'node', 'ui'];
+  }
 
-    const nodeId = `animatedsprite2d-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-    const nodeName = this.params.nodeName || 'AnimatedSprite2D';
+  protected getNodeTypeName(): string {
+    return 'AnimatedSprite2D';
+  }
 
+  protected createNode(params: CreateAnimatedSprite2DOperationParams, nodeId: string) {
+    const nodeName = params.nodeName || 'AnimatedSprite2D';
     const node = new AnimatedSprite2D({
       id: nodeId,
       name: nodeName,
-      position: this.params.position || new Vector2(100, 100),
+      position: params.position || new Vector2(100, 100),
       width: 64,
       height: 64,
     });
-
-    const targetParent = resolve2DParentForCreation(
-      sceneGraph,
-      this.params.parentNodeId ?? null,
-      state.selection.primaryNodeId
-    );
-
-    attachNode(sceneGraph, node, targetParent);
-    SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-    SceneStateUpdater.markSceneDirty(state, activeSceneId);
-    SceneStateUpdater.selectNode(state, nodeId);
-
-    return {
-      didMutate: true,
-      commit: {
-        label: `Create ${nodeName}`,
-        undo: () => {
-          detachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.clearSelectionIfTargeted(state, nodeId);
-        },
-        redo: () => {
-          attachNode(sceneGraph, node, targetParent);
-          SceneStateUpdater.updateHierarchyState(state, activeSceneId, sceneGraph);
-          SceneStateUpdater.markSceneDirty(state, activeSceneId);
-          SceneStateUpdater.selectNode(state, nodeId);
-        },
-      },
-    };
+    return node as SceneGraph['rootNodes'][0];
   }
 }

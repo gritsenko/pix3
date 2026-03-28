@@ -1,12 +1,18 @@
 import { ResourceManager } from './ResourceManager';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { NodeBase } from '../nodes/NodeBase';
-import { AnimationClip, Texture, TextureLoader } from 'three';
+import { AnimationClip, BufferGeometry, Material, Mesh, Texture, TextureLoader } from 'three';
 import { AudioService } from './AudioService';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 export interface AssetLoaderResult {
   node: NodeBase;
+}
+
+export interface InstancingModelAsset {
+  geometry: BufferGeometry;
+  material: Material | Material[];
+  scene: GLTF['scene'];
 }
 
 /**
@@ -30,6 +36,10 @@ export class AssetLoader {
     this.resources = resources;
     this.audioService = audioService;
     this.textureLoader = new TextureLoader();
+  }
+
+  getResourceManager(): ResourceManager {
+    return this.resources;
   }
 
   /**
@@ -204,6 +214,23 @@ export class AssetLoader {
     return loadPromise;
   }
 
+  async loadInstancingModel(resourcePath: string): Promise<InstancingModelAsset> {
+    const gltf = await this.loadGltf(resourcePath);
+    const mesh = this.findFirstMesh(gltf.scene);
+
+    if (!mesh) {
+      throw new Error(`[AssetLoader] No mesh found in model: ${resourcePath}`);
+    }
+
+    return {
+      geometry: mesh.geometry.clone(),
+      material: Array.isArray(mesh.material)
+        ? mesh.material.map(material => material.clone())
+        : mesh.material.clone(),
+      scene: gltf.scene,
+    };
+  }
+
   /**
    * Load a GLB/GLTF file and convert it to a MeshInstance node.
    * @param resourcePath Path to the .glb/.gltf file
@@ -217,21 +244,7 @@ export class AssetLoader {
     nodeName?: string
   ): Promise<AssetLoaderResult> {
     try {
-      const blob = await this.resources.readBlob(resourcePath);
-      const arrayBuffer = await blob.arrayBuffer();
-
-      const loader = new GLTFLoader();
-
-      // Use parse() instead of loadAsync() with an empty resource path
-      // This prevents GLTFLoader from trying to resolve external resources
-      const gltf = await new Promise<GLTF>((resolve, reject) => {
-        loader.parse(
-          arrayBuffer,
-          '', // Empty resource path - all data is embedded in GLB
-          result => resolve(result as GLTF),
-          error => reject(error)
-        );
-      });
+      const gltf = await this.loadGltf(resourcePath);
 
       const animations = gltf.animations.map((clip: AnimationClip) => clip.clone());
 
@@ -255,6 +268,35 @@ export class AssetLoader {
         `Failed to load asset: ${error instanceof Error ? error.message : String(error)}`
       );
     }
+  }
+
+  private async loadGltf(resourcePath: string): Promise<GLTF> {
+    const blob = await this.resources.readBlob(resourcePath);
+    const arrayBuffer = await blob.arrayBuffer();
+    const loader = new GLTFLoader();
+
+    return new Promise<GLTF>((resolve, reject) => {
+      loader.parse(
+        arrayBuffer,
+        '',
+        result => resolve(result as GLTF),
+        error => reject(error)
+      );
+    });
+  }
+
+  private findFirstMesh(root: GLTF['scene']): Mesh | null {
+    let foundMesh: Mesh | null = null;
+
+    root.traverse(object => {
+      if (foundMesh || !(object instanceof Mesh)) {
+        return;
+      }
+
+      foundMesh = object;
+    });
+
+    return foundMesh;
   }
 
   /**

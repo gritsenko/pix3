@@ -11,8 +11,8 @@ import { ToggleUIFlagOperation } from './ToggleUIFlagOperation';
 export class ToggleLightingCommand extends CommandBase<void, void> {
   readonly metadata: CommandMetadata = {
     id: 'view.toggle-lighting',
-    title: 'Toggle Lighting',
-    description: 'Show or hide lighting in the viewport',
+    title: 'Toggle System Lighting',
+    description: 'Toggle fallback viewport lighting for scenes without explicit light sources',
     keywords: ['lighting', 'viewport', 'toggle'],
     menuPath: 'view',
     keybinding: 'L',
@@ -29,7 +29,7 @@ export class ToggleLightingCommand extends CommandBase<void, void> {
     const operations = context.container.getService<OperationService>(
       context.container.getOrCreateToken(OperationService)
     );
-    await operations.invoke(new ToggleUIFlagOperation('showLighting', 'Toggle Lighting'));
+    await operations.invoke(new ToggleUIFlagOperation('showLighting', 'Toggle System Lighting'));
 
     return {
       didMutate: true,
