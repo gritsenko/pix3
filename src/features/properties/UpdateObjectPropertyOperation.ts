@@ -116,6 +116,11 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     }
 
     const currentValue = propDef.getValue(node);
+    const visibilityPreservation = this.createVisibilityPreservationState(
+      node,
+      propertyPath,
+      currentValue
+    );
     const hasPreviousValueOverride = Object.prototype.hasOwnProperty.call(
       this.params,
       'previousValue'
@@ -130,6 +135,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     }
 
     if (currentValueJson !== nextValueJson) {
+      this.applyVisibilityPreservation(node, visibilityPreservation);
       // Set the property value using the schema's setValue method
       propDef.setValue(node, value);
     }
@@ -150,6 +156,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
         label: `Update ${propDef.ui?.label || propertyPath}`,
         beforeSnapshot: context.snapshot,
         undo: async () => {
+          this.restoreVisibilityPreservation(node, visibilityPreservation);
           propDef.setValue(node, previousValue);
           if (activeSceneId) {
             state.scenes.lastLoadedAt = Date.now();
@@ -159,6 +166,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
           this.updateViewport(container, propertyPath, node);
         },
         redo: async () => {
+          this.applyVisibilityPreservation(node, visibilityPreservation);
           propDef.setValue(node, value);
           if (activeSceneId) {
             state.scenes.lastLoadedAt = Date.now();
@@ -195,6 +203,47 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     } catch {
       // Silently ignore viewport renderer errors
     }
+  }
+
+  private createVisibilityPreservationState(
+    node: NodeBase,
+    propertyPath: string,
+    currentValue: unknown
+  ): { shouldPreserve: boolean; initialValue: boolean } {
+    if (propertyPath !== 'visible' || typeof currentValue !== 'boolean') {
+      return { shouldPreserve: false, initialValue: false };
+    }
+
+    const hasInitialVisibility =
+      Object.prototype.hasOwnProperty.call(node.properties, 'initiallyVisible') ||
+      Object.prototype.hasOwnProperty.call(node.properties, 'initially_visible');
+
+    return {
+      shouldPreserve: !hasInitialVisibility,
+      initialValue: currentValue,
+    };
+  }
+
+  private applyVisibilityPreservation(
+    node: NodeBase,
+    preservation: { shouldPreserve: boolean; initialValue: boolean }
+  ): void {
+    if (!preservation.shouldPreserve) {
+      return;
+    }
+
+    node.properties.initiallyVisible = preservation.initialValue;
+  }
+
+  private restoreVisibilityPreservation(
+    node: NodeBase,
+    preservation: { shouldPreserve: boolean; initialValue: boolean }
+  ): void {
+    if (!preservation.shouldPreserve) {
+      return;
+    }
+
+    delete node.properties.initiallyVisible;
   }
 
   private isTransformProperty(propertyPath: string): boolean {
