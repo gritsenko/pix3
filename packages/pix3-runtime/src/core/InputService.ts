@@ -1,6 +1,20 @@
 
 import { Vector2 } from 'three';
 
+export interface InputPointerFrameEvent {
+    type: 'down' | 'move' | 'up';
+    pointerId: number;
+    x: number;
+    y: number;
+}
+
+export interface InputKeyFrameEvent {
+    type: 'down' | 'up';
+    code: string;
+    key: string;
+    repeat: boolean;
+}
+
 /**
  * InputService - Central hub for handling user input.
  * Manages virtual axes, buttons, and raw pointer events.
@@ -13,20 +27,31 @@ export class InputService {
     public isPointerDown = false;
     public activePointerId: number | null = null;
     public wheelDelta = new Vector2();
+    public pointerEvents: readonly InputPointerFrameEvent[] = [];
+    public keyEvents: readonly InputKeyFrameEvent[] = [];
 
     public width = 0;
     public height = 0;
 
     private hoveredUIElements = new Set<string>();
+    private readonly pendingWheelDelta = new Vector2();
+    private pendingPointerEvents: InputPointerFrameEvent[] = [];
+    private pendingKeyEvents: InputKeyFrameEvent[] = [];
 
     private element: HTMLElement | null = null;
+    private previousTouchAction: string | null = null;
 
     /**
      * Resets frame-based input state. Should be called at the start of each frame.
      */
     beginFrame(): void {
         this.hoveredUIElements.clear();
-        this.wheelDelta.set(0, 0);
+        this.wheelDelta.copy(this.pendingWheelDelta);
+        this.pendingWheelDelta.set(0, 0);
+        this.pointerEvents = this.pendingPointerEvents;
+        this.pendingPointerEvents = [];
+        this.keyEvents = this.pendingKeyEvents;
+        this.pendingKeyEvents = [];
     }
 
     /**
@@ -87,6 +112,8 @@ export class InputService {
     attach(element: HTMLElement): void {
         this.detach(); // detach previous if any
         this.element = element;
+        this.previousTouchAction = element.style.touchAction;
+        element.style.touchAction = 'none';
 
         // Initialize dimensions
         const dimensions = this.getInputDimensions();
@@ -125,9 +152,20 @@ export class InputService {
         window.removeEventListener('keydown', this.onKeyDown);
         window.removeEventListener('keyup', this.onKeyUp);
 
+        if (this.previousTouchAction !== null) {
+            this.element.style.touchAction = this.previousTouchAction;
+            this.previousTouchAction = null;
+        }
+
         this.element = null;
         this.isPointerDown = false;
         this.activePointerId = null;
+        this.wheelDelta.set(0, 0);
+        this.pendingWheelDelta.set(0, 0);
+        this.pointerEvents = [];
+        this.pendingPointerEvents = [];
+        this.keyEvents = [];
+        this.pendingKeyEvents = [];
         this.setButton('Action_Primary', false);
     }
 
@@ -138,17 +176,23 @@ export class InputService {
 
         this.activePointerId = event.pointerId;
         this.isPointerDown = true;
-        this.updatePointerPosition(event);
+        const position = this.updatePointerPosition(event);
+        this.pendingPointerEvents.push({ type: 'down', pointerId: event.pointerId, x: position.x, y: position.y });
+        this.element?.setPointerCapture?.(event.pointerId);
 
         // Global "Tap to Action" - Map primary pointer down to "Action_Primary"
         this.setButton('Action_Primary', true);
     };
 
     private onPointerMove = (event: PointerEvent): void => {
-        if (this.activePointerId !== event.pointerId) {
+        if (this.activePointerId !== null && this.activePointerId !== event.pointerId) {
             return;
         }
-        this.updatePointerPosition(event);
+
+        const position = this.updatePointerPosition(event);
+        if (this.activePointerId === event.pointerId) {
+            this.pendingPointerEvents.push({ type: 'move', pointerId: event.pointerId, x: position.x, y: position.y });
+        }
     };
 
     private onPointerUp = (event: PointerEvent): void => {
@@ -158,7 +202,9 @@ export class InputService {
 
         this.isPointerDown = false;
         this.activePointerId = null;
-        this.updatePointerPosition(event);
+        const position = this.updatePointerPosition(event);
+        this.pendingPointerEvents.push({ type: 'up', pointerId: event.pointerId, x: position.x, y: position.y });
+        this.element?.releasePointerCapture?.(event.pointerId);
 
         // Release "Action_Primary"
         this.setButton('Action_Primary', false);
@@ -169,24 +215,27 @@ export class InputService {
     };
 
     private onWheel = (event: WheelEvent): void => {
-        this.wheelDelta.x += event.deltaX;
-        this.wheelDelta.y += event.deltaY;
-        // Optional: event.preventDefault() if we want to swallow scrolling
-        // event.preventDefault();
+        this.pendingWheelDelta.x += event.deltaX;
+        this.pendingWheelDelta.y += event.deltaY;
+        event.preventDefault();
     };
 
     private onKeyDown = (event: KeyboardEvent): void => {
         this.setButton(`Key_${event.code}`, true);
         this.setButton(`Key_${event.key.toUpperCase()}`, true);
+        this.pendingKeyEvents.push({ type: 'down', code: event.code, key: event.key, repeat: event.repeat });
     };
 
     private onKeyUp = (event: KeyboardEvent): void => {
         this.setButton(`Key_${event.code}`, false);
         this.setButton(`Key_${event.key.toUpperCase()}`, false);
+        this.pendingKeyEvents.push({ type: 'up', code: event.code, key: event.key, repeat: event.repeat });
     };
 
-    private updatePointerPosition(event: PointerEvent): void {
-        if (!this.element) return;
+    private updatePointerPosition(event: PointerEvent): { x: number; y: number } {
+        if (!this.element) {
+            return { x: this.pointerPosition.x, y: this.pointerPosition.y };
+        }
 
         // Calculate position relative to the element
         const rect = this.element.getBoundingClientRect();
@@ -199,10 +248,11 @@ export class InputService {
         const scaleX = this.width / safeRectWidth;
         const scaleY = this.height / safeRectHeight;
 
-        this.pointerPosition.set(
-            (event.clientX - rect.left) * scaleX,
-            (event.clientY - rect.top) * scaleY
-        );
+        const x = (event.clientX - rect.left) * scaleX;
+        const y = (event.clientY - rect.top) * scaleY;
+
+        this.pointerPosition.set(x, y);
+        return { x, y };
     }
 
     private getInputDimensions(): { width: number; height: number } {
