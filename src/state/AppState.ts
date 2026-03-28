@@ -181,7 +181,7 @@ export interface UIState {
   editorCameraProjection: EditorCameraProjection;
   /** Toggle for showing the 3D grid helper */
   showGrid: boolean;
-  /** Toggle for editor viewport lighting and shadow preview */
+  /** Toggle for editor fallback lighting used when the scene has no explicit light sources */
   showLighting: boolean;
   /** Warn before leaving the page with unsaved changes */
   warnOnUnsavedUnload: boolean;

@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { ViewportRendererService } from './ViewportRenderService';
-import { AmbientLightNode, Camera3D, Group2D, Sprite2D } from '@pix3/runtime';
+import { AmbientLightNode, Camera3D, DirectionalLightNode, Group2D, Sprite2D } from '@pix3/runtime';
 import { appState, resetAppState } from '@/state';
 
 describe('ViewportRendererService', () => {
@@ -169,6 +169,87 @@ describe('ViewportRendererService', () => {
         shouldSkipSelectionBounds: (node: AmbientLightNode) => boolean;
       }
     ).shouldSkipSelectionBounds(ambientLight);
+
+    expect(result).toBe(true);
+  });
+
+  it('keeps fallback editor lighting enabled when the active scene has no explicit lights', () => {
+    resetAppState();
+    appState.ui.showLighting = true;
+
+    const service = new ViewportRendererService();
+    const renderer = { shadowMap: { enabled: false } } as THREE.WebGLRenderer;
+    const editorAmbientLight = new THREE.AmbientLight();
+    const editorDirectionalLight = new THREE.DirectionalLight();
+
+    Object.defineProperty(service, 'renderer', { value: renderer, configurable: true });
+    Object.defineProperty(service, 'editorAmbientLight', {
+      value: editorAmbientLight,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'editorDirectionalLight', {
+      value: editorDirectionalLight,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({ rootNodes: [new Group2D({ id: 'group', name: 'Group' })] }),
+      },
+      configurable: true,
+    });
+
+    (service as unknown as { syncLighting: () => void }).syncLighting();
+
+    expect(renderer.shadowMap.enabled).toBe(true);
+    expect(editorAmbientLight.visible).toBe(true);
+    expect(editorDirectionalLight.visible).toBe(true);
+  });
+
+  it('disables fallback editor lighting when the active scene contains explicit lights', () => {
+    resetAppState();
+    appState.ui.showLighting = true;
+
+    const service = new ViewportRendererService();
+    const renderer = { shadowMap: { enabled: false } } as THREE.WebGLRenderer;
+    const editorAmbientLight = new THREE.AmbientLight();
+    const editorDirectionalLight = new THREE.DirectionalLight();
+    const lightNode = new DirectionalLightNode({ id: 'dir-light', name: 'Sun' });
+
+    Object.defineProperty(service, 'renderer', { value: renderer, configurable: true });
+    Object.defineProperty(service, 'editorAmbientLight', {
+      value: editorAmbientLight,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'editorDirectionalLight', {
+      value: editorDirectionalLight,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({ rootNodes: [lightNode] }),
+      },
+      configurable: true,
+    });
+
+    (service as unknown as { syncLighting: () => void }).syncLighting();
+
+    expect(renderer.shadowMap.enabled).toBe(true);
+    expect(editorAmbientLight.visible).toBe(false);
+    expect(editorDirectionalLight.visible).toBe(false);
+  });
+
+  it('detects explicit lights in nested scene nodes', () => {
+    const service = new ViewportRendererService();
+    const nestedLight = new DirectionalLightNode({ id: 'nested-light', name: 'Nested Light' });
+    const root = new Group2D({ id: 'root-group', name: 'Root Group' });
+
+    root.adoptChild(nestedLight);
+
+    const result = (
+      service as unknown as {
+        containsExplicitLights: (nodes: readonly AmbientLightNode[] | readonly Group2D[]) => boolean;
+      }
+    ).containsExplicitLights([root]);
 
     expect(result).toBe(true);
   });

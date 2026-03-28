@@ -137,10 +137,10 @@ export class ViewportVisibilityPopover extends ComponentBase {
             'Show or hide the editor grid'
           )}
           ${this.renderToggleRow(
-            'Lighting',
+            'System Lighting',
             this.showLighting,
             'toggle-lighting',
-            'Enable editor lighting and shadows'
+            'Light the scene only when it has no explicit light sources'
           )}
           ${this.renderToggleRow(
             '2D Layer',

@@ -207,7 +207,7 @@ export class ViewportRendererService {
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.setClearColor(0x13161b, 1);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.shadowMap.enabled = appState.ui.showLighting;
+    this.renderer.shadowMap.enabled = this.shouldEnableRendererShadowMap();
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
 
     // Create scene
@@ -690,9 +690,9 @@ export class ViewportRendererService {
   }
 
   private syncLighting(): void {
-    const enabled = appState.ui.showLighting;
+    const enabled = this.isEditorFallbackLightingEnabled();
     if (this.renderer) {
-      this.renderer.shadowMap.enabled = enabled;
+      this.renderer.shadowMap.enabled = this.shouldEnableRendererShadowMap();
     }
     if (this.editorAmbientLight) {
       this.editorAmbientLight.visible = enabled;
@@ -700,6 +700,54 @@ export class ViewportRendererService {
     if (this.editorDirectionalLight) {
       this.editorDirectionalLight.visible = enabled;
     }
+  }
+
+  private isEditorFallbackLightingEnabled(): boolean {
+    return appState.ui.showLighting && !this.activeSceneHasExplicitLights();
+  }
+
+  private shouldEnableRendererShadowMap(): boolean {
+    return appState.ui.showLighting || this.activeSceneHasExplicitLights();
+  }
+
+  private activeSceneHasExplicitLights(): boolean {
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return false;
+    }
+
+    return this.containsExplicitLights(sceneGraph.rootNodes);
+  }
+
+  private containsExplicitLights(nodes: readonly NodeBase[]): boolean {
+    for (const node of nodes) {
+      if (this.isExplicitLightNode(node)) {
+        return true;
+      }
+
+      if (node.children.length > 0 && this.containsExplicitLights(node.children)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  private isExplicitLightNode(
+    node: NodeBase
+  ): node is
+    | DirectionalLightNode
+    | PointLightNode
+    | SpotLightNode
+    | AmbientLightNode
+    | HemisphereLightNode {
+    return (
+      node instanceof DirectionalLightNode ||
+      node instanceof PointLightNode ||
+      node instanceof SpotLightNode ||
+      node instanceof AmbientLightNode ||
+      node instanceof HemisphereLightNode
+    );
   }
 
   private ensureNodeIconTextures(): void {
@@ -948,25 +996,11 @@ export class ViewportRendererService {
   }
 
   private shouldSkipSelectionBounds(node: Node3D): boolean {
-    return (
-      node instanceof Camera3D ||
-      node instanceof DirectionalLightNode ||
-      node instanceof PointLightNode ||
-      node instanceof SpotLightNode ||
-      node instanceof AmbientLightNode ||
-      node instanceof HemisphereLightNode
-    );
+    return node instanceof Camera3D || this.isExplicitLightNode(node);
   }
 
   private shouldKeepSelectedNodeIcon(node: Node3D): boolean {
-    return (
-      node instanceof Camera3D ||
-      node instanceof DirectionalLightNode ||
-      node instanceof PointLightNode ||
-      node instanceof SpotLightNode ||
-      node instanceof AmbientLightNode ||
-      node instanceof HemisphereLightNode
-    );
+    return node instanceof Camera3D || this.isExplicitLightNode(node);
   }
 
   resize(width: number, height: number): void {
@@ -2538,6 +2572,7 @@ export class ViewportRendererService {
       sceneGraph.rootNodes.forEach(node => {
         this.processNodeForRendering(node);
       });
+      this.syncLighting();
       this.syncBaseViewportFrame();
       this.buildNodeIcons(sceneGraph.rootNodes);
 
