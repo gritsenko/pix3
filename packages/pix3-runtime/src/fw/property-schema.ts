@@ -69,10 +69,10 @@ export interface PropertyUIHints {
   nodeTypes?: string[];
 
   /** Optional specialized editor kind for custom inspector widgets */
-  editor?: 'texture-resource' | 'audio-resource' | 'sprite-size';
+  editor?: 'texture-resource' | 'audio-resource' | 'model-resource' | 'sprite-size';
 
   /** Optional resource subtype for object-like values */
-  resourceType?: 'texture';
+  resourceType?: 'texture' | 'model';
 }
 
 /** Validation rule for a property */

@@ -72,6 +72,7 @@ const IMAGE_EXTENSIONS = new Set([
   'avif',
 ]);
 const AUDIO_EXTENSIONS = new Set(['wav', 'mp3', 'ogg']);
+const MODEL_EXTENSIONS = new Set(['glb', 'gltf']);
 
 @customElement('pix3-inspector-panel')
 export class InspectorPanel extends ComponentBase {
@@ -521,6 +522,10 @@ export class InspectorPanel extends ComponentBase {
     return this.hasSupportedExtension(path, AUDIO_EXTENSIONS);
   }
 
+  private isModelResource(path: string): boolean {
+    return this.hasSupportedExtension(path, MODEL_EXTENSIONS);
+  }
+
   private hasSupportedExtension(path: string, extensions: ReadonlySet<string>): boolean {
     const cleaned = path.split('?')[0].split('#')[0];
     const extension = cleaned.includes('.') ? (cleaned.split('.').pop()?.toLowerCase() ?? '') : '';
@@ -588,6 +593,10 @@ export class InspectorPanel extends ComponentBase {
     return this.getDroppedResource(event, path => this.isAudioResource(path));
   }
 
+  private getDroppedModelResource(event: DragEvent): string | null {
+    return this.getDroppedResource(event, path => this.isModelResource(path));
+  }
+
   private onTextureResourceDrop(propertyName: string, event: DragEvent): void {
     const textureUrl = this.getDroppedTextureResource(event);
     if (!textureUrl) {
@@ -606,6 +615,15 @@ export class InspectorPanel extends ComponentBase {
     void this.applyPropertyChange(propertyName, audioUrl);
   }
 
+  private onModelResourceDrop(propertyName: string, event: DragEvent): void {
+    const modelUrl = this.getDroppedModelResource(event);
+    if (!modelUrl) {
+      return;
+    }
+
+    void this.applyPropertyChange(propertyName, modelUrl);
+  }
+
   private onComponentAudioResourceDrop(
     componentId: string,
     prop: PropertyDefinition,
@@ -617,6 +635,19 @@ export class InspectorPanel extends ComponentBase {
     }
 
     void this.applyComponentPropertyChange(componentId, prop, audioUrl);
+  }
+
+  private onComponentModelResourceDrop(
+    componentId: string,
+    prop: PropertyDefinition,
+    event: DragEvent
+  ): void {
+    const modelUrl = this.getDroppedModelResource(event);
+    if (!modelUrl) {
+      return;
+    }
+
+    void this.applyComponentPropertyChange(componentId, prop, modelUrl);
   }
 
   private async handlePropertyInput(propName: string, e: Event) {
@@ -2004,6 +2035,22 @@ export class InspectorPanel extends ComponentBase {
       `;
     }
 
+    if (prop.type === 'string' && prop.ui?.editor === 'model-resource') {
+      return html`
+        <div class="property-group component-property-group">
+          <span class="property-label">${label}</span>
+          <pix3-model-resource-editor
+            .resourceUrl=${state.value}
+            ?disabled=${readOnly}
+            @change=${(event: CustomEvent<{ url: string }>) =>
+              this.applyComponentPropertyChange(component.id, prop, event.detail.url.trim())}
+            @model-drop=${(event: CustomEvent<{ event: DragEvent }>) =>
+              this.onComponentModelResourceDrop(component.id, prop, event.detail.event)}
+          ></pix3-model-resource-editor>
+        </div>
+      `;
+    }
+
     if (prop.type === 'boolean') {
       return html`
         <div class="property-group component-property-group">
@@ -2316,6 +2363,22 @@ export class InspectorPanel extends ComponentBase {
             @audio-drop=${(event: CustomEvent<{ event: DragEvent }>) =>
               this.onAudioResourceDrop(prop.name, event.detail.event)}
           ></pix3-audio-resource-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'string' && prop.ui?.editor === 'model-resource') {
+      return html`
+        <div class="property-group">
+          ${labelTemplate}
+          <pix3-model-resource-editor
+            .resourceUrl=${state.value}
+            ?disabled=${readOnly}
+            @change=${(event: CustomEvent<{ url: string }>) =>
+              this.applyPropertyChange(prop.name, event.detail.url.trim())}
+            @model-drop=${(event: CustomEvent<{ event: DragEvent }>) =>
+              this.onModelResourceDrop(prop.name, event.detail.event)}
+          ></pix3-model-resource-editor>
         </div>
       `;
     }

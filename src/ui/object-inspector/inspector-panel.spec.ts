@@ -35,6 +35,22 @@ function getAudioTrackProperty(schemaOwner: {
   return prop as PropertyDefinition;
 }
 
+class ModelConsumer {
+  static getPropertySchema() {
+    return {
+      properties: [
+        {
+          name: 'modelPath',
+          type: 'string' as const,
+          ui: { editor: 'model-resource' as const },
+          getValue: () => '',
+          setValue: () => {},
+        },
+      ],
+    };
+  }
+}
+
 beforeAll(async () => {
   vi.mock('golden-layout', () => ({}));
   ({ InspectorPanel } = await import('./inspector-panel'));
@@ -139,6 +155,53 @@ describe('InspectorPanel audio resource handling', () => {
     expect(componentCommand.params?.componentId).toBe(component.id);
     expect(componentCommand.params?.propertyName).toBe('audioTrack');
     expect(componentCommand.params?.value).toBe('res://assets/sfx/ui.ogg');
+  });
+});
+
+describe('InspectorPanel model resource handling', () => {
+  it('marks modelPath with the model editor', () => {
+    const prop = ModelConsumer.getPropertySchema().properties.find(property => property.name === 'modelPath');
+
+    expect(prop).toBeDefined();
+    expect(prop?.ui?.editor).toBe('model-resource');
+  });
+
+  it('updates node modelPath from internal model asset drops and ignores non-model assets', async () => {
+    const panel = new InspectorPanel();
+    const execute = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(panel, 'commandDispatcher', {
+      value: { execute },
+      configurable: true,
+    });
+
+    (panel as unknown as { primaryNode: AudioPlayer | null }).primaryNode = new AudioPlayer({
+      id: 'audio-player',
+      name: 'Audio Player',
+    });
+    (panel as unknown as { propertySchema: ReturnType<typeof ModelConsumer.getPropertySchema> | null }).propertySchema =
+      ModelConsumer.getPropertySchema();
+
+    (
+      panel as unknown as { onModelResourceDrop: (propertyName: string, event: DragEvent) => void }
+    ).onModelResourceDrop('modelPath', createDragEvent('res://assets/models/wall.glb') as DragEvent);
+    await Promise.resolve();
+
+    expect(execute).toHaveBeenCalledTimes(1);
+    const objectCommand = execute.mock.calls[0]?.[0] as {
+      params?: { propertyPath: string; value: string };
+    };
+    expect(objectCommand.params?.propertyPath).toBe('modelPath');
+    expect(objectCommand.params?.value).toBe('res://assets/models/wall.glb');
+
+    execute.mockClear();
+
+    (
+      panel as unknown as { onModelResourceDrop: (propertyName: string, event: DragEvent) => void }
+    ).onModelResourceDrop('modelPath', createDragEvent('res://assets/audio/click.wav') as DragEvent);
+    await Promise.resolve();
+
+    expect(execute).not.toHaveBeenCalled();
   });
 });
 
