@@ -599,7 +599,7 @@ export class ViewportRendererService {
     const existingMode = this.transformControls?.getMode() ?? this.currentTransformMode;
 
     if (this.transformControls && this.scene) {
-      this.scene.remove(this.transformControls);
+      this.scene.remove(this.transformControls as unknown as THREE.Object3D);
       this.transformControls.detach();
       this.transformControls.dispose();
     }
@@ -635,7 +635,7 @@ export class ViewportRendererService {
     }
 
     if (this.scene && this.currentTransformMode !== 'select' && this.transformControls.object) {
-      this.scene.add(this.transformControls);
+      this.scene.add(this.transformControls as unknown as THREE.Object3D);
     }
   }
 
