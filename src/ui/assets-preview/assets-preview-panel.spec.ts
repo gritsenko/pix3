@@ -10,6 +10,7 @@ vi.mock('@/services', () => ({
 }));
 
 const { AssetsPreviewPanel } = await import('./assets-preview-panel');
+type AssetsPreviewPanelElement = HTMLElementTagNameMap['pix3-assets-preview-panel'];
 
 const createSnapshot = (items: AssetPreviewItem[]): AssetsPreviewSnapshot => ({
   selectedFolderPath: '.',
@@ -28,7 +29,7 @@ describe('AssetsPreviewPanel', () => {
   });
 
   it('renders inline file size for files', async () => {
-    const panel = document.createElement('pix3-assets-preview-panel') as AssetsPreviewPanel;
+    const panel = document.createElement('pix3-assets-preview-panel') as AssetsPreviewPanelElement;
     stubPanelServices(
       panel,
       createSnapshot([
@@ -49,7 +50,7 @@ describe('AssetsPreviewPanel', () => {
   });
 
   it('does not render inline file size for directories', async () => {
-    const panel = document.createElement('pix3-assets-preview-panel') as AssetsPreviewPanel;
+    const panel = document.createElement('pix3-assets-preview-panel') as AssetsPreviewPanelElement;
     stubPanelServices(
       panel,
       createSnapshot([
@@ -68,6 +69,52 @@ describe('AssetsPreviewPanel', () => {
     expect(panel.querySelector('.meta')).toBeNull();
   });
 
+  it('renders a spinner while a model thumbnail is generating', async () => {
+    const panel = document.createElement('pix3-assets-preview-panel') as AssetsPreviewPanelElement;
+    stubPanelServices(
+      panel,
+      createSnapshot([
+        createItem({
+          name: 'crate.glb',
+          path: 'assets/crate.glb',
+          kind: 'file',
+          previewType: 'model',
+          thumbnailStatus: 'loading',
+        }),
+      ])
+    );
+
+    document.body.appendChild(panel);
+    await panel.updateComplete;
+
+    expect(panel.querySelector('.thumb-spinner')).not.toBeNull();
+  });
+
+  it('requests a model thumbnail when selecting a 3D asset', async () => {
+    const panel = document.createElement('pix3-assets-preview-panel') as AssetsPreviewPanelElement;
+    const services = stubPanelServices(
+      panel,
+      createSnapshot([
+        createItem({
+          name: 'crate.glb',
+          path: 'assets/crate.glb',
+          kind: 'file',
+          previewType: 'model',
+          thumbnailStatus: 'loading',
+        }),
+      ])
+    );
+
+    document.body.appendChild(panel);
+    await panel.updateComplete;
+
+    const button = panel.querySelector('.preview-item');
+    button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+    expect(services.assetsPreviewService.selectItem).toHaveBeenCalledWith('assets/crate.glb');
+    expect(services.assetsPreviewService.requestThumbnail).toHaveBeenCalledWith('assets/crate.glb');
+  });
+
   it('formats bytes, KB, and MB consistently', () => {
     const panel = new AssetsPreviewPanel();
     const formatFileSize = (
@@ -82,13 +129,17 @@ describe('AssetsPreviewPanel', () => {
   });
 });
 
-function stubPanelServices(panel: AssetsPreviewPanel, snapshot: AssetsPreviewSnapshot): void {
-  const assetsPreviewService: Pick<AssetsPreviewService, 'subscribe' | 'selectItem'> = {
+function stubPanelServices(panel: AssetsPreviewPanelElement, snapshot: AssetsPreviewSnapshot) {
+  const assetsPreviewService: Pick<
+    AssetsPreviewService,
+    'subscribe' | 'selectItem' | 'requestThumbnail'
+  > = {
     subscribe(listener: (value: AssetsPreviewSnapshot) => void) {
       listener(snapshot);
       return () => undefined;
     },
     selectItem: vi.fn(),
+    requestThumbnail: vi.fn(),
   };
 
   const assetFileActivationService: Pick<AssetFileActivationService, 'handleActivation'> = {
@@ -111,6 +162,10 @@ function stubPanelServices(panel: AssetsPreviewPanel, snapshot: AssetsPreviewSna
     value: iconService,
     configurable: true,
   });
+
+  return {
+    assetsPreviewService,
+  };
 }
 
 function createItem(
@@ -122,10 +177,12 @@ function createItem(
     kind: overrides.kind,
     previewType: overrides.previewType ?? 'icon',
     thumbnailUrl: overrides.thumbnailUrl ?? null,
+    thumbnailStatus: overrides.thumbnailStatus ?? 'idle',
     iconName: overrides.iconName ?? 'file',
     extension: overrides.extension ?? '',
     sizeBytes: overrides.sizeBytes ?? null,
     width: overrides.width ?? null,
     height: overrides.height ?? null,
+    lastModified: overrides.lastModified ?? null,
   };
 }

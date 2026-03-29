@@ -41,9 +41,12 @@ export { NodeTypePickerService, type NodeTypePickerInstance } from './NodeTypePi
 export {
   AssetsPreviewService,
   type AssetPreviewItem,
+  type AssetThumbnailStatus,
   type AssetPreviewType,
   type AssetsPreviewSnapshot,
 } from './AssetsPreviewService';
+export { ThumbnailCacheService } from './ThumbnailCacheService';
+export { ThumbnailGenerator } from './ThumbnailGenerator';
 export {
   ScriptCreatorService,
   type ScriptCreationParams,

@@ -3,10 +3,14 @@ import { subscribe } from 'valtio/vanilla';
 import { appState } from '@/state';
 import { resolveFileSystemAPIService } from './FileSystemAPIService';
 import { resolveProjectService } from './ProjectService';
+import { resolveThumbnailCacheService } from './ThumbnailCacheService';
+import { resolveThumbnailGenerator } from './ThumbnailGenerator';
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
+const MODEL_EXTENSIONS = new Set(['glb', 'gltf']);
 
-export type AssetPreviewType = 'image' | 'icon';
+export type AssetPreviewType = 'image' | 'model' | 'icon';
+export type AssetThumbnailStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface AssetPreviewItem {
   readonly name: string;
@@ -14,11 +18,13 @@ export interface AssetPreviewItem {
   readonly kind: FileSystemHandleKind;
   readonly previewType: AssetPreviewType;
   readonly thumbnailUrl: string | null;
+  readonly thumbnailStatus: AssetThumbnailStatus;
   readonly iconName: string;
   readonly extension: string;
   readonly sizeBytes: number | null;
   readonly width: number | null;
   readonly height: number | null;
+  readonly lastModified: number | null;
 }
 
 export interface AssetsPreviewSnapshot {
@@ -37,8 +43,13 @@ type AssetsPreviewListener = (snapshot: AssetsPreviewSnapshot) => void;
 export class AssetsPreviewService {
   private readonly projectService = resolveProjectService();
   private readonly fileSystemService = resolveFileSystemAPIService();
+  private readonly thumbnailCacheService = resolveThumbnailCacheService();
+  private readonly thumbnailGenerator = resolveThumbnailGenerator();
   private readonly listeners = new Set<AssetsPreviewListener>();
   private readonly objectUrls = new Set<string>();
+  private readonly thumbnailQueue: string[] = [];
+  private readonly queuedThumbnailVersions = new Map<string, number>();
+  private readonly inFlightThumbnails = new Set<string>();
   private readonly state: {
     selectedFolderPath: string | null;
     displayPath: string;
@@ -59,6 +70,7 @@ export class AssetsPreviewService {
 
   private requestVersion = 0;
   private disposeProjectSubscription?: () => void;
+  private thumbnailWorkerPromise: Promise<void> | null = null;
 
   constructor() {
     this.disposeProjectSubscription = subscribe(appState.project, () => {
@@ -93,6 +105,27 @@ export class AssetsPreviewService {
     this.notify();
   }
 
+  public requestThumbnail(path: string): void {
+    const normalizedPath = this.normalizePath(path);
+    const item = this.state.items.find(entry => this.normalizePath(entry.path) === normalizedPath);
+    if (!item || item.previewType !== 'model' || item.kind !== 'file') {
+      return;
+    }
+
+    if (item.thumbnailUrl && item.thumbnailStatus === 'ready') {
+      return;
+    }
+
+    if (
+      item.thumbnailStatus === 'loading' &&
+      (this.inFlightThumbnails.has(normalizedPath) || this.thumbnailQueue.includes(normalizedPath))
+    ) {
+      return;
+    }
+
+    this.enqueueThumbnailGeneration(normalizedPath, this.requestVersion, true);
+  }
+
   public clearSelectedItem(): void {
     if (!this.state.selectedItemPath && !this.state.selectedItem) {
       return;
@@ -122,6 +155,10 @@ export class AssetsPreviewService {
   public dispose(): void {
     this.disposeProjectSubscription?.();
     this.disposeProjectSubscription = undefined;
+    this.requestVersion += 1;
+    this.thumbnailQueue.length = 0;
+    this.queuedThumbnailVersions.clear();
+    this.inFlightThumbnails.clear();
     this.clearObjectUrls();
     this.listeners.clear();
   }
@@ -205,20 +242,12 @@ export class AssetsPreviewService {
       }
 
       if (requestVersion !== this.requestVersion) {
-        for (const item of items) {
-          if (item.thumbnailUrl) {
-            URL.revokeObjectURL(item.thumbnailUrl);
-          }
-        }
+        this.revokeBlobUrls(items);
         return;
       }
 
       this.clearObjectUrls();
-      for (const item of items) {
-        if (item.thumbnailUrl) {
-          this.objectUrls.add(item.thumbnailUrl);
-        }
-      }
+      this.trackBlobUrls(items);
 
       this.state.items = items;
       if (this.state.selectedItemPath) {
@@ -229,6 +258,8 @@ export class AssetsPreviewService {
         }
       }
       this.state.errorMessage = null;
+      this.notify();
+      this.enqueueMissingModelThumbnails(items, requestVersion);
     } catch (error) {
       if (requestVersion !== this.requestVersion) {
         return;
@@ -262,10 +293,12 @@ export class AssetsPreviewService {
         extension,
         previewType: 'icon',
         thumbnailUrl: null,
+        thumbnailStatus: 'idle',
         iconName: 'folder',
         sizeBytes: null,
         width: null,
         height: null,
+        lastModified: null,
       };
     }
 
@@ -277,6 +310,7 @@ export class AssetsPreviewService {
     }
 
     const sizeBytes = fileBlob?.size ?? null;
+    const lastModified = fileBlob instanceof File ? fileBlob.lastModified : null;
 
     if (IMAGE_EXTENSIONS.has(extension)) {
       if (fileBlob) {
@@ -289,12 +323,34 @@ export class AssetsPreviewService {
           extension,
           previewType: 'image',
           thumbnailUrl,
+          thumbnailStatus: 'ready',
           iconName: 'image',
           sizeBytes,
           width: dimensions.width,
           height: dimensions.height,
+          lastModified,
         };
       }
+    }
+
+    if (MODEL_EXTENSIONS.has(extension)) {
+      const cacheKey = this.buildThumbnailCacheKey(path, lastModified, sizeBytes);
+      const cachedThumbnail = cacheKey ? await this.thumbnailCacheService.get(cacheKey) : null;
+
+      return {
+        name,
+        path,
+        kind,
+        extension,
+        previewType: 'model',
+        thumbnailUrl: cachedThumbnail,
+        thumbnailStatus: cachedThumbnail ? 'ready' : fileBlob ? 'loading' : 'idle',
+        iconName: 'box',
+        sizeBytes,
+        width: null,
+        height: null,
+        lastModified,
+      };
     }
 
     return {
@@ -304,11 +360,182 @@ export class AssetsPreviewService {
       extension,
       previewType: 'icon',
       thumbnailUrl: null,
+      thumbnailStatus: 'idle',
       iconName: this.resolveIconForExtension(extension),
       sizeBytes,
       width: null,
       height: null,
+      lastModified,
     };
+  }
+
+  private enqueueMissingModelThumbnails(
+    items: readonly AssetPreviewItem[],
+    requestVersion: number
+  ): void {
+    for (const item of items) {
+      if (item.kind !== 'file' || item.previewType !== 'model' || item.thumbnailStatus === 'ready') {
+        continue;
+      }
+
+      this.enqueueThumbnailGeneration(item.path, requestVersion, false);
+    }
+  }
+
+  private enqueueThumbnailGeneration(
+    path: string,
+    requestVersion: number,
+    prioritize: boolean
+  ): void {
+    const normalizedPath = this.normalizePath(path);
+    this.queuedThumbnailVersions.set(normalizedPath, requestVersion);
+
+    if (!this.inFlightThumbnails.has(normalizedPath)) {
+      const existingIndex = this.thumbnailQueue.findIndex(entry => entry === normalizedPath);
+      if (existingIndex >= 0) {
+        this.thumbnailQueue.splice(existingIndex, 1);
+      }
+
+      if (prioritize) {
+        this.thumbnailQueue.unshift(normalizedPath);
+      } else {
+        this.thumbnailQueue.push(normalizedPath);
+      }
+    }
+
+    if (!this.thumbnailWorkerPromise) {
+      this.thumbnailWorkerPromise = this.processThumbnailQueue();
+    }
+  }
+
+  private async processThumbnailQueue(): Promise<void> {
+    try {
+      while (this.thumbnailQueue.length > 0) {
+        const path = this.thumbnailQueue.shift();
+        if (!path) {
+          continue;
+        }
+
+        const requestVersion = this.queuedThumbnailVersions.get(path);
+        this.queuedThumbnailVersions.delete(path);
+        if (requestVersion === undefined || this.inFlightThumbnails.has(path)) {
+          continue;
+        }
+
+        this.inFlightThumbnails.add(path);
+        try {
+          await this.waitForNextFrame();
+          await this.generateThumbnailForPath(path, requestVersion);
+        } finally {
+          this.inFlightThumbnails.delete(path);
+        }
+      }
+    } finally {
+      this.thumbnailWorkerPromise = null;
+      if (this.thumbnailQueue.length > 0) {
+        this.thumbnailWorkerPromise = this.processThumbnailQueue();
+      }
+    }
+  }
+
+  private async generateThumbnailForPath(path: string, requestVersion: number): Promise<void> {
+    if (requestVersion !== this.requestVersion) {
+      return;
+    }
+
+    const normalizedPath = this.normalizePath(path);
+    const item = this.state.items.find(entry => this.normalizePath(entry.path) === normalizedPath);
+    if (!item || item.kind !== 'file' || item.previewType !== 'model' || item.thumbnailUrl) {
+      return;
+    }
+
+    try {
+      const fileBlob = await this.fileSystemService.readBlob(path);
+      const sizeBytes = fileBlob.size ?? item.sizeBytes;
+      const lastModified = fileBlob instanceof File ? fileBlob.lastModified : item.lastModified;
+      const cacheKey = this.buildThumbnailCacheKey(path, lastModified, sizeBytes);
+
+      if (cacheKey) {
+        const cachedThumbnail = await this.thumbnailCacheService.get(cacheKey);
+        if (cachedThumbnail) {
+          this.updateItem(path, currentItem => ({
+            ...currentItem,
+            thumbnailUrl: cachedThumbnail,
+            thumbnailStatus: 'ready',
+            lastModified,
+            sizeBytes,
+          }));
+          return;
+        }
+      }
+
+      const thumbnailUrl = await this.thumbnailGenerator.generate(fileBlob, path);
+      if (cacheKey) {
+        await this.thumbnailCacheService.set(cacheKey, thumbnailUrl);
+      }
+
+      if (requestVersion !== this.requestVersion) {
+        return;
+      }
+
+      this.updateItem(path, currentItem => ({
+        ...currentItem,
+        thumbnailUrl,
+        thumbnailStatus: 'ready',
+        lastModified,
+        sizeBytes,
+      }));
+    } catch {
+      if (requestVersion !== this.requestVersion) {
+        return;
+      }
+
+      this.updateItem(path, currentItem => ({
+        ...currentItem,
+        thumbnailStatus: 'error',
+      }));
+    }
+  }
+
+  private updateItem(
+    path: string,
+    updater: (item: AssetPreviewItem) => AssetPreviewItem
+  ): void {
+    const normalizedPath = this.normalizePath(path);
+    let didUpdate = false;
+
+    this.state.items = this.state.items.map(item => {
+      if (this.normalizePath(item.path) !== normalizedPath) {
+        return item;
+      }
+
+      didUpdate = true;
+      return updater(item);
+    });
+
+    if (!didUpdate) {
+      return;
+    }
+
+    if (this.state.selectedItemPath) {
+      this.state.selectedItem =
+        this.state.items.find(item => this.normalizePath(item.path) === this.state.selectedItemPath) ??
+        null;
+    }
+
+    this.notify();
+  }
+
+  private buildThumbnailCacheKey(
+    path: string,
+    lastModified: number | null,
+    sizeBytes: number | null
+  ): string | null {
+    if (lastModified === null || sizeBytes === null) {
+      return null;
+    }
+
+    return `${this.normalizePath(path)}::${lastModified}::${sizeBytes}`;
   }
 
   private async getImageDimensions(
@@ -401,6 +628,33 @@ export class AssetsPreviewService {
       return 'res://';
     }
     return `res://${path}`;
+  }
+
+  private waitForNextFrame(): Promise<void> {
+    return new Promise(resolve => {
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(() => resolve());
+        return;
+      }
+
+      setTimeout(resolve, 0);
+    });
+  }
+
+  private trackBlobUrls(items: readonly AssetPreviewItem[]): void {
+    for (const item of items) {
+      if (item.thumbnailUrl?.startsWith('blob:')) {
+        this.objectUrls.add(item.thumbnailUrl);
+      }
+    }
+  }
+
+  private revokeBlobUrls(items: readonly AssetPreviewItem[]): void {
+    for (const item of items) {
+      if (item.thumbnailUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(item.thumbnailUrl);
+      }
+    }
   }
 
   private clearObjectUrls(): void {

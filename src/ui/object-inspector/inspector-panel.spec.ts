@@ -319,6 +319,84 @@ describe('InspectorPanel camera projection editor', () => {
   });
 });
 
+describe('InspectorPanel asset preview rendering', () => {
+  it('renders interactive model preview for selected 3D assets', async () => {
+    const panel = document.createElement('pix3-inspector-panel') as InstanceType<
+      typeof InspectorPanel
+    >;
+
+    Object.defineProperty(panel, 'sceneManager', {
+      value: { getSceneGraph: vi.fn(() => null), getActiveSceneGraph: vi.fn(() => null) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'commandDispatcher', {
+      value: { execute: vi.fn().mockResolvedValue(undefined) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'behaviorPickerService', {
+      value: { showPicker: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'scriptCreatorService', {
+      value: { showCreator: vi.fn(), createScript: vi.fn(), checkIfScriptExists: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'scriptRegistry', {
+      value: { getComponentPropertySchema: vi.fn(() => null), getComponentType: vi.fn(() => null) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'iconService', {
+      value: { getIcon: vi.fn(() => 'icon') },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'dialogService', {
+      value: { showConfirmation: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'fileSystemAPI', {
+      value: { readBlob: vi.fn(), listDirectory: vi.fn(async () => []) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'assetsPreviewService', {
+      value: {
+        requestThumbnail: vi.fn(),
+        subscribe: (listener: (snapshot: { selectedItem: unknown }) => void) => {
+          listener({
+            selectedItem: {
+              name: 'crate.glb',
+              path: 'assets/models/crate.glb',
+              kind: 'file',
+              previewType: 'model',
+              thumbnailUrl: 'data:image/webp;base64,thumb',
+              thumbnailStatus: 'ready',
+              iconName: 'box',
+              extension: 'glb',
+              sizeBytes: 1024,
+              width: null,
+              height: null,
+              lastModified: 10,
+            },
+          });
+          return () => undefined;
+        },
+      },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'viewportService', {
+      value: { setPreviewAnimation: vi.fn() },
+      configurable: true,
+    });
+
+    document.body.appendChild(panel);
+    await panel.updateComplete;
+
+    const preview = panel.querySelector('pix3-model-asset-preview');
+    expect(preview).not.toBeNull();
+    expect(preview?.getAttribute('resourcepath')).toBeNull();
+    expect((preview as { resourcePath?: string }).resourcePath).toBe('res://assets/models/crate.glb');
+  });
+});
+
 async function setupInspectorForNode(
   node: NodeBase,
   execute = vi.fn().mockResolvedValue(undefined)

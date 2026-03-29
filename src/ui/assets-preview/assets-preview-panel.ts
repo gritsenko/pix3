@@ -83,9 +83,14 @@ export class AssetsPreviewPanel extends ComponentBase {
         @dragstart=${(event: DragEvent) => this.onItemDragStart(event, item)}
       >
         <span class="thumb">
-          ${item.previewType === 'image' && item.thumbnailUrl
+          ${item.thumbnailUrl
             ? html`<img src=${item.thumbnailUrl} alt=${item.name} loading="lazy" />`
-            : html`<span class="icon">${this.iconService.getIcon(item.iconName, 24)}</span>`}
+            : html`
+                <span class="icon">${this.iconService.getIcon(item.iconName, 24)}</span>
+                ${item.previewType === 'model' && item.thumbnailStatus === 'loading'
+                  ? html`<span class="thumb-spinner" aria-hidden="true"></span>`
+                  : null}
+              `}
         </span>
         <span class="name">${item.name}</span>
         ${item.kind === 'file' && item.sizeBytes !== null
@@ -97,6 +102,9 @@ export class AssetsPreviewPanel extends ComponentBase {
 
   private onItemSelected(item: AssetPreviewItem): void {
     this.assetsPreviewService.selectItem(item.path);
+    if (item.previewType === 'model') {
+      this.assetsPreviewService.requestThumbnail(item.path);
+    }
   }
 
   private onItemDragStart(event: DragEvent, item: AssetPreviewItem): void {

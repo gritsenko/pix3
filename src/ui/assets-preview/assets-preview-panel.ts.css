@@ -64,6 +64,7 @@ pix3-assets-preview-panel .preview-item.is-selected {
 }
 
 pix3-assets-preview-panel .thumb {
+  position: relative;
   display: grid;
   place-items: center;
   width: 100%;
@@ -84,6 +85,16 @@ pix3-assets-preview-panel .icon {
   color: rgba(245, 247, 250, 0.72);
 }
 
+pix3-assets-preview-panel .thumb-spinner {
+  position: absolute;
+  width: 1.15rem;
+  height: 1.15rem;
+  border: 2px solid rgba(245, 247, 250, 0.2);
+  border-top-color: rgba(var(--pix3-accent-rgb), 0.9);
+  border-radius: 999px;
+  animation: pix3-assets-preview-spin 0.85s linear infinite;
+}
+
 pix3-assets-preview-panel .name {
   font-size: 0.69rem;
   line-height: 1.2;
@@ -96,4 +107,10 @@ pix3-assets-preview-panel .meta {
   font-size: 0.66rem;
   line-height: 1.1;
   color: rgba(245, 247, 250, 0.56);
+}
+
+@keyframes pix3-assets-preview-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }

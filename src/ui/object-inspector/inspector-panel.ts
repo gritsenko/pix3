@@ -38,6 +38,7 @@ import {
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
+import './model-asset-preview';
 import './property-editors';
 
 interface PropertyUIState {
@@ -160,6 +161,9 @@ export class InspectorPanel extends ComponentBase {
     });
     this.disposeAssetPreviewSubscription = this.assetsPreviewService.subscribe(snapshot => {
       this.selectedAssetItem = snapshot.selectedItem;
+      if (snapshot.selectedItem?.previewType === 'model') {
+        this.assetsPreviewService.requestThumbnail(snapshot.selectedItem.path);
+      }
       this.requestUpdate();
     });
     this.updateSelectedNodes();
@@ -1101,6 +1105,7 @@ export class InspectorPanel extends ComponentBase {
 
     const asset = this.selectedAssetItem;
     const isImage = asset.previewType === 'image' && asset.thumbnailUrl !== null;
+    const isModel = asset.previewType === 'model';
     const resourceUrl = asset.path === '.' ? 'res://' : `res://${asset.path}`;
 
     return html`
@@ -1112,7 +1117,16 @@ export class InspectorPanel extends ComponentBase {
 
         <div class="property-group-section asset-section">
           <h4 class="group-title">Preview</h4>
-          ${isImage
+          ${isModel
+            ? html`
+                <pix3-model-asset-preview
+                  .resourcePath=${resourceUrl}
+                  .assetName=${asset.name}
+                  .fallbackImageUrl=${asset.thumbnailUrl ?? ''}
+                  .thumbnailStatus=${asset.thumbnailStatus}
+                ></pix3-model-asset-preview>
+              `
+            : isImage
             ? html`
                 <div class="asset-image-preview checker-bg">
                   <img src=${asset.thumbnailUrl!} alt=${asset.name} />
