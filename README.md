@@ -1,5 +1,7 @@
 # Pix3 Editor
 
+![Pix3 Editor Screenshot](design_assets/screenshot.png)
+
 Pix3 is a browser-based editor for building rich HTML5 scenes that combine 2D and 3D layers.
 
 ## Architecture Overview
