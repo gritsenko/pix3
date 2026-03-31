@@ -12,8 +12,8 @@ pix3-toolbar-button {
   line-height: 1;
   cursor: pointer;
   user-select: none;
-  padding: 0;
-  width: 32px;
+  padding: 0 10px;
+  min-width: 32px;
   height: 32px;
   transition:
     background 120ms ease,
@@ -57,6 +57,13 @@ pix3-toolbar-button[disabled] {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
+  white-space: nowrap;
+}
+
+pix3-toolbar-button[icon-only] {
+  width: 32px;
+  min-width: 32px;
+  padding: 0;
 }
 
 pix3-toolbar-button[icon-only] .toolbar-button {

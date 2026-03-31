@@ -374,7 +374,11 @@ export class AssetsPreviewService {
     requestVersion: number
   ): void {
     for (const item of items) {
-      if (item.kind !== 'file' || item.previewType !== 'model' || item.thumbnailStatus === 'ready') {
+      if (
+        item.kind !== 'file' ||
+        item.previewType !== 'model' ||
+        item.thumbnailStatus === 'ready'
+      ) {
         continue;
       }
 
@@ -497,10 +501,7 @@ export class AssetsPreviewService {
     }
   }
 
-  private updateItem(
-    path: string,
-    updater: (item: AssetPreviewItem) => AssetPreviewItem
-  ): void {
+  private updateItem(path: string, updater: (item: AssetPreviewItem) => AssetPreviewItem): void {
     const normalizedPath = this.normalizePath(path);
     let didUpdate = false;
 
@@ -519,8 +520,9 @@ export class AssetsPreviewService {
 
     if (this.state.selectedItemPath) {
       this.state.selectedItem =
-        this.state.items.find(item => this.normalizePath(item.path) === this.state.selectedItemPath) ??
-        null;
+        this.state.items.find(
+          item => this.normalizePath(item.path) === this.state.selectedItemPath
+        ) ?? null;
     }
 
     this.notify();

@@ -59,6 +59,7 @@ import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import { GamePlaySessionService } from '@/services/GamePlaySessionService';
 import { EditorTabService } from '@/services/EditorTabService';
+import { CollabJoinService, detectCollabJoinParams } from '@/services/CollabJoinService';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './shared/pix3-main-menu';
@@ -70,6 +71,7 @@ import './shared/pix3-editor-settings-dialog';
 import './shared/pix3-node-type-picker';
 import './shared/pix3-status-bar';
 import './shared/pix3-background';
+import './collab/pix3-share-dialog';
 import './welcome/pix3-welcome';
 import './logs-view/logs-panel';
 import './assets-preview/assets-preview-panel';
@@ -83,6 +85,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(ProjectService)
   private readonly projectService!: ProjectService;
+
+  @inject(CollabJoinService)
+  private readonly collabJoinService!: CollabJoinService;
 
   @inject(OperationService)
   private readonly operationService!: OperationService;
@@ -158,6 +163,12 @@ export class Pix3EditorShell extends ComponentBase {
   @state()
   private activeNodeTypePicker: NodeTypePickerInstance | null = null;
 
+  @state()
+  private pendingCollabJoin: { projectId: string; sceneId: string } | null = null;
+
+  @state()
+  private isJoiningCollab = false;
+
   @property({ type: Boolean, reflect: true, attribute: 'shell-ready' })
   protected shellReady = false;
 
@@ -175,6 +186,7 @@ export class Pix3EditorShell extends ComponentBase {
   private watchedSceneIds = new Set<string>();
   private watchedScenePaths = new Map<string, string>();
   private tabsInitialized = false;
+  private attemptedCollabJoin = false;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -348,7 +360,7 @@ export class Pix3EditorShell extends ComponentBase {
     try {
       if (typeof window !== 'undefined' && window.location.hash === '#editor') {
         // If a project is not already open, attempt to open the most recent one (best-effort).
-        if (appState.project.status !== 'ready') {
+        if (!detectCollabJoinParams() && appState.project.status !== 'ready') {
           const recents = this.projectService.getRecentProjects();
           if (recents && recents.length > 0) {
             // Don't block the UI; attempt to open the most recent project in background.
@@ -361,6 +373,8 @@ export class Pix3EditorShell extends ComponentBase {
     } catch {
       // ignore environment where window/history isn't available
     }
+
+    void this.tryJoinSharedSessionFromUrl();
 
     // Listen for the welcome component signaling that project is ready so
     // the shell can remove it from the DOM and proceed with layout initialization.
@@ -548,9 +562,10 @@ export class Pix3EditorShell extends ComponentBase {
         ${this.renderToolbar()}
         <div class="workspace" role="presentation">
           <div class="layout-host" role="application" aria-busy=${!this.isLayoutReady}></div>
-          ${this.isLayoutReady ? html`` : html`<pix3-welcome></pix3-welcome>`}
+          ${this.renderWorkspaceOverlay()}
         </div>
         <pix3-status-bar></pix3-status-bar>
+        <pix3-share-dialog></pix3-share-dialog>
         ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
         ${this.renderProjectSettingsHost()} ${this.renderEditorSettingsHost()}
         ${this.renderNodeTypePickerHost()}
@@ -562,13 +577,12 @@ export class Pix3EditorShell extends ComponentBase {
     const isPlaying = appState.ui.isPlaying;
     return html`
       <pix3-toolbar aria-label="Editor toolbar">
-        <div class="toolbar-start">
-          <pix3-main-menu slot="actions"></pix3-main-menu>
-        </div>
+        <pix3-main-menu slot="start"></pix3-main-menu>
         <div class="toolbar-content">
           <div class="toolbar-group">
             <pix3-toolbar-button
               icon=${isPlaying ? 'square' : 'play'}
+              iconOnly
               label=${isPlaying ? 'Stop' : 'Play'}
               ?toggled=${isPlaying}
               @click=${() => this.togglePlayMode()}
@@ -577,8 +591,90 @@ export class Pix3EditorShell extends ComponentBase {
           </div>
           <span> Project: ${appState.project.projectName} </span>
         </div>
+        <pix3-toolbar-button
+          slot="actions"
+          icon="share-2"
+          label="Share Project"
+          @click=${this.openShareDialog}
+          aria-label="Share Project"
+        >
+          Share
+        </pix3-toolbar-button>
       </pix3-toolbar>
     `;
+  }
+
+  private openShareDialog = (): void => {
+    const dialog = this.renderRoot.querySelector('pix3-share-dialog');
+    dialog?.openDialog();
+  };
+
+  private async tryJoinSharedSessionFromUrl(): Promise<void> {
+    if (this.attemptedCollabJoin) {
+      return;
+    }
+
+    const params = detectCollabJoinParams();
+    if (!params) {
+      return;
+    }
+
+    this.attemptedCollabJoin = true;
+
+    this.pendingCollabJoin = params;
+    this.requestUpdate();
+  }
+
+  private async startPendingCollabJoin(): Promise<void> {
+    if (!this.pendingCollabJoin || this.isJoiningCollab) {
+      return;
+    }
+
+    this.isJoiningCollab = true;
+
+    try {
+      await this.collabJoinService.joinSession(this.pendingCollabJoin);
+      this.pendingCollabJoin = null;
+    } catch (error) {
+      console.error('[Pix3EditorShell] Failed to join shared session', error);
+      appState.project.status = 'error';
+      appState.project.errorMessage =
+        error instanceof Error ? error.message : 'Failed to join shared session';
+    } finally {
+      this.isJoiningCollab = false;
+    }
+  }
+
+  private renderWorkspaceOverlay() {
+    if (this.isLayoutReady) {
+      return html``;
+    }
+
+    if (this.pendingCollabJoin) {
+      return html`
+        <div class="collab-join-overlay">
+          <div class="collab-join-card">
+            <div class="collab-join-eyebrow">Shared Project</div>
+            <h2 class="collab-join-title">Join collaborative session</h2>
+            <p class="collab-join-copy">
+              Choose a local folder to sync the shared project snapshot, then connect to the live
+              scene.
+            </p>
+            <div class="collab-join-meta">
+              <span>Project: ${this.pendingCollabJoin.projectId}</span>
+              <span>Scene: ${this.pendingCollabJoin.sceneId}</span>
+            </div>
+            <div class="collab-join-actions">
+              <button @click=${this.startPendingCollabJoin} ?disabled=${this.isJoiningCollab}>
+                ${this.isJoiningCollab ? 'Opening folder picker...' : 'Choose Folder & Join'}
+              </button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    return html`<pix3-welcome></pix3-welcome>`;
   }
 
   private togglePlayMode() {

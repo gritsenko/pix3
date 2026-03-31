@@ -22,6 +22,7 @@ export const resetAppState = (): void => {
   appState.selection = defaults.selection;
   appState.ui = defaults.ui;
   appState.operations = defaults.operations;
+  appState.collaboration = defaults.collaboration;
   appState.telemetry = defaults.telemetry;
 };
 
@@ -30,6 +31,9 @@ export { DEFAULT_THEME, THEME_IDS, createInitialAppState } from './AppState';
 export type {
   AppState,
   CameraState,
+  CollabConnectionStatus,
+  CollabRemoteUser,
+  CollaborationState,
   EditorTab,
   EditorTabType,
   NavigationMode,

@@ -102,6 +102,10 @@ export class SceneTreeNodeComponent extends ComponentBase {
   @property({ type: String })
   draggedNodeType: string | null = null;
 
+  /** Remote users who have this node selected (from collab awareness) */
+  @property({ type: Array })
+  collabUsers: Array<{ name: string; color: string }> = [];
+
   @property({ type: Object })
   collapsedNodeIds: Set<string> = new Set();
 
@@ -252,6 +256,18 @@ export class SceneTreeNodeComponent extends ComponentBase {
                   `
                 : null}
             </span>
+            ${this.collabUsers.length > 0
+              ? html`<span class="tree-node__collab-indicators"
+                  >${this.collabUsers.map(
+                    u =>
+                      html`<span
+                        class="tree-node__collab-dot"
+                        title="${u.name}"
+                        style="background-color: ${u.color}"
+                      ></span>`
+                  )}</span
+                >`
+              : null}
           </span>
           <div class="tree-node__buttons">
             <button

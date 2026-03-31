@@ -1127,14 +1127,14 @@ export class InspectorPanel extends ComponentBase {
                 ></pix3-model-asset-preview>
               `
             : isImage
-            ? html`
-                <div class="asset-image-preview checker-bg">
-                  <img src=${asset.thumbnailUrl!} alt=${asset.name} />
-                </div>
-              `
-            : html`
-                <div class="asset-file-icon">${this.iconService.getIcon(asset.iconName, 42)}</div>
-              `}
+              ? html`
+                  <div class="asset-image-preview checker-bg">
+                    <img src=${asset.thumbnailUrl!} alt=${asset.name} />
+                  </div>
+                `
+              : html`
+                  <div class="asset-file-icon">${this.iconService.getIcon(asset.iconName, 42)}</div>
+                `}
         </div>
 
         <div class="property-group-section asset-section">

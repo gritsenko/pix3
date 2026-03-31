@@ -870,7 +870,7 @@ export class SceneLoader {
     return JSON.parse(JSON.stringify(value)) as T;
   }
 
-  private async createNodeFromDefinition(definition: SceneNodeDefinition): Promise<NodeBase> {
+  async createNodeFromDefinition(definition: SceneNodeDefinition): Promise<NodeBase> {
     const baseProps: NodeBaseProps = {
       id: definition.id,
       name: definition.name,

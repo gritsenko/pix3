@@ -48,7 +48,8 @@ export class ThumbnailCacheService {
 
         request.onsuccess = () => resolve();
         request.onerror = () => reject(request.error ?? new Error('IndexedDB put error'));
-        transaction.onerror = () => reject(transaction.error ?? new Error('IndexedDB transaction error'));
+        transaction.onerror = () =>
+          reject(transaction.error ?? new Error('IndexedDB transaction error'));
       });
     } catch {
       // Keep the in-memory cache warm even if IndexedDB is unavailable.

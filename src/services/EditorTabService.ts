@@ -562,7 +562,10 @@ export class EditorTabService {
   }
 
   private deriveSceneIdFromResource(resourcePath: string): string {
-    const withoutScheme = resourcePath.replace(/^res:\/\//i, '').replace(/^templ:\/\//i, '');
+    const withoutScheme = resourcePath
+      .replace(/^res:\/\//i, '')
+      .replace(/^templ:\/\//i, '')
+      .replace(/^collab:\/\//i, '');
     const withoutExtension = withoutScheme.replace(/\.[^./]+$/i, '');
     const normalized = withoutExtension
       .replace(/[^a-z0-9]+/gi, '-')

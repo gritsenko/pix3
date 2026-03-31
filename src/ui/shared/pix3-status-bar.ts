@@ -3,6 +3,7 @@ import { LoggingService } from '@/services/LoggingService';
 import { subscribe } from 'valtio/vanilla';
 import { appState } from '@/state';
 import './pix3-status-bar.ts.css';
+import '../collab/collab-status-bar';
 
 interface StatusMessage {
   text: string;
@@ -103,6 +104,7 @@ export class Pix3StatusBar extends ComponentBase {
             : html`<span class="status-ready">Ready</span>`}
         </div>
         <div class="status-right">
+          <collab-status-bar></collab-status-bar>
           ${this.isPlaying
             ? html`<span class="status-indicator playing">▶ Playing</span>`
             : html``}

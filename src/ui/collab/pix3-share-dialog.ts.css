@@ -1,0 +1,144 @@
+pix3-share-dialog {
+  display: contents;
+}
+
+.pix3-share-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(12, 14, 18, 0.62);
+  backdrop-filter: blur(10px);
+  z-index: 2200;
+}
+
+.pix3-share-dialog {
+  box-sizing: border-box;
+  width: min(100%, 520px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  background:
+    linear-gradient(180deg, rgba(33, 39, 48, 0.98), rgba(22, 26, 33, 0.98)),
+    rgba(22, 26, 33, 0.98);
+  color: rgba(243, 244, 246, 0.94);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+}
+
+.pix3-share-header {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.pix3-share-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.pix3-share-subtitle {
+  color: rgba(243, 244, 246, 0.66);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.pix3-share-body {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.pix3-share-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(243, 244, 246, 0.92);
+  font-size: 0.84rem;
+}
+
+.pix3-share-input:focus {
+  outline: none;
+  border-color: rgba(var(--pix3-accent-rgb), 0.5);
+  box-shadow: 0 0 0 3px rgba(var(--pix3-accent-rgb), 0.18);
+}
+
+.pix3-share-empty,
+.pix3-share-error {
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+}
+
+.pix3-share-empty {
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(243, 244, 246, 0.72);
+}
+
+.pix3-share-error {
+  background: rgba(239, 68, 68, 0.12);
+  color: rgba(254, 202, 202, 0.95);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+}
+
+.pix3-share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.pix3-share-button {
+  min-width: 96px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(243, 244, 246, 0.94);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.pix3-share-button--primary {
+  border-color: rgba(var(--pix3-accent-rgb), 0.28);
+  background: rgba(var(--pix3-accent-rgb), 0.18);
+  color: #fff7d1;
+}
+
+.pix3-share-button:hover:not([disabled]) {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.pix3-share-button--primary:hover:not([disabled]) {
+  background: rgba(var(--pix3-accent-rgb), 0.24);
+}
+
+.pix3-share-button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .pix3-share-overlay {
+    padding: 14px;
+  }
+
+  .pix3-share-dialog {
+    padding: 16px;
+  }
+
+  .pix3-share-actions {
+    justify-content: stretch;
+  }
+
+  .pix3-share-button {
+    flex: 1 1 100%;
+  }
+}

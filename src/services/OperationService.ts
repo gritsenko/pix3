@@ -18,6 +18,7 @@ import {
 } from '../core/Operation';
 import { appState, type AppState, type AppStateSnapshot } from '@/state';
 import { LoggingService } from './LoggingService';
+import type { CollaborationService } from './CollaborationService';
 
 export type OperationEvent =
   | {
@@ -157,6 +158,12 @@ export class OperationService {
   }
 
   async undo(): Promise<boolean> {
+    // Route through Y.UndoManager when collaboration is active
+    const collabUndone = this.tryCollabUndo();
+    if (collabUndone !== null) {
+      return collabUndone;
+    }
+
     if (!this.history.canUndo) {
       return false;
     }
@@ -187,6 +194,12 @@ export class OperationService {
   }
 
   async redo(): Promise<boolean> {
+    // Route through Y.UndoManager when collaboration is active
+    const collabRedone = this.tryCollabRedo();
+    if (collabRedone !== null) {
+      return collabRedone;
+    }
+
     if (!this.history.canRedo) {
       return false;
     }
@@ -223,6 +236,54 @@ export class OperationService {
 
   setHistoryCapacity(capacity: number): void {
     this.history.setCapacity(capacity);
+  }
+
+  /**
+   * Try to undo via Y.UndoManager if collaboration is active.
+   * Returns null if collab is not active (fallback to local history).
+   */
+  private tryCollabUndo(): boolean | null {
+    try {
+      const container = ServiceContainer.getInstance();
+      const token = container.getOrCreateToken('CollaborationService');
+      const collabService = container.getService<CollaborationService>(token);
+      if (collabService?.isConnected()) {
+        const um = collabService.getUndoManager();
+        if (um && um.undoStack.length > 0) {
+          um.undo();
+          this.state.scenes.nodeDataChangeSignal++;
+          return true;
+        }
+        return false;
+      }
+    } catch {
+      // CollaborationService not registered, fall through to local history
+    }
+    return null;
+  }
+
+  /**
+   * Try to redo via Y.UndoManager if collaboration is active.
+   * Returns null if collab is not active (fallback to local history).
+   */
+  private tryCollabRedo(): boolean | null {
+    try {
+      const container = ServiceContainer.getInstance();
+      const token = container.getOrCreateToken('CollaborationService');
+      const collabService = container.getService<CollaborationService>(token);
+      if (collabService?.isConnected()) {
+        const um = collabService.getUndoManager();
+        if (um && um.redoStack.length > 0) {
+          um.redo();
+          this.state.scenes.nodeDataChangeSignal++;
+          return true;
+        }
+        return false;
+      }
+    } catch {
+      // CollaborationService not registered, fall through to local history
+    }
+    return null;
   }
 
   private async executeOperation<TInvokeResult extends OperationInvokeResult>(

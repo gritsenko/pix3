@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:collab": "concurrently \"npm run dev:collab:server\" \"npm run dev\"",
+    "dev:collab:server": "npm run dev -w packages/pix3-collab-server",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "lint": "eslint src --ext .ts,.js",
@@ -17,6 +19,7 @@
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
+    "@hocuspocus/provider": "^2.15.0",
     "@types/three": "^0.183.1",
     "esbuild-wasm": "^0.24.0",
     "feather-icons": "^4.29.2",
@@ -25,7 +28,9 @@
     "reflect-metadata": "^0.2.2",
     "three": "^0.183.2",
     "valtio": "^2.1.8",
-    "yaml": "^2.6.0"
+    "y-indexeddb": "^9.0.12",
+    "yaml": "^2.6.0",
+    "yjs": "^13.6.0"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
@@ -33,6 +38,7 @@
     "@types/node": "^24.5.2",
     "@typescript-eslint/eslint-plugin": "^8.44.1",
     "@typescript-eslint/parser": "^8.44.1",
+    "concurrently": "^9.1.0",
     "eslint": "^9.36.0",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-lit": "^2.1.1",
@@ -44,5 +50,8 @@
     "vite": "^7.1.7",
     "vitest": "^4.0.18"
   },
-  "overrides": {}
+  "overrides": {},
+  "workspaces": [
+    "packages/pix3-collab-server"
+  ]
 }

@@ -116,9 +116,9 @@ describe('AssetsPreviewService', () => {
         expect.stringContaining('models/crate.glb'),
         'data:image/webp;base64,generated'
       );
-      expect(
-        snapshots.some(snapshot => snapshot.items[0]?.thumbnailStatus === 'loading')
-      ).toBe(true);
+      expect(snapshots.some(snapshot => snapshot.items[0]?.thumbnailStatus === 'loading')).toBe(
+        true
+      );
     } finally {
       unsubscribe();
       service.dispose();

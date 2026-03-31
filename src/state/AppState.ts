@@ -207,6 +207,21 @@ export interface OperationState {
   lastUndoableCommandId: string | null;
 }
 
+export interface CollabRemoteUser {
+  clientId: number;
+  name: string;
+  color: string;
+  selection: string[];
+}
+
+export type CollabConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'synced';
+
+export interface CollaborationState {
+  connectionStatus: CollabConnectionStatus;
+  roomName: string | null;
+  remoteUsers: CollabRemoteUser[];
+}
+
 export interface TelemetryState {
   lastEventName: string | null;
   unsentEventCount: number;
@@ -220,6 +235,7 @@ export interface AppState {
   editorContext: EditorContextState;
   ui: UIState;
   operations: OperationState;
+  collaboration: CollaborationState;
   telemetry: TelemetryState;
 }
 
@@ -302,6 +318,11 @@ export const createInitialAppState = (): AppState => ({
     pendingCommandCount: 0,
     lastCommandId: null,
     lastUndoableCommandId: null,
+  },
+  collaboration: {
+    connectionStatus: 'disconnected',
+    roomName: null,
+    remoteUsers: [],
   },
   telemetry: {
     lastEventName: null,

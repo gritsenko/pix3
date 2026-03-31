@@ -59,3 +59,17 @@ export {
 } from './ScriptCompilerService';
 export { ProjectBuildService, type ProjectBuildResult } from './ProjectBuildService';
 export { Navigation2DController } from './Navigation2DController';
+export {
+  CollaborationService,
+  type CollabConnectionStatus,
+  type CollabUserInfo,
+} from './CollaborationService';
+export { AssetUploadService, type AssetUploadResult } from './AssetUploadService';
+export { SceneCRDTBinding } from './SceneCRDTBinding';
+export { CollabViewportOverlayService } from './CollabViewportOverlayService';
+export {
+  CollabJoinService,
+  detectCollabJoinParams,
+  type CollabJoinParams,
+} from './CollabJoinService';
+export { CollabSessionService } from './CollabSessionService';

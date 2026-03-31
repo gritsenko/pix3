@@ -70,3 +70,74 @@ pix3-toolbar {
   font-size: 0.85rem;
   letter-spacing: 0.04em;
 }
+
+.collab-join-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(255, 207, 51, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(17, 19, 23, 0.92), rgba(14, 16, 20, 0.96));
+}
+
+.collab-join-card {
+  width: min(100%, 560px);
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  background: rgba(27, 30, 36, 0.94);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.34);
+}
+
+.collab-join-eyebrow {
+  margin-bottom: 10px;
+  color: rgba(255, 207, 51, 0.82);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.collab-join-title {
+  margin: 0 0 12px;
+  font-size: 1.5rem;
+  line-height: 1.15;
+}
+
+.collab-join-copy {
+  margin: 0 0 18px;
+  color: rgba(243, 244, 246, 0.72);
+  line-height: 1.5;
+}
+
+.collab-join-meta {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 22px;
+  color: rgba(243, 244, 246, 0.8);
+  font-size: 0.86rem;
+  word-break: break-word;
+}
+
+.collab-join-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.collab-join-actions button {
+  min-width: 190px;
+  padding: 11px 16px;
+  border: 1px solid rgba(var(--pix3-accent-rgb), 0.28);
+  border-radius: 12px;
+  background: rgba(var(--pix3-accent-rgb), 0.18);
+  color: #fff7d1;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.collab-join-actions button[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
