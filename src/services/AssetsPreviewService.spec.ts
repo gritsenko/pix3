@@ -7,7 +7,7 @@ const mockProjectService = {
   listDirectory: vi.fn(),
 };
 
-const mockFileSystemService = {
+const mockProjectStorageService = {
   readBlob: vi.fn(),
 };
 
@@ -25,9 +25,9 @@ vi.mock('./ProjectService', () => ({
   resolveProjectService: () => mockProjectService,
 }));
 
-vi.mock('./FileSystemAPIService', () => ({
-  FileSystemAPIService: class FileSystemAPIService {},
-  resolveFileSystemAPIService: () => mockFileSystemService,
+vi.mock('./ProjectStorageService', () => ({
+  ProjectStorageService: class ProjectStorageService {},
+  resolveProjectStorageService: () => mockProjectStorageService,
 }));
 
 vi.mock('./ThumbnailCacheService', () => ({
@@ -48,7 +48,7 @@ describe('AssetsPreviewService', () => {
     appState.project.status = 'ready';
 
     mockProjectService.listDirectory.mockReset();
-    mockFileSystemService.readBlob.mockReset();
+    mockProjectStorageService.readBlob.mockReset();
     mockThumbnailCacheService.get.mockReset();
     mockThumbnailCacheService.set.mockReset();
     mockThumbnailGenerator.generate.mockReset();
@@ -68,7 +68,7 @@ describe('AssetsPreviewService', () => {
     mockProjectService.listDirectory.mockResolvedValue([
       { name: 'crate.glb', path: 'models/crate.glb', kind: 'file' },
     ]);
-    mockFileSystemService.readBlob.mockResolvedValue(
+    mockProjectStorageService.readBlob.mockResolvedValue(
       createFile('crate.glb', 'cached-model', 'model/gltf-binary', 42)
     );
     mockThumbnailCacheService.get.mockResolvedValue('data:image/webp;base64,cached');
@@ -93,7 +93,7 @@ describe('AssetsPreviewService', () => {
     ]);
 
     const file = createFile('crate.glb', 'uncached-model', 'model/gltf-binary', 77);
-    mockFileSystemService.readBlob.mockResolvedValue(file);
+    mockProjectStorageService.readBlob.mockResolvedValue(file);
     mockThumbnailCacheService.get.mockResolvedValue(null);
     mockThumbnailGenerator.generate.mockResolvedValue('data:image/webp;base64,generated');
 
@@ -116,9 +116,9 @@ describe('AssetsPreviewService', () => {
         expect.stringContaining('models/crate.glb'),
         'data:image/webp;base64,generated'
       );
-      expect(
-        snapshots.some(snapshot => snapshot.items[0]?.thumbnailStatus === 'loading')
-      ).toBe(true);
+      expect(snapshots.some(snapshot => snapshot.items[0]?.thumbnailStatus === 'loading')).toBe(
+        true
+      );
     } finally {
       unsubscribe();
       service.dispose();

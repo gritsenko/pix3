@@ -393,7 +393,9 @@ describe('InspectorPanel asset preview rendering', () => {
     const preview = panel.querySelector('pix3-model-asset-preview');
     expect(preview).not.toBeNull();
     expect(preview?.getAttribute('resourcepath')).toBeNull();
-    expect((preview as { resourcePath?: string }).resourcePath).toBe('res://assets/models/crate.glb');
+    expect((preview as { resourcePath?: string }).resourcePath).toBe(
+      'res://assets/models/crate.glb'
+    );
   });
 });
 

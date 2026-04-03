@@ -2,7 +2,7 @@ import { inject } from '@/fw/di';
 import { ResourceManager } from '@/services/ResourceManager';
 import { SceneManager } from '@pix3/runtime';
 import { SceneValidationError } from '@pix3/runtime';
-import { FileSystemAPIService } from '@/services/FileSystemAPIService';
+import { ProjectStorageService } from '@/services/ProjectStorageService';
 import type { SceneGraph } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import {
@@ -28,7 +28,7 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
 
   @inject(ResourceManager) private readonly resources!: ResourceManager;
   @inject(SceneManager) private readonly sceneManager!: SceneManager;
-  @inject(FileSystemAPIService) private readonly fileSystem!: FileSystemAPIService;
+  @inject(ProjectStorageService) private readonly storage!: ProjectStorageService;
 
   private payload?: LoadSceneCommandPayload;
 
@@ -85,9 +85,8 @@ export class LoadSceneCommand extends CommandBase<LoadSceneCommandPayload, void>
       try {
         // Only get handle for res:// paths (project files)
         if (filePath.startsWith('res://')) {
-          fileHandle = await this.fileSystem.getFileHandle(filePath, { mode: 'read' });
-          const file = await fileHandle.getFile();
-          lastModifiedTime = file.lastModified;
+          fileHandle = await this.storage.getFileHandle(filePath);
+          lastModifiedTime = await this.storage.getLastModified(filePath);
 
           // Do not mutate project root from the active scene path.
           // FileSystemAPIService project directory must always remain the opened project root.

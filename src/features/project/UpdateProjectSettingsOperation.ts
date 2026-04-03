@@ -44,6 +44,7 @@ const cloneManifest = (manifest: ProjectManifestSnapshotLike): ProjectManifest =
 function persistRecentProject(entry: {
   id?: string;
   name: string;
+  backend: 'local' | 'cloud';
   localAbsolutePath?: string;
   lastOpenedAt: number;
 }): void {
@@ -122,6 +123,7 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
       persistRecentProject({
         id: state.project.id,
         name: newName ?? 'Untitled Project',
+        backend: state.project.backend,
         localAbsolutePath: newPath ?? undefined,
         lastOpenedAt: Date.now(),
       });
@@ -140,6 +142,7 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
             persistRecentProject({
               id: state.project.id,
               name: prevName ?? 'Untitled Project',
+              backend: state.project.backend,
               localAbsolutePath: prevPath ?? undefined,
               lastOpenedAt: Date.now(),
             });
@@ -154,6 +157,7 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
             persistRecentProject({
               id: state.project.id,
               name: newName ?? 'Untitled Project',
+              backend: state.project.backend,
               localAbsolutePath: newPath ?? undefined,
               lastOpenedAt: Date.now(),
             });

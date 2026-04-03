@@ -36,6 +36,15 @@ export class ServiceContainer {
 
   // Register a service
   addService<T>(token: symbol, implementation: Constructor<T>, lifetime: ServiceLifetimeOption) {
+    const existingDescriptor = this.services.get(token);
+    if (
+      existingDescriptor &&
+      existingDescriptor.implementation === implementation &&
+      existingDescriptor.lifetime === lifetime
+    ) {
+      return;
+    }
+
     // If a service is re-registered, remove any existing cached singleton instance so
     // tests and runtime can replace implementations without stale instances.
     if (this.singletonInstances.has(token)) {

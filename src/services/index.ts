@@ -15,6 +15,13 @@ export {
 export { ResourceManager, type ReadResourceOptions } from './ResourceManager';
 export { FocusRingService, type FocusRingServiceOptions } from './FocusRingService';
 export { ProjectService, resolveProjectService } from './ProjectService';
+export {
+  ProjectLifecycleService,
+  ProjectAuthRequiredError,
+  type CreateProjectDialogInstance,
+  type CreateProjectParams,
+} from './ProjectLifecycleService';
+export { ProjectStorageService, resolveProjectStorageService } from './ProjectStorageService';
 export { EditorSettingsService } from './EditorSettingsService';
 export { ProjectSettingsService } from './ProjectSettingsService';
 export { AssetFileActivationService, type AssetActivation } from './AssetFileActivationService';
@@ -59,3 +66,17 @@ export {
 } from './ScriptCompilerService';
 export { ProjectBuildService, type ProjectBuildResult } from './ProjectBuildService';
 export { Navigation2DController } from './Navigation2DController';
+export {
+  CollaborationService,
+  type CollabConnectionStatus,
+  type CollabUserInfo,
+} from './CollaborationService';
+export { AssetUploadService, type AssetUploadResult } from './AssetUploadService';
+export { SceneCRDTBinding } from './SceneCRDTBinding';
+export { CollabViewportOverlayService } from './CollabViewportOverlayService';
+export {
+  CollabJoinService,
+  detectCollabJoinParams,
+  type CollabJoinParams,
+} from './CollabJoinService';
+export { CollabSessionService } from './CollabSessionService';

@@ -65,7 +65,9 @@ export async function loadGltfFromBlob(
     if (extension === 'gltf') {
       const text = await options.blob.text();
       const json = JSON.parse(text) as MutableGltfJson;
-      cleanupTasks.push(...(await materializeExternalUris(json, options.sourcePath, options.readBlob)));
+      cleanupTasks.push(
+        ...(await materializeExternalUris(json, options.sourcePath, options.readBlob))
+      );
 
       const gltf = await new Promise<GLTF>((resolve, reject) => {
         loader.parse(

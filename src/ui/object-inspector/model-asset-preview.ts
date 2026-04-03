@@ -112,8 +112,13 @@ export class ModelAssetPreview extends ComponentBase {
     const showSpinner = this.previewState === 'loading';
 
     return html`
-      <div class="model-asset-preview checker-bg ${this.previewState === 'ready' ? 'is-ready' : ''}">
-        <canvas class="model-asset-preview-canvas" aria-label=${`${this.assetName} preview`}></canvas>
+      <div
+        class="model-asset-preview checker-bg ${this.previewState === 'ready' ? 'is-ready' : ''}"
+      >
+        <canvas
+          class="model-asset-preview-canvas"
+          aria-label=${`${this.assetName} preview`}
+        ></canvas>
         ${showOverlay
           ? html`
               <div class="model-asset-preview-overlay" aria-live="polite">
@@ -128,12 +133,16 @@ export class ModelAssetPreview extends ComponentBase {
                         <span class="model-asset-preview-cube"></span>
                       </div>
                     `}
-                ${showSpinner ? html`<span class="model-asset-preview-spinner" aria-hidden="true"></span>` : null}
+                ${showSpinner
+                  ? html`<span class="model-asset-preview-spinner" aria-hidden="true"></span>`
+                  : null}
                 <span class="model-asset-preview-status">${statusMessage}</span>
               </div>
             `
           : null}
-        <div class="model-asset-preview-hint">Drag to orbit · Scroll to zoom · Right drag to pan</div>
+        <div class="model-asset-preview-hint">
+          Drag to orbit · Scroll to zoom · Right drag to pan
+        </div>
       </div>
     `;
   }

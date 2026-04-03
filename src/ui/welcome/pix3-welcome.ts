@@ -2,7 +2,11 @@ import { ComponentBase, customElement, html, inject, state, subscribe } from '@/
 import './pix3-welcome.ts.css';
 import { ProjectService } from '@/services';
 import { IconService } from '@/services/IconService';
+import { CloudProjectService } from '@/services/CloudProjectService';
+import type { ApiProject } from '@/services/ApiClient';
 import { appState } from '@/state';
+import type { RecentProjectEntry } from '@/services/ProjectService';
+import { ProjectLifecycleService } from '@/services/ProjectLifecycleService';
 
 @customElement('pix3-welcome')
 export class Pix3Welcome extends ComponentBase {
@@ -12,21 +16,46 @@ export class Pix3Welcome extends ComponentBase {
   @inject(IconService)
   private readonly iconService!: IconService;
 
+  @inject(CloudProjectService)
+  private readonly cloudProjectService!: CloudProjectService;
+
+  @inject(ProjectLifecycleService)
+  private readonly projectLifecycleService!: ProjectLifecycleService;
+
   @state()
-  private recents: { id?: string; name: string; lastOpenedAt: number }[] = [];
+  private recents: RecentProjectEntry[] = [];
+
+  @state()
+  private cloudProjects: ApiProject[] = [];
+
+  @state()
+  private cloudProjectsLoading = false;
+
+  @state()
+  private isAuthenticated = appState.auth.isAuthenticated;
 
   protected firstUpdated(): void {
-    // Avoid mutating reactive properties synchronously during the update
-    // lifecycle (which causes Lit's "scheduled an update after an update
-    // completed" warning). Schedule the load on a microtask so it runs
-    // after the current update completes.
-    Promise.resolve().then(() => this.loadRecents());
+    Promise.resolve().then(() => {
+      this.loadRecents();
+      this.loadCloudProjects();
+    });
   }
 
+  private disposeCloudSubscription?: () => void;
   private disposeProjectSubscription?: () => void;
+  private disposeAuthSubscription?: () => void;
 
   connectedCallback(): void {
     super.connectedCallback();
+    this.disposeCloudSubscription = this.cloudProjectService.subscribe(state => {
+      this.cloudProjects = state.projects;
+      this.cloudProjectsLoading = state.isLoading;
+    });
+    this.disposeAuthSubscription = subscribe(appState.auth, () => {
+      this.isAuthenticated = appState.auth.isAuthenticated;
+      this.loadCloudProjects();
+      this.requestUpdate();
+    });
     // subscribe to project state: reload recents and auto-remove the welcome overlay when project is ready
     this.disposeProjectSubscription = subscribe(appState.project, () => {
       try {
@@ -50,7 +79,10 @@ export class Pix3Welcome extends ComponentBase {
   }
 
   disconnectedCallback(): void {
-    // dispose subscription first
+    this.disposeCloudSubscription?.();
+    this.disposeCloudSubscription = undefined;
+    this.disposeAuthSubscription?.();
+    this.disposeAuthSubscription = undefined;
     this.disposeProjectSubscription?.();
     this.disposeProjectSubscription = undefined;
     super.disconnectedCallback();
@@ -61,15 +93,18 @@ export class Pix3Welcome extends ComponentBase {
     this.recents = this.projectService?.getRecentProjects?.() ?? [];
   }
 
+  private loadCloudProjects(): void {
+    void this.cloudProjectService.loadProjects();
+  }
+
   private onOpen = async (): Promise<void> => {
     await this.projectService.openProjectViaPicker();
   };
 
   private onStartNew = async (): Promise<void> => {
     try {
-      await this.projectService.createNewProject();
+      await this.projectLifecycleService.showCreateDialog();
     } catch (error) {
-      // Show alert for errors (like non-empty directory)
       if (error instanceof Error) {
         alert(error.message);
       } else {
@@ -92,6 +127,15 @@ export class Pix3Welcome extends ComponentBase {
       await this.onOpen();
       return;
     }
+
+    if (entry.backend === 'cloud' && !this.isAuthenticated) {
+      this.requestAuth({
+        projectId: entry.id ?? null,
+        source: 'recent-cloud',
+      });
+      return;
+    }
+
     await this.projectService.openRecentProject(entry);
   };
 
@@ -119,6 +163,44 @@ export class Pix3Welcome extends ComponentBase {
     }
     this.loadRecents();
   };
+
+  private onCloudProject = async (e: Event): Promise<void> => {
+    const btn = e.currentTarget as HTMLElement | null;
+    if (!btn) return;
+    const projectId = btn.getAttribute('data-cloud-id');
+    if (!projectId) return;
+
+    if (!this.isAuthenticated) {
+      this.requestAuth({
+        projectId,
+        source: 'cloud-list',
+      });
+      return;
+    }
+
+    await this.cloudProjectService.openProject(projectId);
+  };
+
+  private requestAuth(detail: { projectId: string | null; source: 'recent-cloud' | 'cloud-list' }) {
+    this.dispatchEvent(
+      new CustomEvent('pix3-auth:request', {
+        detail,
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private getProjectBadgeLabel(entry: RecentProjectEntry): string {
+    return entry.backend === 'cloud' ? 'Cloud' : 'Local';
+  }
+
+  private getProjectIcon(entry: RecentProjectEntry) {
+    return this.iconService.getIcon(
+      entry.backend === 'cloud' ? 'cloud-outline' : 'folder-outline',
+      18
+    );
+  }
 
   protected render() {
     return html`
@@ -159,9 +241,10 @@ export class Pix3Welcome extends ComponentBase {
                             @click=${this.onRecent}
                           >
                             <span class="folder-icon" aria-hidden="true"
-                              >${this.iconService.getIcon('folder-outline', 18)}</span
+                              >${this.getProjectIcon(r)}</span
                             >
                             <span class="recent-name">${r.name}</span>
+                            <span class="recent-backend">${this.getProjectBadgeLabel(r)}</span>
                             <span class="recent-time">${this.formatTime(r.lastOpenedAt)}</span>
                           </button>
                           <button
@@ -177,6 +260,38 @@ export class Pix3Welcome extends ComponentBase {
                       </li>`
                   )}
                 </ul>
+              </div>`
+            : null}
+          ${this.isAuthenticated && this.cloudProjects.length
+            ? html`<div class="recent-list cloud-list">
+                <h3>Cloud Projects</h3>
+                <ul>
+                  ${this.cloudProjects.map(
+                    p =>
+                      html`<li>
+                        <button
+                          class="recent-item"
+                          data-cloud-id="${p.id}"
+                          @click=${this.onCloudProject}
+                        >
+                          <span class="folder-icon" aria-hidden="true"
+                            >${this.iconService.getIcon('cloud-outline', 18)}</span
+                          >
+                          <span class="recent-name">${p.name}</span>
+                          <span class="recent-backend">Cloud</span>
+                          <span class="recent-time"
+                            >${this.formatTime(new Date(p.updated_at).getTime())}</span
+                          >
+                        </button>
+                      </li>`
+                  )}
+                </ul>
+              </div>`
+            : null}
+          ${this.isAuthenticated && this.cloudProjectsLoading && this.cloudProjects.length === 0
+            ? html`<div class="recent-list cloud-list">
+                <h3>Cloud Projects</h3>
+                <div class="recent-empty">Loading cloud projects...</div>
               </div>`
             : null}
         </div>

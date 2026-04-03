@@ -388,6 +388,8 @@ export class ${singletonName} extends Script {
   }
 
   protected render() {
+    const isReadOnly = appState.collaboration.isReadOnly;
+
     return html`
       <pix3-panel
         panel-description="Open a project to browse textures, models, and prefabs."
@@ -398,6 +400,7 @@ export class ${singletonName} extends Script {
           <pix3-dropdown-button
             icon="plus-circle"
             aria-label="Create"
+            ?disabled=${isReadOnly}
             .items=${[
               { id: 'folder', label: 'Create folder', icon: 'folder' },
               { id: 'scene', label: 'Create scene', icon: 'film' },
@@ -417,12 +420,14 @@ export class ${singletonName} extends Script {
             icon="edit"
             label="Rename"
             title="Rename selected item"
+            ?disabled=${isReadOnly}
             @click=${this.onRenameClick}
           ></pix3-toolbar-button>
           <pix3-toolbar-button
             icon="trash"
             label="Delete"
             title="Delete selected item"
+            ?disabled=${isReadOnly}
             @click=${this.onDeleteClick}
           ></pix3-toolbar-button>
           <pix3-toolbar-button

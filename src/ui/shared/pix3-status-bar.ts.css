@@ -26,6 +26,12 @@ pix3-status-bar .status-right {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
+}
+
+pix3-status-bar collab-status-bar {
+  display: inline-flex;
+  align-items: center;
 }
 
 pix3-status-bar .status-message {

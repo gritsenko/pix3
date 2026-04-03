@@ -18,6 +18,7 @@ import {
 } from '../core/Operation';
 import { appState, type AppState, type AppStateSnapshot } from '@/state';
 import { LoggingService } from './LoggingService';
+import type { CollaborationService } from './CollaborationService';
 
 export type OperationEvent =
   | {
@@ -62,6 +63,20 @@ interface ExecutionResult {
   readonly result: OperationInvokeResult;
 }
 
+const READ_ONLY_ALLOWED_OPERATIONS = new Set([
+  'scene.select-object',
+  'viewport.toggle-grid',
+  'viewport.toggle-layer-2d',
+  'viewport.toggle-layer-3d',
+  'viewport.toggle-lighting',
+  'viewport.set-editor-camera-projection',
+  'viewport.set-preview-camera',
+  'viewport.toggle-ui-flag',
+  'scripts.set-play-mode',
+  'scripts.set-game-popout-window-open',
+  'editor.update-settings',
+]);
+
 @injectable()
 export class OperationService {
   readonly history: HistoryManager;
@@ -101,6 +116,7 @@ export class OperationService {
     operation: Operation<TInvokeResult>,
     options: OperationInvokeOptions = {}
   ): Promise<TInvokeResult> {
+    this.ensureWritable(operation.metadata.id);
     const execution = await this.executeOperation(operation, options);
     this.completeOperation(
       execution.metadata,
@@ -115,6 +131,7 @@ export class OperationService {
     operation: Operation<TInvokeResult>,
     options: OperationInvokeOptions = {}
   ): Promise<boolean> {
+    this.ensureWritable(operation.metadata.id);
     this.logger.debug('invokeAndPush: Starting operation', {
       operationId: operation.metadata.id,
       operationTitle: operation.metadata.title,
@@ -157,6 +174,13 @@ export class OperationService {
   }
 
   async undo(): Promise<boolean> {
+    this.ensureWritable('history.undo');
+    // Route through Y.UndoManager when collaboration is active
+    const collabUndone = this.tryCollabUndo();
+    if (collabUndone !== null) {
+      return collabUndone;
+    }
+
     if (!this.history.canUndo) {
       return false;
     }
@@ -187,6 +211,13 @@ export class OperationService {
   }
 
   async redo(): Promise<boolean> {
+    this.ensureWritable('history.redo');
+    // Route through Y.UndoManager when collaboration is active
+    const collabRedone = this.tryCollabRedo();
+    if (collabRedone !== null) {
+      return collabRedone;
+    }
+
     if (!this.history.canRedo) {
       return false;
     }
@@ -223,6 +254,54 @@ export class OperationService {
 
   setHistoryCapacity(capacity: number): void {
     this.history.setCapacity(capacity);
+  }
+
+  /**
+   * Try to undo via Y.UndoManager if collaboration is active.
+   * Returns null if collab is not active (fallback to local history).
+   */
+  private tryCollabUndo(): boolean | null {
+    try {
+      const container = ServiceContainer.getInstance();
+      const token = container.getOrCreateToken('CollaborationService');
+      const collabService = container.getService<CollaborationService>(token);
+      if (collabService?.isConnected()) {
+        const um = collabService.getUndoManager();
+        if (um && um.undoStack.length > 0) {
+          um.undo();
+          this.state.scenes.nodeDataChangeSignal++;
+          return true;
+        }
+        return false;
+      }
+    } catch {
+      // CollaborationService not registered, fall through to local history
+    }
+    return null;
+  }
+
+  /**
+   * Try to redo via Y.UndoManager if collaboration is active.
+   * Returns null if collab is not active (fallback to local history).
+   */
+  private tryCollabRedo(): boolean | null {
+    try {
+      const container = ServiceContainer.getInstance();
+      const token = container.getOrCreateToken('CollaborationService');
+      const collabService = container.getService<CollaborationService>(token);
+      if (collabService?.isConnected()) {
+        const um = collabService.getUndoManager();
+        if (um && um.redoStack.length > 0) {
+          um.redo();
+          this.state.scenes.nodeDataChangeSignal++;
+          return true;
+        }
+        return false;
+      }
+    } catch {
+      // CollaborationService not registered, fall through to local history
+    }
+    return null;
   }
 
   private async executeOperation<TInvokeResult extends OperationInvokeResult>(
@@ -402,5 +481,13 @@ export class OperationService {
     for (const listener of this.listeners) {
       listener(event);
     }
+  }
+
+  private ensureWritable(actionId: string): void {
+    if (!appState.collaboration.isReadOnly || READ_ONLY_ALLOWED_OPERATIONS.has(actionId)) {
+      return;
+    }
+
+    throw new Error(`Read-only collaboration mode blocks "${actionId}".`);
   }
 }

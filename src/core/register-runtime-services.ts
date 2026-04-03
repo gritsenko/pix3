@@ -1,5 +1,9 @@
 import { ServiceContainer, ServiceLifetime } from '@/fw/di';
 import { ResourceManager } from '@/services/ResourceManager';
+import { CollaborationService } from '@/services/CollaborationService';
+import { AssetUploadService } from '@/services/AssetUploadService';
+import { SceneCRDTBinding } from '@/services/SceneCRDTBinding';
+import { CollabViewportOverlayService } from '@/services/CollabViewportOverlayService';
 import {
   AssetLoader,
   AudioService,
@@ -102,6 +106,34 @@ export function registerRuntimeServices(): void {
   container.addService(
     container.getOrCreateToken(SceneManager),
     EditorSceneManager,
+    ServiceLifetime.Singleton
+  );
+
+  // 6. CollaborationService
+  container.addService(
+    container.getOrCreateToken(CollaborationService),
+    CollaborationService,
+    ServiceLifetime.Singleton
+  );
+
+  // 7. AssetUploadService
+  container.addService(
+    container.getOrCreateToken(AssetUploadService),
+    AssetUploadService,
+    ServiceLifetime.Singleton
+  );
+
+  // 8. SceneCRDTBinding
+  container.addService(
+    container.getOrCreateToken(SceneCRDTBinding),
+    SceneCRDTBinding,
+    ServiceLifetime.Singleton
+  );
+
+  // 9. CollabViewportOverlayService
+  container.addService(
+    container.getOrCreateToken(CollabViewportOverlayService),
+    CollabViewportOverlayService,
     ServiceLifetime.Singleton
   );
 

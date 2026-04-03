@@ -1,3 +1,12 @@
+:root {
+  --pix3-z-base: 1;
+  --pix3-z-floating: 10;
+  --pix3-z-overlay: 100;
+  --pix3-z-popover: 200;
+  --pix3-z-menu: 300;
+  --pix3-z-modal: 400;
+}
+
 pix3-editor-shell {
   display: block;
   inline-size: 100%;
@@ -21,6 +30,7 @@ pix3-toolbar {
   inline-size: 100%;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   backdrop-filter: blur(18px);
+  position: relative;
 }
 
 .product-title {
@@ -69,4 +79,146 @@ pix3-toolbar {
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
   font-size: 0.85rem;
   letter-spacing: 0.04em;
+}
+
+.collab-join-overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(255, 207, 51, 0.08), transparent 36%),
+    linear-gradient(180deg, rgba(17, 19, 23, 0.92), rgba(14, 16, 20, 0.96));
+}
+
+.collab-join-card {
+  width: min(100%, 560px);
+  padding: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  background: rgba(27, 30, 36, 0.94);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.34);
+}
+
+.collab-join-eyebrow {
+  margin-bottom: 10px;
+  color: rgba(255, 207, 51, 0.82);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.collab-join-title {
+  margin: 0 0 12px;
+  font-size: 1.5rem;
+  line-height: 1.15;
+}
+
+.collab-join-copy {
+  margin: 0 0 18px;
+  color: rgba(243, 244, 246, 0.72);
+  line-height: 1.5;
+}
+
+.collab-join-meta {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 22px;
+  color: rgba(243, 244, 246, 0.8);
+  font-size: 0.86rem;
+  word-break: break-word;
+}
+
+.collab-join-actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.collab-join-actions button {
+  min-width: 190px;
+  padding: 11px 16px;
+  border: 1px solid rgba(var(--pix3-accent-rgb), 0.28);
+  border-radius: 12px;
+  background: rgba(var(--pix3-accent-rgb), 0.18);
+  color: #fff7d1;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.collab-join-actions button[disabled] {
+  opacity: 0.6;
+  cursor: progress;
+}
+
+.auth-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--pix3-z-modal);
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(circle at top, rgba(255, 207, 51, 0.08), transparent 36%),
+    rgba(12, 14, 18, 0.72);
+  backdrop-filter: blur(10px);
+}
+
+.auth-modal-shell {
+  width: min(100%, 28rem);
+}
+
+.account-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 16px;
+  z-index: var(--pix3-z-popover);
+  min-width: 220px;
+  padding: 12px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(24, 28, 34, 0.98);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+}
+
+.account-popover__name {
+  font-weight: 700;
+  color: #f3f4f6;
+}
+
+.account-popover__email {
+  margin-top: 4px;
+  color: rgba(243, 244, 246, 0.62);
+  font-size: 0.84rem;
+  word-break: break-word;
+}
+
+.account-popover__action {
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.05);
+  color: #f3f4f6;
+  cursor: pointer;
+}
+
+.account-popover__action:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffd84d, #ffb800);
+  color: #171923;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
 }

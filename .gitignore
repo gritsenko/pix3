@@ -27,4 +27,11 @@ public/esbuild.wasm
 *.sw?
 
 .chrome_debug_profile
-packages/pix3-collab-server/.env
+
+# Environment variables
+.env
+.env.local
+
+# Collab server runtime data
+packages/pix3-collab-server/data/
+packages/pix3-collab-server/projects/

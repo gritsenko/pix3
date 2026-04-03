@@ -86,12 +86,15 @@ export interface ScenesState {
 }
 
 export type ProjectStatus = 'idle' | 'selecting' | 'ready' | 'error';
+export type ProjectBackend = 'local' | 'cloud';
 
 export type ScriptLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface ProjectState {
   /** Unique ID for the project (used for persistence). */
   id: string | null;
+  /** Active project storage backend. */
+  backend: ProjectBackend;
   /** Active project directory handle retrieved via the File System Access API. */
   directoryHandle: FileSystemDirectoryHandle | null;
   projectName: string | null;
@@ -207,12 +210,58 @@ export interface OperationState {
   lastUndoableCommandId: string | null;
 }
 
+export interface CollabRemoteUser {
+  clientId: number;
+  name: string;
+  color: string;
+  selection: string[];
+}
+
+export interface CollabParticipant {
+  clientId: number | null;
+  name: string;
+  color: string;
+}
+
+export type CollabConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'synced';
+export type CollabAccessMode = 'local' | 'cloud-edit' | 'cloud-view';
+export type CollabAuthSource = 'none' | 'member' | 'share-token';
+export type CollabRole = 'owner' | 'editor' | 'viewer' | null;
+
+export interface CollaborationState {
+  connectionStatus: CollabConnectionStatus;
+  roomName: string | null;
+  remoteUsers: CollabRemoteUser[];
+  localUser: CollabParticipant | null;
+  accessMode: CollabAccessMode;
+  authSource: CollabAuthSource;
+  role: CollabRole;
+  isReadOnly: boolean;
+  shareToken: string | null;
+  shareEnabled: boolean;
+}
+
+export interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+  is_admin: boolean;
+  token?: string;
+}
+
+export interface AuthState {
+  user: AuthUser | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
+
 export interface TelemetryState {
   lastEventName: string | null;
   unsentEventCount: number;
 }
 
 export interface AppState {
+  auth: AuthState;
   project: ProjectState;
   scenes: ScenesState;
   tabs: TabsState;
@@ -220,12 +269,19 @@ export interface AppState {
   editorContext: EditorContextState;
   ui: UIState;
   operations: OperationState;
+  collaboration: CollaborationState;
   telemetry: TelemetryState;
 }
 
 export const createInitialAppState = (): AppState => ({
+  auth: {
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+  },
   project: {
     id: null,
+    backend: 'local',
     directoryHandle: null,
     projectName: null,
     localAbsolutePath: null,
@@ -302,6 +358,18 @@ export const createInitialAppState = (): AppState => ({
     pendingCommandCount: 0,
     lastCommandId: null,
     lastUndoableCommandId: null,
+  },
+  collaboration: {
+    connectionStatus: 'disconnected',
+    roomName: null,
+    remoteUsers: [],
+    localUser: null,
+    accessMode: 'local',
+    authSource: 'none',
+    role: null,
+    isReadOnly: false,
+    shareToken: null,
+    shareEnabled: false,
   },
   telemetry: {
     lastEventName: null,

@@ -16,12 +16,14 @@ export const getAppStateSnapshot = (): AppStateSnapshot => snapshot(appState);
  */
 export const resetAppState = (): void => {
   const defaults = createInitialAppState();
+  appState.auth = defaults.auth;
   appState.project = defaults.project;
   appState.scenes = defaults.scenes;
   appState.tabs = defaults.tabs;
   appState.selection = defaults.selection;
   appState.ui = defaults.ui;
   appState.operations = defaults.operations;
+  appState.collaboration = defaults.collaboration;
   appState.telemetry = defaults.telemetry;
 };
 
@@ -30,11 +32,15 @@ export { DEFAULT_THEME, THEME_IDS, createInitialAppState } from './AppState';
 export type {
   AppState,
   CameraState,
+  CollabConnectionStatus,
+  CollabRemoteUser,
+  CollaborationState,
   EditorTab,
   EditorTabType,
   NavigationMode,
   OperationState,
   PanelVisibilityState,
+  ProjectBackend,
   ProjectState,
   ProjectStatus,
   SceneDescriptor,

@@ -102,6 +102,13 @@ export class SceneTreeNodeComponent extends ComponentBase {
   @property({ type: String })
   draggedNodeType: string | null = null;
 
+  /** Remote users who have this node selected (from collab awareness) */
+  @property({ type: Array })
+  collabUsers: Array<{ name: string; color: string }> = [];
+
+  @property({ type: Object })
+  remoteSelectionByNodeId: Record<string, Array<{ name: string; color: string }>> = {};
+
   @property({ type: Object })
   collapsedNodeIds: Set<string> = new Set();
 
@@ -139,6 +146,9 @@ export class SceneTreeNodeComponent extends ComponentBase {
     if (changedProperties.has('node')) {
       this.isVisible = (this.node.properties?.visible as boolean) ?? true;
       this.isLocked = (this.node.properties?.locked as boolean) ?? false;
+    }
+    if (changedProperties.has('node') || changedProperties.has('remoteSelectionByNodeId')) {
+      this.collabUsers = this.remoteSelectionByNodeId[this.node.id] ?? [];
     }
   }
 
@@ -251,6 +261,19 @@ export class SceneTreeNodeComponent extends ComponentBase {
                     </button>
                   `
                 : null}
+              ${this.collabUsers.length > 0
+                ? html`<span class="tree-node__collab-indicators"
+                    >${this.collabUsers.map(
+                      u =>
+                        html`<span
+                          class="tree-node__collab-avatar"
+                          title="${u.name}"
+                          style="background-color: ${u.color}"
+                          >${this.getCollabInitials(u.name)}</span
+                        >`
+                    )}</span
+                  >`
+                : null}
             </span>
           </span>
           <div class="tree-node__buttons">
@@ -291,6 +314,7 @@ export class SceneTreeNodeComponent extends ComponentBase {
                       .collapsedNodeIds=${this.collapsedNodeIds}
                       .draggedNodeId=${this.draggedNodeId}
                       .draggedNodeType=${this.draggedNodeType}
+                      .remoteSelectionByNodeId=${this.remoteSelectionByNodeId}
                       ?focusable=${index === 0}
                     ></pix3-scene-tree-node>
                   </li>`
@@ -318,6 +342,15 @@ export class SceneTreeNodeComponent extends ComponentBase {
 
   private renderToggleIcon(iconName: string): TemplateResult {
     return this.iconService.getIcon(iconName, IconSize.SMALL);
+  }
+
+  private getCollabInitials(name: string): string {
+    const words = name.trim().split(/\s+/).filter(Boolean).slice(0, 2);
+    if (words.length === 0) {
+      return '?';
+    }
+
+    return words.map(word => word.charAt(0).toUpperCase()).join('');
   }
 
   private onScriptIndicatorMouseEnter(event: MouseEvent): void {

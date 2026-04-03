@@ -1127,14 +1127,14 @@ export class InspectorPanel extends ComponentBase {
                 ></pix3-model-asset-preview>
               `
             : isImage
-            ? html`
-                <div class="asset-image-preview checker-bg">
-                  <img src=${asset.thumbnailUrl!} alt=${asset.name} />
-                </div>
-              `
-            : html`
-                <div class="asset-file-icon">${this.iconService.getIcon(asset.iconName, 42)}</div>
-              `}
+              ? html`
+                  <div class="asset-image-preview checker-bg">
+                    <img src=${asset.thumbnailUrl!} alt=${asset.name} />
+                  </div>
+                `
+              : html`
+                  <div class="asset-file-icon">${this.iconService.getIcon(asset.iconName, 42)}</div>
+                `}
         </div>
 
         <div class="property-group-section asset-section">
@@ -1631,6 +1631,9 @@ export class InspectorPanel extends ComponentBase {
   }
 
   private applyLayoutPreset(preset: LayoutPreset) {
+    if (appState.collaboration.isReadOnly) {
+      return;
+    }
     if (!this.primaryNode || !(this.primaryNode instanceof Group2D)) return;
 
     const group = this.primaryNode as Group2D;
@@ -2016,6 +2019,10 @@ export class InspectorPanel extends ComponentBase {
     readOnly: ReadOnlyValue,
     target: NodeBase | ScriptComponent | null | undefined
   ): boolean {
+    if (appState.collaboration.isReadOnly) {
+      return true;
+    }
+
     if (typeof readOnly === 'function') {
       return Boolean(target ? readOnly(target) : false);
     }

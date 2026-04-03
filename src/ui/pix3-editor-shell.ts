@@ -46,6 +46,8 @@ import { OpenGamePopoutWindowCommand } from '@/features/scripts/OpenGamePopoutWi
 import { OpenProjectSettingsCommand } from '@/features/project/OpenProjectSettingsCommand';
 import { OpenProjectInIdeCommand } from '@/features/project/OpenProjectInIdeCommand';
 import { BuildProjectCommand } from '@/features/project/BuildProjectCommand';
+import { NewProjectCommand } from '@/features/project/NewProjectCommand';
+import { CloseProjectCommand } from '@/features/project/CloseProjectCommand';
 import { OpenEditorSettingsCommand } from '@/features/editor/OpenEditorSettingsCommand';
 import { SetTransformModeCommand } from '@/features/viewport/SetTransformModeCommand';
 import { ToggleGridCommand } from '@/features/viewport/ToggleGridCommand';
@@ -59,18 +61,29 @@ import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import { GamePlaySessionService } from '@/services/GamePlaySessionService';
 import { EditorTabService } from '@/services/EditorTabService';
+import { CollabJoinService, detectCollabJoinParams } from '@/services/CollabJoinService';
+import { AuthService } from '@/services/AuthService';
+import { CloudProjectService } from '@/services/CloudProjectService';
+import {
+  ProjectLifecycleService,
+  type CreateProjectDialogInstance,
+} from '@/services/ProjectLifecycleService';
 import './shared/pix3-toolbar';
 import './shared/pix3-toolbar-button';
 import './shared/pix3-main-menu';
 import './shared/pix3-confirm-dialog';
 import './shared/pix3-behavior-picker';
 import './shared/pix3-script-creator';
+import './shared/pix3-create-project-dialog';
 import './shared/pix3-project-settings-dialog';
 import './shared/pix3-editor-settings-dialog';
 import './shared/pix3-node-type-picker';
 import './shared/pix3-status-bar';
 import './shared/pix3-background';
+import './collab/collab-participants-strip';
+import './collab/pix3-share-dialog';
 import './welcome/pix3-welcome';
+import './auth/pix3-auth-screen';
 import './logs-view/logs-panel';
 import './assets-preview/assets-preview-panel';
 import './viewport/game-tab';
@@ -83,6 +96,18 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(ProjectService)
   private readonly projectService!: ProjectService;
+
+  @inject(CollabJoinService)
+  private readonly collabJoinService!: CollabJoinService;
+
+  @inject(AuthService)
+  private readonly authService!: AuthService;
+
+  @inject(CloudProjectService)
+  private readonly cloudProjectService!: CloudProjectService;
+
+  @inject(ProjectLifecycleService)
+  private readonly projectLifecycleService!: ProjectLifecycleService;
 
   @inject(OperationService)
   private readonly operationService!: OperationService;
@@ -138,6 +163,9 @@ export class Pix3EditorShell extends ComponentBase {
   // project open handled by <pix3-welcome>
 
   @state()
+  private isAuthenticated = appState.auth.isAuthenticated;
+
+  @state()
   private isLayoutReady = appState.ui.isLayoutReady;
 
   @state()
@@ -158,15 +186,35 @@ export class Pix3EditorShell extends ComponentBase {
   @state()
   private activeNodeTypePicker: NodeTypePickerInstance | null = null;
 
+  @state()
+  private pendingCollabJoin: { projectId: string; sceneId: string } | null = null;
+
+  @state()
+  private isJoiningCollab = false;
+
+  @state()
+  private isAuthModalOpen = false;
+
+  @state()
+  private pendingAuthProjectId: string | null = null;
+
+  @state()
+  private activeCreateProjectDialog: CreateProjectDialogInstance | null = null;
+
+  @state()
+  private isAccountPopoverOpen = false;
+
   @property({ type: Boolean, reflect: true, attribute: 'shell-ready' })
   protected shellReady = false;
 
+  private disposeAuthSubscription?: () => void;
   private disposeSubscription?: () => void;
   private disposeScenesSubscription?: () => void;
   private disposeProjectSubscription?: () => void;
   private disposeDialogsSubscription?: () => void;
   private disposeProjectSettingsSubscription?: () => void;
   private disposeEditorSettingsSubscription?: () => void;
+  private disposeCreateProjectSubscription?: () => void;
   private disposeNodeTypePickerSubscription?: () => void;
   private disposeBehaviorPickerSubscription?: () => void;
   private disposeScriptCreatorSubscription?: () => void;
@@ -175,6 +223,7 @@ export class Pix3EditorShell extends ComponentBase {
   private watchedSceneIds = new Set<string>();
   private watchedScenePaths = new Map<string, string>();
   private tabsInitialized = false;
+  private attemptedCollabJoin = false;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -200,6 +249,8 @@ export class Pix3EditorShell extends ComponentBase {
     const projectSettingsCommand = new OpenProjectSettingsCommand();
     const openProjectInIdeCommand = new OpenProjectInIdeCommand();
     const buildProjectCommand = new BuildProjectCommand();
+    const newProjectCommand = new NewProjectCommand();
+    const closeProjectCommand = new CloseProjectCommand();
     const editorSettingsCommand = new OpenEditorSettingsCommand();
 
     // Register viewport commands
@@ -229,6 +280,8 @@ export class Pix3EditorShell extends ComponentBase {
       restartGameCommand,
       openGamePopoutWindowCommand,
       editorSettingsCommand,
+      newProjectCommand,
+      closeProjectCommand,
       projectSettingsCommand,
       openProjectInIdeCommand,
       buildProjectCommand,
@@ -259,6 +312,11 @@ export class Pix3EditorShell extends ComponentBase {
 
     this.disposeEditorSettingsSubscription = this.editorSettingsService.subscribe(dialog => {
       this.activeEditorSettingsDialog = dialog;
+      this.requestUpdate();
+    });
+
+    this.disposeCreateProjectSubscription = this.projectLifecycleService.subscribe(dialog => {
+      this.activeCreateProjectDialog = dialog;
       this.requestUpdate();
     });
 
@@ -293,6 +351,14 @@ export class Pix3EditorShell extends ComponentBase {
     this.gamePlaySessionService.initialize();
 
     this.editorSettingsService.initialize();
+
+    // Restore auth session on startup
+    void this.authService.restoreSession();
+
+    this.disposeAuthSubscription = subscribe(appState.auth, () => {
+      this.isAuthenticated = appState.auth.isAuthenticated;
+      this.requestUpdate();
+    });
 
     this.disposeSubscription = subscribe(appState.ui, () => {
       this.isLayoutReady = appState.ui.isLayoutReady;
@@ -348,11 +414,14 @@ export class Pix3EditorShell extends ComponentBase {
     try {
       if (typeof window !== 'undefined' && window.location.hash === '#editor') {
         // If a project is not already open, attempt to open the most recent one (best-effort).
-        if (appState.project.status !== 'ready') {
+        if (!detectCollabJoinParams() && appState.project.status !== 'ready') {
           const recents = this.projectService.getRecentProjects();
-          if (recents && recents.length > 0) {
+          const preferredRecent =
+            recents.find(entry => entry.backend === 'local') ??
+            (this.isAuthenticated ? recents[0] : null);
+          if (preferredRecent) {
             // Don't block the UI; attempt to open the most recent project in background.
-            void this.projectService.openRecentProject(recents[0]).catch(() => {
+            void this.projectService.openRecentProject(preferredRecent).catch(() => {
               // If auto-open fails (permission denied or no handle), we'll keep showing welcome.
             });
           }
@@ -361,6 +430,8 @@ export class Pix3EditorShell extends ComponentBase {
     } catch {
       // ignore environment where window/history isn't available
     }
+
+    void this.tryJoinSharedSessionFromUrl();
 
     // Listen for the welcome component signaling that project is ready so
     // the shell can remove it from the DOM and proceed with layout initialization.
@@ -381,6 +452,8 @@ export class Pix3EditorShell extends ComponentBase {
   }
 
   disconnectedCallback(): void {
+    this.disposeAuthSubscription?.();
+    this.disposeAuthSubscription = undefined;
     this.disposeSubscription?.();
     this.disposeSubscription = undefined;
     this.disposeScenesSubscription?.();
@@ -393,6 +466,8 @@ export class Pix3EditorShell extends ComponentBase {
     this.disposeProjectSettingsSubscription = undefined;
     this.disposeEditorSettingsSubscription?.();
     this.disposeEditorSettingsSubscription = undefined;
+    this.disposeCreateProjectSubscription?.();
+    this.disposeCreateProjectSubscription = undefined;
     this.disposeNodeTypePickerSubscription?.();
     this.disposeNodeTypePickerSubscription = undefined;
     this.disposeBehaviorPickerSubscription?.();
@@ -548,11 +623,13 @@ export class Pix3EditorShell extends ComponentBase {
         ${this.renderToolbar()}
         <div class="workspace" role="presentation">
           <div class="layout-host" role="application" aria-busy=${!this.isLayoutReady}></div>
-          ${this.isLayoutReady ? html`` : html`<pix3-welcome></pix3-welcome>`}
+          ${this.renderWorkspaceOverlay()}
         </div>
         <pix3-status-bar></pix3-status-bar>
-        ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
-        ${this.renderProjectSettingsHost()} ${this.renderEditorSettingsHost()}
+        <pix3-share-dialog></pix3-share-dialog>
+        ${this.renderAuthModal()} ${this.renderDialogHost()} ${this.renderPickerHost()}
+        ${this.renderScriptCreatorHost()} ${this.renderProjectSettingsHost()}
+        ${this.renderEditorSettingsHost()} ${this.renderCreateProjectHost()}
         ${this.renderNodeTypePickerHost()}
       </div>
     `;
@@ -562,23 +639,205 @@ export class Pix3EditorShell extends ComponentBase {
     const isPlaying = appState.ui.isPlaying;
     return html`
       <pix3-toolbar aria-label="Editor toolbar">
-        <div class="toolbar-start">
-          <pix3-main-menu slot="actions"></pix3-main-menu>
-        </div>
+        <pix3-main-menu slot="start"></pix3-main-menu>
         <div class="toolbar-content">
           <div class="toolbar-group">
             <pix3-toolbar-button
               icon=${isPlaying ? 'square' : 'play'}
+              iconOnly
               label=${isPlaying ? 'Stop' : 'Play'}
               ?toggled=${isPlaying}
               @click=${() => this.togglePlayMode()}
               aria-label=${isPlaying ? 'Stop Scene' : 'Play Scene'}
             ></pix3-toolbar-button>
           </div>
-          <span> Project: ${appState.project.projectName} </span>
+          <span> Project: ${appState.project.projectName ?? 'No project open'} </span>
+          <collab-participants-strip></collab-participants-strip>
         </div>
+        <pix3-toolbar-button
+          slot="actions"
+          .icon=${this.isAuthenticated ? null : 'log-in'}
+          label=${this.isAuthenticated ? 'Account' : 'Login'}
+          ?iconOnly=${this.isAuthenticated}
+          @click=${this.onAuthButtonClick}
+          aria-label=${this.isAuthenticated ? 'Open account menu' : 'Open login'}
+        >
+          ${this.isAuthenticated
+            ? html`<span class="account-avatar">${this.getUserInitials()}</span>`
+            : 'Login'}
+        </pix3-toolbar-button>
+        <pix3-toolbar-button
+          slot="actions"
+          icon="share-2"
+          label="Share Project"
+          @click=${this.openShareDialog}
+          aria-label="Share Project"
+        >
+          Share
+        </pix3-toolbar-button>
+        ${this.renderAccountPopover()}
       </pix3-toolbar>
     `;
+  }
+
+  private openShareDialog = (): void => {
+    const dialog = this.renderRoot.querySelector('pix3-share-dialog');
+    dialog?.openDialog();
+  };
+
+  private openAuthModal = (): void => {
+    this.pendingAuthProjectId = null;
+    this.isAuthModalOpen = true;
+    this.isAccountPopoverOpen = false;
+  };
+
+  private closeAuthModal = (): void => {
+    this.isAuthModalOpen = false;
+    this.pendingAuthProjectId = null;
+  };
+
+  private onAuthRequest = (event: CustomEvent<{ projectId: string | null }>): void => {
+    this.pendingAuthProjectId = event.detail.projectId ?? null;
+    this.isAuthModalOpen = true;
+    this.isAccountPopoverOpen = false;
+  };
+
+  private onAuthSuccess = async (): Promise<void> => {
+    const pendingProjectId = this.pendingAuthProjectId;
+    this.isAuthModalOpen = false;
+    this.pendingAuthProjectId = null;
+
+    await this.cloudProjectService.loadProjects();
+
+    if (this.projectLifecycleService.hasPendingCloudCreation()) {
+      await this.projectLifecycleService.resumePendingCloudCreation();
+      return;
+    }
+
+    if (pendingProjectId) {
+      await this.cloudProjectService.openProject(pendingProjectId);
+    }
+  };
+
+  private onAuthButtonClick = (): void => {
+    if (!this.isAuthenticated) {
+      this.openAuthModal();
+      return;
+    }
+
+    this.isAccountPopoverOpen = !this.isAccountPopoverOpen;
+  };
+
+  private onLogoutClick = async (): Promise<void> => {
+    this.isAccountPopoverOpen = false;
+    await this.projectLifecycleService.logout();
+  };
+
+  private async tryJoinSharedSessionFromUrl(): Promise<void> {
+    if (this.attemptedCollabJoin) {
+      return;
+    }
+
+    const params = detectCollabJoinParams();
+    if (!params) {
+      return;
+    }
+
+    this.attemptedCollabJoin = true;
+
+    this.pendingCollabJoin = params;
+    this.requestUpdate();
+    void this.startPendingCollabJoin();
+  }
+
+  private async startPendingCollabJoin(): Promise<void> {
+    if (!this.pendingCollabJoin || this.isJoiningCollab) {
+      return;
+    }
+
+    this.isJoiningCollab = true;
+
+    try {
+      await this.collabJoinService.joinSession(this.pendingCollabJoin);
+      this.pendingCollabJoin = null;
+    } catch (error) {
+      console.error('[Pix3EditorShell] Failed to join shared session', error);
+      appState.project.status = 'error';
+      appState.project.errorMessage =
+        error instanceof Error ? error.message : 'Failed to join shared session';
+    } finally {
+      this.isJoiningCollab = false;
+    }
+  }
+
+  private renderWorkspaceOverlay() {
+    if (this.pendingCollabJoin) {
+      return html`
+        <div class="collab-join-overlay">
+          <div class="collab-join-card">
+            <div class="collab-join-eyebrow">Shared Project</div>
+            <h2 class="collab-join-title">Opening collaborative session</h2>
+            <p class="collab-join-copy">
+              Pix3 is loading the shared cloud project, assets, and live scene now.
+            </p>
+            <div class="collab-join-meta">
+              <span>Project: ${this.pendingCollabJoin.projectId}</span>
+              <span>Scene: ${this.pendingCollabJoin.sceneId}</span>
+            </div>
+            ${this.isJoiningCollab
+              ? html`<div class="loading-label">Connecting to shared workspace...</div>`
+              : html``}
+          </div>
+        </div>
+      `;
+    }
+
+    if (appState.project.status === 'ready' && this.isLayoutReady) {
+      return html``;
+    }
+
+    return html` <pix3-welcome @pix3-auth:request=${this.onAuthRequest}></pix3-welcome> `;
+  }
+
+  private renderAuthModal() {
+    if (!this.isAuthModalOpen) {
+      return html``;
+    }
+
+    return html`
+      <div class="auth-modal-backdrop" @click=${this.closeAuthModal}>
+        <div class="auth-modal-shell" @click=${(event: Event) => event.stopPropagation()}>
+          <pix3-auth-screen
+            variant="modal"
+            show-close
+            @pix3-auth:close=${this.closeAuthModal}
+            @pix3-auth:success=${() => void this.onAuthSuccess()}
+          ></pix3-auth-screen>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderAccountPopover() {
+    if (!this.isAuthenticated || !this.isAccountPopoverOpen) {
+      return html``;
+    }
+
+    return html`
+      <div class="account-popover">
+        <div class="account-popover__name">${appState.auth.user?.username ?? 'User'}</div>
+        <div class="account-popover__email">${appState.auth.user?.email ?? ''}</div>
+        <button class="account-popover__action" @click=${() => void this.onLogoutClick()}>
+          Logout
+        </button>
+      </div>
+    `;
+  }
+
+  private getUserInitials(): string {
+    const username = appState.auth.user?.username?.trim() || 'U';
+    const parts = username.split(/\s+/).filter(Boolean).slice(0, 2);
+    return parts.map(part => part.charAt(0).toUpperCase()).join('') || 'U';
   }
 
   private togglePlayMode() {
@@ -702,6 +961,20 @@ export class Pix3EditorShell extends ComponentBase {
       <div class="editor-settings-host">
         <pix3-editor-settings-dialog></pix3-editor-settings-dialog>
       </div>
+    `;
+  }
+
+  private renderCreateProjectHost() {
+    if (!this.activeCreateProjectDialog) {
+      return null;
+    }
+
+    return html`
+      <pix3-create-project-dialog
+        .dialogId=${this.activeCreateProjectDialog.id}
+        .initialBackend=${this.activeCreateProjectDialog.initialBackend}
+        @pix3-auth:request=${this.onAuthRequest}
+      ></pix3-create-project-dialog>
     `;
   }
 

@@ -13,6 +13,74 @@ Scene creation commands use a shared `CreateNodeBaseCommand` in `src/features/sc
 See full specification in [docs/pix3-specification.md](docs/pix3-specification.md).
 Additional agent guidelines: [AGENTS.md](AGENTS.md).
 
+## Collaboration Server (`packages/pix3-collab-server`)
+
+A self-hosted Node.js server that enables real-time multiplayer editing and cloud project storage.
+
+### Stack
+
+- **Express** — REST API for auth, projects, file storage, and admin
+- **better-sqlite3** — local SQLite database (users, projects, memberships)
+- **@hocuspocus/server** — WebSocket CRDT sync via Yjs
+- **JWT (HttpOnly cookie)** — session auth; token also returned in response body for WebSocket handshake
+- **bcrypt** — password hashing
+
+### API Surface
+
+| Group | Endpoints |
+|-------|-----------|
+| Auth | `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me` |
+| Projects | `GET /api/projects`, `POST /api/projects`, `POST /api/projects/:id/share`, `DELETE /api/projects/:id/share`, `DELETE /api/projects/:id` |
+| Storage | `GET /api/projects/:id/manifest`, `GET /api/projects/:id/files/*`, `POST /api/projects/:id/files/*`, `DELETE /api/projects/:id/files/*` |
+| Admin | `GET /api/admin/users`, `DELETE /api/admin/users/:id`, `GET /api/admin/projects` |
+| Sync | WebSocket on `WS_PORT` (default 4000) — room format `project:{projectId}` |
+
+### Environment Variables
+
+```env
+HTTP_PORT=4001
+WS_PORT=4000
+DB_PATH=./data/pix3.db
+HOCUSPOCUS_DB_PATH=./data/crdt.db
+PROJECTS_STORAGE_DIR=./data/projects
+JWT_SECRET=change-me
+PASSWORD_SALT_ROUNDS=10
+```
+
+### Running
+
+```bash
+cd packages/pix3-collab-server
+npm install
+npm run dev     # tsx watch src/server.ts
+```
+
+## Frontend Collaboration Integration
+
+### Auth Flow
+
+- `AppState.auth` — `{ user, isAuthenticated, isLoading }` — tracks session
+- `AuthService` — `restoreSession()` called on shell init; also exposes `login()`, `register()`, `logout()`
+- `pix3-auth-screen` — combined login/register Lit component shown before the welcome screen when unauthenticated
+- JWT `token` is stored on `appState.auth.user.token` and passed to HocuspocusProvider for WebSocket auth
+
+### Cloud Projects
+
+- `ApiClient.ts` — typed `fetch` wrapper for all REST endpoints (`credentials: 'include'` for cookie auth)
+- `CloudProjectService` — wraps project CRUD, exposes `subscribe()` for reactive UI updates
+- Welcome screen (`pix3-welcome`) shows **Cloud Projects** alongside local recent projects
+
+### Collaborative Editing
+
+- `CollaborationService` — connects to Hocuspocus; room name simplified to `project:{id}`; auth token resolved from `appState.auth.user.token` or a `tokenOverride` (share token for guests)
+- `CollabSessionService` — generates share tokens via API and embeds them in invite URLs (`?token=`)
+- `CollabJoinService` — reads optional `?token=` from URL for guest access (no account needed)
+- `SceneCRDTBinding` — unchanged; `Y.Map('scene').get('snapshot')` format is compatible with server persistence
+
+### Local Sync
+
+- `LocalSyncService` — opt-in sync between a cloud project and a local directory via File System Access API; uses SHA-256 manifest diffing to only transfer changed files
+
 ## Autoload Workflow
 
 Pix3 supports project-level autoload scripts via `pix3project.yaml`.

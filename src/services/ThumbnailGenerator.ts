@@ -142,7 +142,8 @@ export class ThumbnailGenerator {
 
             reject(new Error('Failed to serialize generated thumbnail.'));
           };
-          reader.onerror = () => reject(reader.error ?? new Error('Failed to read thumbnail blob.'));
+          reader.onerror = () =>
+            reject(reader.error ?? new Error('Failed to read thumbnail blob.'));
           reader.readAsDataURL(blob);
         });
       }
