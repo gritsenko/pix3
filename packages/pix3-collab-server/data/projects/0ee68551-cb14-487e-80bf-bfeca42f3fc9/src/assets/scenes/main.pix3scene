@@ -1,0 +1,99 @@
+version: 1.0.0
+description: Collaborative Scene
+metadata:
+  author: Pix3 Auto Template
+  created: 2025-09-27
+  description: Starter scene with box, light, camera and logo sprite
+root:
+  - id: environment-root
+    type: Node3D
+    name: Environment Root
+    properties:
+      transform:
+        position: [0, 0, 0]
+        rotationEuler: [0, 0, 0]
+        scale: [1, 1, 1]
+    children:
+      - id: main-camera
+        type: Camera3D
+        name: Main Camera
+        properties:
+          projection: perspective
+          fov: 60
+          near: 0.1
+          far: 1000
+          transform:
+            position: [0, 2, 6]
+            rotationEuler: [-10, 0, 0]
+            scale: [1, 1, 1]
+        children: []
+      - id: key-light
+        type: DirectionalLightNode
+        name: Key Light
+        properties:
+          intensity: 1.2
+          color: "#ffffff"
+          castShadow: true
+          shadowCameraSize: 20
+          shadowMapSize: 2048
+          transform:
+            position: [5, 8, 3]
+            rotationEuler: [-45, 35, 0]
+            scale: [1, 1, 1]
+        children: []
+      - id: demo-box
+        type: GeometryMesh
+        name: Demo Box
+        properties:
+          geometry: box
+          size: [1, 1, 1]
+          material:
+            type: standard
+            color: "#ff00ff"
+          transform:
+            position: [0.9317891356867438, 2.0064936383681298, 2.190938083429257]
+            rotationEuler: [0, 45, 0]
+            scale: [1, 1, 1]
+        children: []
+  - id: layout2d-root
+    type: Layout2D
+    name: 2D Layout
+    properties:
+      width: 1920
+      height: 1080
+      resolutionPreset: FullHD
+      showViewportOutline: true
+      scaleMode: scale-inner
+      transform:
+        position: [0, 0]
+        scale: [1, 1]
+        rotation: 0
+    children:
+      - id: ui-group
+        type: Group2D
+        name: UI Group
+        properties:
+          width: 329
+          height: 363
+          layout:
+            offsetMin: [547, 88]
+            offsetMax: [876, 451]
+          transform:
+            position: [711.5, 269.5]
+            scale: [1, 1]
+            rotation: 0
+        children:
+          - id: logo-sprite
+            type: Sprite2D
+            name: Logo Sprite
+            properties:
+              texture:
+                type: texture
+                url: res://src/assets/textures/sticker.png
+              width: 431
+              height: 380
+              transform:
+                position: [-4.989788113062218, 5.996984724883987]
+                scale: [1, 1]
+                rotation: 0
+            children: []

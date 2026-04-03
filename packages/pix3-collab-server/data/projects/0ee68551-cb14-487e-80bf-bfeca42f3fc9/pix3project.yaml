@@ -1,0 +1,7 @@
+version: 1.0.0
+viewportBaseSize:
+  width: 1920
+  height: 1080
+metadata:
+  projectName: New Project
+autoloads: []
