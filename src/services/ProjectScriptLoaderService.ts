@@ -4,7 +4,7 @@ import { subscribe } from 'valtio/vanilla';
 import { appState } from '@/state';
 import { Script } from '@pix3/runtime';
 import type { ScriptComponent } from '@pix3/runtime';
-import { FileSystemAPIService } from './FileSystemAPIService';
+import { ProjectStorageService } from './ProjectStorageService';
 import { ScriptRegistry } from '@pix3/runtime';
 import type { PropertySchemaProvider } from '@pix3/runtime';
 import { ScriptCompilerService } from './ScriptCompilerService';
@@ -28,8 +28,8 @@ import { isDocumentActive } from './page-activity';
 
 @injectable()
 export class ProjectScriptLoaderService {
-  @inject(FileSystemAPIService)
-  private readonly fs!: FileSystemAPIService;
+  @inject(ProjectStorageService)
+  private readonly storage!: ProjectStorageService;
 
   @inject(ScriptRegistry)
   private readonly scriptRegistry!: ScriptRegistry;
@@ -151,18 +151,20 @@ export class ProjectScriptLoaderService {
         // Register watcher if not already watching
         if (!this.watchedFilePaths.has(file.path)) {
           try {
-            const handle = await this.fs.getFileHandle(file.path);
-            this.fileWatchService.watch(file.path, handle, undefined, () => {
-              void this.syncAndBuild();
-            });
-            this.watchedFilePaths.add(file.path);
+            const handle = await this.storage.getFileHandle(file.path);
+            if (handle) {
+              this.fileWatchService.watch(file.path, handle, undefined, () => {
+                void this.syncAndBuild();
+              });
+              this.watchedFilePaths.add(file.path);
+            }
           } catch (error) {
             this.logger.error(`Failed to register watcher for ${file.path}`, error);
           }
         }
 
         try {
-          const content = await this.fs.readTextFile(file.path);
+          const content = await this.storage.readTextFile(file.path);
           filesMap.set(file.path, content);
         } catch (error) {
           this.logger.error(`Failed to read ${file.path}`, error);
@@ -353,7 +355,7 @@ export class ProjectScriptLoaderService {
 
     for (const directory of this.scriptDirectories) {
       try {
-        await this.fs.listDirectory(directory);
+        await this.storage.listDirectory(directory);
         roots.add(directory);
 
         if (directory === 'src/scripts') {
@@ -385,7 +387,7 @@ export class ProjectScriptLoaderService {
   private async collectFilesRecursively(
     directory: string
   ): Promise<Array<{ name: string; kind: FileSystemHandleKind; path: string }>> {
-    const entries = await this.fs.listDirectory(directory);
+    const entries = await this.storage.listDirectory(directory);
     const collected: Array<{ name: string; kind: FileSystemHandleKind; path: string }> = [];
 
     for (const entry of entries) {

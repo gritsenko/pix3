@@ -16,6 +16,7 @@ root: []
 export class SceneCRDTBinding {
   private disposeOperationBinding: (() => void) | null = null;
   private observedDoc: Y.Doc | null = null;
+  private observedSceneMap: Y.Map<unknown> | null = null;
   private sceneObserver: ((event: Y.YMapEvent<unknown>) => void) | null = null;
   private boundSceneId: string | null = null;
   private collabService: CollaborationService | null = null;
@@ -33,14 +34,14 @@ export class SceneCRDTBinding {
   }
 
   bindToYDoc(ydoc: Y.Doc, sceneId: string): void {
-    if (this.observedDoc && this.sceneObserver) {
-      this.observedDoc.getMap('scene').unobserve(this.sceneObserver);
+    if (this.observedSceneMap && this.sceneObserver) {
+      this.observedSceneMap.unobserve(this.sceneObserver);
     }
 
     this.observedDoc = ydoc;
     this.boundSceneId = sceneId;
 
-    const sceneMap = ydoc.getMap('scene');
+    const sceneMap = this.getOrCreateSceneMap(ydoc, sceneId);
     const snapshot = sceneMap.get('snapshot');
     if (typeof snapshot === 'string' && snapshot.trim()) {
       this.lastSerializedSnapshot = snapshot;
@@ -49,28 +50,40 @@ export class SceneCRDTBinding {
     this.sceneObserver = (event: Y.YMapEvent<unknown>) => {
       this.onSceneMapChanged(event);
     };
+    this.observedSceneMap = sceneMap;
     sceneMap.observe(this.sceneObserver);
   }
 
-  initializeYDocFromScene(ydoc: Y.Doc, sceneGraph: SceneGraph): void {
+  initializeYDocFromScene(
+    ydoc: Y.Doc,
+    sceneId: string,
+    sceneGraph: SceneGraph,
+    filePath: string
+  ): void {
     const snapshot = this.serializeSceneGraph(sceneGraph);
-    const sceneMap = ydoc.getMap('scene');
+    const sceneMap = this.getOrCreateSceneMap(ydoc, sceneId);
 
     sceneMap.set('version', sceneGraph.version ?? '1.0.0');
     sceneMap.set('description', sceneGraph.description ?? 'Collaborative Scene');
+    sceneMap.set('filePath', filePath);
     sceneMap.set('snapshot', snapshot);
 
     this.lastSerializedSnapshot = snapshot;
   }
 
-  async buildSceneFromYDoc(ydoc: Y.Doc): Promise<SceneGraph> {
+  async buildSceneFromYDoc(ydoc: Y.Doc, sceneId: string): Promise<SceneGraph> {
     const sceneManager = this.getSceneManager();
-    const sceneMap = ydoc.getMap('scene');
+    const sceneMap = this.getSceneMap(ydoc, sceneId);
+    if (!sceneMap) {
+      throw new Error(`Scene '${sceneId}' is not available in the collaboration document.`);
+    }
     const snapshot = sceneMap.get('snapshot');
+    const filePath = sceneMap.get('filePath');
     const sceneText =
       typeof snapshot === 'string' && snapshot.trim() ? snapshot : DEFAULT_SCENE_SNAPSHOT;
-
-    const graph = await sceneManager.parseScene(sceneText, { filePath: 'collab://scene' });
+    const resolvedFilePath =
+      typeof filePath === 'string' && filePath.trim() ? filePath : 'collab://scene';
+    const graph = await sceneManager.parseScene(sceneText, { filePath: resolvedFilePath });
     if (!graph.description) {
       const description = sceneMap.get('description');
       if (typeof description === 'string') {
@@ -86,11 +99,12 @@ export class SceneCRDTBinding {
     this.disposeOperationBinding?.();
     this.disposeOperationBinding = null;
 
-    if (this.observedDoc && this.sceneObserver) {
-      this.observedDoc.getMap('scene').unobserve(this.sceneObserver);
+    if (this.observedSceneMap && this.sceneObserver) {
+      this.observedSceneMap.unobserve(this.sceneObserver);
     }
 
     this.observedDoc = null;
+    this.observedSceneMap = null;
     this.sceneObserver = null;
     this.boundSceneId = null;
     this.collabService = null;
@@ -123,10 +137,13 @@ export class SceneCRDTBinding {
       return;
     }
 
-    const sceneMap = ydoc.getMap('scene');
+    const descriptor = appState.scenes.descriptors[this.boundSceneId];
+    const filePath = descriptor?.filePath ?? 'collab://scene';
+    const sceneMap = this.getOrCreateSceneMap(ydoc, this.boundSceneId);
     ydoc.transact(() => {
       sceneMap.set('version', sceneGraph.version ?? '1.0.0');
       sceneMap.set('description', sceneGraph.description ?? 'Collaborative Scene');
+      sceneMap.set('filePath', filePath);
       sceneMap.set('snapshot', snapshot);
     }, this.collabService.getLocalOrigin());
 
@@ -162,7 +179,10 @@ export class SceneCRDTBinding {
     this.collabService.isRemoteUpdate = true;
     try {
       const sceneManager = this.getSceneManager();
-      const graph = await sceneManager.parseScene(snapshot, { filePath: 'collab://scene' });
+      const filePath = sceneMap.get('filePath');
+      const resolvedFilePath =
+        typeof filePath === 'string' && filePath.trim() ? filePath : 'collab://scene';
+      const graph = await sceneManager.parseScene(snapshot, { filePath: resolvedFilePath });
 
       if (!graph.description) {
         const description = sceneMap.get('description');
@@ -175,6 +195,7 @@ export class SceneCRDTBinding {
 
       const descriptor = appState.scenes.descriptors[this.boundSceneId];
       if (descriptor) {
+        descriptor.filePath = resolvedFilePath;
         descriptor.version = graph.version ?? descriptor.version;
         descriptor.name = graph.description || descriptor.name;
         descriptor.isDirty = false;
@@ -198,6 +219,29 @@ export class SceneCRDTBinding {
 
   private serializeSceneGraph(sceneGraph: SceneGraph): string {
     return this.getSceneManager().serializeScene(sceneGraph);
+  }
+
+  getSceneFilePath(ydoc: Y.Doc, sceneId: string): string | null {
+    const sceneMap = this.getSceneMap(ydoc, sceneId);
+    const filePath = sceneMap?.get('filePath');
+    return typeof filePath === 'string' && filePath.trim() ? filePath : null;
+  }
+
+  private getSceneMap(ydoc: Y.Doc, sceneId: string): Y.Map<unknown> | null {
+    const scenesMap = ydoc.getMap<Y.Map<unknown>>('scenes');
+    const entry = scenesMap.get(sceneId);
+    return entry instanceof Y.Map ? entry : null;
+  }
+
+  private getOrCreateSceneMap(ydoc: Y.Doc, sceneId: string): Y.Map<unknown> {
+    const existing = this.getSceneMap(ydoc, sceneId);
+    if (existing) {
+      return existing;
+    }
+
+    const sceneMap = new Y.Map<unknown>();
+    ydoc.getMap<Y.Map<unknown>>('scenes').set(sceneId, sceneMap);
+    return sceneMap;
   }
 
   private getSceneManager(): SceneManager {

@@ -1,13 +1,13 @@
 import { inject, injectable } from '@/fw/di';
 import { ResourceManager as RuntimeResourceManager, type ReadResourceOptions } from '@pix3/runtime';
-import { FileSystemAPIService } from './FileSystemAPIService';
+import { ProjectStorageService } from './ProjectStorageService';
 
 const RES_SCHEME = 'res';
 
 @injectable()
 export class EditorResourceManager extends RuntimeResourceManager {
-  @inject(FileSystemAPIService)
-  private readonly fileSystem!: FileSystemAPIService;
+  @inject(ProjectStorageService)
+  private readonly storage!: ProjectStorageService;
 
   constructor() {
     super();
@@ -19,7 +19,7 @@ export class EditorResourceManager extends RuntimeResourceManager {
     if (scheme === RES_SCHEME) {
       const path = resource.startsWith('res://') ? resource.substring(6) : resource;
       try {
-        return await this.fileSystem.readTextFile(path);
+        return await this.storage.readTextFile(path);
       } catch {
         // Fallback to network
         return super.readText(this.buildPublicUrl(resource));
@@ -35,7 +35,7 @@ export class EditorResourceManager extends RuntimeResourceManager {
     if (scheme === RES_SCHEME) {
       const path = resource.startsWith('res://') ? resource.substring(6) : resource;
       try {
-        return await this.fileSystem.readBlob(path);
+        return await this.storage.readBlob(path);
       } catch {
         // Fallback to network
         return super.readBlob(this.buildPublicUrl(resource));
@@ -48,7 +48,7 @@ export class EditorResourceManager extends RuntimeResourceManager {
   override normalize(resource: string): string {
     const scheme = this.getScheme(resource);
     if (scheme === RES_SCHEME) {
-      return this.fileSystem.normalizeResourcePath(resource);
+      return this.storage.normalizeResourcePath(resource);
     }
     return super.normalize(resource);
   }

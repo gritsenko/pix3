@@ -10,7 +10,7 @@ pix3-node-type-picker .dialog-backdrop {
   justify-content: center;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(2px);
-  z-index: 1300;
+  z-index: var(--pix3-z-modal);
 }
 
 pix3-node-type-picker .node-type-picker-content {

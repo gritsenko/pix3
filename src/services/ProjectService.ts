@@ -1,7 +1,9 @@
 import { injectable, ServiceContainer } from '@/fw/di';
 import { appState } from '@/state';
 import { resolveFileSystemAPIService, type FileDescriptor } from './FileSystemAPIService';
+import { ProjectStorageService } from './ProjectStorageService';
 import { parse, stringify } from 'yaml';
+import { sceneTemplates } from './template-data';
 import {
   createDefaultProjectManifest,
   normalizeProjectManifest,
@@ -15,13 +17,29 @@ const ASSET_BROWSER_STORAGE_PREFIX = 'pix3.assetBrowser:v1:';
 export interface RecentProjectEntry {
   readonly id?: string;
   readonly name: string;
+  readonly backend: 'local' | 'cloud';
   readonly localAbsolutePath?: string;
   readonly lastOpenedAt: number;
 }
 
+export interface CreateProjectOptions {
+  readonly name: string;
+  readonly manifest: ProjectManifest;
+}
+
+export interface ActivateProjectOptions {
+  readonly beforeActivate?: () => Promise<void>;
+}
+
 @injectable()
 export class ProjectService {
+  static readonly STARTUP_SCENE_PATH = 'src/assets/scenes/main.pix3scene';
+  static readonly STARTUP_SCENE_RESOURCE_PATH = `res://${ProjectService.STARTUP_SCENE_PATH}`;
+
   private readonly fs = resolveFileSystemAPIService();
+  private readonly storage = ServiceContainer.getInstance().getService<ProjectStorageService>(
+    ServiceContainer.getInstance().getOrCreateToken(ProjectStorageService)
+  );
 
   constructor() {}
 
@@ -36,6 +54,7 @@ export class ProjectService {
         .map(p => ({
           id: p.id,
           name: p.name,
+          backend: p.backend === 'cloud' ? 'cloud' : 'local',
           localAbsolutePath: p.localAbsolutePath,
           lastOpenedAt: typeof p.lastOpenedAt === 'number' ? p.lastOpenedAt : 0,
         }))
@@ -124,6 +143,7 @@ export class ProjectService {
     const toAdd: RecentProjectEntry = {
       id: entry.id,
       name: entry.name,
+      backend: entry.backend,
       localAbsolutePath: entry.localAbsolutePath,
       lastOpenedAt: entry.lastOpenedAt ?? Date.now(),
     };
@@ -146,6 +166,7 @@ export class ProjectService {
     this.addRecentProject({
       id: appState.project.id,
       name: appState.project.projectName ?? 'Untitled Project',
+      backend: appState.project.backend,
       localAbsolutePath: appState.project.localAbsolutePath ?? undefined,
       lastOpenedAt: Date.now(),
     });
@@ -164,6 +185,7 @@ export class ProjectService {
         : `handle-${Date.now()}`;
 
       appState.project.id = id;
+      appState.project.backend = 'local';
       appState.project.directoryHandle = handle;
       appState.project.projectName = handle.name ?? 'Untitled Project';
       appState.project.status = 'ready';
@@ -174,6 +196,7 @@ export class ProjectService {
       this.addRecentProject({
         id,
         name: appState.project.projectName ?? 'Untitled Project',
+        backend: 'local',
         lastOpenedAt: Date.now(),
       });
       this.saveHandleToIndexedDB(id, handle).catch(() => {
@@ -194,6 +217,21 @@ export class ProjectService {
    * If the persisted handle is unavailable or permission is denied, fall back to showing the picker.
    */
   async openRecentProject(entry: RecentProjectEntry): Promise<void> {
+    if (entry.backend === 'cloud') {
+      if (!entry.id) {
+        throw new Error('Cloud recent project is missing its project ID.');
+      }
+
+      const cloudProjectService = ServiceContainer.getInstance().getService(
+        ServiceContainer.getInstance().getOrCreateToken(
+          (await import('./CloudProjectService')).CloudProjectService
+        )
+      ) as import('./CloudProjectService').CloudProjectService;
+
+      await cloudProjectService.openProject(entry.id);
+      return;
+    }
+
     if (entry.id) {
       try {
         const handle = await this.getHandleFromIndexedDB(entry.id);
@@ -203,6 +241,7 @@ export class ProjectService {
             await this.fs.ensurePermission(handle, 'readwrite');
             this.fs.setProjectDirectory(handle);
             appState.project.id = entry.id || null;
+            appState.project.backend = 'local';
             appState.project.directoryHandle = handle;
             appState.project.projectName = handle.name ?? entry.name;
             appState.project.localAbsolutePath = entry.localAbsolutePath ?? null;
@@ -213,6 +252,7 @@ export class ProjectService {
             this.addRecentProject({
               id: entry.id,
               name: appState.project.projectName ?? entry.name,
+              backend: 'local',
               localAbsolutePath: appState.project.localAbsolutePath ?? undefined,
               lastOpenedAt: Date.now(),
             });
@@ -301,32 +341,32 @@ export class ProjectService {
   }
 
   async listProjectRoot(): Promise<FileDescriptor[]> {
-    if (!appState.project.directoryHandle) return [];
+    if (appState.project.backend === 'local' && !appState.project.directoryHandle) return [];
     try {
-      return await this.fs.listDirectory('.');
+      return await this.storage.listDirectory('.');
     } catch {
       return [];
     }
   }
 
   async createDirectory(path: string): Promise<void> {
-    await this.fs.createDirectory(path);
+    await this.storage.createDirectory(path);
   }
 
   async writeFile(path: string, contents: string): Promise<void> {
-    await this.fs.writeTextFile(path, contents);
+    await this.storage.writeTextFile(path, contents);
   }
 
   async writeBinaryFile(path: string, data: ArrayBuffer): Promise<void> {
-    await this.fs.writeBinaryFile(path, data);
+    await this.storage.writeBinaryFile(path, data);
   }
 
   async deleteEntry(path: string): Promise<void> {
-    await this.fs.deleteEntry(path);
+    await this.storage.deleteEntry(path);
   }
 
   listDirectory(path = '.'): Promise<FileDescriptor[]> {
-    return this.fs.listDirectory(path);
+    return this.storage.listDirectory(path);
   }
 
   async moveItem(sourcePath: string, targetPath: string): Promise<void> {
@@ -351,8 +391,19 @@ export class ProjectService {
   }
 
   async createNewProject(): Promise<void> {
+    return this.createNewProjectWithOptions({
+      name: 'New Project',
+      manifest: createDefaultProjectManifest(),
+    });
+  }
+
+  async createNewProjectWithOptions(
+    options: CreateProjectOptions,
+    activateOptions?: ActivateProjectOptions
+  ): Promise<void> {
     try {
       const handle = await this.fs.requestProjectDirectory('readwrite');
+      appState.project.backend = 'local';
 
       // Check if directory is empty
       const entries = await this.fs.listDirectory('.');
@@ -363,7 +414,9 @@ export class ProjectService {
       }
 
       // Create base project structure
-      await this.createProjectStructure();
+      await this.createProjectStructure(options.name, options.manifest);
+
+      await activateOptions?.beforeActivate?.();
 
       // Set up project state
       const hasRandomUUID =
@@ -375,15 +428,19 @@ export class ProjectService {
 
       appState.project.directoryHandle = handle;
       appState.project.id = id;
-      appState.project.projectName = handle.name ?? 'New Project';
+      appState.project.backend = 'local';
+      appState.project.projectName = options.name.trim() || handle.name || 'New Project';
       appState.project.status = 'ready';
       appState.project.errorMessage = null;
-      appState.project.manifest = await this.loadProjectManifest();
+      appState.project.manifest = options.manifest;
+      appState.project.lastOpenedScenePath = ProjectService.STARTUP_SCENE_RESOURCE_PATH;
+      appState.scenes.pendingScenePaths = [ProjectService.STARTUP_SCENE_RESOURCE_PATH];
 
       // Save to recent projects
       this.addRecentProject({
         id,
-        name: appState.project.projectName ?? 'New Project',
+        name: appState.project.projectName ?? (options.name || 'New Project'),
+        backend: 'local',
         lastOpenedAt: Date.now(),
       });
       this.saveHandleToIndexedDB(id, handle).catch(() => {
@@ -399,7 +456,7 @@ export class ProjectService {
     }
   }
 
-  private async createProjectStructure(): Promise<void> {
+  private async createProjectStructure(name: string, manifest: ProjectManifest): Promise<void> {
     const directories = [
       'src',
       'scripts',
@@ -416,7 +473,7 @@ export class ProjectService {
     }
 
     // Create README.md
-    const readmeContent = `# Pix3 Project
+    const readmeContent = `# ${name || 'Pix3 Project'}
 
 This is a new Pix3 project created on ${new Date().toLocaleDateString()}.
 
@@ -440,13 +497,19 @@ This is a new Pix3 project created on ${new Date().toLocaleDateString()}.
 Happy creating! 🎨
 `;
 
-    await this.fs.writeTextFile('README.md', readmeContent);
-    await this.saveProjectManifest(createDefaultProjectManifest());
+    await this.storage.writeTextFile('README.md', readmeContent);
+    await this.saveProjectManifest(manifest);
+    await this.storage.writeTextFile(
+      ProjectService.STARTUP_SCENE_PATH,
+      sceneTemplates.find(template => template.id === 'startup-scene')?.contents ??
+        sceneTemplates[0]?.contents ??
+        ''
+    );
   }
 
   async loadProjectManifest(): Promise<ProjectManifest> {
     try {
-      const yaml = await this.fs.readTextFile(PROJECT_MANIFEST_PATH);
+      const yaml = await this.storage.readTextFile(PROJECT_MANIFEST_PATH);
       const parsed = parse(yaml);
       const manifest = normalizeProjectManifest(parsed);
       return manifest;
@@ -471,12 +534,57 @@ Happy creating! 🎨
       })),
     };
     const yaml = stringify(payload, { indent: 2 });
-    await this.fs.writeTextFile(PROJECT_MANIFEST_PATH, yaml);
+    await this.storage.writeTextFile(PROJECT_MANIFEST_PATH, yaml);
     appState.project.manifest = normalized;
   }
 
   public dispose(): void {
     // ProjectService holds no subscriptions or event listeners
+  }
+
+  async openStartupScene(): Promise<void> {
+    const editorTabService = ServiceContainer.getInstance().getService(
+      ServiceContainer.getInstance().getOrCreateToken(
+        (await import('./EditorTabService')).EditorTabService
+      )
+    ) as import('./EditorTabService').EditorTabService;
+
+    appState.scenes.pendingScenePaths = [ProjectService.STARTUP_SCENE_RESOURCE_PATH];
+    appState.project.lastOpenedScenePath = ProjectService.STARTUP_SCENE_RESOURCE_PATH;
+    await editorTabService.focusOrOpenScene(ProjectService.STARTUP_SCENE_RESOURCE_PATH);
+  }
+
+  closeCurrentProject(): void {
+    appState.project.id = null;
+    appState.project.backend = 'local';
+    appState.project.directoryHandle = null;
+    appState.project.projectName = null;
+    appState.project.localAbsolutePath = null;
+    appState.project.status = 'idle';
+    appState.project.errorMessage = null;
+    appState.project.lastOpenedScenePath = null;
+    appState.project.assetBrowserExpandedPaths = [];
+    appState.project.assetBrowserSelectedPath = null;
+    appState.project.scriptsStatus = 'idle';
+    appState.project.fileRefreshSignal = 0;
+    appState.project.scriptRefreshSignal = 0;
+    appState.project.lastModifiedDirectoryPath = null;
+    appState.project.manifest = null;
+    appState.scenes.activeSceneId = null;
+    appState.scenes.descriptors = {};
+    appState.scenes.hierarchies = {};
+    appState.scenes.loadState = 'idle';
+    appState.scenes.loadError = null;
+    appState.scenes.lastLoadedAt = null;
+    appState.scenes.pendingScenePaths = [];
+    appState.scenes.nodeDataChangeSignal = 0;
+    appState.scenes.cameraStates = {};
+    appState.scenes.previewCameraNodeIds = {};
+    appState.tabs.tabs = [];
+    appState.tabs.activeTabId = null;
+    appState.selection.nodeIds = [];
+    appState.selection.primaryNodeId = null;
+    appState.selection.hoveredNodeId = null;
   }
 }
 

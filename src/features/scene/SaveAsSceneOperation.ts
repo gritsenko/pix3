@@ -9,6 +9,7 @@ import { getAppStateSnapshot } from '@/state';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
 import { FileWatchService } from '@/services/FileWatchService';
 import { LoggingService } from '@/services/LoggingService';
+import { ProjectStorageService } from '@/services/ProjectStorageService';
 import { ref } from 'valtio/vanilla';
 
 export interface SaveAsSceneOperationParams {
@@ -44,6 +45,9 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
     );
     const fileSystem = context.container.getService<FileSystemAPIService>(
       context.container.getOrCreateToken(FileSystemAPIService)
+    );
+    const storage = context.container.getService<ProjectStorageService>(
+      context.container.getOrCreateToken(ProjectStorageService)
     );
     const fileWatchService = context.container.getService<FileWatchService>(
       context.container.getOrCreateToken(FileWatchService)
@@ -146,7 +150,7 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
       }
 
       try {
-        await fileSystem.writeTextFile(this.params.filePath, sceneYaml);
+        await storage.writeTextFile(this.params.filePath, sceneYaml);
         console.info('[SaveAsSceneOperation] File written successfully to project', {
           filePath: this.params.filePath,
           byteSize: sceneYaml.length,
@@ -187,6 +191,8 @@ export class SaveAsSceneOperation implements Operation<OperationInvokeResult> {
             descriptor.filePath,
             descriptor.lastModifiedTime
           );
+        } else {
+          descriptor.lastModifiedTime = await storage.getLastModified(descriptor.filePath);
         }
       } catch {
         // ignore

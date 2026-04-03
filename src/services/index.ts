@@ -15,6 +15,13 @@ export {
 export { ResourceManager, type ReadResourceOptions } from './ResourceManager';
 export { FocusRingService, type FocusRingServiceOptions } from './FocusRingService';
 export { ProjectService, resolveProjectService } from './ProjectService';
+export {
+  ProjectLifecycleService,
+  ProjectAuthRequiredError,
+  type CreateProjectDialogInstance,
+  type CreateProjectParams,
+} from './ProjectLifecycleService';
+export { ProjectStorageService, resolveProjectStorageService } from './ProjectStorageService';
 export { EditorSettingsService } from './EditorSettingsService';
 export { ProjectSettingsService } from './ProjectSettingsService';
 export { AssetFileActivationService, type AssetActivation } from './AssetFileActivationService';

@@ -1,6 +1,5 @@
 import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
-import { IndexeddbPersistence } from 'y-indexeddb';
 import { injectable } from '@/fw/di';
 import { appState } from '@/state';
 
@@ -20,7 +19,6 @@ export class CollaborationService {
   private provider: HocuspocusProvider | null = null;
   private ydoc: Y.Doc | null = null;
   private undoManager: Y.UndoManager | null = null;
-  private idbProvider: IndexeddbPersistence | null = null;
   private statusListeners = new Set<(status: CollabConnectionStatus) => void>();
 
   connectionStatus: CollabConnectionStatus = 'disconnected';
@@ -28,28 +26,31 @@ export class CollaborationService {
   /** Flag to prevent echo loop: set to true when processing remote updates */
   isRemoteUpdate = false;
 
-  connect(projectId: string, sceneId: string, userName: string, userColor: string): void {
+  connect(
+    projectId: string,
+    _sceneId: string,
+    userName: string,
+    userColor: string,
+    tokenOverride?: string
+  ): void {
     // Clean up any existing connection
     this.disconnect();
 
     this.ydoc = new Y.Doc();
-    const roomName = `project:${projectId}:scene:${sceneId}`;
+    const roomName = `project:${projectId}`;
     appState.collaboration.roomName = roomName;
     appState.collaboration.remoteUsers = [];
 
-    // 1. Local persistence (offline support)
-    this.idbProvider = new IndexeddbPersistence(roomName, this.ydoc);
-    this.idbProvider.on('synced', () => {
-      console.log('[collab] Y.Doc restored from IndexedDB');
-    });
+    // Resolve auth token: explicit override (share token for guests), then JWT from session
+    const token = tokenOverride ?? appState.auth.user?.token ?? '';
 
-    // 2. Server synchronization
+    // Server synchronization
     const wsUrl = import.meta.env.VITE_COLLAB_WS_URL || 'ws://localhost:4000';
     this.provider = new HocuspocusProvider({
       url: wsUrl,
       name: roomName,
       document: this.ydoc,
-      token: 'pix3-collab',
+      token,
       onStatus: ({ status }: { status: string }) => {
         this.setConnectionStatus(status as CollabConnectionStatus);
       },
@@ -71,9 +72,9 @@ export class CollaborationService {
       isTransforming: null,
     } satisfies CollabUserInfo);
 
-    // Create UndoManager scoped to scene map
-    const sceneMap = this.ydoc.getMap('scene');
-    this.undoManager = new Y.UndoManager([sceneMap], {
+    // Track project-scoped scene changes in a single collaboration document.
+    const scenesMap = this.ydoc.getMap('scenes');
+    this.undoManager = new Y.UndoManager([scenesMap], {
       trackedOrigins: new Set([this.getLocalOrigin()]),
       captureTimeout: 500,
     });
@@ -87,9 +88,6 @@ export class CollaborationService {
 
     this.provider?.destroy();
     this.provider = null;
-
-    this.idbProvider?.destroy();
-    this.idbProvider = null;
 
     this.ydoc?.destroy();
     this.ydoc = null;

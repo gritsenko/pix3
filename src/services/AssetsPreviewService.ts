@@ -1,8 +1,8 @@
 import { injectable } from '@/fw/di';
 import { subscribe } from 'valtio/vanilla';
 import { appState } from '@/state';
-import { resolveFileSystemAPIService } from './FileSystemAPIService';
 import { resolveProjectService } from './ProjectService';
+import { resolveProjectStorageService } from './ProjectStorageService';
 import { resolveThumbnailCacheService } from './ThumbnailCacheService';
 import { resolveThumbnailGenerator } from './ThumbnailGenerator';
 
@@ -42,7 +42,7 @@ type AssetsPreviewListener = (snapshot: AssetsPreviewSnapshot) => void;
 @injectable()
 export class AssetsPreviewService {
   private readonly projectService = resolveProjectService();
-  private readonly fileSystemService = resolveFileSystemAPIService();
+  private readonly storage = resolveProjectStorageService();
   private readonly thumbnailCacheService = resolveThumbnailCacheService();
   private readonly thumbnailGenerator = resolveThumbnailGenerator();
   private readonly listeners = new Set<AssetsPreviewListener>();
@@ -304,7 +304,7 @@ export class AssetsPreviewService {
 
     let fileBlob: Blob | null = null;
     try {
-      fileBlob = await this.fileSystemService.readBlob(path);
+      fileBlob = await this.storage.readBlob(path);
     } catch {
       fileBlob = null;
     }
@@ -454,7 +454,7 @@ export class AssetsPreviewService {
     }
 
     try {
-      const fileBlob = await this.fileSystemService.readBlob(path);
+      const fileBlob = await this.storage.readBlob(path);
       const sizeBytes = fileBlob.size ?? item.sizeBytes;
       const lastModified = fileBlob instanceof File ? fileBlob.lastModified : item.lastModified;
       const cacheKey = this.buildThumbnailCacheKey(path, lastModified, sizeBytes);

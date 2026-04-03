@@ -86,12 +86,15 @@ export interface ScenesState {
 }
 
 export type ProjectStatus = 'idle' | 'selecting' | 'ready' | 'error';
+export type ProjectBackend = 'local' | 'cloud';
 
 export type ScriptLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface ProjectState {
   /** Unique ID for the project (used for persistence). */
   id: string | null;
+  /** Active project storage backend. */
+  backend: ProjectBackend;
   /** Active project directory handle retrieved via the File System Access API. */
   directoryHandle: FileSystemDirectoryHandle | null;
   projectName: string | null;
@@ -222,12 +225,27 @@ export interface CollaborationState {
   remoteUsers: CollabRemoteUser[];
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  username: string;
+  is_admin: boolean;
+  token?: string;
+}
+
+export interface AuthState {
+  user: AuthUser | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+}
+
 export interface TelemetryState {
   lastEventName: string | null;
   unsentEventCount: number;
 }
 
 export interface AppState {
+  auth: AuthState;
   project: ProjectState;
   scenes: ScenesState;
   tabs: TabsState;
@@ -240,8 +258,14 @@ export interface AppState {
 }
 
 export const createInitialAppState = (): AppState => ({
+  auth: {
+    user: null,
+    isAuthenticated: false,
+    isLoading: true,
+  },
   project: {
     id: null,
+    backend: 'local',
     directoryHandle: null,
     projectName: null,
     localAbsolutePath: null,

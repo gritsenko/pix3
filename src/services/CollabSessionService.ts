@@ -1,9 +1,11 @@
 import { injectable, ServiceContainer } from '@/fw/di';
+import * as Y from 'yjs';
 import { appState } from '@/state';
 import { SceneManager } from '@pix3/runtime';
 import { CollaborationService } from './CollaborationService';
 import { OperationService } from './OperationService';
 import { SceneCRDTBinding } from './SceneCRDTBinding';
+import * as ApiClient from './ApiClient';
 
 const HOST_COLOR = '#ffcf33';
 
@@ -31,7 +33,7 @@ export class CollabSessionService {
       container.getOrCreateToken(SceneManager)
     );
 
-    const roomName = `project:${projectId}:scene:${sceneId}`;
+    const roomName = `project:${projectId}`;
     const existingRoomName = appState.collaboration.roomName;
 
     if (!collabService.isConnected() || existingRoomName !== roomName) {
@@ -52,21 +54,33 @@ export class CollabSessionService {
       throw new Error('Active scene graph is unavailable.');
     }
 
-    const sceneMap = ydoc.getMap('scene');
-    const snapshot = sceneMap.get('snapshot');
+    const existingFilePath = binding.getSceneFilePath(ydoc, sceneId);
+    const descriptor = appState.scenes.descriptors[sceneId];
+    const sceneEntry = ydoc.getMap<Y.Map<unknown>>('scenes').get(sceneId);
+    const snapshot = sceneEntry instanceof Y.Map ? sceneEntry.get('snapshot') : undefined;
     if (typeof snapshot !== 'string' || !snapshot.trim()) {
       ydoc.transact(() => {
-        binding.initializeYDocFromScene(ydoc, sceneGraph);
+        binding.initializeYDocFromScene(
+          ydoc,
+          sceneId,
+          sceneGraph,
+          descriptor?.filePath ?? existingFilePath ?? `collab://${sceneId}`
+        );
       }, collabService.getLocalOrigin());
     }
 
-    return this.buildInviteLink(projectId, sceneId);
+    // Generate a share token via the API and build an invite link
+    const { share_token } = await ApiClient.generateShareToken(projectId);
+    return this.buildInviteLink(projectId, sceneId, share_token);
   }
 
-  buildInviteLink(projectId: string, sceneId: string): string {
+  buildInviteLink(projectId: string, sceneId: string, shareToken?: string): string {
     const url = new URL(window.location.href);
     url.searchParams.set('collab', projectId);
     url.searchParams.set('scene', sceneId);
+    if (shareToken) {
+      url.searchParams.set('token', shareToken);
+    }
     url.hash = 'editor';
     return url.toString();
   }

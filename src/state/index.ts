@@ -16,6 +16,7 @@ export const getAppStateSnapshot = (): AppStateSnapshot => snapshot(appState);
  */
 export const resetAppState = (): void => {
   const defaults = createInitialAppState();
+  appState.auth = defaults.auth;
   appState.project = defaults.project;
   appState.scenes = defaults.scenes;
   appState.tabs = defaults.tabs;
@@ -39,6 +40,7 @@ export type {
   NavigationMode,
   OperationState,
   PanelVisibilityState,
+  ProjectBackend,
   ProjectState,
   ProjectStatus,
   SceneDescriptor,

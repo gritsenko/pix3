@@ -290,88 +290,25 @@ export class EditorTabService {
       allTabs: appState.tabs.tabs.map(t => ({ id: t.id, type: t.type })),
     });
 
-    if (tab.isDirty) {
-      const decision = await this.promptDirtyClose(tab);
-      if (decision === 'cancel') {
-        this.layoutManager.focusEditorTab(tabId);
-        return;
-      }
-      if (decision === 'save') {
-        await this.saveTabResource(tab);
-      }
+    await this.closeTabInternal(tab, false);
+  }
+
+  getDirtyTabs(): EditorTab[] {
+    return appState.tabs.tabs.filter(tab => tab.isDirty);
+  }
+
+  async saveDirtyTabs(): Promise<void> {
+    const dirtyTabs = this.getDirtyTabs();
+    for (const tab of dirtyTabs) {
+      await this.saveTabResource(tab);
     }
+  }
 
-    if (tab.type === 'game' && !appState.ui.isGamePopoutOpen) {
-      await this.operationService.invoke(
-        new SetPlayModeOperation({
-          isPlaying: false,
-          status: 'stopped',
-        })
-      );
+  async closeAllTabs(skipDirtyPrompt = false): Promise<void> {
+    const tabs = [...appState.tabs.tabs];
+    for (const tab of tabs) {
+      await this.closeTabInternal(tab, skipDirtyPrompt);
     }
-
-    // If closing active tab, save camera/selection before removal.
-    if (appState.tabs.activeTabId === tabId) {
-      this.captureActiveContextState();
-    }
-
-    // Clean up scene data if it's a scene tab.
-    if (tab.type === 'scene') {
-      const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
-
-      // Remove from state.
-      delete appState.scenes.descriptors[sceneId];
-      delete appState.scenes.hierarchies[sceneId];
-      if (appState.scenes.cameraStates[sceneId]) {
-        delete appState.scenes.cameraStates[sceneId];
-      }
-
-      if (appState.scenes.activeSceneId === sceneId) {
-        appState.scenes.activeSceneId = null;
-
-        // Clear selection when active scene is removed.
-        appState.selection.nodeIds = [];
-        appState.selection.primaryNodeId = null;
-        appState.selection.hoveredNodeId = null;
-      }
-
-      // Remove from runtime.
-      this.sceneManager.removeSceneGraph(sceneId);
-    }
-
-    appState.tabs.tabs = appState.tabs.tabs.filter(t => t.id !== tabId);
-
-    // Select a next tab if needed.
-    if (appState.tabs.activeTabId === tabId) {
-      // If closing a game tab, try to restore the previously active tab
-      let next: EditorTab | undefined;
-      if (tab.type === 'game' && this.previousActiveTabIdBeforeGame) {
-        next = appState.tabs.tabs.find(t => t.id === this.previousActiveTabIdBeforeGame);
-        console.log('[EditorTabService] Game tab closed, restoring previous active tab:', {
-          closedTabId: tabId,
-          restoringTabId: this.previousActiveTabIdBeforeGame,
-          found: !!next,
-        });
-        this.previousActiveTabIdBeforeGame = null;
-      }
-
-      // If no previous tab found or not a game tab, just pick the last remaining tab
-      if (!next) {
-        next = appState.tabs.tabs[appState.tabs.tabs.length - 1] ?? null;
-        console.log('[EditorTabService] Active tab was closed, finding next tab:', {
-          closedTabId: tabId,
-          nextTab: next ? { id: next.id, type: next.type } : null,
-          remainingTabs: appState.tabs.tabs.map(t => ({ id: t.id, type: t.type })),
-        });
-      }
-
-      appState.tabs.activeTabId = null;
-      if (next) {
-        await this.activateTab(next.id);
-      }
-    }
-
-    this.layoutManager.removeEditorTab(tabId);
   }
 
   async focusTab(tabId: string): Promise<void> {
@@ -516,6 +453,81 @@ export class EditorTabService {
     if (choice === 'confirm') return 'save';
     if (choice === 'secondary') return 'dont-save';
     return 'cancel';
+  }
+
+  private async closeTabInternal(tab: EditorTab, skipDirtyPrompt: boolean): Promise<void> {
+    if (tab.isDirty && !skipDirtyPrompt) {
+      const decision = await this.promptDirtyClose(tab);
+      if (decision === 'cancel') {
+        this.layoutManager.focusEditorTab(tab.id);
+        return;
+      }
+      if (decision === 'save') {
+        await this.saveTabResource(tab);
+      }
+    }
+
+    if (tab.type === 'game' && !appState.ui.isGamePopoutOpen) {
+      await this.operationService.invoke(
+        new SetPlayModeOperation({
+          isPlaying: false,
+          status: 'stopped',
+        })
+      );
+    }
+
+    if (appState.tabs.activeTabId === tab.id) {
+      this.captureActiveContextState();
+    }
+
+    if (tab.type === 'scene') {
+      const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
+      delete appState.scenes.descriptors[sceneId];
+      delete appState.scenes.hierarchies[sceneId];
+      if (appState.scenes.cameraStates[sceneId]) {
+        delete appState.scenes.cameraStates[sceneId];
+      }
+
+      if (appState.scenes.activeSceneId === sceneId) {
+        appState.scenes.activeSceneId = null;
+        appState.selection.nodeIds = [];
+        appState.selection.primaryNodeId = null;
+        appState.selection.hoveredNodeId = null;
+      }
+
+      this.sceneManager.removeSceneGraph(sceneId);
+    }
+
+    appState.tabs.tabs = appState.tabs.tabs.filter(t => t.id !== tab.id);
+
+    if (appState.tabs.activeTabId === tab.id) {
+      let next: EditorTab | undefined;
+      if (tab.type === 'game' && this.previousActiveTabIdBeforeGame) {
+        next = appState.tabs.tabs.find(t => t.id === this.previousActiveTabIdBeforeGame);
+        console.log('[EditorTabService] Game tab closed, restoring previous active tab:', {
+          closedTabId: tab.id,
+          restoringTabId: this.previousActiveTabIdBeforeGame,
+          found: !!next,
+        });
+        this.previousActiveTabIdBeforeGame = null;
+      }
+
+      if (!next) {
+        next = appState.tabs.tabs[appState.tabs.tabs.length - 1] ?? null;
+        console.log('[EditorTabService] Active tab was closed, finding next tab:', {
+          closedTabId: tab.id,
+          nextTab: next ? { id: next.id, type: next.type } : null,
+          remainingTabs: appState.tabs.tabs.map(t => ({ id: t.id, type: t.type })),
+        });
+      }
+
+      appState.tabs.activeTabId = null;
+      if (next) {
+        await this.activateTab(next.id);
+      }
+    }
+
+    this.layoutManager.removeEditorTab(tab.id);
   }
 
   private syncSceneTabsFromDescriptors(): void {

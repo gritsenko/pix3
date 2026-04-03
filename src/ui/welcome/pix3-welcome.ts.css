@@ -43,7 +43,7 @@ pix3-welcome {
   place-items: center;
   width: 100%;
   height: 100%;
-  z-index: 99999;
+  z-index: var(--pix3-z-overlay);
   pointer-events: auto;
   background-image: url('/splash.jpg');
   background-size: cover;
@@ -154,6 +154,7 @@ pix3-welcome {
 .recent-item {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 0.8rem;
   width: 100%;
   background: rgba(255, 255, 255, 0.05);
@@ -187,6 +188,26 @@ pix3-welcome {
   color: rgba(247, 250, 252, 0.5);
   font-size: 0.8rem;
 }
+.recent-backend {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(247, 250, 252, 0.8);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.recent-empty {
+  padding: 0.75rem;
+  border-radius: 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(247, 250, 252, 0.58);
+  font-size: 0.88rem;
+}
 .recent-remove {
   background: transparent;
   border: none;
@@ -208,4 +229,24 @@ pix3-welcome {
 .recent-remove:focus {
   outline: 2px solid rgba(var(--pix3-accent-rgb), 0.6);
   outline-offset: 2px;
+}
+
+@media (max-width: 720px) {
+  .welcome-card {
+    width: min(92vw, 50rem);
+    padding: 2rem 1.25rem;
+  }
+
+  .welcome-actions-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .recent-item {
+    align-items: flex-start;
+  }
+
+  .recent-time {
+    width: 100%;
+    margin-left: 2.1rem;
+  }
 }

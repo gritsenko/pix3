@@ -10,7 +10,7 @@ pix3-share-dialog {
   padding: 24px;
   background: rgba(12, 14, 18, 0.62);
   backdrop-filter: blur(10px);
-  z-index: 2200;
+  z-index: var(--pix3-z-modal);
 }
 
 .pix3-share-dialog {

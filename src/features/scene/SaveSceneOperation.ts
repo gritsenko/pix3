@@ -6,8 +6,8 @@ import type {
 } from '@/core/Operation';
 import { SceneManager } from '@pix3/runtime';
 import { getAppStateSnapshot } from '@/state';
-import { FileSystemAPIService } from '@/services/FileSystemAPIService';
 import { LoggingService } from '@/services/LoggingService';
+import { ProjectStorageService } from '@/services/ProjectStorageService';
 
 export interface SaveSceneOperationParams {
   /** Optional scene id to save (defaults to active scene). */
@@ -50,8 +50,8 @@ export class SaveSceneOperation implements Operation<OperationInvokeResult> {
     const sceneManager = context.container.getService<SceneManager>(
       context.container.getOrCreateToken(SceneManager)
     );
-    const fileSystem = context.container.getService<FileSystemAPIService>(
-      context.container.getOrCreateToken(FileSystemAPIService)
+    const storage = context.container.getService<ProjectStorageService>(
+      context.container.getOrCreateToken(ProjectStorageService)
     );
     const logger = context.container.getService<LoggingService>(
       context.container.getOrCreateToken(LoggingService)
@@ -69,7 +69,7 @@ export class SaveSceneOperation implements Operation<OperationInvokeResult> {
       throw new Error('Failed to serialize scene - result is empty');
     }
 
-    await fileSystem.writeTextFile(filePath, sceneYaml);
+    await storage.writeTextFile(filePath, sceneYaml);
 
     logger.info(`✓ Scene saved: ${descriptor.name || filePath}`);
 
@@ -84,6 +84,8 @@ export class SaveSceneOperation implements Operation<OperationInvokeResult> {
       if (descriptor.fileHandle) {
         const file = await descriptor.fileHandle.getFile();
         descriptor.lastModifiedTime = file.lastModified;
+      } else {
+        descriptor.lastModifiedTime = await storage.getLastModified(filePath);
       }
     } catch {
       // ignore
