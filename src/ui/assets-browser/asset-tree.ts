@@ -79,7 +79,14 @@ export class AssetTree extends ComponentBase {
     await this.maybeCheckForExternalChanges();
   };
 
+  private get isReadOnly(): boolean {
+    return appState.collaboration.isReadOnly;
+  }
+
   public async createFolder(): Promise<void> {
+    if (this.isReadOnly) {
+      return;
+    }
     await this.startCreateFolder();
   }
 
@@ -143,10 +150,16 @@ export class AssetTree extends ComponentBase {
   }
 
   public createScene(): void {
+    if (this.isReadOnly) {
+      return;
+    }
     this.startCreateScene();
   }
 
   public async deleteSelected(): Promise<void> {
+    if (this.isReadOnly) {
+      return;
+    }
     if (!this.selectedPath) {
       console.warn('[AssetTree] No item selected for deletion');
       return;
@@ -155,6 +168,9 @@ export class AssetTree extends ComponentBase {
   }
 
   public async renameSelected(): Promise<void> {
+    if (this.isReadOnly) {
+      return;
+    }
     if (!this.selectedPath) {
       console.warn('[AssetTree] No item selected for rename');
       return;
@@ -1042,6 +1058,9 @@ export class AssetTree extends ComponentBase {
   }
 
   private async startRename(path: string): Promise<void> {
+    if (this.isReadOnly) {
+      return;
+    }
     const nodeEntry = this.findNodeByPath(path);
     if (!nodeEntry || !nodeEntry.node) {
       console.warn('[AssetTree] Node not found for rename:', path);
@@ -1080,6 +1099,9 @@ export class AssetTree extends ComponentBase {
   private _isNewScene: boolean = true;
 
   private startCreateScene(): void {
+    if (this.isReadOnly) {
+      return;
+    }
     // similar to startCreateFolder but for scene file
     const selected = this.selectedPath ? this.findNodeByPath(this.selectedPath) : null;
     const parentPath =
@@ -1124,6 +1146,9 @@ export class AssetTree extends ComponentBase {
   }
 
   private async startCreateFolder(): Promise<void> {
+    if (this.isReadOnly) {
+      return;
+    }
     // determine parent path
     const selected = this.selectedPath ? this.findNodeByPath(this.selectedPath) : null;
     const parentPath =
@@ -1393,6 +1418,9 @@ export class AssetTree extends ComponentBase {
   }
 
   private async deleteEntry(path: string): Promise<void> {
+    if (this.isReadOnly) {
+      return;
+    }
     try {
       console.log('[AssetTree] Deleting entry at path:', path);
       await this.projectService.deleteEntry(path);

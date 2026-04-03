@@ -11,9 +11,8 @@ const HOST_COLOR = '#ffcf33';
 
 @injectable()
 export class CollabSessionService {
-  async shareActiveScene(): Promise<string> {
+  async ensureSceneSynchronized(sceneId = appState.scenes.activeSceneId): Promise<void> {
     const projectId = appState.project.id;
-    const sceneId = appState.scenes.activeSceneId;
 
     if (!projectId || !sceneId) {
       throw new Error('Open a project and scene before sharing.');
@@ -37,7 +36,11 @@ export class CollabSessionService {
     const existingRoomName = appState.collaboration.roomName;
 
     if (!collabService.isConnected() || existingRoomName !== roomName) {
-      collabService.connect(projectId, sceneId, this.getHostName(), HOST_COLOR);
+      collabService.connect(projectId, sceneId, this.getHostName(), HOST_COLOR, {
+        role: appState.collaboration.role,
+        authSource: appState.collaboration.authSource,
+        isReadOnly: appState.collaboration.isReadOnly,
+      });
       await this.waitForSync(collabService);
     }
 
@@ -68,9 +71,21 @@ export class CollabSessionService {
         );
       }, collabService.getLocalOrigin());
     }
+  }
+
+  async shareActiveScene(): Promise<string> {
+    const projectId = appState.project.id;
+    const sceneId = appState.scenes.activeSceneId;
+
+    if (!projectId || !sceneId) {
+      throw new Error('Open a project and scene before sharing.');
+    }
+
+    await this.ensureSceneSynchronized(sceneId);
 
     // Generate a share token via the API and build an invite link
     const { share_token } = await ApiClient.generateShareToken(projectId);
+    appState.collaboration.shareEnabled = true;
     return this.buildInviteLink(projectId, sceneId, share_token);
   }
 

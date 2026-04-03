@@ -476,7 +476,7 @@ export class ViewportRendererService {
   }
 
   private handleFocusPause(): void {
-    if (appState.ui.pauseRenderingOnUnfocus && !this.isWindowFocused) {
+    if (this.shouldPauseForWindowFocus()) {
       if (!this.isPaused && this.animationId) {
         cancelAnimationFrame(this.animationId);
         this.animationId = undefined;
@@ -1733,7 +1733,7 @@ export class ViewportRendererService {
    * Applies exponential damping to pan velocity over ~500ms.
    */
   startPanMomentum(): void {
-    if (appState.ui.pauseRenderingOnUnfocus && !this.isWindowFocused) {
+    if (this.shouldPauseForWindowFocus()) {
       return;
     }
 
@@ -1745,7 +1745,7 @@ export class ViewportRendererService {
     const minVelocity = 0.001; // Below this, stop animating
 
     const animate = () => {
-      if (this.isPaused || (appState.ui.pauseRenderingOnUnfocus && !this.isWindowFocused)) {
+      if (this.isPaused || this.shouldPauseForWindowFocus()) {
         this.momentumAnimationId = undefined;
         return;
       }
@@ -4582,7 +4582,7 @@ export class ViewportRendererService {
         return;
       }
 
-      if (appState.ui.pauseRenderingOnUnfocus && !this.isWindowFocused) {
+      if (this.shouldPauseForWindowFocus()) {
         this.animationId = undefined;
         return;
       }
@@ -4593,6 +4593,16 @@ export class ViewportRendererService {
 
     this.isPaused = false;
     render();
+  }
+
+  private shouldPauseForWindowFocus(): boolean {
+    if (!appState.ui.pauseRenderingOnUnfocus || this.isWindowFocused) {
+      return false;
+    }
+
+    // Keep collaborative cloud documents visually live even when the browser
+    // window is not focused, so remote CRDT updates appear immediately.
+    return appState.collaboration.accessMode === 'local';
   }
 
   private captureTransformStartState(obj: THREE.Object3D): void {

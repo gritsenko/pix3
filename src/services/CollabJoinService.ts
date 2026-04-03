@@ -3,34 +3,15 @@ import { appState } from '@/state';
 import { CollaborationService } from './CollaborationService';
 import { SceneCRDTBinding } from './SceneCRDTBinding';
 import { OperationService } from './OperationService';
-import { createDefaultProjectManifest } from '@/core/ProjectManifest';
 import { SceneManager, type SceneGraph } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
+import { CloudProjectService } from './CloudProjectService';
 
 export interface CollabJoinParams {
   projectId: string;
   sceneId: string;
   shareToken?: string;
 }
-
-const USER_COLORS = [
-  '#e57373',
-  '#f06292',
-  '#ba68c8',
-  '#9575cd',
-  '#7986cb',
-  '#64b5f6',
-  '#4fc3f7',
-  '#4dd0e1',
-  '#4db6ac',
-  '#81c784',
-  '#aed581',
-  '#dce775',
-  '#fff176',
-  '#ffd54f',
-  '#ffb74d',
-  '#ff8a65',
-];
 
 /**
  * Check the current URL for collab join parameters.
@@ -67,26 +48,22 @@ export class CollabJoinService {
    */
   async joinSession(params: CollabJoinParams): Promise<boolean> {
     const { projectId, sceneId, shareToken } = params;
-    const userName = `Guest ${Math.floor(Math.random() * 1000)}`;
-    const userColor = USER_COLORS[Math.floor(Math.random() * USER_COLORS.length)];
 
-    console.log('[CollabJoin] Joining collaborative session', { projectId, sceneId, userName });
+    console.log('[CollabJoin] Joining collaborative session', { projectId, sceneId });
 
-    // 1. Set lightweight project metadata before we hydrate editor state.
-    appState.project.id = projectId;
-    appState.project.backend = 'cloud';
-    appState.project.directoryHandle = null;
-    appState.project.projectName = `Collab: ${projectId.substring(0, 8)}…`;
-    appState.project.localAbsolutePath = null;
-    appState.project.errorMessage = null;
-    appState.project.manifest = createDefaultProjectManifest();
+    const container = ServiceContainer.getInstance();
+    const cloudProjectService = container.getService<CloudProjectService>(
+      container.getOrCreateToken(CloudProjectService)
+    );
+    await cloudProjectService.openProject(projectId, {
+      shareToken,
+      skipSceneOpen: true,
+    });
 
     // 2. Connect to the collab server
-    const container = ServiceContainer.getInstance();
     const collabService = container.getService<CollaborationService>(
       container.getOrCreateToken(CollaborationService)
     );
-    collabService.connect(projectId, sceneId, userName, userColor, shareToken);
 
     // 3. Wait for Y.Doc sync from the server
     await this.waitForSync(collabService);
@@ -111,12 +88,6 @@ export class CollabJoinService {
     const sceneGraph = await crdtBinding.buildSceneFromYDoc(ydoc, sceneId);
     const sceneFilePath = crdtBinding.getSceneFilePath(ydoc, sceneId) ?? `collab://${sceneId}`;
     this.injectSceneIntoEditor(sceneId, sceneGraph, sceneManager, sceneFilePath, null);
-
-    // NOW set project status to 'ready' — this triggers layout initialization,
-    // script compilation guard, and tab restoration. By this point the scene
-    // descriptor and tabs are already in appState so activateSceneTab will see
-    // the scene as alreadyLoaded.
-    appState.project.status = 'ready';
 
     // 6. Set up CRDT binding for ongoing sync
     crdtBinding.bindToOperationService(operationService, collabService);

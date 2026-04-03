@@ -80,6 +80,7 @@ import './shared/pix3-editor-settings-dialog';
 import './shared/pix3-node-type-picker';
 import './shared/pix3-status-bar';
 import './shared/pix3-background';
+import './collab/collab-participants-strip';
 import './collab/pix3-share-dialog';
 import './welcome/pix3-welcome';
 import './auth/pix3-auth-screen';
@@ -651,15 +652,19 @@ export class Pix3EditorShell extends ComponentBase {
             ></pix3-toolbar-button>
           </div>
           <span> Project: ${appState.project.projectName ?? 'No project open'} </span>
+          <collab-participants-strip></collab-participants-strip>
         </div>
         <pix3-toolbar-button
           slot="actions"
-          icon=${this.isAuthenticated ? 'user' : 'log-in'}
-          label=${this.isAuthenticated ? (appState.auth.user?.username ?? 'Account') : 'Login'}
+          .icon=${this.isAuthenticated ? null : 'log-in'}
+          label=${this.isAuthenticated ? 'Account' : 'Login'}
+          ?iconOnly=${this.isAuthenticated}
           @click=${this.onAuthButtonClick}
           aria-label=${this.isAuthenticated ? 'Open account menu' : 'Open login'}
         >
-          ${this.isAuthenticated ? (appState.auth.user?.username ?? 'Account') : 'Login'}
+          ${this.isAuthenticated
+            ? html`<span class="account-avatar">${this.getUserInitials()}</span>`
+            : 'Login'}
         </pix3-toolbar-button>
         <pix3-toolbar-button
           slot="actions"
@@ -742,6 +747,7 @@ export class Pix3EditorShell extends ComponentBase {
 
     this.pendingCollabJoin = params;
     this.requestUpdate();
+    void this.startPendingCollabJoin();
   }
 
   private async startPendingCollabJoin(): Promise<void> {
@@ -770,20 +776,17 @@ export class Pix3EditorShell extends ComponentBase {
         <div class="collab-join-overlay">
           <div class="collab-join-card">
             <div class="collab-join-eyebrow">Shared Project</div>
-            <h2 class="collab-join-title">Join collaborative session</h2>
+            <h2 class="collab-join-title">Opening collaborative session</h2>
             <p class="collab-join-copy">
-              Choose a local folder to sync the shared project snapshot, then connect to the live
-              scene.
+              Pix3 is loading the shared cloud project, assets, and live scene now.
             </p>
             <div class="collab-join-meta">
               <span>Project: ${this.pendingCollabJoin.projectId}</span>
               <span>Scene: ${this.pendingCollabJoin.sceneId}</span>
             </div>
-            <div class="collab-join-actions">
-              <button @click=${this.startPendingCollabJoin} ?disabled=${this.isJoiningCollab}>
-                ${this.isJoiningCollab ? 'Opening folder picker...' : 'Choose Folder & Join'}
-              </button>
-            </div>
+            ${this.isJoiningCollab
+              ? html`<div class="loading-label">Connecting to shared workspace...</div>`
+              : html``}
           </div>
         </div>
       `;
@@ -829,6 +832,12 @@ export class Pix3EditorShell extends ComponentBase {
         </button>
       </div>
     `;
+  }
+
+  private getUserInitials(): string {
+    const username = appState.auth.user?.username?.trim() || 'U';
+    const parts = username.split(/\s+/).filter(Boolean).slice(0, 2);
+    return parts.map(part => part.charAt(0).toUpperCase()).join('') || 'U';
   }
 
   private togglePlayMode() {

@@ -44,6 +44,15 @@ export class SaveSceneCommand extends CommandBase<void, void> {
       };
     }
 
+    if (state.project.backend === 'cloud') {
+      return {
+        canExecute: false,
+        reason: 'Cloud collaboration scenes are synchronized automatically.',
+        scope: 'scene',
+        recoverable: true,
+      };
+    }
+
     const sceneId = this.params?.sceneId ?? state.scenes.activeSceneId;
     if (!sceneId) {
       return {

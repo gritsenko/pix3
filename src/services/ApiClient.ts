@@ -17,8 +17,18 @@ export interface ApiProject {
   updated_at: string;
 }
 
+export interface ApiProjectAccess {
+  id: string;
+  name: string;
+  role: 'owner' | 'editor' | 'viewer';
+  auth_source: 'member' | 'share-token';
+  access_mode: 'edit' | 'view';
+  share_enabled: boolean;
+}
+
 export interface ManifestEntry {
   path: string;
+  kind: 'file' | 'directory';
   size: number;
   hash: string;
   modified: string;
@@ -48,6 +58,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiClientError(body.error ?? res.statusText, res.status);
   }
   return res.json() as Promise<T>;
+}
+
+function buildShareTokenHeaders(
+  headers: HeadersInit | undefined,
+  shareToken?: string
+): HeadersInit | undefined {
+  if (!shareToken) {
+    return headers;
+  }
+
+  return {
+    ...(headers ?? {}),
+    'X-Share-Token': shareToken,
+  };
 }
 
 // --- Auth ---
@@ -99,6 +123,12 @@ export function generateShareToken(id: string): Promise<{ share_token: string }>
   });
 }
 
+export function getProjectAccess(id: string, shareToken?: string): Promise<ApiProjectAccess> {
+  return request(`/api/projects/${encodeURIComponent(id)}/access`, {
+    headers: buildShareTokenHeaders(undefined, shareToken),
+  });
+}
+
 export function revokeShareToken(id: string): Promise<{ ok: boolean }> {
   return request(`/api/projects/${encodeURIComponent(id)}/share`, {
     method: 'DELETE',
@@ -111,10 +141,26 @@ export function getManifest(projectId: string): Promise<{ files: ManifestEntry[]
   return request(`/api/projects/${encodeURIComponent(projectId)}/manifest`);
 }
 
-export async function downloadFile(projectId: string, filePath: string): Promise<Response> {
+export function getManifestWithAccess(
+  projectId: string,
+  shareToken?: string
+): Promise<{ files: ManifestEntry[] }> {
+  return request(`/api/projects/${encodeURIComponent(projectId)}/manifest`, {
+    headers: buildShareTokenHeaders(undefined, shareToken),
+  });
+}
+
+export async function downloadFile(
+  projectId: string,
+  filePath: string,
+  shareToken?: string
+): Promise<Response> {
   const res = await fetch(
     `${BASE_URL}/api/projects/${encodeURIComponent(projectId)}/files/${filePath}`,
-    { credentials: 'include' }
+    {
+      credentials: 'include',
+      headers: buildShareTokenHeaders(undefined, shareToken),
+    }
   );
   if (!res.ok) {
     throw new ApiClientError(`Failed to download ${filePath}`, res.status);
@@ -154,6 +200,15 @@ export async function uploadFile(
 export async function deleteFile(projectId: string, filePath: string): Promise<{ ok: boolean }> {
   return request(`/api/projects/${encodeURIComponent(projectId)}/files/${filePath}`, {
     method: 'DELETE',
+  });
+}
+
+export async function createDirectory(
+  projectId: string,
+  directoryPath: string
+): Promise<{ path: string }> {
+  return request(`/api/projects/${encodeURIComponent(projectId)}/directories/${directoryPath}`, {
+    method: 'POST',
   });
 }
 

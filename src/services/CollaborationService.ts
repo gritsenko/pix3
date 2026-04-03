@@ -2,6 +2,8 @@ import * as Y from 'yjs';
 import { HocuspocusProvider } from '@hocuspocus/provider';
 import { injectable } from '@/fw/di';
 import { appState } from '@/state';
+import type { CollabAuthSource, CollabRole } from '@/state/AppState';
+import { subscribe } from 'valtio/vanilla';
 
 export type CollabConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'synced';
 
@@ -14,12 +16,20 @@ export interface CollabUserInfo {
   isTransforming: string | null;
 }
 
+export interface CollaborationConnectOptions {
+  tokenOverride?: string;
+  role?: CollabRole;
+  authSource?: CollabAuthSource;
+  isReadOnly?: boolean;
+}
+
 @injectable()
 export class CollaborationService {
   private provider: HocuspocusProvider | null = null;
   private ydoc: Y.Doc | null = null;
   private undoManager: Y.UndoManager | null = null;
   private statusListeners = new Set<(status: CollabConnectionStatus) => void>();
+  private disposeSelectionSubscription: (() => void) | null = null;
 
   connectionStatus: CollabConnectionStatus = 'disconnected';
 
@@ -31,7 +41,7 @@ export class CollaborationService {
     _sceneId: string,
     userName: string,
     userColor: string,
-    tokenOverride?: string
+    options: CollaborationConnectOptions = {}
   ): void {
     // Clean up any existing connection
     this.disconnect();
@@ -40,9 +50,23 @@ export class CollaborationService {
     const roomName = `project:${projectId}`;
     appState.collaboration.roomName = roomName;
     appState.collaboration.remoteUsers = [];
+    appState.collaboration.localUser = {
+      clientId: null,
+      name: userName,
+      color: userColor,
+    };
+    appState.collaboration.role = options.role ?? null;
+    appState.collaboration.authSource = options.authSource ?? 'none';
+    appState.collaboration.isReadOnly = Boolean(options.isReadOnly);
+    appState.collaboration.accessMode =
+      appState.project.backend === 'cloud'
+        ? options.isReadOnly
+          ? 'cloud-view'
+          : 'cloud-edit'
+        : 'local';
 
     // Resolve auth token: explicit override (share token for guests), then JWT from session
-    const token = tokenOverride ?? appState.auth.user?.token ?? '';
+    const token = options.tokenOverride ?? appState.auth.user?.token ?? '';
 
     // Server synchronization
     const wsUrl = import.meta.env.VITE_COLLAB_WS_URL || 'ws://localhost:4000';
@@ -78,6 +102,10 @@ export class CollaborationService {
       trackedOrigins: new Set([this.getLocalOrigin()]),
       captureTimeout: 500,
     });
+    this.disposeSelectionSubscription = subscribe(appState.selection, () => {
+      this.updateLocalSelectionAwareness();
+    });
+    this.updateLocalSelectionAwareness();
 
     this.setConnectionStatus('connecting');
   }
@@ -85,6 +113,8 @@ export class CollaborationService {
   disconnect(): void {
     this.undoManager?.destroy();
     this.undoManager = null;
+    this.disposeSelectionSubscription?.();
+    this.disposeSelectionSubscription = null;
 
     this.provider?.destroy();
     this.provider = null;
@@ -94,6 +124,14 @@ export class CollaborationService {
 
     appState.collaboration.roomName = null;
     appState.collaboration.remoteUsers = [];
+    appState.collaboration.localUser = null;
+    appState.collaboration.role = null;
+    appState.collaboration.authSource = 'none';
+    appState.collaboration.isReadOnly = false;
+    appState.collaboration.accessMode =
+      appState.project.backend === 'cloud' ? 'cloud-edit' : 'local';
+    appState.collaboration.shareToken = null;
+    appState.collaboration.shareEnabled = false;
     this.setConnectionStatus('disconnected');
   }
 
@@ -123,6 +161,28 @@ export class CollaborationService {
 
   getServerBaseUrl(): string {
     return import.meta.env.VITE_COLLAB_HTTP_URL || 'http://localhost:4001';
+  }
+
+  isReadOnlySession(): boolean {
+    return appState.collaboration.isReadOnly;
+  }
+
+  private updateLocalSelectionAwareness(): void {
+    const awareness = this.provider?.awareness;
+    if (!awareness) {
+      return;
+    }
+
+    const currentState =
+      (awareness.getLocalState()?.user as Partial<CollabUserInfo> | undefined) ?? {};
+    awareness.setLocalStateField('user', {
+      name: currentState.name ?? appState.collaboration.localUser?.name ?? 'Pix3 User',
+      color: currentState.color ?? appState.collaboration.localUser?.color ?? '#ffcf33',
+      selection: [...appState.selection.nodeIds],
+      cursor3d: currentState.cursor3d ?? null,
+      cameraPosition: currentState.cameraPosition ?? null,
+      isTransforming: currentState.isTransforming ?? null,
+    } satisfies CollabUserInfo);
   }
 
   addStatusListener(listener: (status: CollabConnectionStatus) => void): () => void {

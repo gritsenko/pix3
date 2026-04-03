@@ -50,6 +50,26 @@ pix3-share-dialog {
   margin-bottom: 16px;
 }
 
+.pix3-share-row {
+  display: grid;
+  gap: 8px;
+}
+
+.pix3-share-field-label {
+  color: rgba(243, 244, 246, 0.72);
+  font-size: 0.84rem;
+}
+
+.pix3-share-select {
+  min-height: 44px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(243, 244, 246, 0.92);
+  padding: 0 14px;
+  font: inherit;
+}
+
 .pix3-share-input {
   box-sizing: border-box;
   width: 100%;
@@ -66,6 +86,12 @@ pix3-share-dialog {
   outline: none;
   border-color: rgba(var(--pix3-accent-rgb), 0.5);
   box-shadow: 0 0 0 3px rgba(var(--pix3-accent-rgb), 0.18);
+}
+
+.pix3-share-hint {
+  color: rgba(243, 244, 246, 0.64);
+  font-size: 0.82rem;
+  line-height: 1.45;
 }
 
 .pix3-share-empty,
@@ -105,19 +131,9 @@ pix3-share-dialog {
   cursor: pointer;
 }
 
-.pix3-share-button--primary {
-  border-color: rgba(var(--pix3-accent-rgb), 0.28);
-  background: rgba(var(--pix3-accent-rgb), 0.18);
-  color: #fff7d1;
-}
-
 .pix3-share-button:hover:not([disabled]) {
   transform: translateY(-1px);
   background: rgba(255, 255, 255, 0.09);
-}
-
-.pix3-share-button--primary:hover:not([disabled]) {
-  background: rgba(var(--pix3-accent-rgb), 0.24);
 }
 
 .pix3-share-button[disabled] {

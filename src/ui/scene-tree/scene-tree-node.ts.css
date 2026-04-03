@@ -101,6 +101,7 @@ pix3-scene-tree-node {
   flex-direction: column;
   gap: 0.18rem;
   align-items: flex-start;
+  min-width: 0;
 }
 
 .tree-node__header {
@@ -108,6 +109,7 @@ pix3-scene-tree-node {
   flex-wrap: wrap;
   align-items: center;
   gap: 0.45rem;
+  min-width: 0;
 }
 
 .tree-node__name {
@@ -352,15 +354,22 @@ pix3-scene-tree-node {
 .tree-node__collab-indicators {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  margin-left: 4px;
+  gap: 4px;
   flex-shrink: 0;
 }
 
-.tree-node__collab-dot {
-  width: 7px;
-  height: 7px;
+.tree-node__collab-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
   border-radius: 50%;
-  display: inline-block;
   flex-shrink: 0;
+  color: rgba(17, 24, 39, 0.92);
+  font-size: 0.55rem;
+  font-weight: 800;
+  line-height: 1;
+  box-shadow: 0 0 0 1px rgba(19, 22, 27, 0.92);
 }

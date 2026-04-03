@@ -120,26 +120,30 @@ export class CollabStatusBar extends ComponentBase {
 
       const localClientId = awareness.clientID;
       const users: RemoteUserDisplay[] = [];
+      const remoteUsers = [];
       awareness.getStates().forEach((state: Record<string, unknown>, clientId: number) => {
         if (clientId === localClientId) {
           return;
         }
-        const user = state.user as { name?: string; color?: string } | undefined;
+        const user = state.user as
+          | { name?: string; color?: string; selection?: string[] }
+          | undefined;
         if (user?.name) {
           users.push({
             clientId,
             name: user.name,
             color: user.color || '#888',
           });
+          remoteUsers.push({
+            clientId,
+            name: user.name,
+            color: user.color || '#888',
+            selection: Array.isArray(user.selection) ? [...user.selection] : [],
+          });
         }
       });
       this.remoteUsers = users;
-      appState.collaboration.remoteUsers = users.map(user => ({
-        clientId: user.clientId,
-        name: user.name,
-        color: user.color,
-        selection: [],
-      }));
+      appState.collaboration.remoteUsers = remoteUsers;
     } catch {
       // Service not available
     }
@@ -163,17 +167,23 @@ export class CollabStatusBar extends ComponentBase {
   }
 
   private get statusText(): string {
+    const isCloudProject = appState.project.backend === 'cloud';
+    const isReadOnly = appState.collaboration.isReadOnly;
+
     switch (this.connectionStatus) {
       case 'synced':
-        return this.remoteUsers.length > 0 ? `${this.remoteUsers.length} online` : 'Shared';
+        if (this.remoteUsers.length > 0) {
+          return `${this.remoteUsers.length} online`;
+        }
+        return isReadOnly ? 'Read only' : isCloudProject ? 'Cloud shared' : 'Shared';
       case 'connected':
-        return 'Connected';
+        return isReadOnly ? 'Read only' : isCloudProject ? 'Cloud shared' : 'Connected';
       case 'connecting':
-        return 'Sharing...';
+        return isCloudProject ? 'Connecting...' : 'Sharing...';
       case 'disconnected':
-        return 'Local only';
+        return isCloudProject ? (isReadOnly ? 'Read only' : 'Cloud shared') : 'Local only';
       default:
-        return 'Local only';
+        return isCloudProject ? 'Cloud shared' : 'Local only';
     }
   }
 

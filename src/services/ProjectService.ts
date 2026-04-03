@@ -3,12 +3,18 @@ import { appState } from '@/state';
 import { resolveFileSystemAPIService, type FileDescriptor } from './FileSystemAPIService';
 import { ProjectStorageService } from './ProjectStorageService';
 import { parse, stringify } from 'yaml';
+import { ref } from 'valtio/vanilla';
 import { sceneTemplates } from './template-data';
+import { SceneStateUpdater } from '@/core/SceneStateUpdater';
 import {
   createDefaultProjectManifest,
   normalizeProjectManifest,
   type ProjectManifest,
 } from '@/core/ProjectManifest';
+import { SceneManager, type SceneGraph } from '@pix3/runtime';
+import type * as Y from 'yjs';
+import { EditorTabService } from './EditorTabService';
+import { CollaborationService } from './CollaborationService';
 
 const RECENTS_KEY = 'pix3.recentProjects:v1';
 const PROJECT_MANIFEST_PATH = 'pix3project.yaml';
@@ -370,20 +376,41 @@ export class ProjectService {
   }
 
   async moveItem(sourcePath: string, targetPath: string): Promise<void> {
-    // Move operation: copy then delete
-    // For now, we'll use FileSystemAPI's move capability if available
-    // Otherwise, we'll implement via copy + delete (for files) or recursive copy + delete (for directories)
+    const normalizedSourcePath = this.normalizeProjectPath(sourcePath);
+    const normalizedTargetPath = this.normalizeProjectPath(targetPath);
+
+    if (
+      !normalizedSourcePath ||
+      normalizedSourcePath === '.' ||
+      !normalizedTargetPath ||
+      normalizedTargetPath === '.'
+    ) {
+      throw new Error('Invalid source or target path');
+    }
+
+    if (normalizedSourcePath === normalizedTargetPath) {
+      return;
+    }
+
+    const sourceEntry = await this.getProjectEntry(normalizedSourcePath);
+    if (!sourceEntry) {
+      throw new Error(`Source entry not found: ${sourcePath}`);
+    }
+
+    if (
+      sourceEntry.kind === 'directory' &&
+      normalizedTargetPath.startsWith(`${normalizedSourcePath}/`)
+    ) {
+      throw new Error('Cannot move a directory into itself.');
+    }
+
     try {
-      // Get the source and target parent directory names and handles
-      const sourceName = sourcePath.split('/').pop();
-      const targetName = targetPath.split('/').pop();
-
-      if (!sourceName || !targetName) {
-        throw new Error('Invalid source or target path');
-      }
-
-      // Use the filesystem API to move (copy + delete or native move if available)
-      await this.fs.moveEntry(sourcePath, targetPath);
+      await this.storage.moveEntry(normalizedSourcePath, normalizedTargetPath);
+      await this.updateProjectReferencesAfterMove(
+        normalizedSourcePath,
+        normalizedTargetPath,
+        sourceEntry.kind
+      );
     } catch (error) {
       console.error('[ProjectService] Error moving item:', error);
       throw error;
@@ -538,6 +565,471 @@ Happy creating! 🎨
     appState.project.manifest = normalized;
   }
 
+  private async updateProjectReferencesAfterMove(
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): Promise<void> {
+    const projectFiles = await this.listAllProjectFiles('.');
+    await this.rewriteSceneFilesAfterMove(projectFiles, sourcePath, targetPath, movedKind);
+    await this.updateProjectManifestAfterMove(sourcePath, targetPath, movedKind);
+    await this.updateOpenScenesAfterMove(sourcePath, targetPath, movedKind);
+    this.updateProjectStatePathsAfterMove(sourcePath, targetPath, movedKind);
+    this.updateCollaborationReferencesAfterMove(sourcePath, targetPath, movedKind);
+
+    const editorTabService = ServiceContainer.getInstance().getService<EditorTabService>(
+      ServiceContainer.getInstance().getOrCreateToken(EditorTabService)
+    );
+    editorTabService.remapSceneTabs(resourcePath =>
+      this.remapResourcePath(resourcePath, sourcePath, targetPath, movedKind)
+    );
+
+    appState.project.lastModifiedDirectoryPath = '.';
+    appState.project.fileRefreshSignal = (appState.project.fileRefreshSignal || 0) + 1;
+  }
+
+  private async rewriteSceneFilesAfterMove(
+    projectFiles: FileDescriptor[],
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): Promise<void> {
+    const sceneFiles = projectFiles.filter(
+      entry => entry.kind === 'file' && entry.path.endsWith('.pix3scene')
+    );
+
+    for (const sceneFile of sceneFiles) {
+      const contents = await this.storage.readTextFile(sceneFile.path);
+      const nextContents = this.rewriteResourceReferencesInText(
+        contents,
+        sourcePath,
+        targetPath,
+        movedKind
+      );
+
+      if (nextContents !== contents) {
+        await this.storage.writeTextFile(sceneFile.path, nextContents);
+      }
+    }
+  }
+
+  private async updateProjectManifestAfterMove(
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): Promise<void> {
+    const manifest = await this.loadProjectManifest();
+    const nextMetadata = this.rewriteUnknownValuePaths(manifest.metadata ?? {}, value =>
+      this.remapResourcePath(value, sourcePath, targetPath, movedKind)
+    ) as ProjectManifest['metadata'];
+
+    let didChange = nextMetadata !== (manifest.metadata ?? {});
+    const nextAutoloads = manifest.autoloads.map(entry => {
+      const nextScriptPath =
+        this.remapProjectPath(entry.scriptPath, sourcePath, targetPath, movedKind) ??
+        entry.scriptPath;
+      if (nextScriptPath !== entry.scriptPath) {
+        didChange = true;
+      }
+
+      return {
+        ...entry,
+        scriptPath: nextScriptPath,
+      };
+    });
+
+    if (!didChange) {
+      return;
+    }
+
+    await this.saveProjectManifest({
+      ...manifest,
+      metadata: nextMetadata,
+      autoloads: nextAutoloads,
+    });
+  }
+
+  private async updateOpenScenesAfterMove(
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): Promise<void> {
+    const sceneManager = ServiceContainer.getInstance().getService<SceneManager>(
+      ServiceContainer.getInstance().getOrCreateToken(SceneManager)
+    );
+
+    const nextDescriptors: typeof appState.scenes.descriptors = {};
+    const nextHierarchies: typeof appState.scenes.hierarchies = {};
+    const nextCameraStates: typeof appState.scenes.cameraStates = {};
+    let nextActiveSceneId = appState.scenes.activeSceneId;
+
+    for (const [sceneId, descriptor] of Object.entries(appState.scenes.descriptors)) {
+      const nextFilePath =
+        this.remapResourcePath(descriptor.filePath, sourcePath, targetPath, movedKind) ??
+        descriptor.filePath;
+      const nextSceneId = this.deriveSceneIdFromResource(nextFilePath);
+      const graph = sceneManager.getSceneGraph(sceneId);
+      const updatedGraph = graph
+        ? await this.rewriteSceneGraphPaths(
+            graph,
+            descriptor.filePath,
+            nextFilePath,
+            sourcePath,
+            targetPath,
+            movedKind
+          )
+        : null;
+
+      let nextFileHandle: FileSystemFileHandle | null | undefined = descriptor.fileHandle ?? null;
+      let nextLastModifiedTime = descriptor.lastModifiedTime ?? null;
+
+      try {
+        nextFileHandle = nextFilePath.startsWith('res://')
+          ? await this.storage.getFileHandle(nextFilePath)
+          : null;
+        nextLastModifiedTime = nextFilePath.startsWith('res://')
+          ? await this.storage.getLastModified(nextFilePath)
+          : null;
+      } catch (error) {
+        console.debug('[ProjectService] Failed to refresh scene handle after move', {
+          nextFilePath,
+          error,
+        });
+      }
+
+      nextDescriptors[nextSceneId] = {
+        ...descriptor,
+        id: nextSceneId,
+        filePath: nextFilePath,
+        fileHandle: nextFileHandle ? ref(nextFileHandle) : null,
+        lastModifiedTime: nextLastModifiedTime,
+      };
+
+      const hierarchy = appState.scenes.hierarchies[sceneId];
+      if (updatedGraph) {
+        nextHierarchies[nextSceneId] = {
+          version: updatedGraph.version ?? null,
+          description: updatedGraph.description ?? null,
+          rootNodes: ref(updatedGraph.rootNodes),
+          metadata: updatedGraph.metadata ?? {},
+        };
+        sceneManager.setActiveSceneGraph(nextSceneId, updatedGraph);
+      } else if (hierarchy) {
+        nextHierarchies[nextSceneId] = hierarchy;
+        const existingGraph = sceneManager.getSceneGraph(sceneId);
+        if (existingGraph && nextSceneId !== sceneId) {
+          sceneManager.setActiveSceneGraph(nextSceneId, existingGraph);
+        }
+      }
+
+      if (appState.scenes.cameraStates[sceneId]) {
+        nextCameraStates[nextSceneId] = appState.scenes.cameraStates[sceneId];
+      }
+
+      if (nextActiveSceneId === sceneId) {
+        nextActiveSceneId = nextSceneId;
+      }
+
+      if (nextSceneId !== sceneId) {
+        sceneManager.removeSceneGraph(sceneId);
+      }
+    }
+
+    appState.scenes.descriptors = nextDescriptors;
+    appState.scenes.hierarchies = nextHierarchies;
+    appState.scenes.cameraStates = nextCameraStates;
+    appState.scenes.activeSceneId = nextActiveSceneId;
+
+    if (nextActiveSceneId && nextDescriptors[nextActiveSceneId]) {
+      const activeGraph = sceneManager.getSceneGraph(nextActiveSceneId);
+      if (activeGraph) {
+        SceneStateUpdater.updateHierarchyState(appState, nextActiveSceneId, activeGraph);
+      }
+      return;
+    }
+
+    const activeDescriptor = Object.values(nextDescriptors).find(
+      descriptor => descriptor.filePath === appState.project.lastOpenedScenePath
+    );
+    if (activeDescriptor) {
+      appState.scenes.activeSceneId = activeDescriptor.id;
+      const activeGraph = sceneManager.getSceneGraph(activeDescriptor.id);
+      if (activeGraph) {
+        SceneStateUpdater.updateHierarchyState(appState, activeDescriptor.id, activeGraph);
+      }
+    }
+  }
+
+  private updateProjectStatePathsAfterMove(
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): void {
+    appState.project.lastOpenedScenePath =
+      this.remapResourcePath(
+        appState.project.lastOpenedScenePath,
+        sourcePath,
+        targetPath,
+        movedKind
+      ) ?? appState.project.lastOpenedScenePath;
+
+    appState.scenes.pendingScenePaths = appState.scenes.pendingScenePaths.map(
+      filePath => this.remapResourcePath(filePath, sourcePath, targetPath, movedKind) ?? filePath
+    );
+
+    appState.project.assetBrowserExpandedPaths = appState.project.assetBrowserExpandedPaths.map(
+      path => this.remapProjectPath(path, sourcePath, targetPath, movedKind) ?? path
+    );
+    appState.project.assetBrowserSelectedPath =
+      this.remapProjectPath(
+        appState.project.assetBrowserSelectedPath,
+        sourcePath,
+        targetPath,
+        movedKind
+      ) ?? appState.project.assetBrowserSelectedPath;
+
+    this.saveAssetBrowserState(
+      appState.project.assetBrowserExpandedPaths,
+      appState.project.assetBrowserSelectedPath
+    );
+  }
+
+  private updateCollaborationReferencesAfterMove(
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): void {
+    const collaborationService = ServiceContainer.getInstance().getService<CollaborationService>(
+      ServiceContainer.getInstance().getOrCreateToken(CollaborationService)
+    );
+    const ydoc = collaborationService.getYDoc();
+    if (!ydoc) {
+      return;
+    }
+
+    const scenesMap = ydoc.getMap<Y.Map<unknown>>('scenes');
+    ydoc.transact(() => {
+      for (const sceneValue of scenesMap.values()) {
+        if (!(sceneValue instanceof Object)) {
+          continue;
+        }
+
+        const sceneMap = sceneValue as Y.Map<unknown>;
+        const filePath = sceneMap.get('filePath');
+        if (typeof filePath === 'string') {
+          const nextFilePath =
+            this.remapResourcePath(filePath, sourcePath, targetPath, movedKind) ?? filePath;
+          if (nextFilePath !== filePath) {
+            sceneMap.set('filePath', nextFilePath);
+          }
+        }
+
+        const snapshot = sceneMap.get('snapshot');
+        if (typeof snapshot === 'string') {
+          const nextSnapshot = this.rewriteResourceReferencesInText(
+            snapshot,
+            sourcePath,
+            targetPath,
+            movedKind
+          );
+          if (nextSnapshot !== snapshot) {
+            sceneMap.set('snapshot', nextSnapshot);
+          }
+        }
+      }
+    }, collaborationService.getLocalOrigin());
+  }
+
+  private async rewriteSceneGraphPaths(
+    graph: SceneGraph,
+    currentFilePath: string,
+    nextFilePath: string,
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): Promise<SceneGraph> {
+    const sceneManager = ServiceContainer.getInstance().getService<SceneManager>(
+      ServiceContainer.getInstance().getOrCreateToken(SceneManager)
+    );
+    const serialized = sceneManager.serializeScene(graph);
+    const nextSerialized = this.rewriteResourceReferencesInText(
+      serialized,
+      sourcePath,
+      targetPath,
+      movedKind
+    );
+
+    if (nextSerialized === serialized && nextFilePath === currentFilePath) {
+      return graph;
+    }
+
+    return await sceneManager.parseScene(nextSerialized, { filePath: nextFilePath });
+  }
+
+  private rewriteUnknownValuePaths(
+    value: unknown,
+    rewrite: (value: string) => string | null
+  ): unknown {
+    if (typeof value === 'string') {
+      return rewrite(value) ?? value;
+    }
+
+    if (Array.isArray(value)) {
+      let didChange = false;
+      const nextArray = value.map(item => {
+        const nextItem = this.rewriteUnknownValuePaths(item, rewrite);
+        didChange = didChange || nextItem !== item;
+        return nextItem;
+      });
+      return didChange ? nextArray : value;
+    }
+
+    if (value && typeof value === 'object') {
+      let didChange = false;
+      const nextRecord: Record<string, unknown> = {};
+      for (const [key, entryValue] of Object.entries(value)) {
+        const nextValue = this.rewriteUnknownValuePaths(entryValue, rewrite);
+        nextRecord[key] = nextValue;
+        didChange = didChange || nextValue !== entryValue;
+      }
+      return didChange ? nextRecord : value;
+    }
+
+    return value;
+  }
+
+  private rewriteResourceReferencesInText(
+    contents: string,
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): string {
+    const sourceResourcePath = this.toResourcePath(sourcePath);
+    const targetResourcePath = this.toResourcePath(targetPath);
+    const escapedSourceResourcePath = this.escapeRegExp(sourceResourcePath);
+
+    let nextContents = contents;
+    if (movedKind === 'directory') {
+      nextContents = nextContents.replace(
+        new RegExp(`${escapedSourceResourcePath}/`, 'g'),
+        `${targetResourcePath}/`
+      );
+    }
+
+    return nextContents.replace(
+      new RegExp(`${escapedSourceResourcePath}(?=$|[^A-Za-z0-9._\\-/])`, 'g'),
+      targetResourcePath
+    );
+  }
+
+  private remapResourcePath(
+    resourcePath: string | null | undefined,
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): string | null {
+    if (!resourcePath || !resourcePath.startsWith('res://')) {
+      return null;
+    }
+
+    const projectPath = this.normalizeProjectPath(resourcePath);
+    const remappedPath = this.remapProjectPath(projectPath, sourcePath, targetPath, movedKind);
+    return remappedPath ? this.toResourcePath(remappedPath) : null;
+  }
+
+  private remapProjectPath(
+    projectPath: string | null | undefined,
+    sourcePath: string,
+    targetPath: string,
+    movedKind: FileSystemHandleKind
+  ): string | null {
+    if (!projectPath) {
+      return null;
+    }
+
+    const normalizedPath = this.normalizeProjectPath(projectPath);
+    if (normalizedPath === sourcePath) {
+      return targetPath;
+    }
+
+    if (movedKind === 'directory' && normalizedPath.startsWith(`${sourcePath}/`)) {
+      return `${targetPath}${normalizedPath.slice(sourcePath.length)}`;
+    }
+
+    return null;
+  }
+
+  private async listAllProjectFiles(path: string): Promise<FileDescriptor[]> {
+    const entries = await this.storage.listDirectory(path);
+    const result: FileDescriptor[] = [];
+
+    for (const entry of entries) {
+      result.push(entry);
+      if (entry.kind === 'directory') {
+        const children = await this.listAllProjectFiles(entry.path);
+        result.push(...children);
+      }
+    }
+
+    return result;
+  }
+
+  private async getProjectEntry(path: string): Promise<FileDescriptor | null> {
+    const parentPath = this.getParentProjectPath(path);
+    const entryName = path.split('/').pop();
+    if (!entryName) {
+      return null;
+    }
+
+    const entries = await this.storage.listDirectory(parentPath);
+    return entries.find(entry => entry.name === entryName) ?? null;
+  }
+
+  private getParentProjectPath(path: string): string {
+    const segments = this.normalizeProjectPath(path).split('/').filter(Boolean);
+    if (segments.length <= 1) {
+      return '.';
+    }
+    return segments.slice(0, -1).join('/');
+  }
+
+  private normalizeProjectPath(path: string): string {
+    if (!path || path === '.') {
+      return '.';
+    }
+
+    return (
+      path
+        .replace(/^res:\/\//i, '')
+        .replace(/^\.\/+/, '')
+        .replace(/^\/+/, '')
+        .replace(/\/+$/, '')
+        .replace(/\\+/g, '/') || '.'
+    );
+  }
+
+  private toResourcePath(path: string): string {
+    const normalizedPath = this.normalizeProjectPath(path);
+    return normalizedPath === '.' ? 'res://' : `res://${normalizedPath}`;
+  }
+
+  private deriveSceneIdFromResource(resourcePath: string): string {
+    const withoutScheme = resourcePath
+      .replace(/^res:\/\//i, '')
+      .replace(/^templ:\/\//i, '')
+      .replace(/^collab:\/\//i, '');
+    const withoutExtension = withoutScheme.replace(/\.[^./]+$/i, '');
+    const normalized = withoutExtension
+      .replace(/[^a-z0-9]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase();
+    return normalized || 'scene';
+  }
+
+  private escapeRegExp(value: string): string {
+    return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
   public dispose(): void {
     // ProjectService holds no subscriptions or event listeners
   }
@@ -555,6 +1047,15 @@ Happy creating! 🎨
   }
 
   closeCurrentProject(): void {
+    try {
+      const collaborationService = ServiceContainer.getInstance().getService<CollaborationService>(
+        ServiceContainer.getInstance().getOrCreateToken(CollaborationService)
+      );
+      collaborationService.disconnect();
+    } catch {
+      // ignore if collaboration service is not available yet
+    }
+
     appState.project.id = null;
     appState.project.backend = 'local';
     appState.project.directoryHandle = null;

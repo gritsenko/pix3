@@ -1631,6 +1631,9 @@ export class InspectorPanel extends ComponentBase {
   }
 
   private applyLayoutPreset(preset: LayoutPreset) {
+    if (appState.collaboration.isReadOnly) {
+      return;
+    }
     if (!this.primaryNode || !(this.primaryNode instanceof Group2D)) return;
 
     const group = this.primaryNode as Group2D;
@@ -2016,6 +2019,10 @@ export class InspectorPanel extends ComponentBase {
     readOnly: ReadOnlyValue,
     target: NodeBase | ScriptComponent | null | undefined
   ): boolean {
+    if (appState.collaboration.isReadOnly) {
+      return true;
+    }
+
     if (typeof readOnly === 'function') {
       return Boolean(target ? readOnly(target) : false);
     }

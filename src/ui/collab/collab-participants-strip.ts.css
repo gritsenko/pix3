@@ -1,0 +1,40 @@
+collab-participants-strip {
+  display: flex;
+}
+
+.participants-strip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-left: 0.5rem;
+}
+
+.participants-strip__divider {
+  width: 1px;
+  height: 1.6rem;
+  background: rgba(255, 255, 255, 0.14);
+  flex-shrink: 0;
+}
+
+.participants-strip__chip {
+  position: relative;
+  margin-left: -0.4rem;
+}
+
+.participants-strip__chip:first-child {
+  margin-left: 0;
+}
+
+.participants-strip__avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  border: 2px solid rgba(19, 22, 27, 0.96);
+  color: rgba(10, 12, 16, 0.88);
+  font-size: 0.72rem;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}

@@ -17,6 +17,9 @@ export class LocalSyncService {
     const { files: serverFiles } = await ApiClient.getManifest(projectId);
     const serverMap = new Map<string, ManifestEntry>();
     for (const entry of serverFiles) {
+      if (entry.kind !== 'file') {
+        continue;
+      }
       serverMap.set(entry.path, entry);
     }
 
@@ -55,6 +58,9 @@ export class LocalSyncService {
     const { files: serverFiles } = await ApiClient.getManifest(projectId);
     const serverMap = new Map<string, ManifestEntry>();
     for (const entry of serverFiles) {
+      if (entry.kind !== 'file') {
+        continue;
+      }
       serverMap.set(entry.path, entry);
     }
 
@@ -80,8 +86,11 @@ export class LocalSyncService {
     prefix = ''
   ): Promise<Map<string, string>> {
     const result = new Map<string, string>();
+    const iterableDirHandle = dirHandle as FileSystemDirectoryHandle & {
+      entries(): AsyncIterable<[string, FileSystemHandle]>;
+    };
 
-    for await (const [name, handle] of (dirHandle as any).entries()) {
+    for await (const [name, handle] of iterableDirHandle.entries()) {
       const path = prefix ? `${prefix}/${name}` : name;
       if (handle.kind === 'directory') {
         const sub = await this.buildLocalManifest(handle as FileSystemDirectoryHandle, path);

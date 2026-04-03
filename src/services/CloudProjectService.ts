@@ -1,4 +1,4 @@
-import { injectable, inject } from '@/fw/di';
+import { injectable, inject, ServiceContainer } from '@/fw/di';
 import { appState } from '@/state';
 import * as ApiClient from './ApiClient';
 import type { ApiProject } from './ApiClient';
@@ -8,6 +8,8 @@ import { EditorTabService } from './EditorTabService';
 import type { ProjectManifest } from '@/core/ProjectManifest';
 import { stringify } from 'yaml';
 import { sceneTemplates } from './template-data';
+import { CollaborationService } from './CollaborationService';
+import { CollabSessionService } from './CollabSessionService';
 
 export interface CloudProjectState {
   projects: ApiProject[];
@@ -21,6 +23,9 @@ export interface CreateCloudProjectOptions {
 
 export interface OpenCloudProjectOptions {
   readonly beforeActivate?: () => Promise<void>;
+  readonly preferredScenePath?: string | null;
+  readonly skipSceneOpen?: boolean;
+  readonly shareToken?: string;
 }
 
 @injectable()
@@ -129,17 +134,24 @@ export class CloudProjectService {
 
   async generateShareToken(id: string): Promise<string> {
     const result = await ApiClient.generateShareToken(id);
+    if (appState.project.id === id) {
+      appState.collaboration.shareEnabled = true;
+    }
     await this.loadProjects();
     return result.share_token;
   }
 
   async revokeShareToken(id: string): Promise<void> {
     await ApiClient.revokeShareToken(id);
+    if (appState.project.id === id) {
+      appState.collaboration.shareEnabled = false;
+    }
     await this.loadProjects();
   }
 
   async openProject(projectId: string, options?: OpenCloudProjectOptions): Promise<void> {
-    const project = this.state.projects.find(entry => entry.id === projectId) ?? null;
+    const listedProject = this.state.projects.find(entry => entry.id === projectId) ?? null;
+    const access = await ApiClient.getProjectAccess(projectId, options?.shareToken);
 
     await options?.beforeActivate?.();
     this.resetOpenProjectState();
@@ -147,10 +159,16 @@ export class CloudProjectService {
     appState.project.id = projectId;
     appState.project.backend = 'cloud';
     appState.project.directoryHandle = null;
-    appState.project.projectName = project?.name ?? 'Cloud Project';
+    appState.project.projectName = access.name || listedProject?.name || 'Cloud Project';
     appState.project.localAbsolutePath = null;
     appState.project.status = 'ready';
     appState.project.errorMessage = null;
+    appState.collaboration.authSource = access.auth_source;
+    appState.collaboration.role = access.role;
+    appState.collaboration.isReadOnly = access.access_mode === 'view';
+    appState.collaboration.accessMode = access.access_mode === 'view' ? 'cloud-view' : 'cloud-edit';
+    appState.collaboration.shareToken = options?.shareToken ?? null;
+    appState.collaboration.shareEnabled = access.share_enabled;
 
     appState.project.manifest = await this.projectService.loadProjectManifest();
     await this.storage.refreshManifest();
@@ -168,7 +186,13 @@ export class CloudProjectService {
       .filter(path => path.endsWith('.pix3scene'))
       .sort((a, b) => a.localeCompare(b));
 
-    const preferredScenePath = this.getPreferredScenePath(projectId);
+    await this.connectToProjectRoom(projectId, options?.shareToken, access);
+
+    if (options?.skipSceneOpen) {
+      return;
+    }
+
+    const preferredScenePath = options?.preferredScenePath ?? this.getPreferredScenePath(projectId);
     const initialScenePath =
       (preferredScenePath && scenePaths.includes(preferredScenePath) ? preferredScenePath : null) ??
       scenePaths[0] ??
@@ -181,6 +205,7 @@ export class CloudProjectService {
     appState.project.lastOpenedScenePath = `res://${initialScenePath}`;
     appState.scenes.pendingScenePaths = [`res://${initialScenePath}`];
     await this.editorTabService.focusOrOpenScene(`res://${initialScenePath}`);
+    await this.ensureActiveSceneBound();
   }
 
   private normalizeScenePath(scenePath: string | null): string | null {
@@ -236,5 +261,52 @@ export class CloudProjectService {
     appState.project.fileRefreshSignal = 0;
     appState.project.scriptRefreshSignal = 0;
     appState.project.lastModifiedDirectoryPath = null;
+  }
+
+  private async connectToProjectRoom(
+    projectId: string,
+    shareToken: string | undefined,
+    access: ApiClient.ApiProjectAccess
+  ): Promise<void> {
+    const serviceContainer = ServiceContainer.getInstance();
+    const collabService = serviceContainer.getService<CollaborationService>(
+      serviceContainer.getOrCreateToken(CollaborationService)
+    );
+
+    const roomName = `project:${projectId}`;
+    if (collabService.isConnected() && appState.collaboration.roomName === roomName) {
+      return;
+    }
+
+    const username =
+      access.auth_source === 'member'
+        ? appState.auth.user?.username?.trim() || appState.project.projectName || 'Pix3 User'
+        : `Guest ${Math.floor(Math.random() * 1000)}`;
+    const color = access.access_mode === 'view' ? '#7dd3fc' : '#ffcf33';
+
+    collabService.connect(
+      projectId,
+      appState.scenes.activeSceneId ?? 'shared-scene',
+      username,
+      color,
+      {
+        tokenOverride: access.auth_source === 'share-token' ? shareToken : undefined,
+        role: access.role,
+        authSource: access.auth_source,
+        isReadOnly: access.access_mode === 'view',
+      }
+    );
+  }
+
+  private async ensureActiveSceneBound(): Promise<void> {
+    if (!appState.scenes.activeSceneId) {
+      return;
+    }
+
+    const serviceContainer = ServiceContainer.getInstance();
+    const collabSessionService = serviceContainer.getService<CollabSessionService>(
+      serviceContainer.getOrCreateToken(CollabSessionService)
+    );
+    await collabSessionService.ensureSceneSynchronized(appState.scenes.activeSceneId);
   }
 }

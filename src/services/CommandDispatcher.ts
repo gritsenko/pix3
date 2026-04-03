@@ -9,6 +9,20 @@ import {
   type CommandPreconditionResult,
 } from '@/core/command';
 
+const READ_ONLY_ALLOWED_COMMANDS = new Set([
+  'scene.load',
+  'scene.reload',
+  'scene.select-object',
+  'project.open-settings',
+  'project.open-in-ide',
+  'editor.open-settings',
+  'game.open-popout',
+  'history.undo',
+  'history.redo',
+]);
+
+const READ_ONLY_ALLOWED_PREFIXES = ['viewport.', 'game.', 'editor.'];
+
 /**
  * CommandDispatcher executes commands with proper lifecycle management.
  * It creates appropriate context, checks preconditions, and invokes command execution.
@@ -51,6 +65,15 @@ export class CommandDispatcher {
         `[CommandDispatcher] Command preconditions blocked: ${command.metadata.id}`,
         preconditionsResult
       );
+      return false;
+    }
+
+    if (
+      appState.collaboration.isReadOnly &&
+      !READ_ONLY_ALLOWED_COMMANDS.has(command.metadata.id) &&
+      !READ_ONLY_ALLOWED_PREFIXES.some(prefix => command.metadata.id.startsWith(prefix))
+    ) {
+      console.warn(`[CommandDispatcher] Read-only mode blocked command: ${command.metadata.id}`);
       return false;
     }
 

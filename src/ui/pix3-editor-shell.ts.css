@@ -208,3 +208,17 @@ pix3-toolbar {
 .account-popover__action:hover {
   background: rgba(255, 255, 255, 0.1);
 }
+
+.account-avatar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #ffd84d, #ffb800);
+  color: #171923;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}

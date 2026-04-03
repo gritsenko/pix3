@@ -111,11 +111,15 @@ export class SceneTreePanel extends ComponentBase {
     y: number;
   } | null = null;
 
+  @state()
+  private remoteSelectionByNodeId: Record<string, Array<{ name: string; color: string }>> = {};
+
   private portal = new DropdownPortal({ minWidth: '12rem' });
   private lastHierarchyRef: NodeBase[] | null = null;
   private pendingScrollNodeId: string | null = null;
   private disposeSceneSubscription?: () => void;
   private disposeSelectionSubscription?: () => void;
+  private disposeCollaborationSubscription?: () => void;
   private readonly onWindowClick = (event: MouseEvent): void => {
     if (!this.contextMenu) {
       return;
@@ -137,11 +141,15 @@ export class SceneTreePanel extends ComponentBase {
     super.connectedCallback();
     this.syncSceneState();
     this.syncSelectionState();
+    this.syncRemoteSelections();
     this.disposeSceneSubscription = subscribe(appState.scenes, () => {
       this.syncSceneState();
     });
     this.disposeSelectionSubscription = subscribe(appState.selection, () => {
       this.syncSelectionState();
+    });
+    this.disposeCollaborationSubscription = subscribe(appState.collaboration, () => {
+      this.syncRemoteSelections();
     });
 
     // Track focus for context-aware shortcuts
@@ -158,6 +166,8 @@ export class SceneTreePanel extends ComponentBase {
     this.disposeSceneSubscription = undefined;
     this.disposeSelectionSubscription?.();
     this.disposeSelectionSubscription = undefined;
+    this.disposeCollaborationSubscription?.();
+    this.disposeCollaborationSubscription = undefined;
     document.removeEventListener('click', this.onWindowClick, { capture: true });
     window.removeEventListener('keydown', this.onWindowEscape);
     this.portal.close();
@@ -167,6 +177,7 @@ export class SceneTreePanel extends ComponentBase {
   protected render() {
     const hasHierarchy = this.hierarchy.length > 0;
     const activeSceneName = this.activeScene?.name ?? null;
+    const isReadOnly = appState.collaboration.isReadOnly;
 
     return html`
       <pix3-panel
@@ -178,6 +189,7 @@ export class SceneTreePanel extends ComponentBase {
           <pix3-toolbar-button
             icon="plus-circle"
             aria-label="Create node"
+            ?disabled=${isReadOnly}
             @click=${this.onOpenNodeTypePicker}
           ></pix3-toolbar-button>
         </pix3-toolbar>
@@ -209,6 +221,7 @@ export class SceneTreePanel extends ComponentBase {
                       .collapsedNodeIds=${this.collapsedNodeIds}
                       .draggedNodeId=${this.draggedNodeId}
                       .draggedNodeType=${this.draggedNodeType}
+                      .remoteSelectionByNodeId=${this.remoteSelectionByNodeId}
                       ?focusable=${index === 0}
                     ></pix3-scene-tree-node>`
                 )}
@@ -348,6 +361,19 @@ export class SceneTreePanel extends ComponentBase {
 
     this.expandAncestorsForNode(selectedNodeId);
     this.pendingScrollNodeId = selectedNodeId;
+  }
+
+  private syncRemoteSelections(): void {
+    const next: Record<string, Array<{ name: string; color: string }>> = {};
+    for (const user of appState.collaboration.remoteUsers) {
+      for (const nodeId of user.selection) {
+        if (!next[nodeId]) {
+          next[nodeId] = [];
+        }
+        next[nodeId].push({ name: user.name, color: user.color });
+      }
+    }
+    this.remoteSelectionByNodeId = next;
   }
 
   private resolveActiveSceneDescriptor(): SceneDescriptor | null {

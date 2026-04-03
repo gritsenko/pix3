@@ -217,12 +217,28 @@ export interface CollabRemoteUser {
   selection: string[];
 }
 
+export interface CollabParticipant {
+  clientId: number | null;
+  name: string;
+  color: string;
+}
+
 export type CollabConnectionStatus = 'disconnected' | 'connecting' | 'connected' | 'synced';
+export type CollabAccessMode = 'local' | 'cloud-edit' | 'cloud-view';
+export type CollabAuthSource = 'none' | 'member' | 'share-token';
+export type CollabRole = 'owner' | 'editor' | 'viewer' | null;
 
 export interface CollaborationState {
   connectionStatus: CollabConnectionStatus;
   roomName: string | null;
   remoteUsers: CollabRemoteUser[];
+  localUser: CollabParticipant | null;
+  accessMode: CollabAccessMode;
+  authSource: CollabAuthSource;
+  role: CollabRole;
+  isReadOnly: boolean;
+  shareToken: string | null;
+  shareEnabled: boolean;
 }
 
 export interface AuthUser {
@@ -347,6 +363,13 @@ export const createInitialAppState = (): AppState => ({
     connectionStatus: 'disconnected',
     roomName: null,
     remoteUsers: [],
+    localUser: null,
+    accessMode: 'local',
+    authSource: 'none',
+    role: null,
+    isReadOnly: false,
+    shareToken: null,
+    shareEnabled: false,
   },
   telemetry: {
     lastEventName: null,

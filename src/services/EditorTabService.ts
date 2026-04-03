@@ -198,6 +198,64 @@ export class EditorTabService {
     await this.openResourceTab('scene', resourcePath);
   }
 
+  remapSceneTabs(remapResourcePath: (resourcePath: string) => string | null): void {
+    let didChange = false;
+    let nextActiveTabId = appState.tabs.activeTabId;
+    const tabsToRecreate: EditorTab[] = [];
+    const nextTabs: EditorTab[] = [];
+
+    for (const tab of appState.tabs.tabs) {
+      if (tab.type !== 'scene') {
+        nextTabs.push(tab);
+        continue;
+      }
+
+      const nextResourceId = remapResourcePath(tab.resourceId);
+      if (!nextResourceId || nextResourceId === tab.resourceId) {
+        nextTabs.push(tab);
+        continue;
+      }
+
+      didChange = true;
+      const nextTabId = this.deriveTabId(tab.type, nextResourceId);
+      const nextTitleBase = this.deriveTitle(nextResourceId);
+      const nextTab: EditorTab = {
+        ...tab,
+        id: nextTabId,
+        resourceId: nextResourceId,
+        title: tab.isDirty ? `*${nextTitleBase}` : nextTitleBase,
+      };
+
+      if (tab.id !== nextTabId) {
+        this.layoutManager.removeEditorTab(tab.id);
+        tabsToRecreate.push(nextTab);
+      } else {
+        this.layoutManager.updateEditorTabTitle(nextTab.id, nextTab.title);
+      }
+
+      if (nextActiveTabId === tab.id) {
+        nextActiveTabId = nextTab.id;
+      }
+
+      nextTabs.push(nextTab);
+    }
+
+    if (!didChange) {
+      return;
+    }
+
+    appState.tabs.tabs = nextTabs;
+    appState.tabs.activeTabId = nextActiveTabId;
+
+    for (const tab of tabsToRecreate) {
+      this.layoutManager.ensureEditorTab(tab, false);
+    }
+
+    if (nextActiveTabId) {
+      this.layoutManager.focusEditorTab(nextActiveTabId);
+    }
+  }
+
   async restoreProjectSession(projectId: string): Promise<boolean> {
     const raw = localStorage.getItem(`pix3.projectTabs:${projectId}`);
     if (!raw) return false;
@@ -294,6 +352,10 @@ export class EditorTabService {
   }
 
   getDirtyTabs(): EditorTab[] {
+    if (appState.project.backend === 'cloud') {
+      return [];
+    }
+
     return appState.tabs.tabs.filter(tab => tab.isDirty);
   }
 
@@ -432,6 +494,10 @@ export class EditorTabService {
   }
 
   private async saveTabResource(tab: EditorTab): Promise<void> {
+    if (appState.project.backend === 'cloud') {
+      return;
+    }
+
     if (tab.type !== 'scene') return;
 
     const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
@@ -532,6 +598,7 @@ export class EditorTabService {
 
   private syncSceneTabsFromDescriptors(): void {
     // Keep tab.isDirty/title aligned with scene descriptor state.
+    const treatAsClean = appState.project.backend === 'cloud';
     let didChange = false;
     const nextTabs = appState.tabs.tabs.map(tab => {
       if (tab.type !== 'scene') return tab;
@@ -540,8 +607,8 @@ export class EditorTabService {
       if (!descriptor) return tab;
 
       const fileTitle = this.deriveTitle(descriptor.filePath);
-      const title = descriptor.isDirty ? `*${fileTitle}` : fileTitle;
-      const isDirty = descriptor.isDirty;
+      const title = treatAsClean ? fileTitle : descriptor.isDirty ? `*${fileTitle}` : fileTitle;
+      const isDirty = treatAsClean ? false : descriptor.isDirty;
 
       if (tab.title !== title || tab.isDirty !== isDirty) {
         didChange = true;
