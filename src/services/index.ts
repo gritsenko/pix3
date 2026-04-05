@@ -76,7 +76,6 @@ export { SceneCRDTBinding } from './SceneCRDTBinding';
 export { CollabViewportOverlayService } from './CollabViewportOverlayService';
 export {
   CollabJoinService,
-  detectCollabJoinParams,
   type CollabJoinParams,
 } from './CollabJoinService';
 export { CollabSessionService } from './CollabSessionService';

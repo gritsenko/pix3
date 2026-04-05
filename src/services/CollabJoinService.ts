@@ -14,27 +14,8 @@ export interface CollabJoinParams {
 }
 
 /**
- * Check the current URL for collab join parameters.
- * Returns the params if found, null otherwise.
- */
-export function detectCollabJoinParams(): CollabJoinParams | null {
-  try {
-    const url = new URL(window.location.href);
-    const projectId = url.searchParams.get('collab');
-    const sceneId = url.searchParams.get('scene');
-    const shareToken = url.searchParams.get('token') ?? undefined;
-    if (projectId && sceneId) {
-      return { projectId, sceneId, shareToken };
-    }
-  } catch {
-    // ignore
-  }
-  return null;
-}
-
-/**
  * Detects collab join URL parameters and orchestrates the guest join flow:
- * 1. Parse `?collab=<projectId>&scene=<sceneId>` from the URL
+ * 1. Parse `?collab=<projectId>&scene=<sceneId>` from the URL (handled by RouterService now)
  * 2. Set project state to 'ready' in cloud mode
  * 3. Connect to the collab server
  * 4. Wait for Y.Doc sync from the server
@@ -92,14 +73,6 @@ export class CollabJoinService {
     // 6. Set up CRDT binding for ongoing sync
     crdtBinding.bindToOperationService(operationService, collabService);
     crdtBinding.bindToYDoc(ydoc, sceneId);
-
-    // 7. Clean the URL to prevent re-joining on reload
-    try {
-      const cleanUrl = window.location.origin + window.location.pathname + '#editor';
-      history.replaceState(null, '', cleanUrl);
-    } catch {
-      // ignore
-    }
 
     console.log('[CollabJoin] Successfully joined collaborative session', {
       projectId,

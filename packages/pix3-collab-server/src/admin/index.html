@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pix3 Collab - Панель управления</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        pix3: {
+                            DEFAULT: '#ffcf33',
+                            dark: '#e6ba2e',
+                            darker: '#2d2d2d',
+                            darkest: '#1a1a1a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body { background-color: #1a1a1a; color: #e5e5e5; }
+        .tab-active { border-bottom: 2px solid #ffcf33; color: #ffcf33; }
+        .glass-panel { background: rgba(45, 45, 45, 0.7); backdrop-filter: blur(10px); border: 1px solid #404040; }
+    </style>
+</head>
+<body class="min-h-screen font-sans antialiased">
+    <div id="app" class="flex flex-col min-h-screen" v-cloak>
+        
+        <!-- Навигация -->
+        <nav class="glass-panel sticky top-0 z-50 px-6 py-4 flex justify-between items-center">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded bg-pix3 flex items-center justify-center text-pix3-darkest font-bold">P3</div>
+                <h1 class="text-xl font-semibold text-white">Админ-панель</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <span v-if="currentUser" class="text-sm text-gray-400">{{ currentUser.email }}</span>
+                <button @click="logout" class="px-4 py-2 text-sm text-white bg-red-600 hover:bg-red-700 rounded transition-colors">
+                    Выйти
+                </button>
+            </div>
+        </nav>
+
+        <!-- Уведомления -->
+        <div v-if="toast.show" :class="`fixed top-20 right-6 px-6 py-3 rounded shadow-lg z-50 transition-opacity ${toast.type === 'error' ? 'bg-red-900 text-red-100' : 'bg-green-900 text-green-100'}`">
+            {{ toast.message }}
+        </div>
+
+        <main class="flex-grow p-8 max-w-7xl mx-auto w-full">
+            
+            <!-- Табы -->
+            <div class="flex gap-6 mb-8 border-b border-gray-700">
+                <button 
+                    @click="currentTab = 'users'"
+                    :class="['pb-3 px-2 font-medium transition-colors hover:text-white', currentTab === 'users' ? 'tab-active' : 'text-gray-400']">
+                    Пользователи
+                </button>
+                <button 
+                    @click="currentTab = 'projects'"
+                    :class="['pb-3 px-2 font-medium transition-colors hover:text-white', currentTab === 'projects' ? 'tab-active' : 'text-gray-400']">
+                    Проекты
+                </button>
+            </div>
+
+            <!-- Вкладка: Пользователи -->
+            <div v-show="currentTab === 'users'" class="glass-panel rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+                    <h2 class="text-lg font-medium text-white">Зарегистрированные пользователи</h2>
+                    <button @click="fetchUsers" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Обновить">
+                        <i data-lucide="refresh-cw" class="w-5 h-5 text-gray-400"></i>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="uppercase tracking-wider border-b border-gray-700 bg-gray-800/50 text-gray-400">
+                            <tr>
+                                <th class="px-6 py-4">ID</th>
+                                <th class="px-6 py-4">Имя пользователя</th>
+                                <th class="px-6 py-4">Email</th>
+                                <th class="px-6 py-4">Роль</th>
+                                <th class="px-6 py-4 text-right">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="loading" class="border-b border-gray-800"><td colspan="5" class="px-6 py-8 text-center text-gray-500">Загрузка...</td></tr>
+                            <tr v-else-if="users.length === 0" class="border-b border-gray-800"><td colspan="5" class="px-6 py-8 text-center text-gray-500">Нет пользователей</td></tr>
+                            <tr v-for="user in users" :key="user.id" class="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
+                                <td class="px-6 py-4 text-gray-500 font-mono text-xs">{{ user.id.substring(0, 8) }}...</td>
+                                <td class="px-6 py-4 text-white font-medium flex items-center gap-3">
+                                    <div class="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center text-xs">{{ user.username.charAt(0).toUpperCase() }}</div>
+                                    {{ user.username }}
+                                </td>
+                                <td class="px-6 py-4 text-gray-300">{{ user.email }}</td>
+                                <td class="px-6 py-4">
+                                    <span v-if="user.is_admin" class="px-2 py-1 rounded text-xs font-medium bg-pix3/20 text-pix3">Admin</span>
+                                    <span v-else class="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300">User</span>
+                                </td>
+                                <td class="px-6 py-4 text-right">
+                                    <button @click="deleteUser(user.id)" class="text-red-400 hover:text-red-300 transition-colors p-1" title="Удалить">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Вкладка: Проекты -->
+            <div v-show="currentTab === 'projects'" class="glass-panel rounded-lg overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-700 flex justify-between items-center">
+                    <h2 class="text-lg font-medium text-white">Все проекты</h2>
+                    <button @click="fetchProjects" class="p-2 hover:bg-gray-700 rounded transition-colors" title="Обновить">
+                        <i data-lucide="refresh-cw" class="w-5 h-5 text-gray-400"></i>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-sm whitespace-nowrap">
+                        <thead class="uppercase tracking-wider border-b border-gray-700 bg-gray-800/50 text-gray-400">
+                            <tr>
+                                <th class="px-6 py-4">ID / Токен доступа</th>
+                                <th class="px-6 py-4">Название</th>
+                                <th class="px-6 py-4">Владелец</th>
+                                <th class="px-6 py-4">Обновлен</th>
+                                <th class="px-6 py-4 text-right">Действия</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr v-if="loading" class="border-b border-gray-800"><td colspan="5" class="px-6 py-8 text-center text-gray-500">Загрузка...</td></tr>
+                            <tr v-else-if="projects.length === 0" class="border-b border-gray-800"><td colspan="5" class="px-6 py-8 text-center text-gray-500">Нет проектов</td></tr>
+                            <tr v-for="project in projects" :key="project.id" class="border-b border-gray-800 hover:bg-gray-800/50 transition-colors">
+                                <td class="px-6 py-4 font-mono text-xs">
+                                    <div class="text-gray-500 mb-1">ID: {{ project.id.substring(0, 8) }}...</div>
+                                    <div v-if="project.share_token" class="text-green-400/70" title="Доступ по ссылке включен">
+                                        <i data-lucide="link" class="w-3 h-3 inline mr-1"></i>Token: {{ project.share_token.substring(0, 8) }}...
+                                    </div>
+                                </td>
+                                <td class="px-6 py-4 text-white font-medium">{{ project.name }}</td>
+                                <td class="px-6 py-4 text-gray-300">{{ project.owner_username }}</td>
+                                <td class="px-6 py-4 text-gray-400">{{ new Date(project.updated_at).toLocaleString('ru-RU') }}</td>
+                                <td class="px-6 py-4 text-right space-x-2">
+                                    <a :href="`/play?token=${project.share_token}`" target="_blank" v-if="project.share_token" class="text-blue-400 hover:text-blue-300 transition-colors p-1 inline-block" title="Открыть игру">
+                                        <i data-lucide="external-link" class="w-4 h-4"></i>
+                                    </a>
+                                    <button @click="deleteProject(project.id)" class="text-red-400 hover:text-red-300 transition-colors p-1 inline-block" title="Удалить">
+                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                    </button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+        </main>
+    </div>
+
+    <script>
+        const { createApp, ref, onMounted, nextTick } = Vue;
+
+        createApp({
+            setup() {
+                const currentTab = ref('users');
+                const users = ref([]);
+                const projects = ref([]);
+                const loading = ref(false);
+                const toast = ref({ show: false, message: '', type: 'success' });
+                const currentUser = ref(null);
+
+                const showToast = (message, type = 'success') => {
+                    toast.value = { show: true, message, type };
+                    setTimeout(() => { toast.value.show = false; }, 3000);
+                };
+
+                const apiFetch = async (endpoint, options = {}) => {
+                    options.credentials = 'include';
+                    options.headers = { ...options.headers, 'Content-Type': 'application/json' };
+                    
+                    try {
+                        const response = await fetch(endpoint, options);
+                        if (response.status === 401) {
+                            window.location.href = '/login';
+                            return null;
+                        }
+                        if (!response.ok) {
+                            const errorData = await response.json().catch(() => ({}));
+                            throw new Error(errorData.error || `Ошибка ${response.status}`);
+                        }
+                        return await response.json();
+                    } catch (e) {
+                        console.error(e);
+                        showToast(e.message, 'error');
+                        return null;
+                    }
+                };
+
+                const fetchMe = async () => {
+                   const data = await apiFetch('/api/auth/me');
+                   if (data) currentUser.value = data;
+                };
+
+                const fetchUsers = async () => {
+                    loading.value = true;
+                    const data = await apiFetch('/api/admin/users');
+                    if (data) {
+                        users.value = data;
+                    }
+                    loading.value = false;
+                    nextTick(() => lucide.createIcons());
+                };
+
+                const fetchProjects = async () => {
+                    loading.value = true;
+                    const data = await apiFetch('/api/admin/projects');
+                    if (data) {
+                        projects.value = data;
+                    }
+                    loading.value = false;
+                    nextTick(() => lucide.createIcons());
+                };
+
+                const deleteUser = async (id) => {
+                    if (id === currentUser.value?.id) {
+                        showToast('Нельзя удалить самого себя', 'error');
+                        return;
+                    }
+                    if (!confirm('Точно удалить пользователя? Это удалит все его проекты.')) return;
+                    const res = await apiFetch(`/api/admin/users/${id}`, { method: 'DELETE' });
+                    if (res) {
+                        users.value = users.value.filter(u => u.id !== id);
+                        showToast('Пользователь удален');
+                    }
+                };
+
+                const deleteProject = async (id) => {
+                    if (!confirm('Точно удалить проект? Это действие необратимо.')) return;
+                    const res = await apiFetch(`/api/admin/projects/${id}`, { method: 'DELETE' });
+                    if (res) {
+                        projects.value = projects.value.filter(p => p.id !== id);
+                        showToast('Проект удален');
+                    }
+                };
+
+                const logout = async () => {
+                    await apiFetch('/api/auth/logout', { method: 'POST' });
+                    window.location.href = '/login';
+                };
+
+                // Инициализация
+                onMounted(async () => {
+                    await fetchMe();
+                    fetchUsers();
+                    fetchProjects();
+                });
+
+                return {
+                    currentTab, users, projects, loading, toast, currentUser,
+                    fetchUsers, fetchProjects, deleteUser, deleteProject, logout
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>

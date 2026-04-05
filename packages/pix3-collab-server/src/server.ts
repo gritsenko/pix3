@@ -39,6 +39,22 @@ export function startServer(): void {
   app.use('/api/projects', storageRouter);
   app.use('/api/admin', adminRouter);
 
+  // Admin UI
+  const adminPath = path.resolve('src/admin/index.html');
+  app.get('/admin', (_req, res) => {
+    if (fs.existsSync(adminPath)) {
+      res.sendFile(adminPath);
+    } else {
+      // Fallback for production/dist
+      const distAdminPath = path.resolve('dist/admin/index.html');
+      if (fs.existsSync(distAdminPath)) {
+        res.sendFile(distAdminPath);
+      } else {
+        res.status(404).send('Admin panel not found');
+      }
+    }
+  });
+
   // Health check
   app.get('/health', (_req, res) => {
     res.json({ status: 'ok', wsPort: config.WS_PORT });

@@ -56,3 +56,25 @@ adminRouter.get('/projects', (_req: AuthenticatedRequest, res: Response) => {
     .all();
   res.json(projects);
 });
+
+// DELETE /api/admin/projects/:id — delete any project
+adminRouter.delete('/projects/:id', (req: AuthenticatedRequest, res: Response) => {
+  const projectId = req.params.id;
+  const db = getDb();
+
+  const project = db.prepare('SELECT id FROM projects WHERE id = ?').get(projectId);
+  if (!project) {
+    res.status(404).json({ error: 'Project not found' });
+    return;
+  }
+
+  // Remove storage
+  const dir = path.resolve(config.PROJECTS_STORAGE_DIR, projectId);
+  if (fs.existsSync(dir)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+
+  // Delete from DB
+  db.prepare('DELETE FROM projects WHERE id = ?').run(projectId);
+  res.json({ ok: true });
+});

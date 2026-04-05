@@ -260,8 +260,26 @@ export interface TelemetryState {
   unsentEventCount: number;
 }
 
+export type RouterStatus = 'idle' | 'authenticating' | 'fetchingMetadata' | 'loadingAssets' | 'reactivationRequired' | 'error';
+
+export interface RouteParams {
+  projectId: string | null;
+  sceneId: string | null;
+  nodeId: string | null;
+  localSessionId: string | null;
+  shareToken: string | null;
+}
+
+export interface RouterState {
+  status: RouterStatus;
+  currentParams: RouteParams;
+  targetParams: RouteParams | null;
+  errorMessage: string | null;
+}
+
 export interface AppState {
   auth: AuthState;
+  router: RouterState;
   project: ProjectState;
   scenes: ScenesState;
   tabs: TabsState;
@@ -278,6 +296,18 @@ export const createInitialAppState = (): AppState => ({
     user: null,
     isAuthenticated: false,
     isLoading: true,
+  },
+  router: {
+    status: 'idle',
+    currentParams: {
+      projectId: null,
+      sceneId: null,
+      nodeId: null,
+      localSessionId: null,
+      shareToken: null,
+    },
+    targetParams: null,
+    errorMessage: null,
   },
   project: {
     id: null,

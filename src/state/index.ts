@@ -25,6 +25,7 @@ export const resetAppState = (): void => {
   appState.operations = defaults.operations;
   appState.collaboration = defaults.collaboration;
   appState.telemetry = defaults.telemetry;
+  appState.router = defaults.router;
 };
 
 export { DEFAULT_THEME, THEME_IDS, createInitialAppState } from './AppState';
@@ -52,4 +53,7 @@ export type {
   TelemetryState,
   ThemeName,
   UIState,
+  RouterState,
+  RouterStatus,
+  RouteParams,
 } from './AppState';

@@ -50,8 +50,10 @@ root:
           material:
             type: standard
             color: "#ff00ff"
+          initiallyVisible: true
+          visible: true
           transform:
-            position: [0.9317891356867438, 2.0064936383681298, 2.190938083429257]
+            position: [1.9725694673576384, 0.7882598138295052, 2.011439183439994]
             rotationEuler: [0, 45, 0]
             scale: [1, 1, 1]
         children: []

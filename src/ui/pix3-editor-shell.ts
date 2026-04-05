@@ -61,7 +61,7 @@ import { appState } from '@/state';
 import { ProjectService } from '@/services';
 import { GamePlaySessionService } from '@/services/GamePlaySessionService';
 import { EditorTabService } from '@/services/EditorTabService';
-import { CollabJoinService, detectCollabJoinParams } from '@/services/CollabJoinService';
+import { RouterService } from '@/services/RouterService';
 import { AuthService } from '@/services/AuthService';
 import { CloudProjectService } from '@/services/CloudProjectService';
 import {
@@ -96,9 +96,6 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(ProjectService)
   private readonly projectService!: ProjectService;
-
-  @inject(CollabJoinService)
-  private readonly collabJoinService!: CollabJoinService;
 
   @inject(AuthService)
   private readonly authService!: AuthService;
@@ -139,6 +136,9 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(ScriptCreatorService)
   private readonly scriptCreatorService!: ScriptCreatorService;
 
+  @inject(RouterService)
+  private readonly routerService!: RouterService;
+
   @inject(ProjectSettingsService)
   private readonly projectSettingsService!: ProjectSettingsService;
 
@@ -169,6 +169,9 @@ export class Pix3EditorShell extends ComponentBase {
   private isLayoutReady = appState.ui.isLayoutReady;
 
   @state()
+  private routerStatus = appState.router.status;
+
+  @state()
   private dialogs: DialogInstance[] = [];
 
   @state()
@@ -185,12 +188,6 @@ export class Pix3EditorShell extends ComponentBase {
 
   @state()
   private activeNodeTypePicker: NodeTypePickerInstance | null = null;
-
-  @state()
-  private pendingCollabJoin: { projectId: string; sceneId: string } | null = null;
-
-  @state()
-  private isJoiningCollab = false;
 
   @state()
   private isAuthModalOpen = false;
@@ -223,7 +220,6 @@ export class Pix3EditorShell extends ComponentBase {
   private watchedSceneIds = new Set<string>();
   private watchedScenePaths = new Map<string, string>();
   private tabsInitialized = false;
-  private attemptedCollabJoin = false;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -351,6 +347,7 @@ export class Pix3EditorShell extends ComponentBase {
     this.gamePlaySessionService.initialize();
 
     this.editorSettingsService.initialize();
+    this.routerService.initialize();
 
     // Restore auth session on startup
     void this.authService.restoreSession();
@@ -360,6 +357,17 @@ export class Pix3EditorShell extends ComponentBase {
       this.requestUpdate();
     });
 
+    this.disposeSubscription = subscribe(appState.router, () => {
+      this.routerStatus = appState.router.status;
+      if (this.routerStatus === 'authenticating' && !this.isAuthModalOpen) {
+          this.openAuthModal();
+      }
+      this.requestUpdate();
+    });
+
+    const handleHash = () => this.requestUpdate();
+    window.addEventListener('hashchange', handleHash);
+
     this.disposeSubscription = subscribe(appState.ui, () => {
       this.isLayoutReady = appState.ui.isLayoutReady;
       this.shellReady = this.isLayoutReady;
@@ -367,20 +375,10 @@ export class Pix3EditorShell extends ComponentBase {
     });
     // also subscribe to project state so we can initialize layout once a project is opened
     this.disposeProjectSubscription = subscribe(appState.project, () => {
-      // if project becomes ready and layout has not been initialized, initialize it
-      if (appState.project.status === 'ready') {
-        // ensure URL reflects editor state so HMR / page reload keeps us in the editor
-        try {
-          if (typeof window !== 'undefined' && window.location.hash !== '#editor') {
-            // Use replaceState to avoid creating extra history entries during normal opens
-            history.replaceState(null, '', '#editor');
-          }
-        } catch {
-          // ignore
-        }
-        const host = this.renderRoot.querySelector<HTMLDivElement>('.layout-host');
-        if (host && !this.shellReady) {
-          void this.layoutManager.initialize(host).then(async () => {
+      // We now initialize layout unconditionally or when ready
+      const host = this.renderRoot.querySelector<HTMLDivElement>('.layout-host');
+      if (host && !this.shellReady) {
+        void this.layoutManager.initialize(host).then(async () => {
             this.shellReady = true;
             this.requestUpdate();
 
@@ -397,7 +395,6 @@ export class Pix3EditorShell extends ComponentBase {
             }
           });
         }
-      }
     });
 
     // Subscribe to scene descriptor changes to start/stop file watching
@@ -412,18 +409,31 @@ export class Pix3EditorShell extends ComponentBase {
     // If the app was reloaded (HMR) and the URL indicates the editor, try to auto-open
     // the most recent project so the shell will initialize and avoid showing the welcome UI.
     try {
-      if (typeof window !== 'undefined' && window.location.hash === '#editor') {
+      if (typeof window !== 'undefined' && window.location.hash === '') {
+         // Default to editor if no hash is set
+         window.location.hash = '#editor';
+      }
+
+      const isEditor = window.location.hash.startsWith('#editor');
+      if (typeof window !== 'undefined' && isEditor) {
+        const { currentParams } = appState.router;
+        const noTargetFound = !currentParams.projectId && !currentParams.localSessionId;
+
         // If a project is not already open, attempt to open the most recent one (best-effort).
-        if (!detectCollabJoinParams() && appState.project.status !== 'ready') {
+        if (noTargetFound && appState.project.status !== 'ready') {
           const recents = this.projectService.getRecentProjects();
           const preferredRecent =
             recents.find(entry => entry.backend === 'local') ??
             (this.isAuthenticated ? recents[0] : null);
+            
           if (preferredRecent) {
             // Don't block the UI; attempt to open the most recent project in background.
             void this.projectService.openRecentProject(preferredRecent).catch(() => {
-              // If auto-open fails (permission denied or no handle), we'll keep showing welcome.
+              // If auto-open fails (permission denied or no handle), redirect to welcome.
+              window.location.hash = '#welcome';
             });
+          } else {
+             window.location.hash = '#welcome';
           }
         }
       }
@@ -431,7 +441,8 @@ export class Pix3EditorShell extends ComponentBase {
       // ignore environment where window/history isn't available
     }
 
-    void this.tryJoinSharedSessionFromUrl();
+    // Check if we already have target params locally wait for router to naturally take over
+    // if not, it will just drop into the empty screen below.
 
     // Listen for the welcome component signaling that project is ready so
     // the shell can remove it from the DOM and proceed with layout initialization.
@@ -733,70 +744,59 @@ export class Pix3EditorShell extends ComponentBase {
     await this.projectLifecycleService.logout();
   };
 
-  private async tryJoinSharedSessionFromUrl(): Promise<void> {
-    if (this.attemptedCollabJoin) {
-      return;
-    }
 
-    const params = detectCollabJoinParams();
-    if (!params) {
-      return;
-    }
-
-    this.attemptedCollabJoin = true;
-
-    this.pendingCollabJoin = params;
-    this.requestUpdate();
-    void this.startPendingCollabJoin();
-  }
-
-  private async startPendingCollabJoin(): Promise<void> {
-    if (!this.pendingCollabJoin || this.isJoiningCollab) {
-      return;
-    }
-
-    this.isJoiningCollab = true;
-
-    try {
-      await this.collabJoinService.joinSession(this.pendingCollabJoin);
-      this.pendingCollabJoin = null;
-    } catch (error) {
-      console.error('[Pix3EditorShell] Failed to join shared session', error);
-      appState.project.status = 'error';
-      appState.project.errorMessage =
-        error instanceof Error ? error.message : 'Failed to join shared session';
-    } finally {
-      this.isJoiningCollab = false;
-    }
-  }
 
   private renderWorkspaceOverlay() {
-    if (this.pendingCollabJoin) {
+    if (window.location.hash === '#welcome') {
+      return html` <pix3-welcome @pix3-auth:request=${this.onAuthRequest}></pix3-welcome> `;
+    }
+
+    if (this.routerStatus !== 'idle') {
+      let title = "Connecting to Workspace";
+      let message = "Pix3 is loading your project setup...";
+
+      if (this.routerStatus === 'reactivationRequired') {
+        return html`
+          <div class="collab-join-overlay">
+            <div class="collab-join-card">
+              <div class="collab-join-eyebrow">Local Project Backup</div>
+              <h2 class="collab-join-title">Reactivate Project Access</h2>
+              <p class="collab-join-copy">
+                The browser requires permission to resume reading this local project folder.
+              </p>
+              <button class="primary-button" @click=${() => this.routerService.reactivateLocalSession()}>
+                Restore Access
+              </button>
+            </div>
+          </div>
+        `;
+      }
+
+      if (this.routerStatus === 'loadingAssets') {
+         title = "Loading project data";
+         message = "Assets and scene hierarchies are being synchronized.";
+      } else if (this.routerStatus === 'fetchingMetadata') {
+         title = "Negotiating connection";
+         message = "Establishing handshake and verifying access.";
+      } else if (this.routerStatus === 'error') {
+         title = "Connection Failed";
+         message = appState.router.errorMessage ?? "An unknown error occurred.";
+      }
+
       return html`
         <div class="collab-join-overlay">
           <div class="collab-join-card">
-            <div class="collab-join-eyebrow">Shared Project</div>
-            <h2 class="collab-join-title">Opening collaborative session</h2>
-            <p class="collab-join-copy">
-              Pix3 is loading the shared cloud project, assets, and live scene now.
-            </p>
-            <div class="collab-join-meta">
-              <span>Project: ${this.pendingCollabJoin.projectId}</span>
-              <span>Scene: ${this.pendingCollabJoin.sceneId}</span>
-            </div>
-            ${this.isJoiningCollab
-              ? html`<div class="loading-label">Connecting to shared workspace...</div>`
-              : html``}
+            <div class="collab-join-eyebrow">Pix3 Workspace</div>
+            <h2 class="collab-join-title">${title}</h2>
+            <p class="collab-join-copy">${message}</p>
+            ${this.routerStatus !== 'error' ? html`<div class="loading-label">Please wait...</div>` : html`<div class="error-label">${message}</div>`}
           </div>
         </div>
       `;
     }
 
-    if (appState.project.status === 'ready' && this.isLayoutReady) {
-      return html``;
-    }
-
-    return html` <pix3-welcome @pix3-auth:request=${this.onAuthRequest}></pix3-welcome> `;
+    // Default to editor mode, we no longer render welcome fallback here
+    return html``;
   }
 
   private renderAuthModal() {
@@ -811,7 +811,12 @@ export class Pix3EditorShell extends ComponentBase {
             variant="modal"
             show-close
             @pix3-auth:close=${this.closeAuthModal}
-            @pix3-auth:success=${() => void this.onAuthSuccess()}
+            @pix3-auth:success=${async () => {
+               await this.onAuthSuccess();
+               if (appState.router.targetParams) {
+                  await this.routerService.resumeTargetSession();
+               }
+            }}
           ></pix3-auth-screen>
         </div>
       </div>

@@ -60,7 +60,7 @@ export class ProjectService {
         .map(p => ({
           id: p.id,
           name: p.name,
-          backend: p.backend === 'cloud' ? 'cloud' : 'local',
+          backend: p.backend === 'cloud' ? 'cloud' : ('local' as const),
           localAbsolutePath: p.localAbsolutePath,
           lastOpenedAt: typeof p.lastOpenedAt === 'number' ? p.lastOpenedAt : 0,
         }))
@@ -274,6 +274,79 @@ export class ProjectService {
 
     // fallback to picker which will create a new persisted mapping
     await this.openProjectViaPicker();
+  }
+
+  /**
+   * Directly open a local session by ID, returning false instead of falling back to picker
+   * if permissions have been dropped (used by Router/Deep Linking)
+   */
+  async openLocalSession(sessionId: string): Promise<boolean> {
+    const handle = await this.getHandleFromIndexedDB(sessionId);
+    if (!handle) {
+      throw new Error('Local session not found in IndexedDB.');
+    }
+
+    try {
+      // With 'silent' request it only checks if we have permission.
+      // Wait, ensurePermission in FileSystemAPIService might prompt. 
+      // Let's assume it checks first, and if it prompts without user gesture it will throw.
+      await this.fs.ensurePermission(handle, 'readwrite');
+      
+      this.fs.setProjectDirectory(handle);
+      appState.project.id = sessionId;
+      appState.project.backend = 'local';
+      appState.project.directoryHandle = handle;
+      appState.project.projectName = handle.name;
+      appState.project.status = 'ready';
+      appState.project.errorMessage = null;
+      appState.project.manifest = await this.loadProjectManifest();
+      
+      const recents = this.getRecentProjects();
+      const existing = recents.find(r => r.id === sessionId);
+      if (existing) {
+         this.addRecentProject({
+           ...existing,
+           lastOpenedAt: Date.now(),
+         });
+      }
+
+      return true;
+    } catch {
+       // Silent permission denied (or missing user gesture)
+       appState.project.directoryHandle = handle;
+       appState.project.id = sessionId;
+       appState.project.projectName = handle.name;
+       return false;
+    }
+  }
+
+  async reactivateLocalSession(sessionId: string): Promise<boolean> {
+     const handle = appState.project.directoryHandle;
+     if (!handle) return false;
+
+     try {
+       // This call is usually tied to a user gesture, so the browser prompt can appear.
+       await this.fs.ensurePermission(handle, 'readwrite');
+       
+       this.fs.setProjectDirectory(handle);
+       appState.project.backend = 'local';
+       appState.project.status = 'ready';
+       appState.project.errorMessage = null;
+       appState.project.manifest = await this.loadProjectManifest();
+
+       const recents = this.getRecentProjects();
+       const existing = recents.find(r => r.id === sessionId);
+       if (existing) {
+          this.addRecentProject({
+            ...existing,
+            lastOpenedAt: Date.now(),
+          });
+       }
+
+       return true;
+     } catch {
+       return false;
+     }
   }
 
   private saveHandleToIndexedDB(id: string, handle: FileSystemDirectoryHandle): Promise<void> {
