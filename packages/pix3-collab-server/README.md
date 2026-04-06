@@ -9,16 +9,16 @@
 - **Персистентность**: Сохранение состояния сцен в SQLite.
 - **Управление ассетами**: HTTP API для загрузки и раздачи файлов (модели, текстуры, звуки).
 - **Многопользовательские комнаты**: Изолированные сессии редактирования на основе ID проекта.
+- **Единый порт**: HTTP API и WebSocket collaboration endpoint работают через один `http.Server`.
 
 ## Структура проекта
 
 ```text
 packages/pix3-collab-server/
 ├── data/               # База данных SQLite (состояние сцен, пользователи, проекты)
-├── projects/           # Хранилище загруженных ассетов по проектам
 └── src/
     ├── index.ts        # Точка входа, загрузка окружения
-    ├── server.ts       # Инициализация Hocuspocus и Express серверов
+    ├── server.ts       # Инициализация единого HTTP + WebSocket сервера
     ├── config.ts       # Конфигурация через переменные окружения
     ├── core/           # Модули бизнес-логики (auth, projects, storage, admin)
     └── sync/           # Интеграция Hocuspocus для синхронизации Yjs
@@ -27,26 +27,43 @@ packages/pix3-collab-server/
 ## Принцип работы
 
 ### 1. Синхронизация состояния (WebSocket)
-Сервер использует **Hocuspocus** (обертка над Yjs) для управления WebSocket-соединениями (`WS_PORT`). 
+Сервер использует **Hocuspocus** (обертка над Yjs) для управления WebSocket-соединениями на пути `/collaboration`.
 Каждый проект открывается в отдельной "комнате" (`documentName`). Изменения, вносимые клиентами, объединяются сервером и рассылаются остальным участникам. Состояние комнаты сохраняется в SQLite.
 
 ### 2. HTTP API (Express)
-Помимо WebSocket, работает Express-сервер (`HTTP_PORT`), предоставляющий REST API:
+Тот же HTTP-сервер предоставляет REST API:
 - `/api/auth` — Аутентификация, токены.
 - `/api/projects` — Управление проектами и списками файлов.
 - `/api/projects` (storageRouter) — Загрузка и скачивание ассетов.
 - `/api/admin` — Административные маршруты.
 
-## Настройка
+### 3. Reverse proxy
+В production `nginx` проксирует и обычные HTTP-запросы, и WebSocket upgrade-запросы на `127.0.0.1:4001`.
+
+## Локальная настройка
 
 Настройки задаются через `.env` файл или переменные окружения:
 
-- `WS_PORT`: Порт для WebSocket (по умолчанию 4000)
-- `HTTP_PORT`: Порт для HTTP API (по умолчанию 4001)
-- `SQLITE_PATH`: Путь к файлу БД SQLite (по умолчанию `./data/pix3.db`)
-- `PROJECTS_STORAGE_DIR`: Путь к директории с проектами/ассетами (по умолчанию `./projects`)
+- `PORT`: Единый порт для HTTP API и WebSocket (по умолчанию `4001`)
+- `COLLABORATION_PATH`: WebSocket endpoint для Hocuspocus (по умолчанию `/collaboration`)
+- `DB_PATH`: Путь к основной SQLite БД (по умолчанию `./data/core.sqlite`)
+- `HOCUSPOCUS_DB_PATH`: Путь к SQLite БД для CRDT-состояния (по умолчанию `./data/crdt.sqlite`)
+- `PROJECTS_STORAGE_DIR`: Путь к директории с проектами и ассетами (по умолчанию `./data/projects`)
 - `JWT_SECRET`: Секретный ключ для JWT-токенов
+- `PASSWORD_SALT_ROUNDS`: Число раундов bcrypt (по умолчанию `10`)
 - И другие параметры (см. `src/config.ts`)
+
+Пример `.env`:
+
+```bash
+PORT=4001
+COLLABORATION_PATH=/collaboration
+DB_PATH=./data/core.sqlite
+HOCUSPOCUS_DB_PATH=./data/crdt.sqlite
+PROJECTS_STORAGE_DIR=./data/projects
+JWT_SECRET=replace-me
+PASSWORD_SALT_ROUNDS=10
+```
 
 ## Запуск
 
@@ -62,4 +79,147 @@ npm run build --workspace=@pix3/collab-server
 
 # Продакшн запуск
 npm start --workspace=@pix3/collab-server
+```
+
+## Deploy на `cloud.pix3.dev`
+
+### Что делает GitHub Action
+
+Workflow `.github/workflows/deploy-collab-server.yml`:
+
+- запускается при `push` в `main` для изменений backend-сервера и вручную через `workflow_dispatch`;
+- собирает `@pix3/collab-server`;
+- упаковывает `dist/`, `package.json` и `src/admin/index.html`;
+- загружает релиз на `cloud.pix3.dev` по SSH;
+- раскладывает релиз в `${DEPLOY_PATH}/releases/<sha>`;
+- привязывает `shared/.env` и `shared/data`;
+- выполняет `npm install --omit=dev`;
+- переключает `${DEPLOY_PATH}/current` на новый релиз;
+- перезапускает `systemd`-сервис `pix3-collab-server`.
+
+### GitHub Secrets
+
+Для workflow нужно завести secrets:
+
+- `COLLAB_DEPLOY_USER`: SSH-пользователь на `cloud.pix3.dev`
+- `COLLAB_DEPLOY_SSH_KEY`: приватный SSH-ключ для этого пользователя
+- `COLLAB_DEPLOY_PATH`: корневая директория деплоя, например `/opt/pix3-collab-server`
+- `COLLAB_DEPLOY_PORT`: SSH-порт, обычно `22`
+
+### Подготовка сервера
+
+На `cloud.pix3.dev` нужно один раз подготовить runtime-окружение.
+
+1. Установить Node.js 20 и проверить путь к бинарнику:
+
+```bash
+node -v
+which node
+```
+
+2. Создать директории для релизов и shared-данных:
+
+```bash
+sudo mkdir -p /opt/pix3-collab-server/releases
+sudo mkdir -p /opt/pix3-collab-server/shared/data
+sudo chown -R deploy:deploy /opt/pix3-collab-server
+```
+
+3. Создать production `.env`:
+
+```bash
+cat >/opt/pix3-collab-server/shared/.env <<'EOF'
+PORT=4001
+COLLABORATION_PATH=/collaboration
+DB_PATH=./data/core.sqlite
+HOCUSPOCUS_DB_PATH=./data/crdt.sqlite
+PROJECTS_STORAGE_DIR=./data/projects
+JWT_SECRET=replace-with-strong-secret
+PASSWORD_SALT_ROUNDS=10
+EOF
+```
+
+4. Создать `systemd` unit `/etc/systemd/system/pix3-collab-server.service`:
+
+```ini
+[Unit]
+Description=Pix3 Collaboration Server
+After=network.target
+
+[Service]
+Type=simple
+User=deploy
+WorkingDirectory=/opt/pix3-collab-server/current
+Environment=NODE_ENV=production
+EnvironmentFile=/opt/pix3-collab-server/shared/.env
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Если `node` находится не в `/usr/bin/node`, подставьте путь из `which node`.
+
+5. Разрешить deploy-пользователю перезапускать сервис без пароля:
+
+```bash
+sudo visudo -f /etc/sudoers.d/pix3-collab-server
+```
+
+Добавить строку:
+
+```text
+deploy ALL=NOPASSWD: /bin/systemctl restart pix3-collab-server, /bin/systemctl status pix3-collab-server
+```
+
+6. Активировать сервис:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable pix3-collab-server
+sudo systemctl start pix3-collab-server
+sudo systemctl status pix3-collab-server
+```
+
+### Проверка nginx
+
+Так как `nginx` уже настроен как reverse proxy на `127.0.0.1:4001`, нужно только убедиться, что он пропускает WebSocket upgrade для `/collaboration`.
+
+Минимально должно быть эквивалентно такой конфигурации:
+
+```nginx
+location / {
+    proxy_pass http://127.0.0.1:4001;
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+
+location /collaboration {
+    proxy_pass http://127.0.0.1:4001;
+    proxy_http_version 1.1;
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+    proxy_set_header Host $host;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+}
+```
+
+### Smoke checks после деплоя
+
+После первого запуска проверьте:
+
+```bash
+curl http://127.0.0.1:4001/health
+sudo systemctl status pix3-collab-server
+journalctl -u pix3-collab-server -n 100 --no-pager
+```
+
+Ожидаемый health-check:
+
+```json
+{"status":"ok","port":4001}
 ```

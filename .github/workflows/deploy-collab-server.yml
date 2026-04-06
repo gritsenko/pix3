@@ -1,0 +1,113 @@
+name: Deploy Collab Server
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/deploy-collab-server.yml'
+      - 'packages/pix3-collab-server/**'
+      - 'package-lock.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-collab-server-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Build and deploy collab backend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: production
+
+    env:
+      DEPLOY_HOST: cloud.pix3.dev
+      DEPLOY_PORT: ${{ secrets.COLLAB_DEPLOY_PORT }}
+      DEPLOY_USER: ${{ secrets.COLLAB_DEPLOY_USER }}
+      DEPLOY_PATH: ${{ secrets.COLLAB_DEPLOY_PATH }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build collab server
+        run: npm run build -w packages/pix3-collab-server
+
+      - name: Prepare release bundle
+        run: |
+          set -euo pipefail
+          RELEASE_DIR=".deploy/pix3-collab-server"
+          rm -rf "$RELEASE_DIR"
+          mkdir -p "$RELEASE_DIR/dist" "$RELEASE_DIR/src/admin"
+
+          cp -R packages/pix3-collab-server/dist/. "$RELEASE_DIR/dist/"
+          cp packages/pix3-collab-server/package.json "$RELEASE_DIR/package.json"
+          cp packages/pix3-collab-server/src/admin/index.html "$RELEASE_DIR/src/admin/index.html"
+
+          tar -C .deploy -czf .deploy/pix3-collab-server.tar.gz pix3-collab-server
+
+      - name: Configure SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.COLLAB_DEPLOY_SSH_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          ssh-keyscan -p "${DEPLOY_PORT:-22}" -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+
+      - name: Upload release bundle
+        run: |
+          set -euo pipefail
+          scp -P "${DEPLOY_PORT:-22}" .deploy/pix3-collab-server.tar.gz \
+            "${DEPLOY_USER}@${DEPLOY_HOST}:/tmp/pix3-collab-server-${GITHUB_SHA}.tar.gz"
+
+      - name: Deploy release on server
+        run: |
+          set -euo pipefail
+          ssh -p "${DEPLOY_PORT:-22}" "${DEPLOY_USER}@${DEPLOY_HOST}" \
+            "DEPLOY_ROOT='${DEPLOY_PATH}' RELEASE_SHA='${GITHUB_SHA}' bash -s" <<'EOF'
+          set -euo pipefail
+
+          RELEASE_DIR="${DEPLOY_ROOT}/releases/${RELEASE_SHA}"
+          SHARED_DIR="${DEPLOY_ROOT}/shared"
+          ARCHIVE_PATH="/tmp/pix3-collab-server-${RELEASE_SHA}.tar.gz"
+
+          mkdir -p "${DEPLOY_ROOT}/releases" "${SHARED_DIR}/data"
+          rm -rf "${RELEASE_DIR}"
+          mkdir -p "${RELEASE_DIR}"
+
+          tar -xzf "${ARCHIVE_PATH}" -C "${RELEASE_DIR}" --strip-components=1
+          rm -f "${ARCHIVE_PATH}"
+
+          if [ ! -f "${SHARED_DIR}/.env" ]; then
+            echo "Missing ${SHARED_DIR}/.env on remote host" >&2
+            exit 1
+          fi
+
+          rm -rf "${RELEASE_DIR}/data"
+          ln -sfn "${SHARED_DIR}/data" "${RELEASE_DIR}/data"
+          ln -sfn "${SHARED_DIR}/.env" "${RELEASE_DIR}/.env"
+
+          cd "${RELEASE_DIR}"
+          npm install --omit=dev
+
+          ln -sfn "${RELEASE_DIR}" "${DEPLOY_ROOT}/current"
+
+          sudo -n systemctl restart pix3-collab-server
+          sudo -n systemctl --no-pager --full status pix3-collab-server | head -n 20
+
+          ls -1dt "${DEPLOY_ROOT}"/releases/* | tail -n +6 | xargs -r rm -rf
+          EOF
