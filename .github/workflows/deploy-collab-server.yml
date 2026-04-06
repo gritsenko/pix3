@@ -34,10 +34,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Use Node.js 20
+      - name: Use Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       - name: Install dependencies
@@ -55,6 +55,7 @@ jobs:
 
           cp -R packages/pix3-collab-server/dist/. "$RELEASE_DIR/dist/"
           cp packages/pix3-collab-server/package.json "$RELEASE_DIR/package.json"
+          cp package-lock.json "$RELEASE_DIR/package-lock.json"
           cp packages/pix3-collab-server/src/admin/index.html "$RELEASE_DIR/src/admin/index.html"
 
           tar -C .deploy -czf .deploy/pix3-collab-server.tar.gz pix3-collab-server
@@ -102,12 +103,13 @@ jobs:
           ln -sfn "${SHARED_DIR}/.env" "${RELEASE_DIR}/.env"
 
           cd "${RELEASE_DIR}"
-          npm install --omit=dev
+          npm ci --omit=dev
 
           ln -sfn "${RELEASE_DIR}" "${DEPLOY_ROOT}/current"
 
-          sudo -n systemctl restart pix3-collab-server
-          sudo -n systemctl --no-pager --full status pix3-collab-server | head -n 20
+          export XDG_RUNTIME_DIR="/run/user/$(id -u)"
+          systemctl --user restart pix3-collab-server
+          systemctl --user --no-pager --full status pix3-collab-server | head -n 20
 
           ls -1dt "${DEPLOY_ROOT}"/releases/* | tail -n +6 | xargs -r rm -rf
           EOF

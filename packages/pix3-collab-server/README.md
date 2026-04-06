@@ -89,11 +89,11 @@ Workflow `.github/workflows/deploy-collab-server.yml`:
 
 - запускается при `push` в `main` для изменений backend-сервера и вручную через `workflow_dispatch`;
 - собирает `@pix3/collab-server`;
-- упаковывает `dist/`, `package.json` и `src/admin/index.html`;
+- упаковывает `dist/`, `package.json`, `package-lock.json` и `src/admin/index.html`;
 - загружает релиз на `cloud.pix3.dev` по SSH;
 - раскладывает релиз в `${DEPLOY_PATH}/releases/<sha>`;
 - привязывает `shared/.env` и `shared/data`;
-- выполняет `npm install --omit=dev`;
+- выполняет `npm ci --omit=dev`;
 - переключает `${DEPLOY_PATH}/current` на новый релиз;
 - перезапускает `systemd`-сервис `pix3-collab-server`.
 
@@ -110,7 +110,7 @@ Workflow `.github/workflows/deploy-collab-server.yml`:
 
 На `cloud.pix3.dev` нужно один раз подготовить runtime-окружение.
 
-1. Установить Node.js 20 и проверить путь к бинарнику:
+1. Установить Node.js `24.14.1` и проверить путь к бинарнику:
 
 ```bash
 node -v
@@ -139,7 +139,7 @@ PASSWORD_SALT_ROUNDS=10
 EOF
 ```
 
-4. Создать `systemd` unit `/etc/systemd/system/pix3-collab-server.service`:
+4. Создать user-level `systemd` unit `~/.config/systemd/user/pix3-collab-server.service`:
 
 ```ini
 [Unit]
@@ -148,7 +148,6 @@ After=network.target
 
 [Service]
 Type=simple
-User=deploy
 WorkingDirectory=/opt/pix3-collab-server/current
 Environment=NODE_ENV=production
 EnvironmentFile=/opt/pix3-collab-server/shared/.env
@@ -157,30 +156,25 @@ Restart=always
 RestartSec=5
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 ```
 
 Если `node` находится не в `/usr/bin/node`, подставьте путь из `which node`.
 
-5. Разрешить deploy-пользователю перезапускать сервис без пароля:
+5. Включить lingering для deploy-пользователя, чтобы `systemctl --user` работал без активной интерактивной сессии:
 
 ```bash
-sudo visudo -f /etc/sudoers.d/pix3-collab-server
-```
-
-Добавить строку:
-
-```text
-deploy ALL=NOPASSWD: /bin/systemctl restart pix3-collab-server, /bin/systemctl status pix3-collab-server
+sudo loginctl enable-linger deploy
 ```
 
 6. Активировать сервис:
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable pix3-collab-server
-sudo systemctl start pix3-collab-server
-sudo systemctl status pix3-collab-server
+mkdir -p ~/.config/systemd/user
+systemctl --user daemon-reload
+systemctl --user enable pix3-collab-server
+systemctl --user start pix3-collab-server
+systemctl --user status pix3-collab-server
 ```
 
 ### Проверка nginx
@@ -214,8 +208,8 @@ location /collaboration {
 
 ```bash
 curl http://127.0.0.1:4001/health
-sudo systemctl status pix3-collab-server
-journalctl -u pix3-collab-server -n 100 --no-pager
+systemctl --user status pix3-collab-server
+journalctl --user -u pix3-collab-server -n 100 --no-pager
 ```
 
 Ожидаемый health-check:
