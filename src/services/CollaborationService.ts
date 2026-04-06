@@ -36,6 +36,16 @@ export class CollaborationService {
   /** Flag to prevent echo loop: set to true when processing remote updates */
   isRemoteUpdate = false;
 
+  private getServerBaseUrlInternal(): string {
+    return import.meta.env.VITE_COLLAB_SERVER_URL || 'http://localhost:4001';
+  }
+
+  private getWebSocketUrl(): string {
+    const wsUrl = new URL('/collaboration', this.getServerBaseUrlInternal());
+    wsUrl.protocol = wsUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+    return wsUrl.toString();
+  }
+
   connect(
     projectId: string,
     _sceneId: string,
@@ -69,9 +79,8 @@ export class CollaborationService {
     const token = options.tokenOverride ?? appState.auth.user?.token ?? '';
 
     // Server synchronization
-    const wsUrl = import.meta.env.VITE_COLLAB_WS_URL || 'ws://localhost:4000';
     this.provider = new HocuspocusProvider({
-      url: wsUrl,
+      url: this.getWebSocketUrl(),
       name: roomName,
       document: this.ydoc,
       token,
@@ -160,7 +169,7 @@ export class CollaborationService {
   }
 
   getServerBaseUrl(): string {
-    return import.meta.env.VITE_COLLAB_HTTP_URL || 'http://localhost:4001';
+    return this.getServerBaseUrlInternal();
   }
 
   isReadOnlySession(): boolean {

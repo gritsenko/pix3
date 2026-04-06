@@ -1,3 +1,5 @@
+import { createServer, type IncomingMessage } from 'node:http';
+import type { Socket } from 'node:net';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
@@ -11,7 +13,31 @@ import { storageRouter } from './core/storage/storage-router.js';
 import { adminRouter } from './core/admin/admin-router.js';
 import { createHocuspocusServer } from './sync/hocuspocus.js';
 
-export function startServer(): void {
+function isCollaborationUpgrade(request: IncomingMessage): boolean {
+  const requestUrl = request.url ?? '';
+  return requestUrl === config.COLLABORATION_PATH
+    || requestUrl.startsWith(`${config.COLLABORATION_PATH}?`);
+}
+
+function closeUpgradeSocket(socket: Socket): void {
+  socket.write('HTTP/1.1 404 Not Found\r\n\r\n');
+  socket.destroy();
+}
+
+function closeHttpServer(server: ReturnType<typeof createServer>): Promise<void> {
+  return new Promise((resolve, reject) => {
+    server.close(error => {
+      if (error) {
+        reject(error);
+        return;
+      }
+
+      resolve();
+    });
+  });
+}
+
+export async function startServer(): Promise<void> {
   // Initialize database
   initDb();
   console.log('[pix3-collab] Database initialized');
@@ -19,12 +45,6 @@ export function startServer(): void {
   // Ensure projects storage directory exists
   fs.mkdirSync(path.resolve(config.PROJECTS_STORAGE_DIR), { recursive: true });
 
-  // --- Hocuspocus WebSocket Server ---
-  const hocuspocus = createHocuspocusServer();
-  hocuspocus.listen();
-  console.log(`[pix3-collab] WebSocket server listening on port ${config.WS_PORT}`);
-
-  // --- Express HTTP Server ---
   const app = express();
   app.use(cookieParser());
   app.use(cors({
@@ -57,10 +77,66 @@ export function startServer(): void {
 
   // Health check
   app.get('/health', (_req, res) => {
-    res.json({ status: 'ok', wsPort: config.WS_PORT });
+    res.json({ status: 'ok', port: config.PORT });
   });
 
-  app.listen(config.HTTP_PORT, () => {
-    console.log(`[pix3-collab] HTTP server listening on port ${config.HTTP_PORT}`);
+  const hocuspocus = createHocuspocusServer();
+  const server = createServer(app);
+
+  server.on('upgrade', async (request: IncomingMessage, socket: Socket, head: Buffer) => {
+    const requestUrl = request.url ?? '';
+    console.log(`[pix3-collab] Upgrade request: ${requestUrl}`);
+
+    if (!isCollaborationUpgrade(request)) {
+      console.log(`[pix3-collab] Rejected upgrade for ${requestUrl}`);
+      closeUpgradeSocket(socket);
+      return;
+    }
+
+    try {
+      await hocuspocus.handleUpgrade(request, socket, head);
+    } catch (error) {
+      console.error(`[pix3-collab] Failed to upgrade ${requestUrl}`, error);
+      socket.destroy();
+    }
+  });
+
+  console.log(`[pix3-collab] Collaboration WS attached on ${config.COLLABORATION_PATH}`);
+
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(config.PORT, () => {
+      server.off('error', reject);
+      console.log(`[pix3-collab] HTTP server listening on port ${config.PORT}`);
+      resolve();
+    });
+  });
+
+  let shuttingDown = false;
+  const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
+    if (shuttingDown) {
+      return;
+    }
+
+    shuttingDown = true;
+    console.log(`[pix3-collab] Received ${signal}, starting graceful shutdown`);
+
+    try {
+      await closeHttpServer(server);
+      console.log('[pix3-collab] HTTP server closed');
+      await hocuspocus.destroy();
+      console.log('[pix3-collab] Collaboration server closed');
+      process.exit(0);
+    } catch (error) {
+      console.error('[pix3-collab] Graceful shutdown failed', error);
+      process.exit(1);
+    }
+  };
+
+  process.once('SIGINT', () => {
+    void shutdown('SIGINT');
+  });
+  process.once('SIGTERM', () => {
+    void shutdown('SIGTERM');
   });
 }

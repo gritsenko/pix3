@@ -53,7 +53,7 @@ root:
           initiallyVisible: true
           visible: true
           transform:
-            position: [1.9725694673576384, 0.7882598138295052, 2.011439183439994]
+            position: [1.9725694673576384, 0.7882598138295052, 0.6374746939959075]
             rotationEuler: [0, 45, 0]
             scale: [1, 1, 1]
         children: []

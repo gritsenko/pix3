@@ -1,4 +1,4 @@
-const BASE_URL = import.meta.env.VITE_COLLAB_HTTP_URL || 'http://localhost:4001';
+const BASE_URL = import.meta.env.VITE_COLLAB_SERVER_URL || 'http://localhost:4001';
 
 export interface ApiUser {
   id: string;

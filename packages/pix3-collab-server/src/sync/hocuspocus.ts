@@ -1,19 +1,27 @@
 import { Server, Hocuspocus } from '@hocuspocus/server';
+import type { IncomingMessage } from 'node:http';
+import type { Socket } from 'node:net';
 import { SQLite } from '@hocuspocus/extension-sqlite';
 import fs from 'fs';
 import path from 'path';
+import { WebSocketServer } from 'ws';
 import * as Y from 'yjs';
 import { config } from '../config.js';
 import { verifyToken } from '../core/auth/auth-middleware.js';
 import { getProjectByShareToken, getUserRole } from '../core/projects/projects-service.js';
 
-export function createHocuspocusServer(): Hocuspocus {
+export interface CollaborationServer {
+  instance: Hocuspocus;
+  handleUpgrade(request: IncomingMessage, socket: Socket, head: Buffer): Promise<void>;
+  destroy(): Promise<void>;
+}
+
+export function createHocuspocusServer(): CollaborationServer {
   // Ensure CRDT sqlite directory exists
   const crdtDir = path.dirname(path.resolve(config.HOCUSPOCUS_DB_PATH));
   fs.mkdirSync(crdtDir, { recursive: true });
 
-  return Server.configure({
-    port: config.WS_PORT,
+  const hocuspocus = Server.configure({
     extensions: [
       new SQLite({
         database: config.HOCUSPOCUS_DB_PATH,
@@ -120,17 +128,60 @@ export function createHocuspocusServer(): Hocuspocus {
       }
       reconcileFiles(scriptsDir, scriptFilePaths, '.ts');
 
-      console.log(`[collab] persisted snapshot for: ${documentName}`);
+      console.log(`[pix3-collab] Persisted snapshot for ${documentName}`);
     },
 
     async onConnect({ documentName }) {
-      console.log(`[collab] client connected to: ${documentName}`);
+      console.log(`[pix3-collab] Client connected to ${documentName}`);
     },
 
     async onDisconnect({ documentName }) {
-      console.log(`[collab] client disconnected from: ${documentName}`);
+      console.log(`[pix3-collab] Client disconnected from ${documentName}`);
     },
   });
+
+  const webSocketServer = new WebSocketServer({ noServer: true });
+  webSocketServer.on('connection', (incoming, request) => {
+    incoming.on('error', error => {
+      console.error('[pix3-collab] WebSocket connection error', error);
+    });
+
+    hocuspocus.handleConnection(incoming, request);
+  });
+
+  return {
+    instance: hocuspocus,
+    async handleUpgrade(request: IncomingMessage, socket: Socket, head: Buffer): Promise<void> {
+      await hocuspocus.hooks('onUpgrade', {
+        request,
+        socket,
+        head,
+        instance: hocuspocus,
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        webSocketServer.handleUpgrade(request, socket, head, ws => {
+          webSocketServer.emit('connection', ws, request);
+          resolve();
+        });
+
+        socket.once('error', reject);
+      });
+    },
+    async destroy(): Promise<void> {
+      hocuspocus.closeConnections();
+
+      await new Promise<void>(resolve => {
+        webSocketServer.close(() => {
+          resolve();
+        });
+      });
+
+      const documents = Array.from(hocuspocus.documents.values());
+      await Promise.all(documents.map(document => hocuspocus.unloadDocument(document)));
+      await hocuspocus.hooks('onDestroy', { instance: hocuspocus });
+    },
+  };
 }
 
 function loadScriptsRecursive(
