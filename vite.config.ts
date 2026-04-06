@@ -35,14 +35,6 @@ export default defineConfig({
     fs: {
       allow: ['..'],
     },
-    proxy: {
-      // Proxy WebSocket connections to the collab server
-      '/collab-ws': {
-        target: 'ws://localhost:4000',
-        ws: true,
-        rewrite: (path) => path.replace(/^\/collab-ws/, ''),
-      },
-    },
   },
   esbuild: {
     sourcemap: false,

@@ -1,0 +1,71 @@
+name: Deploy Editor to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/deploy-editor-pages.yml'
+      - 'src/**'
+      - 'public/**'
+      - 'packages/pix3-runtime/**'
+      - 'index.html'
+      - 'vite.config.ts'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'tsconfig.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: deploy-editor-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build editor
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      VITE_COLLAB_SERVER_URL: https://cloud.pix3.dev
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Use Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build editor bundle
+        run: npx vite build
+
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./dist
+
+  deploy:
+    name: Deploy editor
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

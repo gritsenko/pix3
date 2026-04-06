@@ -145,6 +145,25 @@ npm run dev
 
 Open the app at `http://localhost:5173`.
 
+## Deployment
+
+### Editor on GitHub Pages
+
+The editor is deployed by GitHub Actions via [`.github/workflows/deploy-editor-pages.yml`](/Users/igor.gritsenko/Projects/pix3/.github/workflows/deploy-editor-pages.yml).
+
+- Pushes to `main` that touch the editor build inputs trigger a production build.
+- The workflow builds the Vite app into `dist/` via `vite build`.
+- `dist/` is published to GitHub Pages.
+- The published site includes [public/CNAME](/Users/igor.gritsenko/Projects/pix3/public/CNAME), so GitHub Pages serves it under `editor.pix3.dev` once the DNS is configured.
+- The production frontend uses `VITE_COLLAB_SERVER_URL=https://cloud.pix3.dev`.
+
+To finish the custom domain setup:
+
+1. Enable GitHub Pages for the repository and set the source to GitHub Actions.
+2. Point `editor.pix3.dev` to GitHub Pages in DNS.
+3. Confirm that GitHub Pages shows `editor.pix3.dev` as the custom domain.
+4. After DNS propagates, push to `main` or run the workflow manually.
+
 ### Debugging (Chrome + MCP)
 
 1. Launch Chrome with remote debugging. The `.vscode/launch.json` config uses these flags.
