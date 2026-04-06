@@ -161,7 +161,7 @@ pix3-scene-tree-node {
   box-shadow: 0 10px 24px rgba(2, 6, 23, 0.65);
   padding: 8px 10px;
   border-radius: 6px;
-  z-index: 9999;
+  z-index: var(--pix3-z-popover);
   pointer-events: none;
 }
 

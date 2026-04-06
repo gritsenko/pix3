@@ -37,7 +37,6 @@ pix3-panel {
 
 .scene-tree-context-menu {
   position: relative;
-  z-index: 1200;
   min-width: 12rem;
   display: flex;
   flex-direction: column;

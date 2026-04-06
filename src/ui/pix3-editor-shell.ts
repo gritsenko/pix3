@@ -220,6 +220,7 @@ export class Pix3EditorShell extends ComponentBase {
   private watchedSceneIds = new Set<string>();
   private watchedScenePaths = new Map<string, string>();
   private tabsInitialized = false;
+  private isResumingRouterTarget = false;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -354,13 +355,33 @@ export class Pix3EditorShell extends ComponentBase {
 
     this.disposeAuthSubscription = subscribe(appState.auth, () => {
       this.isAuthenticated = appState.auth.isAuthenticated;
+      if (
+        this.isAuthenticated &&
+        appState.router.status === 'authenticating' &&
+        appState.router.targetParams &&
+        !this.isResumingRouterTarget
+      ) {
+        this.isResumingRouterTarget = true;
+        void this.routerService
+          .resumeTargetSession()
+          .catch(error => {
+            console.error(
+              '[Pix3EditorShell] Failed to resume routed session after auth restore',
+              error
+            );
+          })
+          .finally(() => {
+            this.isResumingRouterTarget = false;
+            this.requestUpdate();
+          });
+      }
       this.requestUpdate();
     });
 
     this.disposeSubscription = subscribe(appState.router, () => {
       this.routerStatus = appState.router.status;
       if (this.routerStatus === 'authenticating' && !this.isAuthModalOpen) {
-          this.openAuthModal();
+        this.openAuthModal();
       }
       this.requestUpdate();
     });
@@ -379,22 +400,22 @@ export class Pix3EditorShell extends ComponentBase {
       const host = this.renderRoot.querySelector<HTMLDivElement>('.layout-host');
       if (host && !this.shellReady) {
         void this.layoutManager.initialize(host).then(async () => {
-            this.shellReady = true;
-            this.requestUpdate();
+          this.shellReady = true;
+          this.requestUpdate();
 
-            // Restore previously open tabs from session storage.
-            if (!this.tabsInitialized) {
-              this.tabsInitialized = true;
+          // Restore previously open tabs from session storage.
+          if (!this.tabsInitialized) {
+            this.tabsInitialized = true;
 
-              if (appState.project.id) {
-                // Wait for project scripts to be compiled before restoring the session
-                // to ensure custom components are available in the ScriptRegistry.
-                await this.waitForScripts();
-                await this.editorTabService.restoreProjectSession(appState.project.id);
-              }
+            if (appState.project.id) {
+              // Wait for project scripts to be compiled before restoring the session
+              // to ensure custom components are available in the ScriptRegistry.
+              await this.waitForScripts();
+              await this.editorTabService.restoreProjectSession(appState.project.id);
             }
-          });
-        }
+          }
+        });
+      }
     });
 
     // Subscribe to scene descriptor changes to start/stop file watching
@@ -410,8 +431,8 @@ export class Pix3EditorShell extends ComponentBase {
     // the most recent project so the shell will initialize and avoid showing the welcome UI.
     try {
       if (typeof window !== 'undefined' && window.location.hash === '') {
-         // Default to editor if no hash is set
-         window.location.hash = '#editor';
+        // Default to editor if no hash is set
+        window.location.hash = '#editor';
       }
 
       const isEditor = window.location.hash.startsWith('#editor');
@@ -425,7 +446,7 @@ export class Pix3EditorShell extends ComponentBase {
           const preferredRecent =
             recents.find(entry => entry.backend === 'local') ??
             (this.isAuthenticated ? recents[0] : null);
-            
+
           if (preferredRecent) {
             // Don't block the UI; attempt to open the most recent project in background.
             void this.projectService.openRecentProject(preferredRecent).catch(() => {
@@ -433,7 +454,7 @@ export class Pix3EditorShell extends ComponentBase {
               window.location.hash = '#welcome';
             });
           } else {
-             window.location.hash = '#welcome';
+            window.location.hash = '#welcome';
           }
         }
       }
@@ -634,9 +655,9 @@ export class Pix3EditorShell extends ComponentBase {
         ${this.renderToolbar()}
         <div class="workspace" role="presentation">
           <div class="layout-host" role="application" aria-busy=${!this.isLayoutReady}></div>
-          ${this.renderWorkspaceOverlay()}
         </div>
         <pix3-status-bar></pix3-status-bar>
+        ${this.renderWorkspaceOverlay()}
         <pix3-share-dialog></pix3-share-dialog>
         ${this.renderAuthModal()} ${this.renderDialogHost()} ${this.renderPickerHost()}
         ${this.renderScriptCreatorHost()} ${this.renderProjectSettingsHost()}
@@ -744,16 +765,14 @@ export class Pix3EditorShell extends ComponentBase {
     await this.projectLifecycleService.logout();
   };
 
-
-
   private renderWorkspaceOverlay() {
     if (window.location.hash === '#welcome') {
       return html` <pix3-welcome @pix3-auth:request=${this.onAuthRequest}></pix3-welcome> `;
     }
 
     if (this.routerStatus !== 'idle') {
-      let title = "Connecting to Workspace";
-      let message = "Pix3 is loading your project setup...";
+      let title = 'Connecting to Workspace';
+      let message = 'Pix3 is loading your project setup...';
 
       if (this.routerStatus === 'reactivationRequired') {
         return html`
@@ -764,7 +783,10 @@ export class Pix3EditorShell extends ComponentBase {
               <p class="collab-join-copy">
                 The browser requires permission to resume reading this local project folder.
               </p>
-              <button class="primary-button" @click=${() => this.routerService.reactivateLocalSession()}>
+              <button
+                class="primary-button"
+                @click=${() => this.routerService.reactivateLocalSession()}
+              >
                 Restore Access
               </button>
             </div>
@@ -773,14 +795,14 @@ export class Pix3EditorShell extends ComponentBase {
       }
 
       if (this.routerStatus === 'loadingAssets') {
-         title = "Loading project data";
-         message = "Assets and scene hierarchies are being synchronized.";
+        title = 'Loading project data';
+        message = 'Assets and scene hierarchies are being synchronized.';
       } else if (this.routerStatus === 'fetchingMetadata') {
-         title = "Negotiating connection";
-         message = "Establishing handshake and verifying access.";
+        title = 'Negotiating connection';
+        message = 'Establishing handshake and verifying access.';
       } else if (this.routerStatus === 'error') {
-         title = "Connection Failed";
-         message = appState.router.errorMessage ?? "An unknown error occurred.";
+        title = 'Connection Failed';
+        message = appState.router.errorMessage ?? 'An unknown error occurred.';
       }
 
       return html`
@@ -789,7 +811,9 @@ export class Pix3EditorShell extends ComponentBase {
             <div class="collab-join-eyebrow">Pix3 Workspace</div>
             <h2 class="collab-join-title">${title}</h2>
             <p class="collab-join-copy">${message}</p>
-            ${this.routerStatus !== 'error' ? html`<div class="loading-label">Please wait...</div>` : html`<div class="error-label">${message}</div>`}
+            ${this.routerStatus !== 'error'
+              ? html`<div class="loading-label">Please wait...</div>`
+              : html`<div class="error-label">${message}</div>`}
           </div>
         </div>
       `;
@@ -812,10 +836,10 @@ export class Pix3EditorShell extends ComponentBase {
             show-close
             @pix3-auth:close=${this.closeAuthModal}
             @pix3-auth:success=${async () => {
-               await this.onAuthSuccess();
-               if (appState.router.targetParams) {
-                  await this.routerService.resumeTargetSession();
-               }
+              await this.onAuthSuccess();
+              if (appState.router.targetParams) {
+                await this.routerService.resumeTargetSession();
+              }
             }}
           ></pix3-auth-screen>
         </div>

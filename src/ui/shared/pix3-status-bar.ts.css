@@ -10,7 +10,6 @@ pix3-status-bar .status-bar {
   font-size: 0.75rem;
   font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
   backdrop-filter: blur(10px);
-  z-index: 1000;
 }
 
 pix3-status-bar .status-left {

@@ -61,7 +61,6 @@ collab-status-bar .collab-users-dropdown {
   border-radius: 4px;
   padding: 4px 0;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.3);
-  z-index: 1000;
 }
 
 collab-status-bar .collab-user-item {

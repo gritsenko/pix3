@@ -36,7 +36,6 @@
   backdrop-filter: blur(14px);
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   pointer-events: auto;
-  z-index: 10;
   flex-wrap: wrap;
 }
 

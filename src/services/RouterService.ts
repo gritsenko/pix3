@@ -1,9 +1,12 @@
 import { injectable, ServiceContainer } from '@/fw/di';
 import { appState, type RouteParams } from '@/state';
+import { SelectObjectCommand } from '@/features/selection/SelectObjectCommand';
+import { SceneManager } from '@pix3/runtime';
 import { subscribe } from 'valtio/vanilla';
 import { ProjectService } from './ProjectService';
 import { CollabJoinService } from './CollabJoinService';
 import { EditorTabService } from './EditorTabService';
+import { CommandDispatcher } from './CommandDispatcher';
 
 @injectable()
 export class RouterService {
@@ -94,7 +97,7 @@ export class RouterService {
         }
       } else if (!isCloud && projectId) {
         newParams.set('local', projectId);
-        // For local, we can theoretically set scene/select too, but let's stick to session ID for now, 
+        // For local, we can theoretically set scene/select too, but let's stick to session ID for now,
         // or add them if we want to deep-link into a local project's specific scene.
         if (sceneId) newParams.set('scene', sceneId);
       }
@@ -105,10 +108,10 @@ export class RouterService {
 
       const queryString = newParams.toString();
       const currentUrl = window.location.href;
-      
+
       let basePath = window.location.origin + window.location.pathname;
       let newUrl = basePath + '#editor';
-      
+
       if (queryString) {
         newUrl += '?' + queryString;
       }
@@ -137,20 +140,17 @@ export class RouterService {
     // Check if we are already in the correct project and scene
     if (params.projectId && appState.project.id === params.projectId) {
       if (params.sceneId && appState.scenes.activeSceneId !== params.sceneId) {
-         // Same cloud project, different scene
-         const editorTabService = ServiceContainer.getInstance().getService<EditorTabService>(
-           ServiceContainer.getInstance().getOrCreateToken(EditorTabService)
-         );
-         const sceneResourcePath = `collab://${params.sceneId}`;
-         appState.router.status = 'loadingAssets';
-         await editorTabService.openResourceTab('scene', sceneResourcePath);
+        // Same cloud project, different scene
+        const editorTabService = ServiceContainer.getInstance().getService<EditorTabService>(
+          ServiceContainer.getInstance().getOrCreateToken(EditorTabService)
+        );
+        const sceneResourcePath = `collab://${params.sceneId}`;
+        appState.router.status = 'loadingAssets';
+        await editorTabService.openResourceTab('scene', sceneResourcePath);
       }
 
-      if (params.nodeId && appState.selection.primaryNodeId !== params.nodeId) {
-         appState.selection.nodeIds = [params.nodeId];
-         appState.selection.primaryNodeId = params.nodeId;
-      }
-      
+      await this.applyRouteSelection(params.nodeId);
+
       appState.router.status = 'idle';
       return;
     }
@@ -159,20 +159,17 @@ export class RouterService {
       // Same local project
       // ... same logic for scene ... wait, local paths are res://...
       if (params.sceneId && appState.scenes.activeSceneId !== params.sceneId) {
-         // Try to find the local descriptor mapped to this scene ID
-         const targetId = params.sceneId;
-         const descriptor = appState.scenes.descriptors[targetId];
-         if (descriptor) {
-            const editorTabService = ServiceContainer.getInstance().getService<EditorTabService>(
-               ServiceContainer.getInstance().getOrCreateToken(EditorTabService)
-            );
-            await editorTabService.openResourceTab('scene', descriptor.filePath);
-         }
+        // Try to find the local descriptor mapped to this scene ID
+        const targetId = params.sceneId;
+        const descriptor = appState.scenes.descriptors[targetId];
+        if (descriptor) {
+          const editorTabService = ServiceContainer.getInstance().getService<EditorTabService>(
+            ServiceContainer.getInstance().getOrCreateToken(EditorTabService)
+          );
+          await editorTabService.openResourceTab('scene', descriptor.filePath);
+        }
       }
-      if (params.nodeId) {
-         appState.selection.nodeIds = [params.nodeId];
-         appState.selection.primaryNodeId = params.nodeId;
-      }
+      await this.applyRouteSelection(params.nodeId);
       appState.router.status = 'idle';
       return;
     }
@@ -200,7 +197,7 @@ export class RouterService {
     const target = appState.router.targetParams;
     appState.router.targetParams = null;
     if (target && target.projectId && target.sceneId) {
-       await this.joinCloudSession(target);
+      await this.joinCloudSession(target);
     }
   }
 
@@ -216,18 +213,16 @@ export class RouterService {
       );
 
       appState.router.status = 'loadingAssets';
-      
+
       const success = await collabJoinService.joinSession({
         projectId,
         sceneId,
-        shareToken: shareToken ?? undefined
+        shareToken: shareToken ?? undefined,
       });
 
-      if (success && nodeId) {
-         appState.selection.nodeIds = [nodeId];
-         appState.selection.primaryNodeId = nodeId;
+      if (success) {
+        await this.applyRouteSelection(nodeId);
       }
-
     } catch (error) {
       console.error('[RouterService] Cloud session join failed:', error);
       appState.router.status = 'error';
@@ -238,26 +233,56 @@ export class RouterService {
     appState.router.status = 'idle';
   }
 
+  private async applyRouteSelection(nodeId: string | null): Promise<void> {
+    if (!nodeId) {
+      return;
+    }
+
+    const activeSceneId = appState.scenes.activeSceneId;
+    if (!activeSceneId) {
+      return;
+    }
+
+    const container = ServiceContainer.getInstance();
+    const sceneManager = container.getService<SceneManager>(
+      container.getOrCreateToken(SceneManager)
+    );
+    const graph = sceneManager.getSceneGraph(activeSceneId);
+    if (!graph?.nodeMap.has(nodeId)) {
+      return;
+    }
+
+    if (appState.selection.primaryNodeId === nodeId && appState.selection.nodeIds.length === 1) {
+      return;
+    }
+
+    const commandDispatcher = container.getService<CommandDispatcher>(
+      container.getOrCreateToken(CommandDispatcher)
+    );
+    await commandDispatcher.execute(new SelectObjectCommand({ nodeId }));
+  }
+
   private async joinLocalSession(localSessionId: string): Promise<void> {
     appState.router.status = 'fetchingMetadata';
-    
+
     try {
       const projectService = ServiceContainer.getInstance().getService<ProjectService>(
         ServiceContainer.getInstance().getOrCreateToken(ProjectService)
       );
-      
+
       appState.router.status = 'loadingAssets';
       const success = await projectService.openLocalSession(localSessionId);
-      
+
       // If success is false, it means we found it but we lack permissions right now.
       if (!success) {
-         appState.router.status = 'reactivationRequired';
-         return;
+        appState.router.status = 'reactivationRequired';
+        return;
       }
     } catch (error) {
       console.error('[RouterService] Local session join failed:', error);
       appState.router.status = 'error';
-      appState.router.errorMessage = error instanceof Error ? error.message : 'Could not restore local project';
+      appState.router.errorMessage =
+        error instanceof Error ? error.message : 'Could not restore local project';
       return;
     }
 
@@ -268,27 +293,27 @@ export class RouterService {
    * Reactivate local session permissions using user gesture.
    */
   async reactivateLocalSession(): Promise<void> {
-     const localSessionId = appState.router.currentParams.localSessionId;
-     if (!localSessionId) return;
-     
-     // Called typically via a user click, so we can show file picker prompt.
-     appState.router.status = 'loadingAssets';
-     try {
-       const projectService = ServiceContainer.getInstance().getService<ProjectService>(
-         ServiceContainer.getInstance().getOrCreateToken(ProjectService)
-       );
-       const success = await projectService.reactivateLocalSession(localSessionId);
-       
-       if (success) {
-          appState.router.status = 'idle';
-       } else {
-          appState.router.status = 'error';
-          appState.router.errorMessage = 'Permission denied to restore project.';
-       }
-     } catch (err) {
-       console.error('[RouterService] Reactivation failed:', err);
-       appState.router.status = 'error';
-       appState.router.errorMessage = 'Reactivation failed.';
-     }
+    const localSessionId = appState.router.currentParams.localSessionId;
+    if (!localSessionId) return;
+
+    // Called typically via a user click, so we can show file picker prompt.
+    appState.router.status = 'loadingAssets';
+    try {
+      const projectService = ServiceContainer.getInstance().getService<ProjectService>(
+        ServiceContainer.getInstance().getOrCreateToken(ProjectService)
+      );
+      const success = await projectService.reactivateLocalSession(localSessionId);
+
+      if (success) {
+        appState.router.status = 'idle';
+      } else {
+        appState.router.status = 'error';
+        appState.router.errorMessage = 'Permission denied to restore project.';
+      }
+    } catch (err) {
+      console.error('[RouterService] Reactivation failed:', err);
+      appState.router.status = 'error';
+      appState.router.errorMessage = 'Reactivation failed.';
+    }
   }
 }
