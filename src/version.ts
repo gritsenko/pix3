@@ -7,7 +7,7 @@ export interface EditorVersionInfo {
 
 export const CURRENT_EDITOR_VERSION: EditorVersionInfo = {
   version: "0.8.1",
-  build: 6,
-  displayVersion: "v0.8.1 (build 6)",
-  publishedAt: "2026-04-07T13:47:09.953Z",
+  build: 7,
+  displayVersion: "v0.8.1 (build 7)",
+  publishedAt: "2026-04-07T16:54:44.437Z",
 };
