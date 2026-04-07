@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { PointLightNode } from '@pix3/runtime';
+import { PointLightNode, type SceneGraph } from '@pix3/runtime';
 import { Vector3 } from 'three';
 
 export interface CreatePointLightOperationParams {

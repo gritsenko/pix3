@@ -8,9 +8,10 @@ const createContext = (
   invokeAndPushResult: boolean,
   invokeResult = { didMutate: true }
 ): CommandContext => {
+  const invokeMock = vi.fn(async () => invokeResult);
   const operationServiceMock: Pick<OperationService, 'invokeAndPush' | 'invoke'> = {
     invokeAndPush: vi.fn(async () => invokeAndPushResult),
-    invoke: vi.fn(async () => invokeResult),
+    invoke: invokeMock as unknown as OperationService['invoke'],
   };
 
   const container = {

@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { Node3D } from '@pix3/runtime';
+import { Node3D, type SceneGraph } from '@pix3/runtime';
 
 export interface CreateNode3DOperationParams {
   nodeName?: string;

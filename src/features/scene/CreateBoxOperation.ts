@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { GeometryMesh } from '@pix3/runtime';
+import { GeometryMesh, type SceneGraph } from '@pix3/runtime';
 
 export interface CreateBoxOperationParams {
   boxName?: string;

@@ -3,7 +3,7 @@ import { customElement, state } from 'lit/decorators.js';
 import { ComponentBase } from '@/fw/component-base';
 import { ServiceContainer } from '@/fw/di';
 import { CollaborationService, type CollabConnectionStatus } from '@/services/CollaborationService';
-import { appState } from '@/state';
+import { appState, type CollabRemoteUser } from '@/state';
 import { subscribe } from 'valtio/vanilla';
 import './collab-status-bar.ts.css';
 
@@ -120,7 +120,7 @@ export class CollabStatusBar extends ComponentBase {
 
       const localClientId = awareness.clientID;
       const users: RemoteUserDisplay[] = [];
-      const remoteUsers = [];
+      const remoteUsers: CollabRemoteUser[] = [];
       awareness.getStates().forEach((state: Record<string, unknown>, clientId: number) => {
         if (clientId === localClientId) {
           return;

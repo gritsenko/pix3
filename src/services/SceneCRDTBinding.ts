@@ -15,7 +15,6 @@ root: []
 @injectable()
 export class SceneCRDTBinding {
   private disposeOperationBinding: (() => void) | null = null;
-  private observedDoc: Y.Doc | null = null;
   private observedSceneMap: Y.Map<unknown> | null = null;
   private sceneObserver: ((event: Y.YMapEvent<unknown>) => void) | null = null;
   private boundSceneId: string | null = null;
@@ -38,7 +37,6 @@ export class SceneCRDTBinding {
       this.observedSceneMap.unobserve(this.sceneObserver);
     }
 
-    this.observedDoc = ydoc;
     this.boundSceneId = sceneId;
 
     const sceneMap = this.getOrCreateSceneMap(ydoc, sceneId);
@@ -103,7 +101,6 @@ export class SceneCRDTBinding {
       this.observedSceneMap.unobserve(this.sceneObserver);
     }
 
-    this.observedDoc = null;
     this.observedSceneMap = null;
     this.sceneObserver = null;
     this.boundSceneId = null;

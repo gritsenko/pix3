@@ -1,6 +1,6 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 import type { OperationContext } from '@/core/Operation';
-import { AssetLoader, Sprite2D } from '@pix3/runtime';
+import { AssetLoader, Sprite2D, type SceneGraph } from '@pix3/runtime';
 import { Vector2 } from 'three';
 
 export interface CreateSprite2DOperationParams {

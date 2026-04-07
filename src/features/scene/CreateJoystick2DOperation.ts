@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { Joystick2D } from '@pix3/runtime';
+import { Joystick2D, type SceneGraph } from '@pix3/runtime';
 import { Vector2 } from 'three';
 
 export interface CreateJoystick2DOperationParams {

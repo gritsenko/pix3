@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { Button2D } from '@pix3/runtime';
+import { Button2D, type SceneGraph } from '@pix3/runtime';
 import { Vector2 } from 'three';
 
 export interface CreateButton2DOperationParams {

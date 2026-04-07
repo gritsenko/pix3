@@ -13,11 +13,11 @@ import { getNodeVisuals } from './node-visuals.helper';
 
 describe('getNodeVisuals', () => {
   it.each([
-    ['DirectionalLightNode', new DirectionalLightNode({ name: 'Directional Light' })],
-    ['PointLightNode', new PointLightNode({ name: 'Point Light' })],
-    ['SpotLightNode', new SpotLightNode({ name: 'Spot Light' })],
-    ['AmbientLightNode', new AmbientLightNode({ name: 'Ambient Light' })],
-    ['HemisphereLightNode', new HemisphereLightNode({ name: 'Hemisphere Light' })],
+    ['DirectionalLightNode', new DirectionalLightNode({ id: 'dir-light', name: 'Directional Light' })],
+    ['PointLightNode', new PointLightNode({ id: 'point-light', name: 'Point Light' })],
+    ['SpotLightNode', new SpotLightNode({ id: 'spot-light', name: 'Spot Light' })],
+    ['AmbientLightNode', new AmbientLightNode({ id: 'ambient-light', name: 'Ambient Light' })],
+    ['HemisphereLightNode', new HemisphereLightNode({ id: 'hemi-light', name: 'Hemisphere Light' })],
   ])('returns sun icon for %s', (_label, node) => {
     expect(getNodeVisuals(node)).toEqual({
       color: '#fe9ebeff',
@@ -26,14 +26,14 @@ describe('getNodeVisuals', () => {
   });
 
   it('keeps existing camera visuals unchanged', () => {
-    expect(getNodeVisuals(new Camera3D({ name: 'Camera' }))).toEqual({
+    expect(getNodeVisuals(new Camera3D({ id: 'camera-node', name: 'Camera' }))).toEqual({
       color: '#fe9ebeff',
       icon: 'camera',
     });
   });
 
   it('keeps existing audio visuals unchanged', () => {
-    expect(getNodeVisuals(new AudioPlayer({ name: 'Audio Player' }))).toEqual({
+    expect(getNodeVisuals(new AudioPlayer({ id: 'audio-node', name: 'Audio Player' }))).toEqual({
       color: '#7fd1b9ff',
       icon: 'volume-2',
     });

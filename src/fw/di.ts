@@ -107,12 +107,13 @@ export class ServiceContainer {
 }
 
 // Service decorator (similar to @Injectable in Blazor)
-export function injectable<T>(lifetime: ServiceLifetimeOption = ServiceLifetime.Singleton) {
-  return function (target: new () => T) {
+export function injectable(
+  lifetime: ServiceLifetimeOption = ServiceLifetime.Singleton
+): <T extends Constructor>(target: T) => void {
+  return function <T extends Constructor>(target: T): void {
     const container = ServiceContainer.getInstance();
     const token = container.getOrCreateToken(target);
     container.addService(token, target, lifetime);
-    return target;
   };
 }
 

@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { AnimatedSprite3D } from '@pix3/runtime';
+import { AnimatedSprite3D, type SceneGraph } from '@pix3/runtime';
 import { Vector3 } from 'three';
 
 export interface CreateAnimatedSprite3DOperationParams {

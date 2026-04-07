@@ -1,4 +1,4 @@
-import { AudioPlayer } from '@pix3/runtime';
+import { AudioPlayer, type SceneGraph } from '@pix3/runtime';
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 
 export interface CreateAudioPlayerOperationParams {

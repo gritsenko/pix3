@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { Group2D } from '@pix3/runtime';
+import { Group2D, type SceneGraph } from '@pix3/runtime';
 import { Vector2 } from 'three';
 
 export interface CreateGroup2DOperationParams {

@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { InventorySlot2D } from '@pix3/runtime';
+import { InventorySlot2D, type SceneGraph } from '@pix3/runtime';
 import { Vector2 } from 'three';
 
 export interface CreateInventorySlot2DOperationParams {

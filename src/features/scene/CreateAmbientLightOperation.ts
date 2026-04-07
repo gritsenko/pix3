@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { AmbientLightNode } from '@pix3/runtime';
+import { AmbientLightNode, type SceneGraph } from '@pix3/runtime';
 
 export interface CreateAmbientLightOperationParams {
   lightName?: string;

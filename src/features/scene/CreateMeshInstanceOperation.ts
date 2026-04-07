@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { MeshInstance } from '@pix3/runtime';
+import { MeshInstance, type SceneGraph } from '@pix3/runtime';
 
 export interface CreateMeshInstanceOperationParams {
   meshName?: string;

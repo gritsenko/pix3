@@ -1,4 +1,4 @@
-import { Particles3D } from '@pix3/runtime';
+import { Particles3D, type SceneGraph } from '@pix3/runtime';
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 
 export interface CreateParticles3DOperationParams {

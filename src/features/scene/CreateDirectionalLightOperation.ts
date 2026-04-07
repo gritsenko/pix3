@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { DirectionalLightNode } from '@pix3/runtime';
+import { DirectionalLightNode, type SceneGraph } from '@pix3/runtime';
 import { Vector3 } from 'three';
 
 export interface CreateDirectionalLightOperationParams {

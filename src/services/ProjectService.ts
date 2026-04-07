@@ -57,7 +57,7 @@ export class ProjectService {
       if (!Array.isArray(parsed)) return [];
       // ensure entries have timestamp and sort by lastOpenedAt desc
       return parsed
-        .map(p => ({
+        .map<RecentProjectEntry>(p => ({
           id: p.id,
           name: p.name,
           backend: p.backend === 'cloud' ? 'cloud' : ('local' as const),

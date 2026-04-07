@@ -36,6 +36,7 @@ export type {
   CollabConnectionStatus,
   CollabRemoteUser,
   CollaborationState,
+  EditorCameraProjection,
   EditorTab,
   EditorTabType,
   NavigationMode,

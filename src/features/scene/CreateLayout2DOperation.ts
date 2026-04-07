@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { Layout2D } from '@pix3/runtime';
+import { Layout2D, type SceneGraph } from '@pix3/runtime';
 
 export interface CreateLayout2DOperationParams {
   width?: number;

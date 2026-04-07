@@ -1,5 +1,5 @@
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
-import { HemisphereLightNode } from '@pix3/runtime';
+import { HemisphereLightNode, type SceneGraph } from '@pix3/runtime';
 
 export interface CreateHemisphereLightOperationParams {
   lightName?: string;

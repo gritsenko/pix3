@@ -1,4 +1,4 @@
-import { Sprite3D } from '@pix3/runtime';
+import { Sprite3D, type SceneGraph } from '@pix3/runtime';
 import { CreateNodeOperationBase } from '@/core/CreateNodeOperationBase';
 
 export interface CreateSprite3DOperationParams {
