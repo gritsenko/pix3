@@ -28,8 +28,10 @@ export type OperationEvent =
     }
   | {
       readonly type: 'operation:completed';
+      /** True when the operation changed local state. */
       readonly metadata: OperationMetadata;
       readonly didMutate: boolean;
+      /** True when the mutation was committed through history and is safe to sync in collaboration. */
       readonly pushedToHistory: boolean;
       readonly timestamp: number;
     }

@@ -13,6 +13,24 @@ interface RemoteUserDisplay {
   color: string;
 }
 
+export function isSystemParticipantName(name: string, projectName?: string | null): boolean {
+  const normalizedName = name.trim();
+  if (!normalizedName) {
+    return true;
+  }
+
+  if (normalizedName === 'Pix3 Host') {
+    return true;
+  }
+
+  const normalizedProjectName = projectName?.trim();
+  if (normalizedProjectName && normalizedName === `${normalizedProjectName} Host`) {
+    return true;
+  }
+
+  return false;
+}
+
 @customElement('collab-status-bar')
 export class CollabStatusBar extends ComponentBase {
   @state() private connectionStatus: CollabConnectionStatus = 'disconnected';
@@ -128,7 +146,7 @@ export class CollabStatusBar extends ComponentBase {
         const user = state.user as
           | { name?: string; color?: string; selection?: string[] }
           | undefined;
-        if (user?.name) {
+        if (user?.name && !isSystemParticipantName(user.name, appState.project.projectName)) {
           users.push({
             clientId,
             name: user.name,

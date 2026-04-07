@@ -138,6 +138,7 @@ export class ViewportRendererService {
   private activeTargetNodeId: string | null = null;
   private activeTargetDragNodeId: string | null = null;
   private lastActiveSceneId: string | null = null;
+  private lastNodeDataChangeSignal = appState.scenes.nodeDataChangeSignal;
   private viewportSize = { width: 0, height: 0 };
   private transformTool2d: TransformTool2d;
 
@@ -280,16 +281,16 @@ export class ViewportRendererService {
 
     // Render loop will start on first attach/resume
 
-    const syncIfActiveSceneChanged = () => {
+    const syncIfSceneContentChanged = () => {
       const currentSceneId = appState.scenes.activeSceneId;
-      if (currentSceneId !== this.lastActiveSceneId) {
-        this.lastActiveSceneId = currentSceneId;
+      const currentNodeDataChangeSignal = appState.scenes.nodeDataChangeSignal;
+      if (this.shouldSyncSceneContent(currentSceneId, currentNodeDataChangeSignal)) {
         this.syncSceneContent();
       }
     };
 
     const unsubscribeScenes = subscribe(appState.scenes, () => {
-      syncIfActiveSceneChanged();
+      syncIfSceneContentChanged();
       this.updateSelection();
       this.requestRender();
     });
@@ -370,7 +371,23 @@ export class ViewportRendererService {
     this.syncBaseViewportFrame();
 
     // Initial sync
-    syncIfActiveSceneChanged();
+    syncIfSceneContentChanged();
+  }
+
+  private shouldSyncSceneContent(
+    currentSceneId: string | null,
+    currentNodeDataChangeSignal: number
+  ): boolean {
+    if (
+      currentSceneId === this.lastActiveSceneId &&
+      currentNodeDataChangeSignal === this.lastNodeDataChangeSignal
+    ) {
+      return false;
+    }
+
+    this.lastActiveSceneId = currentSceneId;
+    this.lastNodeDataChangeSignal = currentNodeDataChangeSignal;
+    return true;
   }
 
   getCanvasElement(): HTMLCanvasElement | undefined {

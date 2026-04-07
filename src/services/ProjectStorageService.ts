@@ -1,10 +1,22 @@
 import { injectable, inject } from '@/fw/di';
 import { ServiceContainer } from '@/fw/di';
 import { appState } from '@/state';
+import { subscribe } from 'valtio/vanilla';
+import * as Y from 'yjs';
 import { FileSystemAPIService, type FileDescriptor } from './FileSystemAPIService';
+import { CollaborationService } from './CollaborationService';
 import * as ApiClient from './ApiClient';
 
 type CloudManifestEntry = ApiClient.ManifestEntry;
+type AssetMutationKind = 'create-directory' | 'write-file' | 'delete-entry' | 'move-entry';
+
+interface AssetMutationEvent {
+  readonly id: string;
+  readonly kind: AssetMutationKind;
+  readonly path: string;
+  readonly directories: readonly string[];
+  readonly occurredAt: number;
+}
 
 @injectable()
 export class ProjectStorageService {
@@ -13,6 +25,16 @@ export class ProjectStorageService {
 
   private cachedProjectId: string | null = null;
   private cachedManifest: CloudManifestEntry[] | null = null;
+  private disposeCollaborationSubscription?: () => void;
+  private observedAssetEventsMap: Y.Map<string> | null = null;
+  private assetEventsObserver?: (event: Y.YMapEvent<string>) => void;
+
+  constructor() {
+    this.disposeCollaborationSubscription = subscribe(appState.collaboration, () => {
+      this.rebindCollaborationAssetEvents();
+    });
+    this.rebindCollaborationAssetEvents();
+  }
 
   getBackend(): 'local' | 'cloud' {
     return appState.project.backend;
@@ -81,47 +103,45 @@ export class ProjectStorageService {
   }
 
   async writeTextFile(path: string, contents: string): Promise<void> {
-    if (this.getBackend() === 'local') {
-      await this.fileSystem.writeTextFile(path, contents);
-      return;
-    }
-
-    this.ensureWriteAllowed();
-    await ApiClient.uploadFile(this.requireProjectId(), this.normalizePath(path), contents);
-    await this.refreshManifest();
+    const normalizedPath = this.normalizePath(path);
+    await this.writeTextFileInternal(normalizedPath, contents);
+    await this.publishAssetMutation({
+      kind: 'write-file',
+      path: normalizedPath,
+      directories: [this.getParentDirectory(normalizedPath)],
+    });
   }
 
   async writeBinaryFile(path: string, data: ArrayBuffer): Promise<void> {
-    if (this.getBackend() === 'local') {
-      await this.fileSystem.writeBinaryFile(path, data);
-      return;
-    }
-
-    this.ensureWriteAllowed();
-    await ApiClient.uploadFile(this.requireProjectId(), this.normalizePath(path), data);
-    await this.refreshManifest();
+    const normalizedPath = this.normalizePath(path);
+    await this.writeBinaryFileInternal(normalizedPath, data);
+    await this.publishAssetMutation({
+      kind: 'write-file',
+      path: normalizedPath,
+      directories: [this.getParentDirectory(normalizedPath)],
+    });
   }
 
   async deleteEntry(path: string): Promise<void> {
-    if (this.getBackend() === 'local') {
-      await this.fileSystem.deleteEntry(path);
-      return;
-    }
+    const normalizedPath = this.normalizePath(path);
+    const entry = await this.getEntryDescriptor(normalizedPath);
 
-    this.ensureWriteAllowed();
-    await ApiClient.deleteFile(this.requireProjectId(), this.normalizePath(path));
-    await this.refreshManifest();
+    await this.deleteEntryInternal(normalizedPath);
+    await this.publishAssetMutation({
+      kind: 'delete-entry',
+      path: normalizedPath,
+      directories: this.getDirectoriesAffectedByDeletion(normalizedPath, entry?.kind),
+    });
   }
 
   async createDirectory(path: string): Promise<void> {
-    if (this.getBackend() === 'local') {
-      await this.fileSystem.createDirectory(path);
-      return;
-    }
-
-    this.ensureWriteAllowed();
-    await ApiClient.createDirectory(this.requireProjectId(), this.normalizePath(path));
-    await this.refreshManifest();
+    const normalizedPath = this.normalizePath(path);
+    await this.createDirectoryInternal(normalizedPath);
+    await this.publishAssetMutation({
+      kind: 'create-directory',
+      path: normalizedPath,
+      directories: [this.getParentDirectory(normalizedPath), normalizedPath],
+    });
   }
 
   async moveEntry(sourcePath: string, targetPath: string): Promise<void> {
@@ -139,13 +159,31 @@ export class ProjectStorageService {
 
     if (sourceEntry.kind === 'file') {
       const blob = await this.readBlob(normalizedSourcePath);
-      await this.writeBinaryFile(normalizedTargetPath, await blob.arrayBuffer());
-      await this.deleteEntry(normalizedSourcePath);
+      await this.writeBinaryFileInternal(normalizedTargetPath, await blob.arrayBuffer());
+      await this.deleteEntryInternal(normalizedSourcePath);
+      await this.refreshManifest();
+      await this.publishAssetMutation({
+        kind: 'move-entry',
+        path: normalizedTargetPath,
+        directories: this.getUniqueDirectories([
+          this.getParentDirectory(normalizedSourcePath),
+          this.getParentDirectory(normalizedTargetPath),
+        ]),
+      });
       return;
     }
 
     await this.copyDirectory(normalizedSourcePath, normalizedTargetPath);
-    await this.deleteEntry(normalizedSourcePath);
+    await this.deleteEntryInternal(normalizedSourcePath);
+    await this.refreshManifest();
+    await this.publishAssetMutation({
+      kind: 'move-entry',
+      path: normalizedTargetPath,
+      directories: this.getUniqueDirectories([
+        this.getParentDirectory(normalizedSourcePath),
+        this.getParentDirectory(normalizedTargetPath),
+      ]),
+    });
   }
 
   async getFileHandle(path: string): Promise<FileSystemFileHandle | null> {
@@ -206,6 +244,12 @@ export class ProjectStorageService {
     }
   }
 
+  dispose(): void {
+    this.disposeCollaborationSubscription?.();
+    this.disposeCollaborationSubscription = undefined;
+    this.detachAssetEventsObserver();
+  }
+
   private async getEntryDescriptor(path: string): Promise<FileDescriptor | null> {
     const parentPath = this.getParentDirectory(path);
     const name = this.getBaseName(path);
@@ -214,7 +258,7 @@ export class ProjectStorageService {
   }
 
   private async copyDirectory(sourcePath: string, targetPath: string): Promise<void> {
-    await this.createDirectory(targetPath);
+    await this.createDirectoryInternal(targetPath);
     const entries = await this.listDirectory(sourcePath);
     for (const entry of entries) {
       const childSourcePath = `${sourcePath}/${entry.name}`;
@@ -225,7 +269,182 @@ export class ProjectStorageService {
       }
 
       const blob = await this.readBlob(childSourcePath);
-      await this.writeBinaryFile(childTargetPath, await blob.arrayBuffer());
+      await this.writeBinaryFileInternal(childTargetPath, await blob.arrayBuffer());
+    }
+  }
+
+  private async writeTextFileInternal(path: string, contents: string): Promise<void> {
+    if (this.getBackend() === 'local') {
+      await this.fileSystem.writeTextFile(path, contents);
+      return;
+    }
+
+    this.ensureWriteAllowed();
+    await ApiClient.uploadFile(this.requireProjectId(), path, contents);
+    await this.refreshManifest();
+  }
+
+  private async writeBinaryFileInternal(path: string, data: ArrayBuffer): Promise<void> {
+    if (this.getBackend() === 'local') {
+      await this.fileSystem.writeBinaryFile(path, data);
+      return;
+    }
+
+    this.ensureWriteAllowed();
+    await ApiClient.uploadFile(this.requireProjectId(), path, data);
+    await this.refreshManifest();
+  }
+
+  private async deleteEntryInternal(path: string): Promise<void> {
+    if (this.getBackend() === 'local') {
+      await this.fileSystem.deleteEntry(path);
+      return;
+    }
+
+    this.ensureWriteAllowed();
+    await ApiClient.deleteFile(this.requireProjectId(), path);
+    await this.refreshManifest();
+  }
+
+  private async createDirectoryInternal(path: string): Promise<void> {
+    if (this.getBackend() === 'local') {
+      await this.fileSystem.createDirectory(path);
+      return;
+    }
+
+    this.ensureWriteAllowed();
+    await ApiClient.createDirectory(this.requireProjectId(), path);
+    await this.refreshManifest();
+  }
+
+  private async publishAssetMutation(
+    event: Omit<AssetMutationEvent, 'id' | 'occurredAt'>
+  ): Promise<void> {
+    const normalizedDirectories = this.getUniqueDirectories(event.directories);
+    const mutation: AssetMutationEvent = {
+      id: this.createMutationId(),
+      occurredAt: Date.now(),
+      ...event,
+      directories: normalizedDirectories,
+    };
+
+    if (this.getBackend() === 'cloud') {
+      const collaborationService = this.tryGetCollaborationService();
+      const ydoc = collaborationService?.getYDoc();
+      if (collaborationService && ydoc) {
+        const assetEvents = ydoc.getMap<string>('asset-events');
+        ydoc.transact(() => {
+          assetEvents.set('lastMutation', JSON.stringify(mutation));
+        }, collaborationService.getLocalOrigin());
+      }
+    }
+
+    this.applyAssetMutationSignal(mutation.directories);
+  }
+
+  private applyAssetMutationSignal(directories: readonly string[]): void {
+    appState.project.lastModifiedDirectoryPath = this.coalesceDirectories(directories);
+    appState.project.fileRefreshSignal = (appState.project.fileRefreshSignal || 0) + 1;
+  }
+
+  private coalesceDirectories(directories: readonly string[]): string {
+    const normalized = this.getUniqueDirectories(directories);
+    if (normalized.length === 0) {
+      return '.';
+    }
+
+    return normalized.length === 1 ? normalized[0] : '.';
+  }
+
+  private getDirectoriesAffectedByDeletion(
+    path: string,
+    kind: FileSystemHandleKind | undefined
+  ): string[] {
+    if (kind === 'directory') {
+      return [this.getParentDirectory(path), path];
+    }
+    return [this.getParentDirectory(path)];
+  }
+
+  private getUniqueDirectories(directories: readonly string[]): string[] {
+    return Array.from(new Set(directories.map(path => this.normalizePath(path))));
+  }
+
+  private createMutationId(): string {
+    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+      return crypto.randomUUID();
+    }
+
+    return `asset-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  }
+
+  private rebindCollaborationAssetEvents(): void {
+    const collaborationService = this.tryGetCollaborationService();
+    const ydoc = collaborationService?.getYDoc();
+    const assetEvents = ydoc?.getMap<string>('asset-events') ?? null;
+
+    if (assetEvents === this.observedAssetEventsMap) {
+      return;
+    }
+
+    this.detachAssetEventsObserver();
+
+    if (!assetEvents) {
+      return;
+    }
+
+    this.assetEventsObserver = event => {
+      void this.handleAssetEventsUpdated(event);
+    };
+    this.observedAssetEventsMap = assetEvents;
+    assetEvents.observe(this.assetEventsObserver);
+  }
+
+  private detachAssetEventsObserver(): void {
+    if (this.observedAssetEventsMap && this.assetEventsObserver) {
+      this.observedAssetEventsMap.unobserve(this.assetEventsObserver);
+    }
+
+    this.observedAssetEventsMap = null;
+    this.assetEventsObserver = undefined;
+  }
+
+  private async handleAssetEventsUpdated(event: Y.YMapEvent<string>): Promise<void> {
+    const collaborationService = this.tryGetCollaborationService();
+    if (
+      !collaborationService ||
+      event.transaction.origin === collaborationService.getLocalOrigin()
+    ) {
+      return;
+    }
+
+    if (!event.keysChanged.has('lastMutation')) {
+      return;
+    }
+
+    const rawMutation = event.target.get('lastMutation');
+    if (!rawMutation) {
+      return;
+    }
+
+    try {
+      const mutation = JSON.parse(rawMutation) as AssetMutationEvent;
+      if (this.getBackend() === 'cloud') {
+        await this.refreshManifest();
+      }
+      this.applyAssetMutationSignal(mutation.directories);
+    } catch (error) {
+      console.warn('[ProjectStorageService] Failed to process remote asset mutation', error);
+    }
+  }
+
+  private tryGetCollaborationService(): CollaborationService | null {
+    try {
+      return ServiceContainer.getInstance().getService<CollaborationService>(
+        ServiceContainer.getInstance().getOrCreateToken(CollaborationService)
+      );
+    } catch {
+      return null;
     }
   }
 

@@ -331,9 +331,11 @@ export class AssetTree extends ComponentBase {
     // Subscribe only to lastModifiedDirectoryPath changes (file system changes)
     // Do not subscribe to lastOpenedScenePath (scene loading UI state)
     let previousModifiedDir = appState.project.lastModifiedDirectoryPath;
+    let previousFileRefreshSignal = appState.project.fileRefreshSignal;
     let previousProjectId = appState.project.id;
     this.disposeSubscription = subscribe(appState.project, async () => {
       const modifiedDir = appState.project.lastModifiedDirectoryPath;
+      const fileRefreshSignal = appState.project.fileRefreshSignal;
       const currentProjectId = appState.project.id;
 
       // Check if project changed - restore state for new project
@@ -350,7 +352,23 @@ export class AssetTree extends ComponentBase {
         return;
       }
 
-      // Only refresh if lastModifiedDirectoryPath actually changed
+      // fileRefreshSignal guarantees refresh even for repeated updates in the same directory.
+      if (fileRefreshSignal !== previousFileRefreshSignal) {
+        previousFileRefreshSignal = fileRefreshSignal;
+        previousModifiedDir = modifiedDir;
+        console.debug('[AssetTree] Project file refresh signal received', {
+          modifiedDirectory: modifiedDir,
+          fileRefreshSignal,
+        });
+        if (modifiedDir) {
+          await this.refreshDirectory(modifiedDir);
+        } else {
+          await this.loadRoot();
+        }
+        return;
+      }
+
+      // Fallback for code paths that still update only lastModifiedDirectoryPath.
       if (modifiedDir !== previousModifiedDir) {
         console.debug('[AssetTree] Project file refresh signal received', {
           modifiedDirectory: modifiedDir,

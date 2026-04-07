@@ -213,6 +213,21 @@ describe('ViewportRendererService', () => {
     expect(editorDirectionalLight.visible).toBe(true);
   });
 
+  it('tracks node data updates even when the active scene id does not change', () => {
+    const service = new ViewportRendererService();
+
+    const shouldSyncSceneContent = (
+      service as unknown as {
+        shouldSyncSceneContent: (sceneId: string | null, nodeDataChangeSignal: number) => boolean;
+      }
+    ).shouldSyncSceneContent.bind(service);
+
+    expect(shouldSyncSceneContent('scene-1', 0)).toBe(true);
+    expect(shouldSyncSceneContent('scene-1', 0)).toBe(false);
+    expect(shouldSyncSceneContent('scene-1', 1)).toBe(true);
+    expect(shouldSyncSceneContent('scene-1', 1)).toBe(false);
+  });
+
   it('disables fallback editor lighting when the active scene contains explicit lights', () => {
     resetAppState();
     appState.ui.showLighting = true;

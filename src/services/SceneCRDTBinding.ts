@@ -109,7 +109,7 @@ export class SceneCRDTBinding {
   }
 
   private onOperationCompleted(event: OperationEvent): void {
-    if (event.type !== 'operation:completed' || !event.didMutate) {
+    if (event.type !== 'operation:completed' || !event.didMutate || !event.pushedToHistory) {
       return;
     }
 
