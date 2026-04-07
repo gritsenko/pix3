@@ -7,6 +7,7 @@ import type { ApiProject } from '@/services/ApiClient';
 import { appState } from '@/state';
 import type { RecentProjectEntry } from '@/services/ProjectService';
 import { ProjectLifecycleService } from '@/services/ProjectLifecycleService';
+import { CURRENT_EDITOR_VERSION } from '@/version';
 
 @customElement('pix3-welcome')
 export class Pix3Welcome extends ComponentBase {
@@ -208,6 +209,7 @@ export class Pix3Welcome extends ComponentBase {
         <div class="welcome-card">
           <div class="welcome-header">
             <img src="/splash-logo.png" alt="Pix3" class="welcome-logo" />
+            <div class="welcome-version">${CURRENT_EDITOR_VERSION.displayVersion}</div>
           </div>
 
           <div class="welcome-actions-grid">

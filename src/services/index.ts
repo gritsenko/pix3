@@ -79,3 +79,10 @@ export {
   type CollabJoinParams,
 } from './CollabJoinService';
 export { CollabSessionService } from './CollabSessionService';
+export {
+  UpdateCheckService,
+  compareEditorVersions,
+  type UpdateCheckState,
+  type UpdateCheckStatus,
+  type UpdateCheckListener,
+} from './UpdateCheckService';

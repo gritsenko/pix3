@@ -64,6 +64,7 @@ import { EditorTabService } from '@/services/EditorTabService';
 import { RouterService } from '@/services/RouterService';
 import { AuthService } from '@/services/AuthService';
 import { CloudProjectService } from '@/services/CloudProjectService';
+import { UpdateCheckService } from '@/services/UpdateCheckService';
 import {
   ProjectLifecycleService,
   type CreateProjectDialogInstance,
@@ -105,6 +106,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(ProjectLifecycleService)
   private readonly projectLifecycleService!: ProjectLifecycleService;
+
+  @inject(UpdateCheckService)
+  private readonly updateCheckService!: UpdateCheckService;
 
   @inject(OperationService)
   private readonly operationService!: OperationService;
@@ -350,6 +354,7 @@ export class Pix3EditorShell extends ComponentBase {
     // Initialize tab service early to catch session persistence
     this.editorTabService.initialize();
     this.gamePlaySessionService.initialize();
+    this.updateCheckService.initialize();
 
     this.editorSettingsService.initialize();
     this.routerService.initialize();

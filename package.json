@@ -1,9 +1,10 @@
 {
   "name": "pix3",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.8.1",
   "type": "module",
   "scripts": {
+    "prebuild": "node scripts/update-version.mjs",
     "dev": "vite",
     "dev:collab": "concurrently \"npm run dev:collab:server\" \"npm run dev\"",
     "dev:collab:server": "npm run dev -w packages/pix3-collab-server",

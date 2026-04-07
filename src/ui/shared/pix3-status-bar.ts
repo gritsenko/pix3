@@ -1,5 +1,11 @@
 import { ComponentBase, customElement, html, inject, state } from '@/fw';
+import { DialogService } from '@/services/DialogService';
 import { LoggingService } from '@/services/LoggingService';
+import {
+  UpdateCheckService,
+  type UpdateCheckState,
+} from '@/services/UpdateCheckService';
+import { CURRENT_EDITOR_VERSION } from '@/version';
 import { subscribe } from 'valtio/vanilla';
 import { appState } from '@/state';
 import './pix3-status-bar.ts.css';
@@ -18,6 +24,12 @@ export class Pix3StatusBar extends ComponentBase {
   @inject(LoggingService)
   private readonly logger!: LoggingService;
 
+  @inject(DialogService)
+  private readonly dialogService!: DialogService;
+
+  @inject(UpdateCheckService)
+  private readonly updateCheckService!: UpdateCheckService;
+
   @state()
   private currentMessage: StatusMessage | null = null;
 
@@ -27,10 +39,18 @@ export class Pix3StatusBar extends ComponentBase {
   @state()
   private isPlaying = false;
 
+  @state()
+  private updateState: UpdateCheckState = {
+    status: 'idle',
+    currentVersion: CURRENT_EDITOR_VERSION,
+    latestVersion: null,
+  };
+
   private messageTimeout: number | null = null;
   private disposeLogListener?: () => void;
   private disposeProjectSubscription?: () => void;
   private disposeUiSubscription?: () => void;
+  private disposeUpdateCheckSubscription?: () => void;
 
   connectedCallback() {
     super.connectedCallback();
@@ -41,6 +61,10 @@ export class Pix3StatusBar extends ComponentBase {
 
     this.disposeUiSubscription = subscribe(appState.ui, () => {
       this.isPlaying = appState.ui.isPlaying;
+    });
+
+    this.disposeUpdateCheckSubscription = this.updateCheckService.subscribe(state => {
+      this.updateState = state;
     });
 
     // Subscribe to log messages to show status
@@ -63,6 +87,7 @@ export class Pix3StatusBar extends ComponentBase {
     this.disposeLogListener?.();
     this.disposeProjectSubscription?.();
     this.disposeUiSubscription?.();
+    this.disposeUpdateCheckSubscription?.();
     if (this.messageTimeout !== null) {
       window.clearTimeout(this.messageTimeout);
     }
@@ -108,12 +133,54 @@ export class Pix3StatusBar extends ComponentBase {
           ${this.isPlaying
             ? html`<span class="status-indicator playing">▶ Playing</span>`
             : html``}
+          ${this.updateState.status === 'update-available' && this.updateState.latestVersion
+            ? html`
+                <button
+                  type="button"
+                  class="status-indicator update status-update-button"
+                  title="Reload the editor to apply the update"
+                  @click=${this.onUpdateIndicatorClick}
+                >
+                  Update available: ${this.updateState.latestVersion.displayVersion}
+                </button>
+              `
+            : html``}
+          <span class="status-version">${this.updateState.currentVersion.displayVersion}</span>
           ${this.projectName
             ? html`<span class="status-project">${this.projectName}</span>`
             : html``}
         </div>
       </div>
     `;
+  }
+
+  private onUpdateIndicatorClick = async (): Promise<void> => {
+    if (this.updateState.status !== 'update-available' || !this.updateState.latestVersion) {
+      return;
+    }
+
+    const confirmed = await this.dialogService.showConfirmation({
+      title: 'Update Available',
+      message:
+        `A newer Pix3 editor build is available.\n\n` +
+        `Current: ${this.updateState.currentVersion.displayVersion}\n` +
+        `Available: ${this.updateState.latestVersion.displayVersion}\n\n` +
+        `Reload the page now to update the editor.`,
+      confirmLabel: 'Reload Now',
+      cancelLabel: 'Later',
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.reloadForUpdate();
+  };
+
+  private reloadForUpdate(): void {
+    const url = new URL(window.location.href);
+    url.searchParams.set('pix3_refresh', Date.now().toString());
+    window.location.replace(url.toString());
   }
 }
 

@@ -79,6 +79,30 @@ pix3-status-bar .status-indicator.playing {
   animation: pulse 2s ease-in-out infinite;
 }
 
+pix3-status-bar .status-indicator.update {
+  background: rgba(251, 191, 36, 0.14);
+  color: rgba(251, 191, 36, 0.95);
+}
+
+pix3-status-bar .status-update-button {
+  border: none;
+  cursor: pointer;
+  font: inherit;
+}
+
+pix3-status-bar .status-update-button:hover {
+  background: rgba(251, 191, 36, 0.22);
+}
+
+pix3-status-bar .status-update-button:focus-visible {
+  outline: 1px solid rgba(251, 191, 36, 0.9);
+  outline-offset: 2px;
+}
+
+pix3-status-bar .status-version {
+  color: rgba(243, 244, 246, 0.72);
+}
+
 pix3-status-bar .status-project {
   color: rgba(243, 244, 246, 0.6);
 }

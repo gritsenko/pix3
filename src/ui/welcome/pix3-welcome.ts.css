@@ -75,6 +75,20 @@ pix3-welcome {
   margin: 0 auto 1rem auto;
   animation: logoBounceIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
+.welcome-version {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(15, 18, 23, 0.52);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  color: rgba(247, 250, 252, 0.72);
+  font-size: 0.78rem;
+  font-family: 'SF Mono', 'Monaco', 'Menlo', 'Consolas', monospace;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(6px);
+}
 
 .welcome-actions-grid {
   display: grid;
