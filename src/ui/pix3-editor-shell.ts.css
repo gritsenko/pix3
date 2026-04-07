@@ -5,6 +5,7 @@
   --pix3-z-menu: 200;
   --pix3-z-overlay: 300;
   --pix3-z-modal: 400;
+  --pix3-z-modal-top: 500;
 }
 
 pix3-editor-shell {
@@ -22,6 +23,10 @@ pix3-editor-shell {
   min-block-size: 100dvh;
   background: var(--pix3-shell-background, #1b1e24);
   color: #f3f4f6;
+}
+
+.toolbar-layer {
+  position: relative;
 }
 
 pix3-toolbar {
@@ -156,7 +161,7 @@ pix3-toolbar {
 .auth-modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: var(--pix3-z-modal);
+  z-index: var(--pix3-z-modal-top);
   display: grid;
   place-items: center;
   padding: 24px;

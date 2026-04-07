@@ -217,6 +217,7 @@ export class Pix3EditorShell extends ComponentBase {
   private disposeScriptCreatorSubscription?: () => void;
   private onWelcomeProjectReady?: (e: Event) => void;
   private keyboardHandler?: (e: KeyboardEvent) => void;
+  private accountPopoverPointerHandler?: (e: PointerEvent) => void;
   private watchedSceneIds = new Set<string>();
   private watchedScenePaths = new Map<string, string>();
   private tabsInitialized = false;
@@ -342,6 +343,9 @@ export class Pix3EditorShell extends ComponentBase {
     // Setup keyboard shortcuts
     this.keyboardHandler = this.handleKeyboardShortcuts.bind(this);
     window.addEventListener('keydown', this.keyboardHandler);
+
+    this.accountPopoverPointerHandler = this.handleAccountPopoverPointerDown.bind(this);
+    window.addEventListener('pointerdown', this.accountPopoverPointerHandler);
 
     // Initialize tab service early to catch session persistence
     this.editorTabService.initialize();
@@ -517,6 +521,10 @@ export class Pix3EditorShell extends ComponentBase {
       window.removeEventListener('keydown', this.keyboardHandler);
       this.keyboardHandler = undefined;
     }
+    if (this.accountPopoverPointerHandler) {
+      window.removeEventListener('pointerdown', this.accountPopoverPointerHandler);
+      this.accountPopoverPointerHandler = undefined;
+    }
     // Stop all file watchers
     this.fileWatchService.unwatchAll();
     // Stop script execution service
@@ -525,11 +533,39 @@ export class Pix3EditorShell extends ComponentBase {
   }
 
   private handleKeyboardShortcuts(e: KeyboardEvent): void {
+    if (e.key === 'Escape' && this.isAccountPopoverOpen) {
+      this.isAccountPopoverOpen = false;
+      this.requestUpdate();
+      return;
+    }
+
     // Use KeybindingService to find matching command
     const commandId = this.keybindingService.handleKeyboardEvent(e);
     if (commandId) {
       e.preventDefault();
       void this.commandDispatcher.executeById(commandId);
+    }
+  }
+
+  private handleAccountPopoverPointerDown(e: PointerEvent): void {
+    if (!this.isAccountPopoverOpen) {
+      return;
+    }
+
+    const path = e.composedPath();
+    const clickedToolbarButton = path.some(
+      target =>
+        target instanceof HTMLElement &&
+        target.tagName.toLowerCase() === 'pix3-toolbar-button' &&
+        target.getAttribute('aria-label') === 'Open account menu'
+    );
+    const clickedPopover = path.some(
+      target => target instanceof HTMLElement && target.classList.contains('account-popover')
+    );
+
+    if (!clickedToolbarButton && !clickedPopover) {
+      this.isAccountPopoverOpen = false;
+      this.requestUpdate();
     }
   }
 
@@ -652,17 +688,17 @@ export class Pix3EditorShell extends ComponentBase {
   protected render() {
     return html`
       <div class="editor-shell" data-ready=${this.shellReady ? 'true' : 'false'}>
-        ${this.renderToolbar()}
+        <div class="toolbar-layer">${this.renderToolbar()} ${this.renderAccountPopover()}</div>
         <div class="workspace" role="presentation">
           <div class="layout-host" role="application" aria-busy=${!this.isLayoutReady}></div>
         </div>
         <pix3-status-bar></pix3-status-bar>
         ${this.renderWorkspaceOverlay()}
         <pix3-share-dialog></pix3-share-dialog>
-        ${this.renderAuthModal()} ${this.renderDialogHost()} ${this.renderPickerHost()}
-        ${this.renderScriptCreatorHost()} ${this.renderProjectSettingsHost()}
-        ${this.renderEditorSettingsHost()} ${this.renderCreateProjectHost()}
-        ${this.renderNodeTypePickerHost()}
+        ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
+        ${this.renderProjectSettingsHost()} ${this.renderEditorSettingsHost()}
+        ${this.renderCreateProjectHost()} ${this.renderNodeTypePickerHost()}
+        ${this.renderAuthModal()}
       </div>
     `;
   }
@@ -707,7 +743,6 @@ export class Pix3EditorShell extends ComponentBase {
         >
           Share
         </pix3-toolbar-button>
-        ${this.renderAccountPopover()}
       </pix3-toolbar>
     `;
   }
