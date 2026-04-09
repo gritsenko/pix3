@@ -1,5 +1,5 @@
 import { injectable, ServiceContainer } from '@/fw/di';
-import { appState } from '@/state';
+import { appState, createInitialHybridSyncState } from '@/state';
 import { resolveFileSystemAPIService, type FileDescriptor } from './FileSystemAPIService';
 import { ProjectStorageService } from './ProjectStorageService';
 import { parse, stringify } from 'yaml';
@@ -25,6 +25,8 @@ export interface RecentProjectEntry {
   readonly name: string;
   readonly backend: 'local' | 'cloud';
   readonly localAbsolutePath?: string;
+  readonly linkedCloudProjectId?: string;
+  readonly linkedLocalSessionId?: string;
   readonly lastOpenedAt: number;
 }
 
@@ -62,6 +64,10 @@ export class ProjectService {
           name: p.name,
           backend: p.backend === 'cloud' ? 'cloud' : ('local' as const),
           localAbsolutePath: p.localAbsolutePath,
+          linkedCloudProjectId:
+            typeof p.linkedCloudProjectId === 'string' ? p.linkedCloudProjectId : undefined,
+          linkedLocalSessionId:
+            typeof p.linkedLocalSessionId === 'string' ? p.linkedLocalSessionId : undefined,
           lastOpenedAt: typeof p.lastOpenedAt === 'number' ? p.lastOpenedAt : 0,
         }))
         .sort((a, b) => b.lastOpenedAt - a.lastOpenedAt);
@@ -151,6 +157,8 @@ export class ProjectService {
       name: entry.name,
       backend: entry.backend,
       localAbsolutePath: entry.localAbsolutePath,
+      linkedCloudProjectId: entry.linkedCloudProjectId,
+      linkedLocalSessionId: entry.linkedLocalSessionId,
       lastOpenedAt: entry.lastOpenedAt ?? Date.now(),
     };
     filtered.unshift(toAdd);
@@ -174,8 +182,27 @@ export class ProjectService {
       name: appState.project.projectName ?? 'Untitled Project',
       backend: appState.project.backend,
       localAbsolutePath: appState.project.localAbsolutePath ?? undefined,
+      linkedCloudProjectId: appState.project.hybridSync.linkedCloudProjectId ?? undefined,
+      linkedLocalSessionId: appState.project.hybridSync.linkedLocalSessionId ?? undefined,
       lastOpenedAt: Date.now(),
     });
+  }
+
+  createProjectSessionId(): string {
+    const hasRandomUUID =
+      typeof crypto !== 'undefined' &&
+      typeof (crypto as unknown as { randomUUID?: unknown }).randomUUID === 'function';
+    return hasRandomUUID
+      ? (crypto as unknown as { randomUUID: () => string }).randomUUID()
+      : `handle-${Date.now()}`;
+  }
+
+  persistProjectDirectoryHandle(id: string, handle: FileSystemDirectoryHandle): Promise<void> {
+    return this.saveHandleToIndexedDB(id, handle);
+  }
+
+  getPersistedProjectDirectoryHandle(id: string): Promise<FileSystemDirectoryHandle | null> {
+    return this.getHandleFromIndexedDB(id);
   }
 
   async openProjectViaPicker(): Promise<void> {
@@ -183,17 +210,13 @@ export class ProjectService {
       const handle = await this.fs.requestProjectDirectory('readwrite');
       // try to persist the handle and associate it with a recent entry id
       // prefer secure randomUUID when available; otherwise fallback to timestamp-based id
-      const hasRandomUUID =
-        typeof crypto !== 'undefined' &&
-        typeof (crypto as unknown as { randomUUID?: unknown }).randomUUID === 'function';
-      const id = hasRandomUUID
-        ? (crypto as unknown as { randomUUID: () => string }).randomUUID()
-        : `handle-${Date.now()}`;
+      const id = this.createProjectSessionId();
 
       appState.project.id = id;
       appState.project.backend = 'local';
       appState.project.directoryHandle = handle;
       appState.project.projectName = handle.name ?? 'Untitled Project';
+      appState.project.hybridSync = createInitialHybridSyncState();
       appState.project.status = 'ready';
       appState.project.errorMessage = null;
       appState.project.manifest = await this.loadProjectManifest();
@@ -205,9 +228,10 @@ export class ProjectService {
         backend: 'local',
         lastOpenedAt: Date.now(),
       });
-      this.saveHandleToIndexedDB(id, handle).catch(() => {
+      this.persistProjectDirectoryHandle(id, handle).catch(() => {
         // ignore persistence errors; fallback behavior remains functional
       });
+      this.scheduleHybridSyncRefresh();
     } catch (error) {
       // propagate error after recording state
       appState.project.status = 'error';
@@ -240,7 +264,7 @@ export class ProjectService {
 
     if (entry.id) {
       try {
-        const handle = await this.getHandleFromIndexedDB(entry.id);
+        const handle = await this.getPersistedProjectDirectoryHandle(entry.id);
         if (handle) {
           // ensure we have permission and then activate project
           try {
@@ -251,6 +275,7 @@ export class ProjectService {
             appState.project.directoryHandle = handle;
             appState.project.projectName = handle.name ?? entry.name;
             appState.project.localAbsolutePath = entry.localAbsolutePath ?? null;
+            appState.project.hybridSync = createInitialHybridSyncState();
             appState.project.status = 'ready';
             appState.project.errorMessage = null;
             appState.project.manifest = await this.loadProjectManifest();
@@ -262,6 +287,7 @@ export class ProjectService {
               localAbsolutePath: appState.project.localAbsolutePath ?? undefined,
               lastOpenedAt: Date.now(),
             });
+            this.scheduleHybridSyncRefresh();
             return;
           } catch {
             // permission problem - fall through to picker
@@ -288,65 +314,71 @@ export class ProjectService {
 
     try {
       // With 'silent' request it only checks if we have permission.
-      // Wait, ensurePermission in FileSystemAPIService might prompt. 
+      // Wait, ensurePermission in FileSystemAPIService might prompt.
       // Let's assume it checks first, and if it prompts without user gesture it will throw.
       await this.fs.ensurePermission(handle, 'readwrite');
-      
+
       this.fs.setProjectDirectory(handle);
       appState.project.id = sessionId;
       appState.project.backend = 'local';
       appState.project.directoryHandle = handle;
       appState.project.projectName = handle.name;
+      appState.project.hybridSync = createInitialHybridSyncState();
       appState.project.status = 'ready';
       appState.project.errorMessage = null;
       appState.project.manifest = await this.loadProjectManifest();
-      
+
       const recents = this.getRecentProjects();
       const existing = recents.find(r => r.id === sessionId);
       if (existing) {
-         this.addRecentProject({
-           ...existing,
-           lastOpenedAt: Date.now(),
-         });
+        this.addRecentProject({
+          ...existing,
+          lastOpenedAt: Date.now(),
+        });
       }
+
+      this.scheduleHybridSyncRefresh();
 
       return true;
     } catch {
-       // Silent permission denied (or missing user gesture)
-       appState.project.directoryHandle = handle;
-       appState.project.id = sessionId;
-       appState.project.projectName = handle.name;
-       return false;
+      // Silent permission denied (or missing user gesture)
+      appState.project.directoryHandle = handle;
+      appState.project.id = sessionId;
+      appState.project.projectName = handle.name;
+      return false;
     }
   }
 
   async reactivateLocalSession(sessionId: string): Promise<boolean> {
-     const handle = appState.project.directoryHandle;
-     if (!handle) return false;
+    const handle = appState.project.directoryHandle;
+    if (!handle) return false;
 
-     try {
-       // This call is usually tied to a user gesture, so the browser prompt can appear.
-       await this.fs.ensurePermission(handle, 'readwrite');
-       
-       this.fs.setProjectDirectory(handle);
-       appState.project.backend = 'local';
-       appState.project.status = 'ready';
-       appState.project.errorMessage = null;
-       appState.project.manifest = await this.loadProjectManifest();
+    try {
+      // This call is usually tied to a user gesture, so the browser prompt can appear.
+      await this.fs.ensurePermission(handle, 'readwrite');
 
-       const recents = this.getRecentProjects();
-       const existing = recents.find(r => r.id === sessionId);
-       if (existing) {
-          this.addRecentProject({
-            ...existing,
-            lastOpenedAt: Date.now(),
-          });
-       }
+      this.fs.setProjectDirectory(handle);
+      appState.project.backend = 'local';
+      appState.project.hybridSync = createInitialHybridSyncState();
+      appState.project.status = 'ready';
+      appState.project.errorMessage = null;
+      appState.project.manifest = await this.loadProjectManifest();
 
-       return true;
-     } catch {
-       return false;
-     }
+      const recents = this.getRecentProjects();
+      const existing = recents.find(r => r.id === sessionId);
+      if (existing) {
+        this.addRecentProject({
+          ...existing,
+          lastOpenedAt: Date.now(),
+        });
+      }
+
+      this.scheduleHybridSyncRefresh();
+
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private saveHandleToIndexedDB(id: string, handle: FileSystemDirectoryHandle): Promise<void> {
@@ -519,17 +551,13 @@ export class ProjectService {
       await activateOptions?.beforeActivate?.();
 
       // Set up project state
-      const hasRandomUUID =
-        typeof crypto !== 'undefined' &&
-        typeof (crypto as unknown as { randomUUID?: unknown }).randomUUID === 'function';
-      const id = hasRandomUUID
-        ? (crypto as unknown as { randomUUID: () => string }).randomUUID()
-        : `handle-${Date.now()}`;
+      const id = this.createProjectSessionId();
 
       appState.project.directoryHandle = handle;
       appState.project.id = id;
       appState.project.backend = 'local';
       appState.project.projectName = options.name.trim() || handle.name || 'New Project';
+      appState.project.hybridSync = createInitialHybridSyncState();
       appState.project.status = 'ready';
       appState.project.errorMessage = null;
       appState.project.manifest = options.manifest;
@@ -543,9 +571,10 @@ export class ProjectService {
         backend: 'local',
         lastOpenedAt: Date.now(),
       });
-      this.saveHandleToIndexedDB(id, handle).catch(() => {
+      this.persistProjectDirectoryHandle(id, handle).catch(() => {
         // ignore persistence errors; fallback behavior remains functional
       });
+      this.scheduleHybridSyncRefresh();
     } catch (error) {
       // Propagate error after recording state
       appState.project.status = 'error';
@@ -1103,6 +1132,20 @@ Happy creating! 🎨
     return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  private scheduleHybridSyncRefresh(): void {
+    void (async () => {
+      try {
+        const container = ServiceContainer.getInstance();
+        const localSyncService = container.getService(
+          container.getOrCreateToken((await import('./LocalSyncService')).LocalSyncService)
+        ) as import('./LocalSyncService').LocalSyncService;
+        await localSyncService.handleProjectActivated();
+      } catch {
+        // Hybrid sync is best-effort during project activation.
+      }
+    })();
+  }
+
   public dispose(): void {
     // ProjectService holds no subscriptions or event listeners
   }
@@ -1144,6 +1187,7 @@ Happy creating! 🎨
     appState.project.scriptRefreshSignal = 0;
     appState.project.lastModifiedDirectoryPath = null;
     appState.project.manifest = null;
+    appState.project.hybridSync = createInitialHybridSyncState();
     appState.scenes.activeSceneId = null;
     appState.scenes.descriptors = {};
     appState.scenes.hierarchies = {};

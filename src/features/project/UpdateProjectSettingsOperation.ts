@@ -46,6 +46,8 @@ function persistRecentProject(entry: {
   name: string;
   backend: 'local' | 'cloud';
   localAbsolutePath?: string;
+  linkedCloudProjectId?: string;
+  linkedLocalSessionId?: string;
   lastOpenedAt: number;
 }): void {
   try {
@@ -125,6 +127,8 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
         name: newName ?? 'Untitled Project',
         backend: state.project.backend,
         localAbsolutePath: newPath ?? undefined,
+        linkedCloudProjectId: state.project.hybridSync.linkedCloudProjectId ?? undefined,
+        linkedLocalSessionId: state.project.hybridSync.linkedLocalSessionId ?? undefined,
         lastOpenedAt: Date.now(),
       });
     }
@@ -144,6 +148,8 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
               name: prevName ?? 'Untitled Project',
               backend: state.project.backend,
               localAbsolutePath: prevPath ?? undefined,
+              linkedCloudProjectId: state.project.hybridSync.linkedCloudProjectId ?? undefined,
+              linkedLocalSessionId: state.project.hybridSync.linkedLocalSessionId ?? undefined,
               lastOpenedAt: Date.now(),
             });
           }
@@ -159,6 +165,8 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
               name: newName ?? 'Untitled Project',
               backend: state.project.backend,
               localAbsolutePath: newPath ?? undefined,
+              linkedCloudProjectId: state.project.hybridSync.linkedCloudProjectId ?? undefined,
+              linkedLocalSessionId: state.project.hybridSync.linkedLocalSessionId ?? undefined,
               lastOpenedAt: Date.now(),
             });
           }

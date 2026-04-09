@@ -30,6 +30,7 @@ export { LoggingService, type LogLevel, type LogEntry, type LogListener } from '
 export { CommandRegistry, type CommandMenuItem, type MenuSection } from './CommandRegistry';
 export { KeybindingService } from './KeybindingService';
 export { FileWatchService } from './FileWatchService';
+export { LocalSyncService, type SyncResult } from './LocalSyncService';
 export {
   DialogService,
   type DialogOptions,
@@ -74,10 +75,7 @@ export {
 export { AssetUploadService, type AssetUploadResult } from './AssetUploadService';
 export { SceneCRDTBinding } from './SceneCRDTBinding';
 export { CollabViewportOverlayService } from './CollabViewportOverlayService';
-export {
-  CollabJoinService,
-  type CollabJoinParams,
-} from './CollabJoinService';
+export { CollabJoinService, type CollabJoinParams } from './CollabJoinService';
 export { CollabSessionService } from './CollabSessionService';
 export {
   UpdateCheckService,

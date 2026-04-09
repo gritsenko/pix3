@@ -193,7 +193,17 @@ export class Pix3Welcome extends ComponentBase {
   }
 
   private getProjectBadgeLabel(entry: RecentProjectEntry): string {
+    if (entry.linkedCloudProjectId || entry.linkedLocalSessionId) {
+      return 'Hybrid';
+    }
+
     return entry.backend === 'cloud' ? 'Cloud' : 'Local';
+  }
+
+  private getProjectBadgeClass(entry: RecentProjectEntry): string {
+    return entry.linkedCloudProjectId || entry.linkedLocalSessionId
+      ? 'recent-backend recent-backend--hybrid'
+      : 'recent-backend';
   }
 
   private getProjectIcon(entry: RecentProjectEntry) {
@@ -246,7 +256,9 @@ export class Pix3Welcome extends ComponentBase {
                               >${this.getProjectIcon(r)}</span
                             >
                             <span class="recent-name">${r.name}</span>
-                            <span class="recent-backend">${this.getProjectBadgeLabel(r)}</span>
+                            <span class=${this.getProjectBadgeClass(r)}
+                              >${this.getProjectBadgeLabel(r)}</span
+                            >
                             <span class="recent-time">${this.formatTime(r.lastOpenedAt)}</span>
                           </button>
                           <button

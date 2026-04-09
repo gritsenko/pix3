@@ -215,6 +215,12 @@ pix3-welcome {
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
+
+.recent-backend--hybrid {
+  background: rgba(var(--pix3-accent-rgb), 0.16);
+  border-color: rgba(var(--pix3-accent-rgb), 0.3);
+  color: rgba(255, 244, 204, 0.96);
+}
 .recent-empty {
   padding: 0.75rem;
   border-radius: 0.5rem;

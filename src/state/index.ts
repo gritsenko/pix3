@@ -28,7 +28,12 @@ export const resetAppState = (): void => {
   appState.router = defaults.router;
 };
 
-export { DEFAULT_THEME, THEME_IDS, createInitialAppState } from './AppState';
+export {
+  DEFAULT_THEME,
+  THEME_IDS,
+  createInitialAppState,
+  createInitialHybridSyncState,
+} from './AppState';
 
 export type {
   AppState,
@@ -38,11 +43,13 @@ export type {
   CollaborationState,
   EditorCameraProjection,
   EditorTab,
+  HybridSyncStatus,
   EditorTabType,
   NavigationMode,
   OperationState,
   PanelVisibilityState,
   ProjectBackend,
+  ProjectHybridSyncState,
   ProjectState,
   ProjectStatus,
   SceneDescriptor,

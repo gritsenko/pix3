@@ -87,8 +87,30 @@ export interface ScenesState {
 
 export type ProjectStatus = 'idle' | 'selecting' | 'ready' | 'error';
 export type ProjectBackend = 'local' | 'cloud';
+export type HybridSyncStatus =
+  | 'unlinked'
+  | 'checking'
+  | 'up-to-date'
+  | 'local-changes'
+  | 'cloud-changes'
+  | 'conflict'
+  | 'syncing'
+  | 'auth-required'
+  | 'error';
 
 export type ScriptLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+export interface ProjectHybridSyncState {
+  linkedCloudProjectId: string | null;
+  linkedLocalSessionId: string | null;
+  linkedLocalPath: string | null;
+  status: HybridSyncStatus;
+  lastSyncAt: number | null;
+  localChangeCount: number;
+  cloudChangeCount: number;
+  conflictCount: number;
+  errorMessage: string | null;
+}
 
 export interface ProjectState {
   /** Unique ID for the project (used for persistence). */
@@ -120,6 +142,8 @@ export interface ProjectState {
   lastModifiedDirectoryPath: string | null;
   /** Project manifest loaded from pix3project.yaml. */
   manifest: ProjectManifest | null;
+  /** Hybrid sync state between the local folder and linked cloud project. */
+  hybridSync: ProjectHybridSyncState;
 }
 
 export interface SelectionState {
@@ -260,7 +284,13 @@ export interface TelemetryState {
   unsentEventCount: number;
 }
 
-export type RouterStatus = 'idle' | 'authenticating' | 'fetchingMetadata' | 'loadingAssets' | 'reactivationRequired' | 'error';
+export type RouterStatus =
+  | 'idle'
+  | 'authenticating'
+  | 'fetchingMetadata'
+  | 'loadingAssets'
+  | 'reactivationRequired'
+  | 'error';
 
 export interface RouteParams {
   projectId: string | null;
@@ -290,6 +320,18 @@ export interface AppState {
   collaboration: CollaborationState;
   telemetry: TelemetryState;
 }
+
+export const createInitialHybridSyncState = (): ProjectHybridSyncState => ({
+  linkedCloudProjectId: null,
+  linkedLocalSessionId: null,
+  linkedLocalPath: null,
+  status: 'unlinked',
+  lastSyncAt: null,
+  localChangeCount: 0,
+  cloudChangeCount: 0,
+  conflictCount: 0,
+  errorMessage: null,
+});
 
 export const createInitialAppState = (): AppState => ({
   auth: {
@@ -326,6 +368,7 @@ export const createInitialAppState = (): AppState => ({
     scriptRefreshSignal: 0,
     lastModifiedDirectoryPath: null,
     manifest: null,
+    hybridSync: createInitialHybridSyncState(),
   },
   scenes: {
     activeSceneId: null,

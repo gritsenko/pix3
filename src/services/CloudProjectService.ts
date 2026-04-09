@@ -1,5 +1,5 @@
 import { injectable, inject, ServiceContainer } from '@/fw/di';
-import { appState } from '@/state';
+import { appState, createInitialHybridSyncState } from '@/state';
 import * as ApiClient from './ApiClient';
 import type { ApiProject } from './ApiClient';
 import { ProjectService } from './ProjectService';
@@ -179,6 +179,7 @@ export class CloudProjectService {
       backend: 'cloud',
       lastOpenedAt: Date.now(),
     });
+    this.scheduleHybridSyncRefresh();
 
     const manifest = await this.storage.getManifestEntries();
     const scenePaths = manifest
@@ -261,6 +262,21 @@ export class CloudProjectService {
     appState.project.fileRefreshSignal = 0;
     appState.project.scriptRefreshSignal = 0;
     appState.project.lastModifiedDirectoryPath = null;
+    appState.project.hybridSync = createInitialHybridSyncState();
+  }
+
+  private scheduleHybridSyncRefresh(): void {
+    void (async () => {
+      try {
+        const serviceContainer = ServiceContainer.getInstance();
+        const localSyncService = serviceContainer.getService(
+          serviceContainer.getOrCreateToken((await import('./LocalSyncService')).LocalSyncService)
+        ) as import('./LocalSyncService').LocalSyncService;
+        await localSyncService.handleProjectActivated();
+      } catch {
+        // Hybrid sync probing should not block project opening.
+      }
+    })();
   }
 
   private async connectToProjectRoom(

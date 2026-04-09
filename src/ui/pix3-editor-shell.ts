@@ -699,7 +699,7 @@ export class Pix3EditorShell extends ComponentBase {
         </div>
         <pix3-status-bar></pix3-status-bar>
         ${this.renderWorkspaceOverlay()}
-        <pix3-share-dialog></pix3-share-dialog>
+        <pix3-share-dialog @pix3-auth:request=${this.onAuthRequest}></pix3-share-dialog>
         ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
         ${this.renderProjectSettingsHost()} ${this.renderEditorSettingsHost()}
         ${this.renderCreateProjectHost()} ${this.renderNodeTypePickerHost()}

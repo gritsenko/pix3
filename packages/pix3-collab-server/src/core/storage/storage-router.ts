@@ -5,6 +5,7 @@ import multer from 'multer';
 import { config } from '../../config.js';
 import { attachOptionalAuth, requireAuth, AuthenticatedRequest } from '../auth/auth-middleware.js';
 import { resolveProjectAccess } from '../projects/projects-service.js';
+import { touchProject } from '../projects/projects-service.js';
 import { buildManifest } from './manifest.js';
 
 export const storageRouter = Router();
@@ -48,38 +49,46 @@ function checkAccess(req: AuthenticatedRequest, res: Response, write: boolean): 
 }
 
 // GET /api/projects/:id/manifest — file tree with hashes
-storageRouter.get('/:id/manifest', attachOptionalAuth, (req: AuthenticatedRequest, res: Response) => {
-  if (!checkAccess(req, res, false)) return;
+storageRouter.get(
+  '/:id/manifest',
+  attachOptionalAuth,
+  (req: AuthenticatedRequest, res: Response) => {
+    if (!checkAccess(req, res, false)) return;
 
-  const projectDir = getProjectDir(req.params.id);
-  const manifest = buildManifest(projectDir);
-  res.json({ files: manifest });
-});
+    const projectDir = getProjectDir(req.params.id);
+    const manifest = buildManifest(projectDir);
+    res.json({ files: manifest });
+  }
+);
 
 // GET /api/projects/:id/files/* — download file
-storageRouter.get('/:id/files/*', attachOptionalAuth, (req: AuthenticatedRequest, res: Response) => {
-  if (!checkAccess(req, res, false)) return;
+storageRouter.get(
+  '/:id/files/*',
+  attachOptionalAuth,
+  (req: AuthenticatedRequest, res: Response) => {
+    if (!checkAccess(req, res, false)) return;
 
-  const filePath = (req.params as Record<string, string>)[0];
-  if (!filePath) {
-    res.status(400).json({ error: 'File path is required' });
-    return;
+    const filePath = (req.params as Record<string, string>)[0];
+    if (!filePath) {
+      res.status(400).json({ error: 'File path is required' });
+      return;
+    }
+
+    const projectDir = getProjectDir(req.params.id);
+    const fullPath = resolveSafePath(projectDir, filePath);
+    if (!fullPath) {
+      res.status(400).json({ error: 'Invalid file path' });
+      return;
+    }
+
+    if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+
+    res.sendFile(fullPath);
   }
-
-  const projectDir = getProjectDir(req.params.id);
-  const fullPath = resolveSafePath(projectDir, filePath);
-  if (!fullPath) {
-    res.status(400).json({ error: 'Invalid file path' });
-    return;
-  }
-
-  if (!fs.existsSync(fullPath) || !fs.statSync(fullPath).isFile()) {
-    res.status(404).json({ error: 'File not found' });
-    return;
-  }
-
-  res.sendFile(fullPath);
-});
+);
 
 // POST /api/projects/:id/files/* — upload/overwrite file
 storageRouter.post(
@@ -87,66 +96,72 @@ storageRouter.post(
   requireAuth,
   upload.single('file'),
   (req: Request & AuthenticatedRequest, res: Response) => {
-  if (!checkAccess(req, res, true)) return;
+    if (!checkAccess(req, res, true)) return;
 
-  const filePath = (req.params as Record<string, string>)[0];
-  if (!filePath) {
-    res.status(400).json({ error: 'File path is required' });
-    return;
-  }
+    const filePath = (req.params as Record<string, string>)[0];
+    if (!filePath) {
+      res.status(400).json({ error: 'File path is required' });
+      return;
+    }
 
-  const projectDir = getProjectDir(req.params.id);
-  const fullPath = resolveSafePath(projectDir, filePath);
-  if (!fullPath) {
-    res.status(400).json({ error: 'Invalid file path' });
-    return;
-  }
+    const projectDir = getProjectDir(req.params.id);
+    const fullPath = resolveSafePath(projectDir, filePath);
+    if (!fullPath) {
+      res.status(400).json({ error: 'Invalid file path' });
+      return;
+    }
 
-  // Support both multipart upload and raw body
-  let content: Buffer;
-  if (req.file) {
-    content = req.file.buffer;
-  } else if (req.body && Buffer.isBuffer(req.body)) {
-    content = req.body;
-  } else if (typeof req.body === 'string') {
-    content = Buffer.from(req.body, 'utf-8');
-  } else {
-    res.status(400).json({ error: 'No file content provided. Use multipart or raw body.' });
-    return;
-  }
+    // Support both multipart upload and raw body
+    let content: Buffer;
+    if (req.file) {
+      content = req.file.buffer;
+    } else if (req.body && Buffer.isBuffer(req.body)) {
+      content = req.body;
+    } else if (typeof req.body === 'string') {
+      content = Buffer.from(req.body, 'utf-8');
+    } else {
+      res.status(400).json({ error: 'No file content provided. Use multipart or raw body.' });
+      return;
+    }
 
-  fs.mkdirSync(path.dirname(fullPath), { recursive: true });
-  fs.writeFileSync(fullPath, content);
+    fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+    fs.writeFileSync(fullPath, content);
+    touchProject(req.params.id);
 
-  res.status(201).json({ path: filePath, size: content.length });
+    res.status(201).json({ path: filePath, size: content.length });
   }
 );
 
 // POST /api/projects/:id/directories/* — create directory
-storageRouter.post('/:id/directories/*', requireAuth, (req: AuthenticatedRequest, res: Response) => {
-  if (!checkAccess(req, res, true)) return;
+storageRouter.post(
+  '/:id/directories/*',
+  requireAuth,
+  (req: AuthenticatedRequest, res: Response) => {
+    if (!checkAccess(req, res, true)) return;
 
-  const directoryPath = (req.params as Record<string, string>)[0];
-  if (!directoryPath) {
-    res.status(400).json({ error: 'Directory path is required' });
-    return;
+    const directoryPath = (req.params as Record<string, string>)[0];
+    if (!directoryPath) {
+      res.status(400).json({ error: 'Directory path is required' });
+      return;
+    }
+
+    const projectDir = getProjectDir(req.params.id);
+    const fullPath = resolveSafePath(projectDir, directoryPath);
+    if (!fullPath) {
+      res.status(400).json({ error: 'Invalid directory path' });
+      return;
+    }
+
+    if (fs.existsSync(fullPath) && !fs.statSync(fullPath).isDirectory()) {
+      res.status(409).json({ error: 'A file already exists at that path' });
+      return;
+    }
+
+    fs.mkdirSync(fullPath, { recursive: true });
+    touchProject(req.params.id);
+    res.status(201).json({ path: directoryPath });
   }
-
-  const projectDir = getProjectDir(req.params.id);
-  const fullPath = resolveSafePath(projectDir, directoryPath);
-  if (!fullPath) {
-    res.status(400).json({ error: 'Invalid directory path' });
-    return;
-  }
-
-  if (fs.existsSync(fullPath) && !fs.statSync(fullPath).isDirectory()) {
-    res.status(409).json({ error: 'A file already exists at that path' });
-    return;
-  }
-
-  fs.mkdirSync(fullPath, { recursive: true });
-  res.status(201).json({ path: directoryPath });
-});
+);
 
 // DELETE /api/projects/:id/files/* — delete file
 storageRouter.delete('/:id/files/*', requireAuth, (req: AuthenticatedRequest, res: Response) => {
@@ -175,6 +190,8 @@ storageRouter.delete('/:id/files/*', requireAuth, (req: AuthenticatedRequest, re
   } else {
     fs.unlinkSync(fullPath);
   }
+
+  touchProject(req.params.id);
 
   res.json({ ok: true });
 });
