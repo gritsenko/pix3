@@ -214,7 +214,7 @@ export class ProjectService {
 
       appState.project.id = id;
       appState.project.backend = 'local';
-      appState.project.directoryHandle = handle;
+      appState.project.directoryHandle = ref(handle);
       appState.project.projectName = handle.name ?? 'Untitled Project';
       appState.project.hybridSync = createInitialHybridSyncState();
       appState.project.status = 'ready';
@@ -272,7 +272,7 @@ export class ProjectService {
             this.fs.setProjectDirectory(handle);
             appState.project.id = entry.id || null;
             appState.project.backend = 'local';
-            appState.project.directoryHandle = handle;
+            appState.project.directoryHandle = ref(handle);
             appState.project.projectName = handle.name ?? entry.name;
             appState.project.localAbsolutePath = entry.localAbsolutePath ?? null;
             appState.project.hybridSync = createInitialHybridSyncState();
@@ -321,7 +321,7 @@ export class ProjectService {
       this.fs.setProjectDirectory(handle);
       appState.project.id = sessionId;
       appState.project.backend = 'local';
-      appState.project.directoryHandle = handle;
+      appState.project.directoryHandle = ref(handle);
       appState.project.projectName = handle.name;
       appState.project.hybridSync = createInitialHybridSyncState();
       appState.project.status = 'ready';
@@ -342,7 +342,7 @@ export class ProjectService {
       return true;
     } catch {
       // Silent permission denied (or missing user gesture)
-      appState.project.directoryHandle = handle;
+      appState.project.directoryHandle = ref(handle);
       appState.project.id = sessionId;
       appState.project.projectName = handle.name;
       return false;
@@ -553,7 +553,7 @@ export class ProjectService {
       // Set up project state
       const id = this.createProjectSessionId();
 
-      appState.project.directoryHandle = handle;
+      appState.project.directoryHandle = ref(handle);
       appState.project.id = id;
       appState.project.backend = 'local';
       appState.project.projectName = options.name.trim() || handle.name || 'New Project';

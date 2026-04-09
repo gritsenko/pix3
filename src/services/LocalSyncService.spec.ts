@@ -5,6 +5,16 @@ import { appState, resetAppState } from '@/state';
 import type { ProjectManifest } from '@/core/ProjectManifest';
 
 const mockApiClient = {
+  ApiClientError: class ApiClientError extends Error {
+    constructor(
+      message: string,
+      public status: number
+    ) {
+      super(message);
+    }
+  },
+  PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES: 100 * 1024 * 1024,
+  formatUploadLimitBytes: (bytes: number) => `${Math.round(bytes / (1024 * 1024))} MB`,
   getManifestWithAccess: vi.fn(),
   uploadFile: vi.fn(),
   deleteFile: vi.fn(),
@@ -265,6 +275,9 @@ describe('LocalSyncService', () => {
     });
     Object.defineProperty(service, 'fileSystem', { value: { ensurePermission: vi.fn() } });
     Object.defineProperty(service, 'cloudProjectService', { value: { createProject: vi.fn() } });
+    Object.defineProperty(service, 'logger', {
+      value: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
 
     await service.refreshCurrentProjectStatus();
 
@@ -318,6 +331,9 @@ describe('LocalSyncService', () => {
     });
     Object.defineProperty(service, 'fileSystem', { value: { ensurePermission: vi.fn() } });
     Object.defineProperty(service, 'cloudProjectService', { value: cloudProjectService });
+    Object.defineProperty(service, 'logger', {
+      value: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
 
     await service.syncCurrentLocalProjectToCloud();
 
@@ -351,5 +367,95 @@ describe('LocalSyncService', () => {
         localSessionId: 'local-1',
       }),
     ]);
+  });
+
+  it('skips oversized files and continues uploading the rest', async () => {
+    appState.project.id = 'local-1';
+    appState.project.backend = 'local';
+    appState.project.status = 'ready';
+    appState.project.directoryHandle = createDirectoryTree(
+      {}
+    ) as unknown as FileSystemDirectoryHandle;
+    appState.project.projectName = 'Hybrid Project';
+    appState.project.manifest = createManifest();
+    appState.auth.isAuthenticated = true;
+
+    const saveProjectManifest = vi.fn(async (manifest: ProjectManifest) => {
+      appState.project.manifest = manifest;
+    });
+    const projectService = {
+      saveProjectManifest,
+      syncProjectMetadata: vi.fn(),
+      addRecentProject: vi.fn(),
+    };
+    const cloudProjectService = {
+      createProject: vi.fn(async () => ({ id: 'cloud-3' })),
+    };
+    const logger = {
+      info: vi.fn(),
+      warn: vi.fn(),
+      error: vi.fn(),
+    };
+
+    mockApiClient.uploadFile.mockImplementation(async (_projectId: string, filePath: string) => {
+      if (filePath === 'design_assets/screenshot.png') {
+        throw new Error('File design_assets/screenshot.png exceeds the upload limit of 100 MB.');
+      }
+      return { path: filePath, size: 4 };
+    });
+
+    const service = new LocalSyncService();
+    Object.defineProperty(service, 'projectService', { value: projectService });
+    Object.defineProperty(service, 'dialogService', {
+      value: { showConfirmation: vi.fn(), showChoice: vi.fn() },
+    });
+    Object.defineProperty(service, 'fileSystem', { value: { ensurePermission: vi.fn() } });
+    Object.defineProperty(service, 'cloudProjectService', { value: cloudProjectService });
+    Object.defineProperty(service, 'logger', { value: logger });
+    Object.defineProperty(service, 'buildLocalManifest', {
+      value: vi.fn(
+        async () =>
+          new Map([
+            [
+              'design_assets/screenshot.png',
+              {
+                hash: 'big-hash',
+                modified: 1,
+                size: 110 * 1024 * 1024,
+              },
+            ],
+            [
+              'src/app.txt',
+              {
+                hash: 'small-hash',
+                modified: 1,
+                size: 128,
+              },
+            ],
+          ])
+      ),
+    });
+    Object.defineProperty(service, 'readFile', {
+      value: vi.fn(
+        async (_handle: FileSystemDirectoryHandle, filePath: string) =>
+          new TextEncoder().encode(filePath).buffer
+      ),
+    });
+    Object.defineProperty(service, 'isUploadTooLargeError', {
+      value: vi.fn(
+        (error: unknown) => error instanceof Error && error.message.includes('upload limit')
+      ),
+    });
+
+    await service.syncCurrentLocalProjectToCloud();
+
+    expect(mockApiClient.uploadFile).toHaveBeenCalledWith(
+      'cloud-3',
+      'src/app.txt',
+      expect.any(ArrayBuffer)
+    );
+    expect(appState.project.hybridSync.status).toBe('local-changes');
+    expect(appState.project.hybridSync.errorMessage).toContain('upload limit is 100 MB');
+    expect(logger.warn).toHaveBeenCalled();
   });
 });

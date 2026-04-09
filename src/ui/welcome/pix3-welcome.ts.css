@@ -165,6 +165,52 @@ pix3-welcome {
   display: grid;
   gap: 0.5rem;
 }
+.project-tabs {
+  text-align: left;
+}
+
+.project-tabs__nav {
+  display: inline-flex;
+  gap: 0.35rem;
+  padding: 0.25rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.project-tab {
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(247, 250, 252, 0.72);
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  padding: 0.55rem 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.project-tab:hover {
+  color: #f7fafc;
+}
+
+.project-tab--active {
+  background: rgba(var(--pix3-accent-rgb), 0.2);
+  color: #fff4cc;
+  box-shadow: 0 0 0 1px rgba(var(--pix3-accent-rgb), 0.25) inset;
+}
+
+.project-tabs__panel {
+  margin-top: 1rem;
+}
+
+.recent-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
 .recent-item {
   display: flex;
   align-items: center;
@@ -228,6 +274,42 @@ pix3-welcome {
   color: rgba(247, 250, 252, 0.58);
   font-size: 0.88rem;
 }
+
+.cloud-auth-status {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+  padding: 0.9rem;
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.cloud-auth-status__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 6rem;
+  padding: 0.6rem 1rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(var(--pix3-accent-rgb), 0.35);
+  background: rgba(var(--pix3-accent-rgb), 0.14);
+  color: #f7fafc;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cloud-auth-status__button:hover {
+  background: rgba(var(--pix3-accent-rgb), 0.2);
+  border-color: rgba(var(--pix3-accent-rgb), 0.55);
+}
+
+.cloud-auth-status__hint {
+  color: rgba(247, 250, 252, 0.62);
+  font-size: 0.88rem;
+}
+
 .recent-remove {
   background: transparent;
   border: none;
@@ -265,8 +347,18 @@ pix3-welcome {
     align-items: flex-start;
   }
 
+  .project-tabs__nav {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
   .recent-time {
     width: 100%;
     margin-left: 2.1rem;
+  }
+
+  .recent-row {
+    align-items: flex-start;
   }
 }

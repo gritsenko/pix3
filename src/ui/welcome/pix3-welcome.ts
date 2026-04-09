@@ -11,6 +11,10 @@ import { CURRENT_EDITOR_VERSION } from '@/version';
 
 @customElement('pix3-welcome')
 export class Pix3Welcome extends ComponentBase {
+  private static readonly DEFAULT_TAB_AUTHENTICATED = 'cloud';
+
+  private static readonly DEFAULT_TAB_UNAUTHENTICATED = 'local';
+
   @inject(ProjectService)
   private readonly projectService!: ProjectService;
 
@@ -35,6 +39,11 @@ export class Pix3Welcome extends ComponentBase {
   @state()
   private isAuthenticated = appState.auth.isAuthenticated;
 
+  @state()
+  private activeTab: 'cloud' | 'local' = appState.auth.isAuthenticated
+    ? Pix3Welcome.DEFAULT_TAB_AUTHENTICATED
+    : Pix3Welcome.DEFAULT_TAB_UNAUTHENTICATED;
+
   protected firstUpdated(): void {
     Promise.resolve().then(() => {
       this.loadRecents();
@@ -53,7 +62,13 @@ export class Pix3Welcome extends ComponentBase {
       this.cloudProjectsLoading = state.isLoading;
     });
     this.disposeAuthSubscription = subscribe(appState.auth, () => {
+      const wasAuthenticated = this.isAuthenticated;
       this.isAuthenticated = appState.auth.isAuthenticated;
+      if (wasAuthenticated !== this.isAuthenticated) {
+        this.activeTab = this.isAuthenticated
+          ? Pix3Welcome.DEFAULT_TAB_AUTHENTICATED
+          : Pix3Welcome.DEFAULT_TAB_UNAUTHENTICATED;
+      }
       this.loadCloudProjects();
       this.requestUpdate();
     });
@@ -182,6 +197,17 @@ export class Pix3Welcome extends ComponentBase {
     await this.cloudProjectService.openProject(projectId);
   };
 
+  private onLoginRequest = (): void => {
+    this.requestAuth({
+      projectId: null,
+      source: 'cloud-list',
+    });
+  };
+
+  private setActiveTab(tab: 'cloud' | 'local'): void {
+    this.activeTab = tab;
+  }
+
   private requestAuth(detail: { projectId: string | null; source: 'recent-cloud' | 'cloud-list' }) {
     this.dispatchEvent(
       new CustomEvent('pix3-auth:request', {
@@ -213,7 +239,15 @@ export class Pix3Welcome extends ComponentBase {
     );
   }
 
+  private getLocalProjectItems(): Array<{ entry: RecentProjectEntry; recentIndex: number }> {
+    return this.recents
+      .map((entry, recentIndex) => ({ entry, recentIndex }))
+      .filter(item => item.entry.backend === 'local');
+  }
+
   protected render() {
+    const localProjectItems = this.getLocalProjectItems();
+
     return html`
       <div class="welcome-root" role="region" aria-label="Welcome">
         <div class="welcome-card">
@@ -239,75 +273,110 @@ export class Pix3Welcome extends ComponentBase {
             </div>
           </div>
 
-          ${this.recents.length
-            ? html`<div class="recent-list">
-                <h3>Recent Projects</h3>
-                <ul>
-                  ${this.recents.map(
-                    (r, i) =>
-                      html`<li>
-                        <div style="display:flex; align-items:center; gap:0.5rem;">
-                          <button
-                            class="recent-item"
-                            data-recent-index="${i}"
-                            @click=${this.onRecent}
-                          >
-                            <span class="folder-icon" aria-hidden="true"
-                              >${this.getProjectIcon(r)}</span
+          <div class="recent-list project-tabs">
+            <div class="project-tabs__nav" role="tablist" aria-label="Project sources">
+              <button
+                class="project-tab ${this.activeTab === 'cloud' ? 'project-tab--active' : ''}"
+                type="button"
+                role="tab"
+                aria-selected=${this.activeTab === 'cloud'}
+                @click=${() => this.setActiveTab('cloud')}
+              >
+                Cloud Projects
+              </button>
+              <button
+                class="project-tab ${this.activeTab === 'local' ? 'project-tab--active' : ''}"
+                type="button"
+                role="tab"
+                aria-selected=${this.activeTab === 'local'}
+                @click=${() => this.setActiveTab('local')}
+              >
+                Local Projects
+              </button>
+            </div>
+
+            <div class="project-tabs__panel" role="tabpanel">
+              ${this.activeTab === 'cloud'
+                ? html`
+                    ${!this.isAuthenticated
+                      ? html`
+                          <div class="cloud-auth-status">
+                            <button
+                              type="button"
+                              class="cloud-auth-status__button"
+                              @click=${this.onLoginRequest}
                             >
-                            <span class="recent-name">${r.name}</span>
-                            <span class=${this.getProjectBadgeClass(r)}
-                              >${this.getProjectBadgeLabel(r)}</span
-                            >
-                            <span class="recent-time">${this.formatTime(r.lastOpenedAt)}</span>
-                          </button>
-                          <button
-                            class="recent-remove"
-                            title="Remove from recent"
-                            data-recent-index="${i}"
-                            @click=${this.onRemoveRecent}
-                            aria-label="Remove recent"
-                          >
-                            ${this.iconService.getIcon('x-close', 12)}
-                          </button>
-                        </div>
-                      </li>`
-                  )}
-                </ul>
-              </div>`
-            : null}
-          ${this.isAuthenticated && this.cloudProjects.length
-            ? html`<div class="recent-list cloud-list">
-                <h3>Cloud Projects</h3>
-                <ul>
-                  ${this.cloudProjects.map(
-                    p =>
-                      html`<li>
-                        <button
-                          class="recent-item"
-                          data-cloud-id="${p.id}"
-                          @click=${this.onCloudProject}
-                        >
-                          <span class="folder-icon" aria-hidden="true"
-                            >${this.iconService.getIcon('cloud-outline', 18)}</span
-                          >
-                          <span class="recent-name">${p.name}</span>
-                          <span class="recent-backend">Cloud</span>
-                          <span class="recent-time"
-                            >${this.formatTime(new Date(p.updated_at).getTime())}</span
-                          >
-                        </button>
-                      </li>`
-                  )}
-                </ul>
-              </div>`
-            : null}
-          ${this.isAuthenticated && this.cloudProjectsLoading && this.cloudProjects.length === 0
-            ? html`<div class="recent-list cloud-list">
-                <h3>Cloud Projects</h3>
-                <div class="recent-empty">Loading cloud projects...</div>
-              </div>`
-            : null}
+                              Login
+                            </button>
+                            <div class="cloud-auth-status__hint">Login to load cloud projects.</div>
+                          </div>
+                        `
+                      : this.cloudProjectsLoading && this.cloudProjects.length === 0
+                        ? html`<div class="recent-empty">Loading cloud projects...</div>`
+                        : this.cloudProjects.length
+                          ? html`<ul>
+                              ${this.cloudProjects.map(
+                                p =>
+                                  html`<li>
+                                    <button
+                                      class="recent-item"
+                                      data-cloud-id="${p.id}"
+                                      @click=${this.onCloudProject}
+                                    >
+                                      <span class="folder-icon" aria-hidden="true"
+                                        >${this.iconService.getIcon('cloud-outline', 18)}</span
+                                      >
+                                      <span class="recent-name">${p.name}</span>
+                                      <span class="recent-backend">Cloud</span>
+                                      <span class="recent-time"
+                                        >${this.formatTime(new Date(p.updated_at).getTime())}</span
+                                      >
+                                    </button>
+                                  </li>`
+                              )}
+                            </ul>`
+                          : html`<div class="recent-empty">No cloud projects yet.</div>`}
+                  `
+                : html`
+                    ${localProjectItems.length
+                      ? html`<ul>
+                          ${localProjectItems.map(
+                            ({ entry, recentIndex }) =>
+                              html`<li>
+                                <div class="recent-row">
+                                  <button
+                                    class="recent-item"
+                                    data-recent-index="${recentIndex}"
+                                    @click=${this.onRecent}
+                                  >
+                                    <span class="folder-icon" aria-hidden="true"
+                                      >${this.getProjectIcon(entry)}</span
+                                    >
+                                    <span class="recent-name">${entry.name}</span>
+                                    <span class=${this.getProjectBadgeClass(entry)}
+                                      >${this.getProjectBadgeLabel(entry)}</span
+                                    >
+                                    <span class="recent-time"
+                                      >${this.formatTime(entry.lastOpenedAt)}</span
+                                    >
+                                  </button>
+                                  <button
+                                    class="recent-remove"
+                                    title="Remove from recent"
+                                    data-recent-index="${recentIndex}"
+                                    @click=${this.onRemoveRecent}
+                                    aria-label="Remove recent"
+                                  >
+                                    ${this.iconService.getIcon('x-close', 12)}
+                                  </button>
+                                </div>
+                              </li>`
+                          )}
+                        </ul>`
+                      : html`<div class="recent-empty">No local projects yet.</div>`}
+                  `}
+            </div>
+          </div>
         </div>
       </div>
     `;

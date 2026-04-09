@@ -1,4 +1,32 @@
-const BASE_URL = import.meta.env.VITE_COLLAB_SERVER_URL || 'http://localhost:4001';
+const SERVER_BASE_URL = import.meta.env.VITE_COLLAB_SERVER_URL || 'http://localhost:4001';
+const BASE_URL = import.meta.env.DEV ? '' : SERVER_BASE_URL;
+export const PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES = 100 * 1024 * 1024;
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) {
+    return '0 B';
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+
+  const precision = value >= 10 || unitIndex === 0 ? 0 : 1;
+  return `${value.toFixed(precision)} ${units[unitIndex]}`;
+}
+
+function getUploadLimitMessage(filePath?: string): string {
+  const prefix = filePath ? `File ${filePath}` : 'File';
+  return `${prefix} was rejected with HTTP 413. Pix3 server limit is ${formatBytes(PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES)}, but an upstream proxy may enforce a lower limit.`;
+}
+
+export function formatUploadLimitBytes(bytes: number): string {
+  return formatBytes(bytes);
+}
 
 export interface ApiUser {
   id: string;
@@ -54,6 +82,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
   if (!res.ok) {
+    if (res.status === 413) {
+      throw new ApiClientError(getUploadLimitMessage(), res.status);
+    }
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new ApiClientError(body.error ?? res.statusText, res.status);
   }
@@ -191,6 +222,9 @@ export async function uploadFile(
     }
   );
   if (!res.ok) {
+    if (res.status === 413) {
+      throw new ApiClientError(getUploadLimitMessage(filePath), res.status);
+    }
     const body = await res.json().catch(() => ({ error: res.statusText }));
     throw new ApiClientError(body.error ?? res.statusText, res.status);
   }
@@ -213,7 +247,7 @@ export async function createDirectory(
 }
 
 export function getBaseUrl(): string {
-  return BASE_URL;
+  return BASE_URL || SERVER_BASE_URL;
 }
 
 export { ApiClientError };

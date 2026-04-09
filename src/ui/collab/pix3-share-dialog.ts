@@ -224,6 +224,15 @@ export class Pix3ShareDialog extends ComponentBase {
     }
   }
 
+  private get syncProgressLabel(): string | null {
+    const { processedFileCount, totalFileCount, status } = appState.project.hybridSync;
+    if (status !== 'syncing' || totalFileCount <= 0) {
+      return null;
+    }
+
+    return `Processed ${processedFileCount}/${totalFileCount} files`;
+  }
+
   private get syncPrimaryActionLabel(): string {
     if (appState.project.backend === 'local') {
       return appState.project.hybridSync.linkedCloudProjectId ? 'Sync Changes' : 'Sync to Cloud';
@@ -259,12 +268,34 @@ export class Pix3ShareDialog extends ComponentBase {
       } else {
         await this.localSyncService.syncCurrentCloudProjectToLocalFolder();
       }
-      await this.localSyncService.refreshCurrentProjectStatus();
     } catch (error) {
       this.errorMessage = error instanceof Error ? error.message : 'Failed to synchronize project.';
     } finally {
       this.isSyncing = false;
     }
+  }
+
+  private renderSyncIssues() {
+    const issues = appState.project.hybridSync.issues;
+    if (issues.length === 0) {
+      return nothing;
+    }
+
+    return html`
+      <div class="pix3-share-issues">
+        <div class="pix3-share-issues__title">Problems</div>
+        <ul class="pix3-share-issues__list">
+          ${issues.map(
+            issue => html`
+              <li class="pix3-share-issues__item">
+                <div class="pix3-share-issues__path">${issue.path}</div>
+                <div class="pix3-share-issues__reason">${issue.reason}</div>
+              </li>
+            `
+          )}
+        </ul>
+      </div>
+    `;
   }
 
   private renderSyncSection() {
@@ -297,7 +328,11 @@ export class Pix3ShareDialog extends ComponentBase {
           >
             ${this.isSyncing ? 'Working...' : this.syncPrimaryActionLabel}
           </button>
+          ${this.syncProgressLabel
+            ? html`<div class="pix3-share-progress">${this.syncProgressLabel}</div>`
+            : nothing}
         </div>
+        ${this.renderSyncIssues()}
       </div>
     `;
   }

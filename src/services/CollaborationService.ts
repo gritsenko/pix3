@@ -37,6 +37,10 @@ export class CollaborationService {
   isRemoteUpdate = false;
 
   private getServerBaseUrlInternal(): string {
+    if (import.meta.env.DEV) {
+      return window.location.origin;
+    }
+
     return import.meta.env.VITE_COLLAB_SERVER_URL || 'http://localhost:4001';
   }
 

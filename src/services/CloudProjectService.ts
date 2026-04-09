@@ -10,6 +10,7 @@ import { stringify } from 'yaml';
 import { sceneTemplates } from './template-data';
 import { CollaborationService } from './CollaborationService';
 import { CollabSessionService } from './CollabSessionService';
+import { ProjectScriptLoaderService } from './ProjectScriptLoaderService';
 
 export interface CloudProjectState {
   projects: ApiProject[];
@@ -38,6 +39,9 @@ export class CloudProjectService {
 
   @inject(EditorTabService)
   private readonly editorTabService!: EditorTabService;
+
+  @inject(ProjectScriptLoaderService)
+  private readonly projectScriptLoader!: ProjectScriptLoaderService;
 
   private state: CloudProjectState = {
     projects: [],
@@ -192,6 +196,8 @@ export class CloudProjectService {
     if (options?.skipSceneOpen) {
       return;
     }
+
+    await this.projectScriptLoader.ensureReady();
 
     const preferredScenePath = options?.preferredScenePath ?? this.getPreferredScenePath(projectId);
     const initialScenePath =

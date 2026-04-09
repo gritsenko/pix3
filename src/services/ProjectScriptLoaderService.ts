@@ -112,6 +112,47 @@ export class ProjectScriptLoaderService {
     }, this.debounceMs);
   }
 
+  async ensureReady(): Promise<void> {
+    if (appState.project.status !== 'ready') {
+      return;
+    }
+
+    if (appState.project.scriptsStatus === 'ready' || appState.project.scriptsStatus === 'error') {
+      return;
+    }
+
+    if (appState.project.scriptsStatus === 'idle') {
+      await this.syncAndBuild();
+    }
+
+    await new Promise<void>(resolve => {
+      if (
+        appState.project.scriptsStatus === 'ready' ||
+        appState.project.scriptsStatus === 'error'
+      ) {
+        resolve();
+        return;
+      }
+
+      const timeoutId = window.setTimeout(() => {
+        unsubscribe();
+        this.logger.warn('Timed out waiting for project scripts to finish loading');
+        resolve();
+      }, 15000);
+
+      const unsubscribe = subscribe(appState.project, () => {
+        if (
+          appState.project.scriptsStatus === 'ready' ||
+          appState.project.scriptsStatus === 'error'
+        ) {
+          window.clearTimeout(timeoutId);
+          unsubscribe();
+          resolve();
+        }
+      });
+    });
+  }
+
   /**
    * Perform the actual sync and build workflow
    */
@@ -190,7 +231,9 @@ export class ProjectScriptLoaderService {
       // Step 3: Compile scripts using ScriptCompilerService
       let compilationResult;
       try {
-        compilationResult = await this.compiler.bundle(filesMap, entryFiles);
+        compilationResult = await this.compiler.bundle(filesMap, entryFiles, async filePath =>
+          this.loadBundledDependency(filePath)
+        );
       } catch (error) {
         const userError = this.handleCompilationError(
           error as CompilationError,
@@ -351,15 +394,14 @@ export class ProjectScriptLoaderService {
       string,
       { name: string; kind: FileSystemHandleKind; path: string }
     >();
-    const roots = new Set<string>();
 
     for (const directory of this.scriptDirectories) {
       try {
-        await this.storage.listDirectory(directory);
-        roots.add(directory);
-
-        if (directory === 'src/scripts') {
-          roots.add('src');
+        const entries = await this.collectFilesRecursively(directory);
+        for (const entry of entries) {
+          if (this.isSupportedSourceFile(entry.name)) {
+            sourceFiles.set(entry.path, entry);
+          }
         }
       } catch (error) {
         if (this.isDirectoryNotFoundError(error)) {
@@ -369,19 +411,38 @@ export class ProjectScriptLoaderService {
       }
     }
 
-    for (const root of roots) {
-      const entries = await this.collectFilesRecursively(root);
-      for (const entry of entries) {
-        if (this.isSupportedSourceFile(entry.name)) {
-          sourceFiles.set(entry.path, entry);
-        }
-      }
-    }
-
     return {
       sourceFiles: Array.from(sourceFiles.values()),
       checkedDirectories: this.scriptDirectories,
     };
+  }
+
+  private async loadBundledDependency(filePath: string): Promise<string | null> {
+    if (!this.isLoadableDependencyPath(filePath)) {
+      return null;
+    }
+
+    try {
+      const content = await this.storage.readTextFile(filePath);
+
+      if (filePath.endsWith('.ts') && !this.watchedFilePaths.has(filePath)) {
+        try {
+          const handle = await this.storage.getFileHandle(filePath);
+          if (handle) {
+            this.fileWatchService.watch(filePath, handle, undefined, () => {
+              void this.syncAndBuild();
+            });
+            this.watchedFilePaths.add(filePath);
+          }
+        } catch (error) {
+          this.logger.error(`Failed to register watcher for ${filePath}`, error);
+        }
+      }
+
+      return content;
+    } catch {
+      return null;
+    }
   }
 
   private async collectFilesRecursively(
@@ -406,6 +467,16 @@ export class ProjectScriptLoaderService {
 
   private isSupportedSourceFile(fileName: string): boolean {
     return this.supportedSourceExtensions.some(extension => fileName.endsWith(extension));
+  }
+
+  private isLoadableDependencyPath(filePath: string): boolean {
+    return (
+      filePath.endsWith('.ts') ||
+      filePath.endsWith('.css') ||
+      filePath.endsWith('.glsl') ||
+      filePath.endsWith('.frag') ||
+      filePath.endsWith('.vert')
+    );
   }
 
   private findComponentEntryFiles(files: Map<string, string>): string[] {

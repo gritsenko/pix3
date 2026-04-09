@@ -38,6 +38,8 @@ export interface CompilationError {
   details?: unknown;
 }
 
+type VirtualFileLoader = (filePath: string) => Promise<string | null>;
+
 @injectable()
 export class ScriptCompilerService {
   @inject(LoggingService)
@@ -83,7 +85,11 @@ export class ScriptCompilerService {
    * @param files Map of file paths to their TypeScript content
    * @returns Compilation result with bundled code or throws CompilationError
    */
-  async bundle(files: Map<string, string>, entryFiles?: string[]): Promise<CompilationResult> {
+  async bundle(
+    files: Map<string, string>,
+    entryFiles?: string[],
+    fileLoader?: VirtualFileLoader
+  ): Promise<CompilationResult> {
     if (!this.initialized) {
       await this.init();
     }
@@ -130,7 +136,7 @@ export class ScriptCompilerService {
         ],
         write: false,
         logLevel: 'silent',
-        plugins: [this.createVirtualFileSystemPlugin(files)],
+        plugins: [this.createVirtualFileSystemPlugin(files, fileLoader)],
       });
 
       const warnings = result.warnings.map(w => this.formatMessage(w));
@@ -178,34 +184,51 @@ export class ScriptCompilerService {
   /**
    * Create esbuild plugin for virtual file system
    */
-  private createVirtualFileSystemPlugin(files: Map<string, string>): esbuild.Plugin {
+  private createVirtualFileSystemPlugin(
+    files: Map<string, string>,
+    fileLoader?: VirtualFileLoader
+  ): esbuild.Plugin {
     return {
       name: 'virtual-fs',
       setup: build => {
         build.onResolve({ filter: /.*/ }, args => {
-          if (this.isExternalModule(args.path)) {
-            return { path: args.path, external: true };
-          }
-
-          // Resolve relative imports against the importing virtual file.
-          if (args.path.startsWith('./') || args.path.startsWith('../')) {
-            const resolved = this.resolveVirtualImport(args.path, args.importer, files);
-            if (resolved) {
-              return resolved;
+          return (async () => {
+            if (this.isExternalModule(args.path)) {
+              return { path: args.path, external: true };
             }
 
-            return {
-              path: this.resolveUnresolvedPath(args.path, args.importer),
-              namespace: 'virtual-fs',
-            };
-          }
+            // Resolve relative imports against the importing virtual file.
+            if (args.path.startsWith('./') || args.path.startsWith('../')) {
+              const resolved = await this.resolveVirtualImport(
+                args.path,
+                args.importer,
+                files,
+                fileLoader
+              );
+              if (resolved) {
+                return resolved;
+              }
 
-          return { path: args.path, external: true };
+              return {
+                path: this.resolveUnresolvedPath(args.path, args.importer),
+                namespace: 'virtual-fs',
+              };
+            }
+
+            return { path: args.path, external: true };
+          })();
         });
 
         // Load file contents from virtual FS
-        build.onLoad({ filter: /.*/, namespace: 'virtual-fs' }, args => {
-          const contents = files.get(args.path);
+        build.onLoad({ filter: /.*/, namespace: 'virtual-fs' }, async args => {
+          let contents = files.get(args.path);
+
+          if (contents === undefined && fileLoader) {
+            contents = (await fileLoader(args.path)) ?? undefined;
+            if (contents !== undefined) {
+              files.set(args.path, contents);
+            }
+          }
 
           if (contents === undefined) {
             return {
@@ -224,8 +247,15 @@ export class ScriptCompilerService {
           };
         });
 
-        build.onLoad({ filter: /.*/, namespace: 'virtual-raw' }, args => {
-          const contents = files.get(args.path);
+        build.onLoad({ filter: /.*/, namespace: 'virtual-raw' }, async args => {
+          let contents = files.get(args.path);
+
+          if (contents === undefined && fileLoader) {
+            contents = (await fileLoader(args.path)) ?? undefined;
+            if (contents !== undefined) {
+              files.set(args.path, contents);
+            }
+          }
 
           if (contents === undefined) {
             return {
@@ -270,8 +300,9 @@ export class ScriptCompilerService {
   private resolveVirtualImport(
     importPath: string,
     importer: string,
-    files: Map<string, string>
-  ): { path: string; namespace: VirtualNamespace } | null {
+    files: Map<string, string>,
+    fileLoader?: VirtualFileLoader
+  ): Promise<{ path: string; namespace: VirtualNamespace } | null> {
     const querySuffix = importPath.endsWith('?raw')
       ? '?raw'
       : importPath.endsWith('?url')
@@ -286,18 +317,28 @@ export class ScriptCompilerService {
         this.findExistingPath(candidateBasePaths[0] ?? resolvedBasePath, [''], files) ??
         this.findFirstExistingPath(candidateBasePaths, [''], files) ??
         resolvedBasePath;
-      return { path: assetPath, namespace: 'virtual-url' };
+      return Promise.resolve({ path: assetPath, namespace: 'virtual-url' });
     }
 
     if (querySuffix === '?raw') {
-      const rawPath = this.findFirstExistingPath(candidateBasePaths, [''], files);
-      return rawPath ? { path: rawPath, namespace: 'virtual-raw' } : null;
+      return this.resolveLoadableVirtualPath(
+        candidateBasePaths,
+        [''],
+        'virtual-raw',
+        files,
+        fileLoader
+      );
     }
 
     if (cleanImportPath.endsWith('.css')) {
-      const cssPath =
-        this.findFirstExistingPath(candidateBasePaths, [''], files) ?? resolvedBasePath;
-      return { path: cssPath, namespace: 'virtual-css' };
+      return this.resolveLoadableVirtualPath(
+        candidateBasePaths,
+        [''],
+        'virtual-css',
+        files,
+        fileLoader,
+        resolvedBasePath
+      );
     }
 
     const resolvedTsPath = this.findFirstExistingPath(
@@ -305,7 +346,17 @@ export class ScriptCompilerService {
       ['', '.ts', '/index.ts'],
       files
     );
-    return resolvedTsPath ? { path: resolvedTsPath, namespace: 'virtual-fs' } : null;
+    if (resolvedTsPath) {
+      return Promise.resolve({ path: resolvedTsPath, namespace: 'virtual-fs' });
+    }
+
+    return this.resolveLoadableVirtualPath(
+      candidateBasePaths,
+      ['', '.ts', '/index.ts'],
+      'virtual-fs',
+      files,
+      fileLoader
+    );
   }
 
   private getImportCandidateBasePaths(basePath: string): string[] {
@@ -347,6 +398,38 @@ export class ScriptCompilerService {
       if (!files || files.has(candidate)) {
         return candidate;
       }
+    }
+
+    return null;
+  }
+
+  private async resolveLoadableVirtualPath(
+    basePaths: string[],
+    suffixes: string[],
+    namespace: VirtualNamespace,
+    files: Map<string, string>,
+    fileLoader?: VirtualFileLoader,
+    fallbackPath?: string
+  ): Promise<{ path: string; namespace: VirtualNamespace } | null> {
+    if (fileLoader) {
+      for (const basePath of basePaths) {
+        for (const suffix of suffixes) {
+          const candidate = this.normalizePath(`${basePath}${suffix}`);
+          if (files.has(candidate)) {
+            return { path: candidate, namespace };
+          }
+
+          const loaded = await fileLoader(candidate);
+          if (loaded !== null) {
+            files.set(candidate, loaded);
+            return { path: candidate, namespace };
+          }
+        }
+      }
+    }
+
+    if (fallbackPath) {
+      return { path: fallbackPath, namespace };
     }
 
     return null;

@@ -27,17 +27,21 @@ packages/pix3-collab-server/
 ## Принцип работы
 
 ### 1. Синхронизация состояния (WebSocket)
+
 Сервер использует **Hocuspocus** (обертка над Yjs) для управления WebSocket-соединениями на пути `/collaboration`.
 Каждый проект открывается в отдельной "комнате" (`documentName`). Изменения, вносимые клиентами, объединяются сервером и рассылаются остальным участникам. Состояние комнаты сохраняется в SQLite.
 
 ### 2. HTTP API (Express)
+
 Тот же HTTP-сервер предоставляет REST API:
+
 - `/api/auth` — Аутентификация, токены.
 - `/api/projects` — Управление проектами и списками файлов.
 - `/api/projects` (storageRouter) — Загрузка и скачивание ассетов.
 - `/api/admin` — Административные маршруты.
 
 ### 3. Reverse proxy
+
 В production `nginx` проксирует и обычные HTTP-запросы, и WebSocket upgrade-запросы на `127.0.0.1:4001`.
 
 ## Локальная настройка
@@ -185,6 +189,7 @@ systemctl --user status pix3-collab-server
 
 ```nginx
 location / {
+    client_max_body_size 100m;
     proxy_pass http://127.0.0.1:4001;
     proxy_set_header Host $host;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -192,6 +197,7 @@ location / {
 }
 
 location /collaboration {
+    client_max_body_size 100m;
     proxy_pass http://127.0.0.1:4001;
     proxy_http_version 1.1;
     proxy_set_header Upgrade $http_upgrade;
@@ -201,6 +207,10 @@ location /collaboration {
     proxy_set_header X-Forwarded-Proto $scheme;
 }
 ```
+
+Если upload-файлы начинают отваливаться на размерах около `1 MB`, почти всегда это значит,
+что `nginx` использует дефолтный `client_max_body_size 1m` и режет запрос до того,
+как он попадёт в Express + `multer`.
 
 ### Smoke checks после деплоя
 
@@ -215,5 +225,5 @@ journalctl --user -u pix3-collab-server -n 100 --no-pager
 Ожидаемый health-check:
 
 ```json
-{"status":"ok","port":4001}
+{ "status": "ok", "port": 4001 }
 ```

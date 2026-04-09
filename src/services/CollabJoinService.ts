@@ -6,6 +6,7 @@ import { OperationService } from './OperationService';
 import { SceneManager, type SceneGraph } from '@pix3/runtime';
 import { ref } from 'valtio/vanilla';
 import { CloudProjectService } from './CloudProjectService';
+import { ProjectScriptLoaderService } from './ProjectScriptLoaderService';
 
 export interface CollabJoinParams {
   projectId: string;
@@ -41,13 +42,17 @@ export class CollabJoinService {
       skipSceneOpen: true,
     });
 
+    const projectScriptLoader = container.getService<ProjectScriptLoaderService>(
+      container.getOrCreateToken(ProjectScriptLoaderService)
+    );
+
     // 2. Connect to the collab server
     const collabService = container.getService<CollaborationService>(
       container.getOrCreateToken(CollaborationService)
     );
 
-    // 3. Wait for Y.Doc sync from the server
-    await this.waitForSync(collabService);
+    // 3. Wait for Y.Doc sync and project scripts before hydrating the scene graph.
+    await Promise.all([this.waitForSync(collabService), projectScriptLoader.ensureReady()]);
 
     // 4. Build the target scene from the shared project document.
     const ydoc = collabService.getYDoc();

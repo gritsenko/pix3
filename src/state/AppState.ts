@@ -109,6 +109,13 @@ export interface ProjectHybridSyncState {
   localChangeCount: number;
   cloudChangeCount: number;
   conflictCount: number;
+  processedFileCount: number;
+  totalFileCount: number;
+  issues: Array<{
+    path: string;
+    size: number | null;
+    reason: string;
+  }>;
   errorMessage: string | null;
 }
 
@@ -330,6 +337,9 @@ export const createInitialHybridSyncState = (): ProjectHybridSyncState => ({
   localChangeCount: 0,
   cloudChangeCount: 0,
   conflictCount: 0,
+  processedFileCount: 0,
+  totalFileCount: 0,
+  issues: [],
   errorMessage: null,
 });
 

@@ -90,6 +90,58 @@ pix3-share-dialog {
   word-break: break-word;
 }
 
+.pix3-share-progress {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(243, 244, 246, 0.72);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.pix3-share-issues {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.pix3-share-issues__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255, 244, 204, 0.92);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pix3-share-issues__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.pix3-share-issues__item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.pix3-share-issues__path {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.94);
+  word-break: break-word;
+}
+
+.pix3-share-issues__reason {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: rgba(243, 244, 246, 0.72);
+}
+
 .pix3-share-row {
   display: grid;
   gap: 8px;

@@ -4,15 +4,33 @@ import { injectable, inject } from '@/fw/di';
 import { appState } from '@/state';
 
 import * as ApiClient from './ApiClient';
-import type { ManifestEntry } from './ApiClient';
+import {
+  ApiClientError,
+  PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES,
+  formatUploadLimitBytes,
+  type ManifestEntry,
+} from './ApiClient';
 import { CloudProjectService } from './CloudProjectService';
 import { DialogService } from './DialogService';
 import { FileSystemAPIService } from './FileSystemAPIService';
+import { LoggingService } from './LoggingService';
 import { ProjectService } from './ProjectService';
 
 interface FileHashEntry {
   readonly hash: string;
   readonly modified: number;
+  readonly size: number;
+}
+
+interface SyncSkippedEntry {
+  readonly path: string;
+  readonly size: number | null;
+  readonly reason: string;
+}
+
+interface SyncProgressState {
+  processedFileCount: number;
+  totalFileCount: number;
 }
 
 interface HybridLinkRecord {
@@ -48,6 +66,7 @@ export interface SyncResult {
   deletedRemote: string[];
   conflicts: string[];
   unchanged: string[];
+  skipped: SyncSkippedEntry[];
 }
 
 const HYBRID_LINKS_KEY = 'pix3.hybridLinks:v1';
@@ -71,6 +90,9 @@ export class LocalSyncService {
 
   @inject(CloudProjectService)
   private readonly cloudProjectService!: CloudProjectService;
+
+  @inject(LoggingService)
+  private readonly logger!: LoggingService;
 
   private lastPromptSignature: string | null = null;
 
@@ -96,6 +118,9 @@ export class LocalSyncService {
         localChangeCount: 0,
         cloudChangeCount: 0,
         conflictCount: 0,
+        processedFileCount: 0,
+        totalFileCount: 0,
+        issues: [],
       });
       return null;
     }
@@ -109,6 +134,9 @@ export class LocalSyncService {
         localChangeCount: 0,
         cloudChangeCount: 0,
         conflictCount: 0,
+        processedFileCount: 0,
+        totalFileCount: 0,
+        issues: [],
       });
       this.projectService.syncProjectMetadata();
       return null;
@@ -117,6 +145,9 @@ export class LocalSyncService {
     this.applyHybridState(link, {
       status: 'checking',
       errorMessage: null,
+      issues: [],
+      processedFileCount: 0,
+      totalFileCount: 0,
     });
 
     try {
@@ -131,6 +162,9 @@ export class LocalSyncService {
           localChangeCount: 0,
           cloudChangeCount: 0,
           conflictCount: 0,
+          processedFileCount: 0,
+          totalFileCount: 0,
+          issues: [],
         });
         this.projectService.syncProjectMetadata();
         return null;
@@ -143,6 +177,9 @@ export class LocalSyncService {
           localChangeCount: 0,
           cloudChangeCount: 0,
           conflictCount: 0,
+          processedFileCount: 0,
+          totalFileCount: 0,
+          issues: [],
         });
         this.projectService.syncProjectMetadata();
         return null;
@@ -155,13 +192,23 @@ export class LocalSyncService {
       const baseline = this.readBaseline(link);
       const plan = this.createSyncPlan(localManifest, cloudManifest, baseline);
       const status = this.getPlanStatus(plan);
+      const oversizeEntries = this.getOversizeLocalEntries(localManifest, plan);
+      const issues =
+        oversizeEntries.length > 0
+          ? oversizeEntries
+          : status === 'local-changes' && appState.project.hybridSync.issues.length > 0
+            ? appState.project.hybridSync.issues
+            : [];
 
       this.applyHybridState(link, {
         status,
-        errorMessage: null,
+        errorMessage: this.buildIssuesSummary(issues),
         localChangeCount: plan.uploadToCloud.length + plan.deleteFromCloud.length,
         cloudChangeCount: plan.downloadToLocal.length + plan.deleteFromLocal.length,
         conflictCount: plan.conflicts.length,
+        processedFileCount: 0,
+        totalFileCount: 0,
+        issues,
       });
       this.projectService.syncProjectMetadata();
 
@@ -183,6 +230,9 @@ export class LocalSyncService {
         localChangeCount: 0,
         cloudChangeCount: 0,
         conflictCount: 0,
+        processedFileCount: 0,
+        totalFileCount: 0,
+        issues: [],
       });
       this.projectService.syncProjectMetadata();
       return null;
@@ -206,6 +256,7 @@ export class LocalSyncService {
         deletedRemote: [],
         conflicts: [],
         unchanged: prepared.plan.unchanged,
+        skipped: [],
       };
     }
 
@@ -251,6 +302,7 @@ export class LocalSyncService {
     this.applyHybridState(null, {
       status: 'syncing',
       errorMessage: null,
+      issues: [],
     });
 
     const project = await this.cloudProjectService.createProject(projectName);
@@ -258,9 +310,51 @@ export class LocalSyncService {
 
     const localManifest = await this.buildLocalManifest(localHandle);
     const filePaths = Array.from(localManifest.keys()).sort((a, b) => a.localeCompare(b));
+    const skipped: SyncSkippedEntry[] = [];
+    const progress: SyncProgressState = {
+      processedFileCount: 0,
+      totalFileCount: filePaths.length,
+    };
+    this.updateSyncProgress(null, progress);
+
+    this.logger.info(`Hybrid sync started: local -> cloud (${filePaths.length} file(s))`, {
+      projectId: project.id,
+    });
+
     for (const filePath of filePaths) {
-      const content = await this.readFile(localHandle, filePath);
-      await ApiClient.uploadFile(project.id, filePath, content);
+      const entry = localManifest.get(filePath);
+      if (!entry) {
+        continue;
+      }
+
+      this.logger.info(`Upload ${filePath} (${this.formatBytes(entry.size)})`, {
+        path: filePath,
+        size: entry.size,
+        direction: 'local-to-cloud',
+      });
+
+      try {
+        const content = await this.readFile(localHandle, filePath);
+        await ApiClient.uploadFile(project.id, filePath, content);
+      } catch (error) {
+        if (this.isUploadTooLargeError(error)) {
+          const reason = this.getUploadTooLargeMessage(filePath, entry.size, error);
+          skipped.push({ path: filePath, size: entry.size, reason });
+          this.logger.warn(reason, {
+            path: filePath,
+            size: entry.size,
+            limitBytes: PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES,
+          });
+          progress.processedFileCount += 1;
+          this.updateSyncProgress(null, progress);
+          continue;
+        }
+
+        throw error;
+      }
+
+      progress.processedFileCount += 1;
+      this.updateSyncProgress(null, progress);
     }
 
     const link = this.upsertLinkRecord({
@@ -271,15 +365,28 @@ export class LocalSyncService {
       lastSyncAt: Date.now(),
     });
 
-    this.writeBaseline(link, localManifest);
+    const nextBaseline = this.createBaselineForInitialCloudSync(localManifest, skipped);
+    this.writeBaseline(link, nextBaseline);
+    const skippedMessage = this.buildIssuesSummary(skipped);
     this.applyHybridState(link, {
-      status: 'up-to-date',
-      errorMessage: null,
-      localChangeCount: 0,
+      status: skipped.length > 0 ? 'local-changes' : 'up-to-date',
+      errorMessage: skippedMessage,
+      localChangeCount: skipped.length,
       cloudChangeCount: 0,
       conflictCount: 0,
+      processedFileCount: 0,
+      totalFileCount: 0,
+      issues: skipped,
       lastSyncAt: link.lastSyncAt,
     });
+
+    if (skipped.length > 0) {
+      this.logger.warn(`Hybrid sync finished with skipped file(s): ${skipped.length}`, {
+        skipped,
+      });
+    } else {
+      this.logger.info('Hybrid sync finished: local -> cloud completed successfully');
+    }
 
     this.projectService.addRecentProject({
       id: project.id,
@@ -454,6 +561,7 @@ export class LocalSyncService {
     this.applyHybridState(prepared.link, {
       status: 'syncing',
       errorMessage: null,
+      issues: [],
     });
 
     const uploadPaths = [...prepared.plan.uploadToCloud];
@@ -470,20 +578,70 @@ export class LocalSyncService {
 
     const uploaded: string[] = [];
     const deletedRemote: string[] = [];
+    const skipped: SyncSkippedEntry[] = [];
+    const uniqueUploadPaths = this.uniqueSortedPaths(uploadPaths);
+    const uniqueDeletePaths = this.uniqueSortedPaths(deletePaths);
+    const progress: SyncProgressState = {
+      processedFileCount: 0,
+      totalFileCount: uniqueUploadPaths.length + uniqueDeletePaths.length,
+    };
+    this.updateSyncProgress(prepared.link, progress);
 
-    for (const filePath of this.uniqueSortedPaths(uploadPaths)) {
-      const content = await this.readFile(prepared.localHandle, filePath);
-      await ApiClient.uploadFile(prepared.link.cloudProjectId, filePath, content);
-      uploaded.push(filePath);
+    this.logger.info(
+      `Hybrid sync started: local -> cloud (${uploadPaths.length} upload(s), ${deletePaths.length} delete(s))`
+    );
+
+    for (const filePath of uniqueUploadPaths) {
+      const entry = prepared.localManifest.get(filePath);
+      if (!entry) {
+        continue;
+      }
+
+      this.logger.info(`Upload ${filePath} (${this.formatBytes(entry.size)})`, {
+        path: filePath,
+        size: entry.size,
+        direction: 'local-to-cloud',
+      });
+
+      try {
+        const content = await this.readFile(prepared.localHandle, filePath);
+        await ApiClient.uploadFile(prepared.link.cloudProjectId, filePath, content);
+        uploaded.push(filePath);
+      } catch (error) {
+        if (this.isUploadTooLargeError(error)) {
+          const reason = this.getUploadTooLargeMessage(filePath, entry.size, error);
+          skipped.push({ path: filePath, size: entry.size, reason });
+          this.logger.warn(reason, {
+            path: filePath,
+            size: entry.size,
+            limitBytes: PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES,
+          });
+          progress.processedFileCount += 1;
+          this.updateSyncProgress(prepared.link, progress);
+          continue;
+        }
+
+        throw error;
+      }
+
+      progress.processedFileCount += 1;
+      this.updateSyncProgress(prepared.link, progress);
     }
 
-    for (const filePath of this.uniqueSortedPaths(deletePaths)) {
+    for (const filePath of uniqueDeletePaths) {
+      this.logger.info(`Delete remote ${filePath}`, {
+        path: filePath,
+        direction: 'local-to-cloud',
+      });
       try {
         await ApiClient.deleteFile(prepared.link.cloudProjectId, filePath);
         deletedRemote.push(filePath);
       } catch {
         // Ignore missing files while converging to the local folder state.
       }
+
+      progress.processedFileCount += 1;
+      this.updateSyncProgress(prepared.link, progress);
     }
 
     const lastSyncAt = Date.now();
@@ -491,16 +649,34 @@ export class LocalSyncService {
       ...prepared.link,
       lastSyncAt,
     });
-    this.writeBaseline(nextLink, prepared.localManifest);
+    const nextBaseline = this.createBaselineAfterLocalToCloud(prepared, uploaded, deletedRemote);
+    this.writeBaseline(nextLink, nextBaseline);
+    const skippedMessage = this.buildIssuesSummary(skipped);
     this.applyHybridState(nextLink, {
-      status: 'up-to-date',
-      errorMessage: null,
-      localChangeCount: 0,
+      status: skipped.length > 0 ? 'local-changes' : 'up-to-date',
+      errorMessage: skippedMessage,
+      localChangeCount: skipped.length,
       cloudChangeCount: 0,
       conflictCount: 0,
+      processedFileCount: 0,
+      totalFileCount: 0,
+      issues: skipped,
       lastSyncAt,
     });
     this.projectService.syncProjectMetadata();
+
+    if (skipped.length > 0) {
+      this.logger.warn(`Hybrid sync finished with skipped file(s): ${skipped.length}`, {
+        uploaded: uploaded.length,
+        deletedRemote: deletedRemote.length,
+        skipped,
+      });
+    } else {
+      this.logger.info('Hybrid sync finished: local -> cloud completed successfully', {
+        uploaded: uploaded.length,
+        deletedRemote: deletedRemote.length,
+      });
+    }
 
     return {
       uploaded,
@@ -509,6 +685,7 @@ export class LocalSyncService {
       deletedRemote,
       conflicts: options.includeConflicts ? prepared.plan.conflicts : [],
       unchanged: prepared.plan.unchanged,
+      skipped,
     };
   }
 
@@ -519,6 +696,7 @@ export class LocalSyncService {
     this.applyHybridState(prepared.link, {
       status: 'syncing',
       errorMessage: null,
+      issues: [],
     });
 
     const downloadPaths = [...prepared.plan.downloadToLocal];
@@ -536,8 +714,25 @@ export class LocalSyncService {
     const downloaded: string[] = [];
     const deletedLocal: string[] = [];
     const shareToken = this.getCloudShareToken(prepared.link.cloudProjectId);
+    const uniqueDownloadPaths = this.uniqueSortedPaths(downloadPaths);
+    const uniqueDeletePaths = this.uniqueSortedPaths(deletePaths);
+    const progress: SyncProgressState = {
+      processedFileCount: 0,
+      totalFileCount: uniqueDownloadPaths.length + uniqueDeletePaths.length,
+    };
+    this.updateSyncProgress(prepared.link, progress);
 
-    for (const filePath of this.uniqueSortedPaths(downloadPaths)) {
+    this.logger.info(
+      `Hybrid sync started: cloud -> local (${downloadPaths.length} download(s), ${deletePaths.length} delete(s))`
+    );
+
+    for (const filePath of uniqueDownloadPaths) {
+      const entry = prepared.cloudManifest.get(filePath);
+      this.logger.info(`Download ${filePath}${entry ? ` (${this.formatBytes(entry.size)})` : ''}`, {
+        path: filePath,
+        size: entry?.size ?? null,
+        direction: 'cloud-to-local',
+      });
       const response = await ApiClient.downloadFile(
         prepared.link.cloudProjectId,
         filePath,
@@ -545,11 +740,19 @@ export class LocalSyncService {
       );
       await this.writeFile(prepared.localHandle, filePath, await response.arrayBuffer());
       downloaded.push(filePath);
+      progress.processedFileCount += 1;
+      this.updateSyncProgress(prepared.link, progress);
     }
 
-    for (const filePath of this.uniqueSortedPaths(deletePaths)) {
+    for (const filePath of uniqueDeletePaths) {
+      this.logger.info(`Delete local ${filePath}`, {
+        path: filePath,
+        direction: 'cloud-to-local',
+      });
       await this.deleteFile(prepared.localHandle, filePath);
       deletedLocal.push(filePath);
+      progress.processedFileCount += 1;
+      this.updateSyncProgress(prepared.link, progress);
     }
 
     const nextLocalManifest = await this.buildLocalManifest(prepared.localHandle);
@@ -565,6 +768,9 @@ export class LocalSyncService {
       localChangeCount: 0,
       cloudChangeCount: 0,
       conflictCount: 0,
+      processedFileCount: 0,
+      totalFileCount: 0,
+      issues: [],
       lastSyncAt,
     });
     this.projectService.syncProjectMetadata();
@@ -573,6 +779,11 @@ export class LocalSyncService {
       appState.project.manifest = await this.projectService.loadProjectManifest();
     }
 
+    this.logger.info('Hybrid sync finished: cloud -> local completed successfully', {
+      downloaded: downloaded.length,
+      deletedLocal: deletedLocal.length,
+    });
+
     return {
       uploaded: [],
       downloaded,
@@ -580,6 +791,7 @@ export class LocalSyncService {
       deletedRemote: [],
       conflicts: options.includeConflicts ? prepared.plan.conflicts : [],
       unchanged: prepared.plan.unchanged,
+      skipped: [],
     };
   }
 
@@ -884,8 +1096,20 @@ export class LocalSyncService {
       updates.cloudChangeCount ?? appState.project.hybridSync.cloudChangeCount;
     appState.project.hybridSync.conflictCount =
       updates.conflictCount ?? appState.project.hybridSync.conflictCount;
+    appState.project.hybridSync.processedFileCount =
+      updates.processedFileCount ?? appState.project.hybridSync.processedFileCount;
+    appState.project.hybridSync.totalFileCount =
+      updates.totalFileCount ?? appState.project.hybridSync.totalFileCount;
+    appState.project.hybridSync.issues = updates.issues ?? appState.project.hybridSync.issues;
     appState.project.hybridSync.errorMessage =
       updates.errorMessage ?? appState.project.hybridSync.errorMessage;
+  }
+
+  private updateSyncProgress(link: HybridLinkRecord | null, progress: SyncProgressState): void {
+    this.applyHybridState(link, {
+      processedFileCount: progress.processedFileCount,
+      totalFileCount: progress.totalFileCount,
+    });
   }
 
   private readLinkRecords(): HybridLinkRecord[] {
@@ -1019,6 +1243,7 @@ export class LocalSyncService {
       result.set(path, {
         hash,
         modified: file.lastModified,
+        size: file.size,
       });
     }
 
@@ -1051,6 +1276,115 @@ export class LocalSyncService {
 
   private uniqueSortedPaths(paths: string[]): string[] {
     return Array.from(new Set(paths)).sort((a, b) => a.localeCompare(b));
+  }
+
+  private getOversizeLocalEntries(
+    localManifest: Map<string, FileHashEntry>,
+    plan: SyncPlan
+  ): SyncSkippedEntry[] {
+    const oversizePaths = new Set<string>([...plan.uploadToCloud, ...plan.conflicts]);
+
+    const entries: SyncSkippedEntry[] = [];
+    for (const filePath of oversizePaths) {
+      const entry = localManifest.get(filePath);
+      if (!entry || entry.size <= PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES) {
+        continue;
+      }
+
+      entries.push({
+        path: filePath,
+        size: entry.size,
+        reason: this.getUploadTooLargeMessage(filePath, entry.size),
+      });
+    }
+
+    return entries;
+  }
+
+  private createBaselineForInitialCloudSync(
+    localManifest: Map<string, FileHashEntry>,
+    skipped: SyncSkippedEntry[]
+  ): Map<string, string> {
+    const skippedPaths = new Set(skipped.map(entry => entry.path));
+    const baseline = new Map<string, string>();
+    for (const [filePath, entry] of localManifest) {
+      if (skippedPaths.has(filePath)) {
+        continue;
+      }
+      baseline.set(filePath, entry.hash);
+    }
+    return baseline;
+  }
+
+  private createBaselineAfterLocalToCloud(
+    prepared: PreparedCurrentSync,
+    uploaded: string[],
+    deletedRemote: string[]
+  ): Map<string, string> {
+    const baseline = new Map(prepared.baseline);
+
+    for (const filePath of uploaded) {
+      const entry = prepared.localManifest.get(filePath);
+      if (entry) {
+        baseline.set(filePath, entry.hash);
+      }
+    }
+
+    for (const filePath of deletedRemote) {
+      baseline.delete(filePath);
+    }
+
+    return baseline;
+  }
+
+  private isUploadTooLargeError(error: unknown): boolean {
+    return error instanceof ApiClientError && error.status === 413;
+  }
+
+  private getUploadTooLargeMessage(filePath: string, size: number, error?: unknown): string {
+    if (size > PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES) {
+      return `Skipped ${filePath} (${this.formatBytes(size)}): configured upload limit is ${formatUploadLimitBytes(PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES)}.`;
+    }
+
+    if (this.isUploadTooLargeError(error)) {
+      return `Skipped ${filePath} (${this.formatBytes(size)}): server rejected the upload with HTTP 413. Pix3 server limit is ${formatUploadLimitBytes(PROJECT_UPLOAD_FILE_SIZE_LIMIT_BYTES)}, so an upstream proxy such as nginx likely has a lower limit.`;
+    }
+
+    return `Skipped ${filePath} (${this.formatBytes(size)}): upload was rejected because it is too large.`;
+  }
+
+  private buildIssuesSummary(issues: SyncSkippedEntry[]): string | null {
+    if (issues.length === 0) {
+      return null;
+    }
+
+    const [first] = issues;
+    if (!first) {
+      return null;
+    }
+
+    if (issues.length === 1) {
+      return first.reason;
+    }
+
+    return `${issues.length} file(s) need attention. First issue: ${first.reason}`;
+  }
+
+  private formatBytes(bytes: number): string {
+    if (!Number.isFinite(bytes) || bytes <= 0) {
+      return '0 B';
+    }
+
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let value = bytes;
+    let unitIndex = 0;
+    while (value >= 1024 && unitIndex < units.length - 1) {
+      value /= 1024;
+      unitIndex += 1;
+    }
+
+    const precision = value >= 10 || unitIndex === 0 ? 0 : 1;
+    return `${value.toFixed(precision)} ${units[unitIndex]}`;
   }
 
   private ensureCloudWriteAccess(): void {
