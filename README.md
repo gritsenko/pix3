@@ -124,18 +124,22 @@ npm install
 
 ### yalc workflow
 
-# after changes in runtime 
-cd pix3/packages/pix3-runtime && npm run yalc:publish
-# in target game project:
+After changes in the runtime:
+```bash
+cd packages/pix3-runtime && npm run yalc:publish
+```
+In the target game project:
+```bash
 yalc update
-# или просто npm install - yalc обновит автоматически
+```
+Or simply use `npm install` — `yalc` will update automatically.
 
 ### Type Checking
 
 The project uses multiple `tsconfig` files to manage different scopes:
 - `tsconfig.json`: Main editor and core library configuration.
-- `samples/tsconfig.json`: configuration for standalone sample scripts to ensure they resolve `@pix3/runtime` correctly without being part of the main build.
-- `packages/pix3-runtime/tsconfig.json`: configuration for the runtime package.
+- `samples/tsconfig.json`: Configuration for standalone sample scripts to ensure they resolve `@pix3/runtime` correctly without being part of the main build.
+- `packages/pix3-runtime/tsconfig.json`: Configuration for the runtime package.
 
 ### Run Dev Server
 
