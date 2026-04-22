@@ -1,8 +1,14 @@
 import { injectable, inject, ServiceContainer } from '@/fw/di';
-import { appState, createInitialHybridSyncState } from '@/state';
+import {
+  appState,
+  createInitialHybridSyncState,
+  createInitialProjectOpenProgressState,
+  type ProjectOpenPhase,
+} from '@/state';
 import * as ApiClient from './ApiClient';
 import type { ApiProject } from './ApiClient';
 import { ProjectService } from './ProjectService';
+import { CloudProjectCacheService } from './CloudProjectCacheService';
 import { ProjectStorageService } from './ProjectStorageService';
 import { EditorTabService } from './EditorTabService';
 import type { ProjectManifest } from '@/core/ProjectManifest';
@@ -36,6 +42,9 @@ export class CloudProjectService {
 
   @inject(ProjectStorageService)
   private readonly storage!: ProjectStorageService;
+
+  @inject(CloudProjectCacheService)
+  private readonly cloudCache!: CloudProjectCacheService;
 
   @inject(EditorTabService)
   private readonly editorTabService!: EditorTabService;
@@ -155,64 +164,89 @@ export class CloudProjectService {
 
   async openProject(projectId: string, options?: OpenCloudProjectOptions): Promise<void> {
     const listedProject = this.state.projects.find(entry => entry.id === projectId) ?? null;
-    const access = await ApiClient.getProjectAccess(projectId, options?.shareToken);
 
-    await options?.beforeActivate?.();
+    if (options?.beforeActivate) {
+      await options.beforeActivate();
+    }
     this.resetOpenProjectState();
 
-    appState.project.id = projectId;
-    appState.project.backend = 'cloud';
-    appState.project.directoryHandle = null;
-    appState.project.projectName = access.name || listedProject?.name || 'Cloud Project';
-    appState.project.localAbsolutePath = null;
-    appState.project.status = 'ready';
-    appState.project.errorMessage = null;
-    appState.collaboration.authSource = access.auth_source;
-    appState.collaboration.role = access.role;
-    appState.collaboration.isReadOnly = access.access_mode === 'view';
-    appState.collaboration.accessMode = access.access_mode === 'view' ? 'cloud-view' : 'cloud-edit';
-    appState.collaboration.shareToken = options?.shareToken ?? null;
-    appState.collaboration.shareEnabled = access.share_enabled;
+    this.beginProjectOpening(
+      projectId,
+      listedProject?.name ?? 'Cloud Project',
+      options?.shareToken ?? null
+    );
 
-    appState.project.manifest = await this.projectService.loadProjectManifest();
-    await this.storage.refreshManifest();
+    try {
+      this.updateOpenProgress('fetching-access', 'Verifying project access.');
+      const access = await ApiClient.getProjectAccess(projectId, options?.shareToken);
 
-    this.projectService.addRecentProject({
-      id: projectId,
-      name: appState.project.projectName ?? 'Cloud Project',
-      backend: 'cloud',
-      lastOpenedAt: Date.now(),
-    });
-    this.scheduleHybridSyncRefresh();
+      appState.project.projectName = access.name || listedProject?.name || 'Cloud Project';
+      appState.collaboration.authSource = access.auth_source;
+      appState.collaboration.role = access.role;
+      appState.collaboration.isReadOnly = access.access_mode === 'view';
+      appState.collaboration.accessMode =
+        access.access_mode === 'view' ? 'cloud-view' : 'cloud-edit';
+      appState.collaboration.shareEnabled = access.share_enabled;
 
-    const manifest = await this.storage.getManifestEntries();
-    const scenePaths = manifest
-      .map(entry => entry.path)
-      .filter(path => path.endsWith('.pix3scene'))
-      .sort((a, b) => a.localeCompare(b));
+      this.updateOpenProgress('loading-manifest', 'Loading project manifest.');
+      appState.project.manifest = await this.projectService.loadProjectManifest();
+      await this.storage.refreshManifest();
 
-    await this.connectToProjectRoom(projectId, options?.shareToken, access);
+      const manifest = await this.storage.getManifestEntries();
+      const scenePaths = manifest
+        .map(entry => entry.path)
+        .filter(path => path.endsWith('.pix3scene'))
+        .sort((a, b) => a.localeCompare(b));
 
-    if (options?.skipSceneOpen) {
-      return;
+      await this.hydrateProjectCache(projectId, manifest, options?.shareToken);
+
+      this.updateOpenProgress('connecting-collaboration', 'Connecting collaboration session.');
+      await this.connectToProjectRoom(projectId, options?.shareToken, access);
+
+      appState.project.status = 'ready';
+
+      this.projectService.addRecentProject({
+        id: projectId,
+        name: appState.project.projectName ?? 'Cloud Project',
+        backend: 'cloud',
+        lastOpenedAt: Date.now(),
+      });
+      this.scheduleHybridSyncRefresh();
+
+      if (options?.skipSceneOpen) {
+        this.finishProjectOpening();
+        return;
+      }
+
+      this.updateOpenProgress('compiling-scripts', 'Compiling project scripts.');
+      await this.projectScriptLoader.ensureReady();
+
+      const preferredScenePath =
+        options?.preferredScenePath ?? this.getPreferredScenePath(projectId);
+      const initialScenePath =
+        (preferredScenePath && scenePaths.includes(preferredScenePath)
+          ? preferredScenePath
+          : null) ??
+        scenePaths[0] ??
+        null;
+
+      if (!initialScenePath) {
+        this.finishProjectOpening();
+        return;
+      }
+
+      this.updateOpenProgress('opening-scene', 'Opening initial scene.', {
+        currentPath: initialScenePath,
+      });
+      appState.project.lastOpenedScenePath = `res://${initialScenePath}`;
+      appState.scenes.pendingScenePaths = [`res://${initialScenePath}`];
+      await this.editorTabService.focusOrOpenScene(`res://${initialScenePath}`);
+      await this.ensureActiveSceneBound();
+      this.finishProjectOpening();
+    } catch (error) {
+      this.failProjectOpening(error);
+      throw error;
     }
-
-    await this.projectScriptLoader.ensureReady();
-
-    const preferredScenePath = options?.preferredScenePath ?? this.getPreferredScenePath(projectId);
-    const initialScenePath =
-      (preferredScenePath && scenePaths.includes(preferredScenePath) ? preferredScenePath : null) ??
-      scenePaths[0] ??
-      null;
-
-    if (!initialScenePath) {
-      return;
-    }
-
-    appState.project.lastOpenedScenePath = `res://${initialScenePath}`;
-    appState.scenes.pendingScenePaths = [`res://${initialScenePath}`];
-    await this.editorTabService.focusOrOpenScene(`res://${initialScenePath}`);
-    await this.ensureActiveSceneBound();
   }
 
   private normalizeScenePath(scenePath: string | null): string | null {
@@ -268,7 +302,119 @@ export class CloudProjectService {
     appState.project.fileRefreshSignal = 0;
     appState.project.scriptRefreshSignal = 0;
     appState.project.lastModifiedDirectoryPath = null;
+    appState.project.manifest = null;
+    appState.project.openProgress = createInitialProjectOpenProgressState();
     appState.project.hybridSync = createInitialHybridSyncState();
+  }
+
+  private beginProjectOpening(
+    projectId: string,
+    projectName: string,
+    shareToken: string | null
+  ): void {
+    appState.project.id = projectId;
+    appState.project.backend = 'cloud';
+    appState.project.directoryHandle = null;
+    appState.project.projectName = projectName;
+    appState.project.localAbsolutePath = null;
+    appState.project.status = 'opening';
+    appState.project.errorMessage = null;
+    appState.collaboration.shareToken = shareToken;
+    appState.project.openProgress = createInitialProjectOpenProgressState();
+  }
+
+  private updateOpenProgress(
+    phase: ProjectOpenPhase,
+    message: string,
+    progress: Partial<typeof appState.project.openProgress> = {}
+  ): void {
+    appState.project.openProgress = {
+      ...appState.project.openProgress,
+      phase,
+      message,
+      ...progress,
+    };
+  }
+
+  private finishProjectOpening(): void {
+    appState.project.openProgress = createInitialProjectOpenProgressState();
+  }
+
+  private failProjectOpening(error: unknown): void {
+    appState.project.status = 'error';
+    appState.project.errorMessage =
+      error instanceof Error ? error.message : 'Failed to open cloud project.';
+    appState.project.openProgress = {
+      ...createInitialProjectOpenProgressState(),
+      message: appState.project.errorMessage,
+    };
+  }
+
+  private async hydrateProjectCache(
+    projectId: string,
+    manifest: readonly ApiClient.ManifestEntry[],
+    shareToken?: string
+  ): Promise<void> {
+    const fileEntries = manifest.filter(entry => entry.kind === 'file');
+    const totalBytes = fileEntries.reduce((sum, entry) => sum + entry.size, 0);
+    let processedFileCount = 0;
+    let processedBytes = 0;
+
+    this.updateOpenProgress('hydrating-cache', 'Preparing project files for local access.', {
+      currentPath: null,
+      processedFileCount: 0,
+      totalFileCount: fileEntries.length,
+      processedBytes: 0,
+      totalBytes,
+    });
+
+    await this.cloudCache.reconcileManifest(projectId, manifest);
+
+    for (const entry of fileEntries) {
+      if (!(await this.cloudCache.isEntryFresh(projectId, entry))) {
+        try {
+          const response = await ApiClient.downloadFile(projectId, entry.path, shareToken);
+          await this.cloudCache.storeBlobFile(projectId, entry.path, await response.blob(), {
+            hash: entry.hash,
+            modified: entry.modified,
+            size: entry.size,
+          });
+        } catch (error) {
+          if (!this.shouldSkipHydrationError(error)) {
+            throw error;
+          }
+
+          await this.cloudCache.invalidatePath(projectId, entry.path);
+          console.warn('[CloudProjectService] Skipping missing manifest entry during hydrate', {
+            path: entry.path,
+            error,
+          });
+        }
+      }
+
+      processedFileCount += 1;
+      processedBytes += entry.size;
+      this.updateOpenProgress('hydrating-cache', 'Preparing project files for local access.', {
+        currentPath: entry.path,
+        processedFileCount,
+        totalFileCount: fileEntries.length,
+        processedBytes,
+        totalBytes,
+      });
+    }
+  }
+
+  private shouldSkipHydrationError(error: unknown): boolean {
+    if (error instanceof ApiClient.ApiClientError) {
+      return error.status === 404;
+    }
+
+    return (
+      typeof error === 'object' &&
+      error !== null &&
+      'status' in error &&
+      (error as { status?: number }).status === 404
+    );
   }
 
   private scheduleHybridSyncRefresh(): void {

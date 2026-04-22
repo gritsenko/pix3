@@ -1,5 +1,6 @@
 import { injectable, ServiceContainer } from '@/fw/di';
 import { appState, createInitialHybridSyncState } from '@/state';
+import { createInitialProjectOpenProgressState } from '@/state';
 import { resolveFileSystemAPIService, type FileDescriptor } from './FileSystemAPIService';
 import { ProjectStorageService } from './ProjectStorageService';
 import { parse, stringify } from 'yaml';
@@ -1187,6 +1188,7 @@ Happy creating! 🎨
     appState.project.scriptRefreshSignal = 0;
     appState.project.lastModifiedDirectoryPath = null;
     appState.project.manifest = null;
+    appState.project.openProgress = createInitialProjectOpenProgressState();
     appState.project.hybridSync = createInitialHybridSyncState();
     appState.scenes.activeSceneId = null;
     appState.scenes.descriptors = {};

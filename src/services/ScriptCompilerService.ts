@@ -24,7 +24,7 @@ export interface CompilationResult {
   warnings: string[];
 }
 
-type VirtualNamespace = 'virtual-fs' | 'virtual-raw' | 'virtual-url' | 'virtual-css';
+export type VirtualNamespace = 'virtual-fs' | 'virtual-raw' | 'virtual-url' | 'virtual-css';
 
 export interface CompilationError {
   message: string;
@@ -38,7 +38,16 @@ export interface CompilationError {
   details?: unknown;
 }
 
-type VirtualFileLoader = (filePath: string) => Promise<string | null>;
+export interface VirtualFileLoadContext {
+  importer: string;
+  requestedImportPath: string;
+  namespace: VirtualNamespace;
+}
+
+type VirtualFileLoader = (
+  filePath: string,
+  context: VirtualFileLoadContext
+) => Promise<string | null>;
 
 @injectable()
 export class ScriptCompilerService {
@@ -206,12 +215,24 @@ export class ScriptCompilerService {
                 fileLoader
               );
               if (resolved) {
-                return resolved;
+                return {
+                  ...resolved,
+                  pluginData: {
+                    importer: args.importer,
+                    requestedImportPath: args.path,
+                    namespace: resolved.namespace,
+                  },
+                };
               }
 
               return {
                 path: this.resolveUnresolvedPath(args.path, args.importer),
                 namespace: 'virtual-fs',
+                pluginData: {
+                  importer: args.importer,
+                  requestedImportPath: args.path,
+                  namespace: 'virtual-fs',
+                },
               };
             }
 
@@ -222,9 +243,14 @@ export class ScriptCompilerService {
         // Load file contents from virtual FS
         build.onLoad({ filter: /.*/, namespace: 'virtual-fs' }, async args => {
           let contents = files.get(args.path);
+          const context = this.getVirtualFileLoadContext(
+            args.pluginData,
+            args.path,
+            'virtual-fs'
+          );
 
           if (contents === undefined && fileLoader) {
-            contents = (await fileLoader(args.path)) ?? undefined;
+            contents = (await fileLoader(args.path, context)) ?? undefined;
             if (contents !== undefined) {
               files.set(args.path, contents);
             }
@@ -249,9 +275,14 @@ export class ScriptCompilerService {
 
         build.onLoad({ filter: /.*/, namespace: 'virtual-raw' }, async args => {
           let contents = files.get(args.path);
+          const context = this.getVirtualFileLoadContext(
+            args.pluginData,
+            args.path,
+            'virtual-raw'
+          );
 
           if (contents === undefined && fileLoader) {
-            contents = (await fileLoader(args.path)) ?? undefined;
+            contents = (await fileLoader(args.path, context)) ?? undefined;
             if (contents !== undefined) {
               files.set(args.path, contents);
             }
@@ -325,6 +356,8 @@ export class ScriptCompilerService {
         candidateBasePaths,
         [''],
         'virtual-raw',
+        importer,
+        importPath,
         files,
         fileLoader
       );
@@ -335,6 +368,8 @@ export class ScriptCompilerService {
         candidateBasePaths,
         [''],
         'virtual-css',
+        importer,
+        importPath,
         files,
         fileLoader,
         resolvedBasePath
@@ -354,6 +389,8 @@ export class ScriptCompilerService {
       candidateBasePaths,
       ['', '.ts', '/index.ts'],
       'virtual-fs',
+      importer,
+      importPath,
       files,
       fileLoader
     );
@@ -407,6 +444,8 @@ export class ScriptCompilerService {
     basePaths: string[],
     suffixes: string[],
     namespace: VirtualNamespace,
+    importer: string,
+    requestedImportPath: string,
     files: Map<string, string>,
     fileLoader?: VirtualFileLoader,
     fallbackPath?: string
@@ -419,7 +458,11 @@ export class ScriptCompilerService {
             return { path: candidate, namespace };
           }
 
-          const loaded = await fileLoader(candidate);
+          const loaded = await fileLoader(candidate, {
+            importer,
+            requestedImportPath,
+            namespace,
+          });
           if (loaded !== null) {
             files.set(candidate, loaded);
             return { path: candidate, namespace };
@@ -440,6 +483,36 @@ export class ScriptCompilerService {
     return this.normalizePath(
       importerDirectory ? `${importerDirectory}/${importPath}` : importPath
     );
+  }
+
+  private getVirtualFileLoadContext(
+    pluginData: unknown,
+    filePath: string,
+    namespace: VirtualNamespace
+  ): VirtualFileLoadContext {
+    if (typeof pluginData !== 'object' || pluginData === null) {
+      return {
+        importer: '',
+        requestedImportPath: filePath,
+        namespace,
+      };
+    }
+
+    const candidate = pluginData as Partial<VirtualFileLoadContext>;
+    return {
+      importer: typeof candidate.importer === 'string' ? candidate.importer : '',
+      requestedImportPath:
+        typeof candidate.requestedImportPath === 'string'
+          ? candidate.requestedImportPath
+          : filePath,
+      namespace:
+        candidate.namespace === 'virtual-fs' ||
+        candidate.namespace === 'virtual-raw' ||
+        candidate.namespace === 'virtual-url' ||
+        candidate.namespace === 'virtual-css'
+          ? candidate.namespace
+          : namespace,
+    };
   }
 
   private rewriteVirtualAssetUrls(contents: string, filePath: string): string {

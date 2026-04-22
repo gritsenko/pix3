@@ -33,6 +33,7 @@ export {
   THEME_IDS,
   createInitialAppState,
   createInitialHybridSyncState,
+  createInitialProjectOpenProgressState,
 } from './AppState';
 
 export type {
@@ -50,6 +51,8 @@ export type {
   PanelVisibilityState,
   ProjectBackend,
   ProjectHybridSyncState,
+  ProjectOpenPhase,
+  ProjectOpenProgressState,
   ProjectState,
   ProjectStatus,
   SceneDescriptor,

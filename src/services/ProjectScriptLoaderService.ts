@@ -9,6 +9,8 @@ import { ScriptRegistry } from '@pix3/runtime';
 import type { PropertySchemaProvider } from '@pix3/runtime';
 import { ScriptCompilerService } from './ScriptCompilerService';
 import type { CompilationError } from './ScriptCompilerService';
+import type { VirtualFileLoadContext } from './ScriptCompilerService';
+import { ApiClientError } from './ApiClient';
 import { LoggingService } from './LoggingService';
 import { FileWatchService } from './FileWatchService';
 import { isDocumentActive } from './page-activity';
@@ -231,8 +233,10 @@ export class ProjectScriptLoaderService {
       // Step 3: Compile scripts using ScriptCompilerService
       let compilationResult;
       try {
-        compilationResult = await this.compiler.bundle(filesMap, entryFiles, async filePath =>
-          this.loadBundledDependency(filePath)
+        compilationResult = await this.compiler.bundle(
+          filesMap,
+          entryFiles,
+          async (filePath, context) => this.loadBundledDependency(filePath, context)
         );
       } catch (error) {
         const userError = this.handleCompilationError(
@@ -417,7 +421,10 @@ export class ProjectScriptLoaderService {
     };
   }
 
-  private async loadBundledDependency(filePath: string): Promise<string | null> {
+  private async loadBundledDependency(
+    filePath: string,
+    context?: VirtualFileLoadContext
+  ): Promise<string | null> {
     if (!this.isLoadableDependencyPath(filePath)) {
       return null;
     }
@@ -440,9 +447,38 @@ export class ProjectScriptLoaderService {
       }
 
       return content;
-    } catch {
+    } catch (error) {
+      this.reportBundledDependencyLoadFailure(filePath, context, error);
       return null;
     }
+  }
+
+  private reportBundledDependencyLoadFailure(
+    filePath: string,
+    context: VirtualFileLoadContext | undefined,
+    error: unknown
+  ): void {
+    const requestedImport = context?.requestedImportPath ?? filePath;
+    const importer = context?.importer?.trim() || null;
+    const message = importer
+      ? `Script dependency fetch failed: tried ${filePath} while resolving ${requestedImport} from ${importer}`
+      : `Script dependency fetch failed: tried ${filePath} while resolving ${requestedImport}`;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorData = {
+      attemptedPath: filePath,
+      requestedImport,
+      importer,
+      namespace: context?.namespace ?? null,
+      status: error instanceof ApiClientError ? error.status : null,
+      message: errorMessage,
+    };
+
+    if (error instanceof ApiClientError && error.status === 404) {
+      this.logger.warn(message, errorData);
+      return;
+    }
+
+    this.logger.error(message, errorData);
   }
 
   private async collectFilesRecursively(

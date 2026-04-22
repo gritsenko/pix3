@@ -85,7 +85,7 @@ export interface ScenesState {
   previewCameraNodeIds: Record<string, string | null>;
 }
 
-export type ProjectStatus = 'idle' | 'selecting' | 'ready' | 'error';
+export type ProjectStatus = 'idle' | 'selecting' | 'opening' | 'ready' | 'error';
 export type ProjectBackend = 'local' | 'cloud';
 export type HybridSyncStatus =
   | 'unlinked'
@@ -99,6 +99,25 @@ export type HybridSyncStatus =
   | 'error';
 
 export type ScriptLoadStatus = 'idle' | 'loading' | 'ready' | 'error';
+
+export type ProjectOpenPhase =
+  | 'idle'
+  | 'fetching-access'
+  | 'loading-manifest'
+  | 'hydrating-cache'
+  | 'connecting-collaboration'
+  | 'compiling-scripts'
+  | 'opening-scene';
+
+export interface ProjectOpenProgressState {
+  phase: ProjectOpenPhase;
+  message: string | null;
+  currentPath: string | null;
+  processedFileCount: number;
+  totalFileCount: number;
+  processedBytes: number | null;
+  totalBytes: number | null;
+}
 
 export interface ProjectHybridSyncState {
   linkedCloudProjectId: string | null;
@@ -149,6 +168,8 @@ export interface ProjectState {
   lastModifiedDirectoryPath: string | null;
   /** Project manifest loaded from pix3project.yaml. */
   manifest: ProjectManifest | null;
+  /** Progress of the current project opening/hydration pipeline. */
+  openProgress: ProjectOpenProgressState;
   /** Hybrid sync state between the local folder and linked cloud project. */
   hybridSync: ProjectHybridSyncState;
 }
@@ -343,6 +364,16 @@ export const createInitialHybridSyncState = (): ProjectHybridSyncState => ({
   errorMessage: null,
 });
 
+export const createInitialProjectOpenProgressState = (): ProjectOpenProgressState => ({
+  phase: 'idle',
+  message: null,
+  currentPath: null,
+  processedFileCount: 0,
+  totalFileCount: 0,
+  processedBytes: null,
+  totalBytes: null,
+});
+
 export const createInitialAppState = (): AppState => ({
   auth: {
     user: null,
@@ -378,6 +409,7 @@ export const createInitialAppState = (): AppState => ({
     scriptRefreshSignal: 0,
     lastModifiedDirectoryPath: null,
     manifest: null,
+    openProgress: createInitialProjectOpenProgressState(),
     hybridSync: createInitialHybridSyncState(),
   },
   scenes: {

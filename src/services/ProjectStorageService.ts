@@ -4,6 +4,7 @@ import { appState } from '@/state';
 import { subscribe } from 'valtio/vanilla';
 import * as Y from 'yjs';
 import { FileSystemAPIService, type FileDescriptor } from './FileSystemAPIService';
+import { CloudProjectCacheService } from './CloudProjectCacheService';
 import { CollaborationService } from './CollaborationService';
 import * as ApiClient from './ApiClient';
 
@@ -22,6 +23,9 @@ interface AssetMutationEvent {
 export class ProjectStorageService {
   @inject(FileSystemAPIService)
   private readonly fileSystem!: FileSystemAPIService;
+
+  @inject(CloudProjectCacheService)
+  private readonly cloudCache!: CloudProjectCacheService;
 
   private cachedProjectId: string | null = null;
   private cachedManifest: CloudManifestEntry[] | null = null;
@@ -81,12 +85,26 @@ export class ProjectStorageService {
       return this.fileSystem.readTextFile(path);
     }
 
+    const projectId = this.requireProjectId();
+    const normalizedPath = this.normalizePath(path);
+    const cached = await this.cloudCache.readTextFile(projectId, normalizedPath);
+    if (cached !== null) {
+      return cached;
+    }
+
     const response = await ApiClient.downloadFile(
-      this.requireProjectId(),
-      this.normalizePath(path),
+      projectId,
+      normalizedPath,
       appState.collaboration.shareToken ?? undefined
     );
-    return response.text();
+    const contents = await response.text();
+    await this.cloudCache.storeTextFile(
+      projectId,
+      normalizedPath,
+      contents,
+      this.getManifestEntryMetadata(normalizedPath)
+    );
+    return contents;
   }
 
   async readBlob(path: string): Promise<Blob> {
@@ -94,12 +112,26 @@ export class ProjectStorageService {
       return this.fileSystem.readBlob(path);
     }
 
+    const projectId = this.requireProjectId();
+    const normalizedPath = this.normalizePath(path);
+    const cached = await this.cloudCache.readBlob(projectId, normalizedPath);
+    if (cached) {
+      return cached;
+    }
+
     const response = await ApiClient.downloadFile(
-      this.requireProjectId(),
-      this.normalizePath(path),
+      projectId,
+      normalizedPath,
       appState.collaboration.shareToken ?? undefined
     );
-    return response.blob();
+    const blob = await response.blob();
+    await this.cloudCache.storeBlobFile(
+      projectId,
+      normalizedPath,
+      blob,
+      this.getManifestEntryMetadata(normalizedPath)
+    );
+    return blob;
   }
 
   async writeTextFile(path: string, contents: string): Promise<void> {
@@ -235,6 +267,7 @@ export class ProjectStorageService {
     );
     this.cachedProjectId = projectId;
     this.cachedManifest = files;
+    await this.cloudCache.reconcileManifest(projectId, files);
     return files;
   }
 
@@ -280,8 +313,15 @@ export class ProjectStorageService {
     }
 
     this.ensureWriteAllowed();
-    await ApiClient.uploadFile(this.requireProjectId(), path, contents);
+    const projectId = this.requireProjectId();
+    await ApiClient.uploadFile(projectId, path, contents);
     await this.refreshManifest();
+    await this.cloudCache.storeTextFile(
+      projectId,
+      path,
+      contents,
+      this.getManifestEntryMetadata(path)
+    );
   }
 
   private async writeBinaryFileInternal(path: string, data: ArrayBuffer): Promise<void> {
@@ -291,8 +331,15 @@ export class ProjectStorageService {
     }
 
     this.ensureWriteAllowed();
-    await ApiClient.uploadFile(this.requireProjectId(), path, data);
+    const projectId = this.requireProjectId();
+    await ApiClient.uploadFile(projectId, path, data);
     await this.refreshManifest();
+    await this.cloudCache.storeBlobFile(
+      projectId,
+      path,
+      new Blob([data]),
+      this.getManifestEntryMetadata(path)
+    );
   }
 
   private async deleteEntryInternal(path: string): Promise<void> {
@@ -302,7 +349,9 @@ export class ProjectStorageService {
     }
 
     this.ensureWriteAllowed();
-    await ApiClient.deleteFile(this.requireProjectId(), path);
+    const projectId = this.requireProjectId();
+    await ApiClient.deleteFile(projectId, path);
+    await this.cloudCache.invalidatePath(projectId, path, { recursive: true });
     await this.refreshManifest();
   }
 
@@ -430,12 +479,39 @@ export class ProjectStorageService {
     try {
       const mutation = JSON.parse(rawMutation) as AssetMutationEvent;
       if (this.getBackend() === 'cloud') {
+        const projectId = this.requireProjectId();
         await this.refreshManifest();
+        await this.cloudCache.invalidatePath(projectId, mutation.path, {
+          recursive: mutation.kind === 'delete-entry',
+        });
       }
       this.applyAssetMutationSignal(mutation.directories);
     } catch (error) {
       console.warn('[ProjectStorageService] Failed to process remote asset mutation', error);
     }
+  }
+
+  private getManifestEntryMetadata(path: string): {
+    hash?: string | null;
+    modified?: string | null;
+    size?: number | null;
+  } {
+    const manifest = this.cachedManifest;
+    if (!manifest || this.cachedProjectId !== appState.project.id) {
+      return {};
+    }
+
+    const normalizedPath = this.normalizePath(path);
+    const entry = manifest.find(item => item.path === normalizedPath);
+    if (!entry || entry.kind !== 'file') {
+      return {};
+    }
+
+    return {
+      hash: entry.hash,
+      modified: entry.modified,
+      size: entry.size,
+    };
   }
 
   private tryGetCollaborationService(): CollaborationService | null {

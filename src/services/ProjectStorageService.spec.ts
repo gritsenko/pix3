@@ -8,6 +8,7 @@ const mockApiClient = {
   createDirectory: vi.fn(),
   getManifest: vi.fn(),
   getManifestWithAccess: vi.fn(),
+  downloadFile: vi.fn(),
   uploadFile: vi.fn(),
   deleteFile: vi.fn(),
 };
@@ -31,6 +32,7 @@ class MockCollaborationService {
 describe('ProjectStorageService', () => {
   let service: InstanceType<typeof ProjectStorageService>;
   let mockFileSystem: Record<string, ReturnType<typeof vi.fn>>;
+  let mockCloudCache: Record<string, ReturnType<typeof vi.fn>>;
   let collabService: MockCollaborationService;
 
   beforeEach(() => {
@@ -55,12 +57,25 @@ describe('ProjectStorageService', () => {
       deleteEntry: vi.fn(),
       createDirectory: vi.fn(),
     };
+    mockCloudCache = {
+      readTextFile: vi.fn(),
+      readBlob: vi.fn(),
+      storeTextFile: vi.fn(),
+      storeBlobFile: vi.fn(),
+      reconcileManifest: vi.fn(),
+      invalidatePath: vi.fn(),
+    };
     Object.defineProperty(service, 'fileSystem', {
       value: mockFileSystem,
       configurable: true,
     });
+    Object.defineProperty(service, 'cloudCache', {
+      value: mockCloudCache,
+      configurable: true,
+    });
 
     mockApiClient.createDirectory.mockReset();
+    mockApiClient.downloadFile.mockReset();
     mockApiClient.getManifest.mockReset();
     mockApiClient.getManifestWithAccess.mockReset();
     mockApiClient.uploadFile.mockReset();
@@ -82,8 +97,27 @@ describe('ProjectStorageService', () => {
 
     expect(mockApiClient.createDirectory).toHaveBeenCalledWith('project-1', 'folder');
     expect(mockApiClient.getManifestWithAccess).toHaveBeenCalledWith('project-1', undefined);
+    expect(mockCloudCache.reconcileManifest).toHaveBeenCalledWith('project-1', [
+      { path: 'folder', kind: 'directory', size: 0, hash: '', modified: '2026-04-03' },
+    ]);
     expect(appState.project.lastModifiedDirectoryPath).toBe('.');
     expect(appState.project.fileRefreshSignal).toBe(1);
+  });
+
+  it('hydrates cloud text reads into cache and reuses cached content', async () => {
+    mockCloudCache.readTextFile.mockResolvedValueOnce(null).mockResolvedValueOnce('cached scene');
+    mockApiClient.downloadFile.mockResolvedValue(new Response('remote scene'));
+
+    await expect(service.readTextFile('Scenes/main.pix3scene')).resolves.toBe('remote scene');
+    await expect(service.readTextFile('Scenes/main.pix3scene')).resolves.toBe('cached scene');
+
+    expect(mockApiClient.downloadFile).toHaveBeenCalledTimes(1);
+    expect(mockCloudCache.storeTextFile).toHaveBeenCalledWith(
+      'project-1',
+      'Scenes/main.pix3scene',
+      'remote scene',
+      {}
+    );
   });
 
   it('lists empty cloud directories from manifest entries', async () => {

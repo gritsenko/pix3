@@ -86,6 +86,42 @@ pix3-toolbar {
   letter-spacing: 0.04em;
 }
 
+.loading-progress {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.loading-progress__bar {
+  overflow: hidden;
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.loading-progress__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, rgba(255, 207, 51, 0.78), rgba(255, 239, 148, 0.94));
+  box-shadow: 0 0 18px rgba(255, 207, 51, 0.25);
+  transition: width 160ms ease-out;
+}
+
+.loading-progress__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: rgba(243, 244, 246, 0.72);
+  font-size: 0.82rem;
+}
+
+.loading-progress__path {
+  margin-top: 12px;
+  color: rgba(243, 244, 246, 0.6);
+  font-size: 0.78rem;
+  word-break: break-word;
+}
+
 .collab-join-overlay {
   position: fixed;
   inset: 0;

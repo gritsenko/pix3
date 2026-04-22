@@ -176,7 +176,8 @@ export class Pix3EditorShell extends ComponentBase {
   private routerStatus = appState.router.status;
 
   @state()
-  private currentHash = typeof window !== 'undefined' ? window.location.hash || '#editor' : '#editor';
+  private currentHash =
+    typeof window !== 'undefined' ? window.location.hash || '#editor' : '#editor';
 
   @state()
   private dialogs: DialogInstance[] = [];
@@ -849,8 +850,55 @@ export class Pix3EditorShell extends ComponentBase {
   };
 
   private renderWorkspaceOverlay() {
-    if (this.currentHash === '#welcome' || appState.project.status !== 'ready') {
-      return html` <pix3-welcome @pix3-auth:request=${this.onAuthRequest}></pix3-welcome> `;
+    if (appState.project.status === 'opening') {
+      const progress = appState.project.openProgress;
+      const progressValue =
+        progress.totalBytes && progress.totalBytes > 0
+          ? Math.min(100, Math.round(((progress.processedBytes ?? 0) / progress.totalBytes) * 100))
+          : progress.totalFileCount > 0
+            ? Math.min(
+                100,
+                Math.round((progress.processedFileCount / progress.totalFileCount) * 100)
+              )
+            : null;
+      const metaLabel =
+        progress.totalFileCount > 0
+          ? `${progress.processedFileCount}/${progress.totalFileCount} file(s)`
+          : 'Preparing project files';
+
+      return html`
+        <div class="collab-join-overlay">
+          <div class="collab-join-card">
+            <div class="collab-join-eyebrow">Pix3 Workspace</div>
+            <h2 class="collab-join-title">Opening Cloud Project</h2>
+            <p class="collab-join-copy">
+              ${progress.message ?? 'Preparing project files for local access.'}
+            </p>
+            ${progressValue !== null
+              ? html`
+                  <div
+                    class="loading-progress"
+                    role="progressbar"
+                    aria-valuemin="0"
+                    aria-valuemax="100"
+                    aria-valuenow=${String(progressValue)}
+                  >
+                    <div class="loading-progress__bar">
+                      <div class="loading-progress__fill" style=${`width: ${progressValue}%`}></div>
+                    </div>
+                    <div class="loading-progress__meta">
+                      <span>${metaLabel}</span>
+                      <span>${progressValue}%</span>
+                    </div>
+                  </div>
+                `
+              : html`<div class="loading-label">Please wait...</div>`}
+            ${progress.currentPath
+              ? html`<div class="loading-progress__path">${progress.currentPath}</div>`
+              : html``}
+          </div>
+        </div>
+      `;
     }
 
     if (this.routerStatus !== 'idle') {
@@ -888,7 +936,6 @@ export class Pix3EditorShell extends ComponentBase {
         message = appState.router.errorMessage ?? 'An unknown error occurred.';
       }
 
-
       return html`
         <div class="collab-join-overlay">
           <div class="collab-join-card">
@@ -901,6 +948,10 @@ export class Pix3EditorShell extends ComponentBase {
           </div>
         </div>
       `;
+    }
+
+    if (this.currentHash === '#welcome' || appState.project.status !== 'ready') {
+      return html` <pix3-welcome @pix3-auth:request=${this.onAuthRequest}></pix3-welcome> `;
     }
 
     // Default to editor mode, we no longer render welcome fallback here

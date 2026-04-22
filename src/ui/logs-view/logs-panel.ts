@@ -114,6 +114,21 @@ export class LogsPanel extends ComponentBase {
     if (errorData.file) {
       parts.push(`File: ${String(errorData.file)}`);
     }
+    if (errorData.attemptedPath) {
+      parts.push(`Attempted Path: ${String(errorData.attemptedPath)}`);
+    }
+    if (errorData.requestedImport) {
+      parts.push(`Requested Import: ${String(errorData.requestedImport)}`);
+    }
+    if (errorData.importer) {
+      parts.push(`Declared In: ${String(errorData.importer)}`);
+    }
+    if (errorData.namespace) {
+      parts.push(`Namespace: ${String(errorData.namespace)}`);
+    }
+    if (errorData.status !== undefined && errorData.status !== null) {
+      parts.push(`Status: ${String(errorData.status)}`);
+    }
     if (errorData.line !== undefined) {
       parts.push(`Line: ${String(errorData.line)}`);
     }
