@@ -176,6 +176,9 @@ export class Pix3EditorShell extends ComponentBase {
   private routerStatus = appState.router.status;
 
   @state()
+  private currentHash = typeof window !== 'undefined' ? window.location.hash || '#editor' : '#editor';
+
+  @state()
   private dialogs: DialogInstance[] = [];
 
   @state()
@@ -222,6 +225,7 @@ export class Pix3EditorShell extends ComponentBase {
   private onWelcomeProjectReady?: (e: Event) => void;
   private keyboardHandler?: (e: KeyboardEvent) => void;
   private accountPopoverPointerHandler?: (e: PointerEvent) => void;
+  private hashChangeHandler?: () => void;
   private watchedSceneIds = new Set<string>();
   private watchedScenePaths = new Map<string, string>();
   private tabsInitialized = false;
@@ -395,8 +399,10 @@ export class Pix3EditorShell extends ComponentBase {
       this.requestUpdate();
     });
 
-    const handleHash = () => this.requestUpdate();
-    window.addEventListener('hashchange', handleHash);
+    this.hashChangeHandler = () => {
+      this.currentHash = window.location.hash || '#editor';
+    };
+    window.addEventListener('hashchange', this.hashChangeHandler);
 
     this.disposeSubscription = subscribe(appState.ui, () => {
       this.isLayoutReady = appState.ui.isLayoutReady;
@@ -425,6 +431,8 @@ export class Pix3EditorShell extends ComponentBase {
           }
         });
       }
+
+      this.requestUpdate();
     });
 
     // Subscribe to scene descriptor changes to start/stop file watching
@@ -443,6 +451,8 @@ export class Pix3EditorShell extends ComponentBase {
         // Default to editor if no hash is set
         window.location.hash = '#editor';
       }
+
+      this.currentHash = window.location.hash || '#editor';
 
       const isEditor = window.location.hash.startsWith('#editor');
       if (typeof window !== 'undefined' && isEditor) {
@@ -475,16 +485,9 @@ export class Pix3EditorShell extends ComponentBase {
     // if not, it will just drop into the empty screen below.
 
     // Listen for the welcome component signaling that project is ready so
-    // the shell can remove it from the DOM and proceed with layout initialization.
+    // the shell can switch to the editor route and let Lit reconcile the overlay.
     this.onWelcomeProjectReady = () => {
-      try {
-        const welcome = this.renderRoot.querySelector('pix3-welcome');
-        if (welcome && welcome.parentElement) {
-          welcome.parentElement.removeChild(welcome);
-        }
-      } catch {
-        // ignore
-      }
+      this.syncEditorRoute();
     };
     this.addEventListener(
       'pix3-welcome:project-ready',
@@ -529,6 +532,10 @@ export class Pix3EditorShell extends ComponentBase {
     if (this.accountPopoverPointerHandler) {
       window.removeEventListener('pointerdown', this.accountPopoverPointerHandler);
       this.accountPopoverPointerHandler = undefined;
+    }
+    if (this.hashChangeHandler) {
+      window.removeEventListener('hashchange', this.hashChangeHandler);
+      this.hashChangeHandler = undefined;
     }
     // Stop all file watchers
     this.fileWatchService.unwatchAll();
@@ -660,6 +667,42 @@ export class Pix3EditorShell extends ComponentBase {
       void this.commandDispatcher.execute(refreshCommand).catch(error => {
         console.error('[Pix3EditorShell] Failed to refresh active scene prefab instances:', error);
       });
+    }
+  }
+
+  private syncEditorRoute(): void {
+    if (
+      typeof window === 'undefined' ||
+      appState.project.status !== 'ready' ||
+      !appState.project.id
+    ) {
+      return;
+    }
+
+    const params = new URLSearchParams();
+    if (appState.project.backend === 'cloud') {
+      params.set('project', appState.project.id);
+    } else {
+      params.set('local', appState.project.id);
+    }
+
+    if (appState.scenes.activeSceneId) {
+      params.set('scene', appState.scenes.activeSceneId);
+    }
+
+    if (appState.selection.primaryNodeId) {
+      params.set('select', appState.selection.primaryNodeId);
+    }
+
+    const nextHash = params.toString() ? `#editor?${params.toString()}` : '#editor';
+    this.currentHash = nextHash;
+
+    if (window.location.hash !== nextHash) {
+      history.replaceState(
+        null,
+        '',
+        `${window.location.pathname}${window.location.search}${nextHash}`
+      );
     }
   }
 
@@ -806,7 +849,7 @@ export class Pix3EditorShell extends ComponentBase {
   };
 
   private renderWorkspaceOverlay() {
-    if (window.location.hash === '#welcome') {
+    if (this.currentHash === '#welcome' || appState.project.status !== 'ready') {
       return html` <pix3-welcome @pix3-auth:request=${this.onAuthRequest}></pix3-welcome> `;
     }
 
@@ -844,6 +887,7 @@ export class Pix3EditorShell extends ComponentBase {
         title = 'Connection Failed';
         message = appState.router.errorMessage ?? 'An unknown error occurred.';
       }
+
 
       return html`
         <div class="collab-join-overlay">

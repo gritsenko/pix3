@@ -1,9 +1,12 @@
 import { ComponentBase, customElement, html, inject, state, unsafeCSS } from '@/fw';
+import { createCommandContext } from '@/core/command';
+import { ServiceContainer } from '@/fw/di';
 import { CommandRegistry } from '@/services/CommandRegistry';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { NodeRegistry } from '@/services/NodeRegistry';
 import { NodeTypePickerService } from '@/services/NodeTypePickerService';
 import { IconService, IconSize } from '@/services/IconService';
+import { appState, getAppStateSnapshot } from '@/state';
 import styles from './pix3-main-menu.ts.css?raw';
 
 interface MainMenuItem {
@@ -147,13 +150,16 @@ export class Pix3MainMenu extends ComponentBase {
     const section = this.menuSections.find(s => s.id === this.activeSection);
     if (!section) return '';
 
-    const renderItem = (item: MainMenuItem): string => `
+    const renderItem = (item: MainMenuItem): string => {
+      const isDisabled = item.commandId ? !this.canExecuteCommand(item.commandId) : false;
+      return `
       <button
         role="menuitem"
         class="menu-item"
         data-menu-item="${item.id}"
         ${item.commandId ? `data-command-id="${item.commandId}"` : ''}
         ${item.nodeTypeId ? `data-node-type-id="${item.nodeTypeId}"` : ''}
+        ${isDisabled ? 'disabled aria-disabled="true"' : ''}
       >
         ${
           item.icon
@@ -164,6 +170,7 @@ export class Pix3MainMenu extends ComponentBase {
         ${item.shortcut ? `<span class="menu-item-shortcut">${item.shortcut}</span>` : ''}
       </button>
     `;
+    };
 
     const content = section.groupedItems?.length
       ? section.groupedItems
@@ -195,6 +202,11 @@ export class Pix3MainMenu extends ComponentBase {
     const menuItems = this.portalElement.querySelectorAll<HTMLElement>('.menu-item');
     menuItems.forEach(item => {
       item.addEventListener('click', e => {
+        if (item.hasAttribute('disabled')) {
+          e.preventDefault();
+          e.stopPropagation();
+          return;
+        }
         e.preventDefault();
         e.stopPropagation();
         const commandId = item.getAttribute('data-command-id');
@@ -223,6 +235,12 @@ export class Pix3MainMenu extends ComponentBase {
   }
 
   private async executeMenuItem(commandId: string): Promise<void> {
+    if (!this.canExecuteCommand(commandId)) {
+      this.activeSection = null;
+      this.menuOpenedByClick = false;
+      return;
+    }
+
     const command = this.commandRegistry.getCommand(commandId);
     if (command) {
       await this.commandDispatcher.execute(command);
@@ -250,6 +268,29 @@ export class Pix3MainMenu extends ComponentBase {
       this.menuOpenedByClick = false;
     }
   };
+
+  private canExecuteCommand(commandId: string): boolean {
+    const command = this.commandRegistry.getCommand(commandId);
+    if (!command?.preconditions) {
+      return true;
+    }
+
+    try {
+      const context = createCommandContext(
+        appState,
+        getAppStateSnapshot(),
+        ServiceContainer.getInstance()
+      );
+      const result = command.preconditions(context);
+      if (result instanceof Promise) {
+        return true;
+      }
+
+      return result.canExecute;
+    } catch {
+      return false;
+    }
+  }
 
   private toggleSection = (sectionId: string) => {
     if (sectionId === 'create') {

@@ -1,5 +1,6 @@
 import { inject, injectable } from '@/fw/di';
 import { createDefaultProjectManifest, type ProjectManifest } from '@/core/ProjectManifest';
+import { LayoutManagerService } from '@/core/LayoutManager';
 import { appState } from '@/state';
 import { ProjectService } from './ProjectService';
 import { CloudProjectService } from './CloudProjectService';
@@ -37,6 +38,9 @@ export class ProjectLifecycleService {
 
   @inject(EditorTabService)
   private readonly editorTabService!: EditorTabService;
+
+  @inject(LayoutManagerService)
+  private readonly layoutManager!: LayoutManagerService;
 
   @inject(DialogService)
   private readonly dialogService!: DialogService;
@@ -116,6 +120,7 @@ export class ProjectLifecycleService {
 
     await this.editorTabService.closeAllTabs(true);
     this.projectService.closeCurrentProject();
+    await this.layoutManager.resetLayout();
   }
 
   private async createProjectInternal(

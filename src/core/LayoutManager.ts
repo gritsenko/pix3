@@ -219,7 +219,7 @@ export class LayoutManagerService {
 
   async resetLayout(): Promise<void> {
     if (!this.layout) {
-      throw new Error('LayoutManager has not been initialized');
+      return;
     }
 
     // Clear cached stack reference so it's re-discovered after layout reset.
