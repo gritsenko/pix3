@@ -25,7 +25,8 @@ export class ServiceContainer {
   private static instance: ServiceContainer;
   private services = new Map<symbol, ServiceDescriptor>();
   private singletonInstances = new Map<symbol, unknown>();
-  private tokenRegistry = new Map<string, symbol>(); // New token registry
+  private stringTokenRegistry = new Map<string, symbol>();
+  private constructorTokenRegistry = new WeakMap<Constructor, symbol>();
 
   static getInstance(): ServiceContainer {
     if (!ServiceContainer.instance) {
@@ -66,17 +67,29 @@ export class ServiceContainer {
       return service;
     }
 
-    const serviceName = typeof service === 'string' ? service : service?.name;
-    if (!serviceName) {
-      throw new Error(
-        'Cannot derive service name for DI token. Provide a class, string, or symbol.'
-      );
+    if (typeof service === 'string') {
+      if (!service) {
+        throw new Error('Cannot derive DI token from an empty service name.');
+      }
+
+      if (!this.stringTokenRegistry.has(service)) {
+        this.stringTokenRegistry.set(service, Symbol(service));
+      }
+
+      return this.stringTokenRegistry.get(service)!;
     }
 
-    if (!this.tokenRegistry.has(serviceName)) {
-      this.tokenRegistry.set(serviceName, Symbol(serviceName));
+    if (!service) {
+      throw new Error('Cannot derive service token for DI. Provide a class, string, or symbol.');
     }
-    return this.tokenRegistry.get(serviceName)!;
+
+    let token = this.constructorTokenRegistry.get(service);
+    if (!token) {
+      token = Symbol(service.name || 'anonymous-service');
+      this.constructorTokenRegistry.set(service, token);
+    }
+
+    return token;
   }
 
   // Get service instance
@@ -134,7 +147,17 @@ export function inject<T>(serviceType?: Constructor<T>) {
     const token = container.getOrCreateToken(type);
     const descriptor = {
       get: function (this: object) {
-        return container.getService<T>(token);
+        try {
+          return container.getService<T>(token);
+        } catch (error) {
+          const hostName =
+            (this as { constructor?: { name?: string } }).constructor?.name ?? 'UnknownHost';
+          const dependencyName =
+            typeof type === 'function' && type.name ? type.name : String(propertyKey);
+          const message = `Failed to inject "${dependencyName}" into "${hostName}.${String(propertyKey)}".`;
+          const cause = error instanceof Error ? error.message : String(error);
+          throw new Error(`${message} ${cause}`);
+        }
       },
       enumerable: true,
       configurable: true,

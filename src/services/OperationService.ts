@@ -18,7 +18,7 @@ import {
 } from '../core/Operation';
 import { appState, type AppState, type AppStateSnapshot } from '@/state';
 import { LoggingService } from './LoggingService';
-import type { CollaborationService } from './CollaborationService';
+import { CollaborationService } from './CollaborationService';
 
 export type OperationEvent =
   | {
@@ -265,7 +265,7 @@ export class OperationService {
   private tryCollabUndo(): boolean | null {
     try {
       const container = ServiceContainer.getInstance();
-      const token = container.getOrCreateToken('CollaborationService');
+      const token = container.getOrCreateToken(CollaborationService);
       const collabService = container.getService<CollaborationService>(token);
       if (collabService?.isConnected()) {
         const um = collabService.getUndoManager();
@@ -289,7 +289,7 @@ export class OperationService {
   private tryCollabRedo(): boolean | null {
     try {
       const container = ServiceContainer.getInstance();
-      const token = container.getOrCreateToken('CollaborationService');
+      const token = container.getOrCreateToken(CollaborationService);
       const collabService = container.getService<CollaborationService>(token);
       if (collabService?.isConnected()) {
         const um = collabService.getUndoManager();

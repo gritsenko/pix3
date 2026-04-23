@@ -646,7 +646,7 @@ export class Pix3EditorShell extends ComponentBase {
    * Handle external file change detection - reload the scene.
    */
   private handleFileChanged(sceneId: string, filePath: string): void {
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       console.debug('[Pix3EditorShell] External scene file change detected', {
         sceneId,
         filePath,
@@ -724,7 +724,7 @@ export class Pix3EditorShell extends ComponentBase {
         if (appState.tabs.tabs.length === 0) {
           const pending = appState.scenes.pendingScenePaths[0];
           if (pending) {
-            if (process.env.NODE_ENV === 'development') {
+            if (import.meta.env.DEV) {
               console.debug('[Pix3Editor] Opening startup scene tab', { pending });
             }
             await this.editorTabService.openResourceTab('scene', pending);

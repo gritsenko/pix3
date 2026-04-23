@@ -4,13 +4,32 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
+interface VersionManifest {
+  version: string;
+  build: number;
+  displayVersion: string;
+  publishedAt?: string;
+}
+
+interface UpdateVersionArtifactsOptions {
+  publishedAt?: string;
+  paths?: {
+    packageJsonPath?: string;
+    publicVersionPath?: string;
+    sourceVersionPath?: string;
+  };
+}
+
 // @ts-ignore Plain .mjs script module is exercised directly in this spec.
-import {
-  buildVersionManifest,
-  buildVersionModule,
-  readJsonFile,
-  updateVersionArtifacts,
-} from '../../scripts/update-version.mjs';
+import * as updateVersionModule from '../../scripts/update-version.mjs';
+
+const { buildVersionManifest, buildVersionModule, readJsonFile, updateVersionArtifacts } =
+  updateVersionModule as {
+    buildVersionManifest: (version: string, build: number, publishedAt?: string) => VersionManifest;
+    buildVersionModule: (manifest: VersionManifest) => string;
+    readJsonFile: <T>(path: string, fallback: T) => Promise<T>;
+    updateVersionArtifacts: (options?: UpdateVersionArtifactsOptions) => Promise<VersionManifest>;
+  };
 
 describe('update-version helpers', () => {
   it('builds a manifest with semver, build and displayVersion', () => {

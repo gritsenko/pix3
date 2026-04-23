@@ -75,7 +75,7 @@ export class LoggingService {
     this.listeners.forEach(listener => listener(entry));
 
     // Also log to console in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.DEV) {
       const prefix = `[Pix3 ${level.toUpperCase()}] ${message}`;
       if (level === 'debug') {
         console.debug(prefix, data);
