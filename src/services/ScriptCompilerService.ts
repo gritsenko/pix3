@@ -243,11 +243,7 @@ export class ScriptCompilerService {
         // Load file contents from virtual FS
         build.onLoad({ filter: /.*/, namespace: 'virtual-fs' }, async args => {
           let contents = files.get(args.path);
-          const context = this.getVirtualFileLoadContext(
-            args.pluginData,
-            args.path,
-            'virtual-fs'
-          );
+          const context = this.getVirtualFileLoadContext(args.pluginData, args.path, 'virtual-fs');
 
           if (contents === undefined && fileLoader) {
             contents = (await fileLoader(args.path, context)) ?? undefined;
@@ -275,11 +271,7 @@ export class ScriptCompilerService {
 
         build.onLoad({ filter: /.*/, namespace: 'virtual-raw' }, async args => {
           let contents = files.get(args.path);
-          const context = this.getVirtualFileLoadContext(
-            args.pluginData,
-            args.path,
-            'virtual-raw'
-          );
+          const context = this.getVirtualFileLoadContext(args.pluginData, args.path, 'virtual-raw');
 
           if (contents === undefined && fileLoader) {
             contents = (await fileLoader(args.path, context)) ?? undefined;

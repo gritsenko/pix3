@@ -5,7 +5,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 // @ts-ignore Plain .mjs script module is exercised directly in this spec.
-import { buildVersionManifest, buildVersionModule, readJsonFile, updateVersionArtifacts } from '../../scripts/update-version.mjs';
+import {
+  buildVersionManifest,
+  buildVersionModule,
+  readJsonFile,
+  updateVersionArtifacts,
+} from '../../scripts/update-version.mjs';
 
 describe('update-version helpers', () => {
   it('builds a manifest with semver, build and displayVersion', () => {

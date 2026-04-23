@@ -6,17 +6,21 @@ import { UpdateCheckService, compareEditorVersions } from './UpdateCheckService'
 
 describe('compareEditorVersions', () => {
   it('prefers semver before build number', () => {
-    expect(compareEditorVersions({ version: '0.0.2', build: 0 }, { version: '0.0.1', build: 99 }))
-      .toBe(1);
-    expect(compareEditorVersions({ version: '0.0.1', build: 99 }, { version: '0.0.2', build: 0 }))
-      .toBe(-1);
+    expect(
+      compareEditorVersions({ version: '0.0.2', build: 0 }, { version: '0.0.1', build: 99 })
+    ).toBe(1);
+    expect(
+      compareEditorVersions({ version: '0.0.1', build: 99 }, { version: '0.0.2', build: 0 })
+    ).toBe(-1);
   });
 
   it('compares build numbers when semver matches', () => {
-    expect(compareEditorVersions({ version: '0.0.1', build: 5 }, { version: '0.0.1', build: 4 }))
-      .toBe(1);
-    expect(compareEditorVersions({ version: '0.0.1', build: 4 }, { version: '0.0.1', build: 4 }))
-      .toBe(0);
+    expect(
+      compareEditorVersions({ version: '0.0.1', build: 5 }, { version: '0.0.1', build: 4 })
+    ).toBe(1);
+    expect(
+      compareEditorVersions({ version: '0.0.1', build: 4 }, { version: '0.0.1', build: 4 })
+    ).toBe(0);
   });
 });
 

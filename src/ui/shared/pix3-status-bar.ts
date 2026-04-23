@@ -1,10 +1,7 @@
 import { ComponentBase, customElement, html, inject, state } from '@/fw';
 import { DialogService } from '@/services/DialogService';
 import { LoggingService } from '@/services/LoggingService';
-import {
-  UpdateCheckService,
-  type UpdateCheckState,
-} from '@/services/UpdateCheckService';
+import { UpdateCheckService, type UpdateCheckState } from '@/services/UpdateCheckService';
 import { CURRENT_EDITOR_VERSION } from '@/version';
 import { subscribe } from 'valtio/vanilla';
 import { appState } from '@/state';

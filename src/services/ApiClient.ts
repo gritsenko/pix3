@@ -65,15 +65,18 @@ export interface ManifestEntry {
 class ApiClientError extends Error {
   constructor(
     message: string,
-    public status: number
+    public status: number,
+    public url?: string
   ) {
-    super(message);
+    const fullMessage = url ? `${message} (${url})` : message;
+    super(fullMessage);
     this.name = 'ApiClientError';
   }
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const fullUrl = `${BASE_URL}${path}`;
+  const res = await fetch(fullUrl, {
     credentials: 'include',
     ...init,
     headers: {
@@ -83,10 +86,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   });
   if (!res.ok) {
     if (res.status === 413) {
-      throw new ApiClientError(getUploadLimitMessage(), res.status);
+      throw new ApiClientError(getUploadLimitMessage(), res.status, fullUrl);
     }
     const body = await res.json().catch(() => ({ error: res.statusText }));
-    throw new ApiClientError(body.error ?? res.statusText, res.status);
+    throw new ApiClientError(body.error ?? res.statusText, res.status, fullUrl);
   }
   return res.json() as Promise<T>;
 }

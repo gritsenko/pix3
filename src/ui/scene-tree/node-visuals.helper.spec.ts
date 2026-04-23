@@ -13,11 +13,17 @@ import { getNodeVisuals } from './node-visuals.helper';
 
 describe('getNodeVisuals', () => {
   it.each([
-    ['DirectionalLightNode', new DirectionalLightNode({ id: 'dir-light', name: 'Directional Light' })],
+    [
+      'DirectionalLightNode',
+      new DirectionalLightNode({ id: 'dir-light', name: 'Directional Light' }),
+    ],
     ['PointLightNode', new PointLightNode({ id: 'point-light', name: 'Point Light' })],
     ['SpotLightNode', new SpotLightNode({ id: 'spot-light', name: 'Spot Light' })],
     ['AmbientLightNode', new AmbientLightNode({ id: 'ambient-light', name: 'Ambient Light' })],
-    ['HemisphereLightNode', new HemisphereLightNode({ id: 'hemi-light', name: 'Hemisphere Light' })],
+    [
+      'HemisphereLightNode',
+      new HemisphereLightNode({ id: 'hemi-light', name: 'Hemisphere Light' }),
+    ],
   ])('returns sun icon for %s', (_label, node) => {
     expect(getNodeVisuals(node)).toEqual({
       color: '#fe9ebeff',

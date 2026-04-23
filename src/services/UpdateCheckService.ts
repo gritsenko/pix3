@@ -1,12 +1,7 @@
 import { injectable } from '@/fw/di';
 import { CURRENT_EDITOR_VERSION, type EditorVersionInfo } from '@/version';
 
-export type UpdateCheckStatus =
-  | 'idle'
-  | 'checking'
-  | 'up-to-date'
-  | 'update-available'
-  | 'error';
+export type UpdateCheckStatus = 'idle' | 'checking' | 'up-to-date' | 'update-available' | 'error';
 
 export interface UpdateCheckState {
   status: UpdateCheckStatus;
