@@ -19,7 +19,7 @@
     "postinstall": "node -e \"require('fs').copyFileSync('node_modules/esbuild-wasm/esbuild.wasm', 'public/esbuild.wasm')\""
   },
   "dependencies": {
-    "@dimforge/rapier3d-compat": "^0.19.3",
+    "@dimforge/rapier3d": "^0.19.3",
     "@hocuspocus/provider": "^2.15.0",
     "@types/three": "^0.183.1",
     "esbuild-wasm": "^0.24.0",
@@ -34,6 +34,7 @@
     "yjs": "^13.6.0"
   },
   "devDependencies": {
+    "@dimforge/rapier3d-compat": "^0.19.3",
     "@eslint/eslintrc": "^3.3.1",
     "@types/feather-icons": "^4.29.4",
     "@types/node": "^24.5.2",
@@ -49,6 +50,7 @@
     "prettier": "^3.6.2",
     "typescript": "~5.8.3",
     "vite": "^7.1.7",
+    "vite-plugin-wasm": "^3.6.0",
     "vitest": "^4.0.18"
   },
   "overrides": {},

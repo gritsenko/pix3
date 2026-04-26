@@ -8,9 +8,6 @@ import * as EngineAPI from '@pix3/runtime';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
-// Game-specific dependencies exposed for project scripts (DeepCore)
-import RAPIER from '@dimforge/rapier3d-compat';
-
 type HapticFunction = (() => void) & {
   confirm: () => void;
   error: () => void;
@@ -19,7 +16,6 @@ type HapticFunction = (() => void) & {
 interface WindowWithEngine extends Window {
   __PIX3_ENGINE__: typeof EngineAPI;
   __PIX3_THREE__: typeof THREE;
-  __RAPIER__: typeof RAPIER;
   __PIX3_GLTFLoader__: typeof GLTFLoader;
   __PIX3_IOS_HAPTICS__: {
     haptic: HapticFunction;
@@ -28,7 +24,6 @@ interface WindowWithEngine extends Window {
 
 (window as unknown as WindowWithEngine).__PIX3_ENGINE__ = EngineAPI;
 (window as unknown as WindowWithEngine).__PIX3_THREE__ = THREE;
-(window as unknown as WindowWithEngine).__RAPIER__ = RAPIER;
 (window as unknown as WindowWithEngine).__PIX3_GLTFLoader__ = GLTFLoader;
 (window as unknown as WindowWithEngine).__PIX3_IOS_HAPTICS__ = {
   haptic: Object.assign(() => undefined, {
@@ -63,12 +58,15 @@ const createImportMapShim = () => {
   const threeBlob = new Blob([threeModuleCode], { type: 'application/javascript' });
   const threeBlobUrl = URL.createObjectURL(threeBlob);
 
+  // Rapier itself is lazy-loaded via ensureRapierLoaded() before user scripts
+  // execute. The shim reads window.__RAPIER__, which is populated at that
+  // point. The export key list is baked in at build time via Vite `define`,
+  // so this module does not pull rapier (and its 2 MB inlined wasm) into the
+  // main bundle.
   const rapierModuleCode = `
     const api = window.__RAPIER__;
     export default api;
-    ${Object.keys(RAPIER)
-      .map(key => `export const ${key} = api.${key};`)
-      .join('\n')}
+    ${__PIX3_RAPIER_EXPORT_KEYS__.map(key => `export const ${key} = api.${key};`).join('\n')}
   `;
   const rapierBlob = new Blob([rapierModuleCode], { type: 'application/javascript' });
   const rapierBlobUrl = URL.createObjectURL(rapierBlob);

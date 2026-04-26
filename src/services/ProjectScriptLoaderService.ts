@@ -14,6 +14,7 @@ import { ApiClientError } from './ApiClient';
 import { LoggingService } from './LoggingService';
 import { FileWatchService } from './FileWatchService';
 import { isDocumentActive } from './page-activity';
+import { ensureRapierLoaded } from '@/core/lazy-rapier';
 
 /**
  * ProjectScriptLoaderService
@@ -271,6 +272,19 @@ export class ProjectScriptLoaderService {
       return;
     }
 
+    // Rapier is lazy-loaded so it does not bloat the editor's main chunk.
+    // The runtime importmap shim for `@dimforge/rapier3d-compat` resolves to
+    // window.__RAPIER__, so it must be populated before the user bundle is
+    // dynamically imported.
+    if (this.bundleReferencesRapier(code)) {
+      try {
+        await ensureRapierLoaded();
+      } catch (error) {
+        this.logger.error('Failed to load rapier physics runtime', error);
+        throw error;
+      }
+    }
+
     // Create a blob URL from the compiled code
     const blob = new Blob([code], { type: 'application/javascript' });
     const blobUrl = URL.createObjectURL(blob);
@@ -298,6 +312,10 @@ export class ProjectScriptLoaderService {
       // Clean up blob URL
       URL.revokeObjectURL(blobUrl);
     }
+  }
+
+  private bundleReferencesRapier(code: string): boolean {
+    return code.includes('@dimforge/rapier3d-compat') || code.includes('@dimforge/');
   }
 
   /**
