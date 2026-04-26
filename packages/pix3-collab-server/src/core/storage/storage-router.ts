@@ -86,7 +86,7 @@ storageRouter.get(
       return;
     }
 
-    res.sendFile(fullPath);
+    res.sendFile(fullPath, { dotfiles: 'allow' });
   }
 );
 
