@@ -229,9 +229,14 @@ pix3-welcome {
   font-size: 0.9rem;
   font-weight: 500;
 }
-.recent-item:hover {
+.recent-item:hover:not([disabled]) {
   background: rgba(var(--pix3-accent-rgb), 0.15);
   border-color: rgba(var(--pix3-accent-rgb), 0.3);
+}
+
+.recent-item[disabled] {
+  cursor: default;
+  opacity: 0.72;
 }
 .folder-icon {
   display: inline-flex;
@@ -331,6 +336,47 @@ pix3-welcome {
 .recent-remove:focus {
   outline: 2px solid rgba(var(--pix3-accent-rgb), 0.6);
   outline-offset: 2px;
+}
+
+.cloud-project-delete {
+  flex-shrink: 0;
+  min-width: 6.75rem;
+  padding: 0.8rem 0.95rem;
+  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 107, 107, 0.45);
+  background: rgba(151, 33, 33, 0.24);
+  color: #ffd7d7;
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  transition: all 0.2s ease;
+}
+
+.cloud-project-delete:hover:not([disabled]) {
+  background: rgba(171, 34, 34, 0.34);
+  border-color: rgba(255, 128, 128, 0.68);
+  color: #fff2f2;
+}
+
+.cloud-project-delete:focus {
+  outline: 2px solid rgba(255, 128, 128, 0.55);
+  outline-offset: 2px;
+}
+
+.cloud-project-delete[disabled] {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.recent-error {
+  margin-top: 0.75rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 0.6rem;
+  border: 1px solid rgba(255, 107, 107, 0.32);
+  background: rgba(151, 33, 33, 0.2);
+  color: #ffd7d7;
+  font-size: 0.86rem;
+  line-height: 1.45;
 }
 
 @media (max-width: 720px) {

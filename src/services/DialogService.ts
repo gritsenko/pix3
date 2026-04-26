@@ -8,6 +8,10 @@ export interface DialogOptions {
   cancelLabel?: string;
   isDangerous?: boolean;
   secondaryIsDangerous?: boolean;
+  requiredInputLabel?: string;
+  requiredInputValue?: string;
+  requiredInputPlaceholder?: string;
+  disclaimer?: string;
 }
 
 export interface DialogInstance {

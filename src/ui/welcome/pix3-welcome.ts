@@ -3,6 +3,7 @@ import './pix3-welcome.ts.css';
 import { ProjectService } from '@/services';
 import { IconService } from '@/services/IconService';
 import { CloudProjectService } from '@/services/CloudProjectService';
+import { DialogService } from '@/services/DialogService';
 import type { ApiProject } from '@/services/ApiClient';
 import { appState } from '@/state';
 import type { RecentProjectEntry } from '@/services/ProjectService';
@@ -27,6 +28,9 @@ export class Pix3Welcome extends ComponentBase {
   @inject(ProjectLifecycleService)
   private readonly projectLifecycleService!: ProjectLifecycleService;
 
+  @inject(DialogService)
+  private readonly dialogService!: DialogService;
+
   @state()
   private recents: RecentProjectEntry[] = [];
 
@@ -38,6 +42,12 @@ export class Pix3Welcome extends ComponentBase {
 
   @state()
   private isAuthenticated = appState.auth.isAuthenticated;
+
+  @state()
+  private deletingCloudProjectId: string | null = null;
+
+  @state()
+  private cloudProjectsError: string | null = null;
 
   @state()
   private activeTab: 'cloud' | 'local' = appState.auth.isAuthenticated
@@ -110,6 +120,7 @@ export class Pix3Welcome extends ComponentBase {
   }
 
   private loadCloudProjects(): void {
+    this.cloudProjectsError = null;
     void this.cloudProjectService.loadProjects();
   }
 
@@ -197,6 +208,52 @@ export class Pix3Welcome extends ComponentBase {
     await this.cloudProjectService.openProject(projectId);
   };
 
+  private onDeleteCloudProject = async (e: Event): Promise<void> => {
+    e.stopPropagation();
+    const button = e.currentTarget as HTMLElement | null;
+    if (!button) return;
+
+    const projectId = button.getAttribute('data-cloud-delete-id');
+    if (!projectId || this.deletingCloudProjectId === projectId) {
+      return;
+    }
+
+    const project = this.cloudProjects.find(entry => entry.id === projectId);
+    if (!project || !this.isCloudProjectOwner(project)) {
+      return;
+    }
+
+    const confirmed = await this.dialogService.showConfirmation({
+      title: 'Delete Cloud Project',
+      message: `Delete ${project.name} from the cloud workspace? This removes the project and all stored files for everyone who has access.`,
+      disclaimer: 'Deleted cloud projects cannot be restored.',
+      confirmLabel: 'Delete Project',
+      cancelLabel: 'Keep Project',
+      isDangerous: true,
+      requiredInputLabel: `Enter the project name to confirm: ${project.name}`,
+      requiredInputValue: project.name,
+      requiredInputPlaceholder: project.name,
+    });
+
+    if (!confirmed) {
+      return;
+    }
+
+    this.deletingCloudProjectId = projectId;
+    this.cloudProjectsError = null;
+
+    try {
+      await this.cloudProjectService.deleteProject(projectId);
+    } catch (error) {
+      this.cloudProjectsError =
+        error instanceof Error ? error.message : 'Failed to delete cloud project.';
+    } finally {
+      if (this.deletingCloudProjectId === projectId) {
+        this.deletingCloudProjectId = null;
+      }
+    }
+  };
+
   private onLoginRequest = (): void => {
     this.requestAuth({
       projectId: null,
@@ -237,6 +294,10 @@ export class Pix3Welcome extends ComponentBase {
       entry.backend === 'cloud' ? 'cloud-outline' : 'folder-outline',
       18
     );
+  }
+
+  private isCloudProjectOwner(project: ApiProject): boolean {
+    return project.owner_id === appState.auth.user?.id;
   }
 
   private getLocalProjectItems(): Array<{ entry: RecentProjectEntry; recentIndex: number }> {
@@ -316,25 +377,47 @@ export class Pix3Welcome extends ComponentBase {
                         : this.cloudProjects.length
                           ? html`<ul>
                               ${this.cloudProjects.map(
-                                p =>
-                                  html`<li>
-                                    <button
-                                      class="recent-item"
-                                      data-cloud-id="${p.id}"
-                                      @click=${this.onCloudProject}
-                                    >
-                                      <span class="folder-icon" aria-hidden="true"
-                                        >${this.iconService.getIcon('cloud-outline', 18)}</span
+                                p => {
+                                  const isDeleting = this.deletingCloudProjectId === p.id;
+                                  return html`<li>
+                                    <div class="recent-row">
+                                      <button
+                                        class="recent-item"
+                                        data-cloud-id="${p.id}"
+                                        ?disabled=${isDeleting}
+                                        @click=${this.onCloudProject}
                                       >
-                                      <span class="recent-name">${p.name}</span>
-                                      <span class="recent-backend">Cloud</span>
-                                      <span class="recent-time"
-                                        >${this.formatTime(new Date(p.updated_at).getTime())}</span
-                                      >
-                                    </button>
-                                  </li>`
+                                        <span class="folder-icon" aria-hidden="true"
+                                          >${this.iconService.getIcon('cloud-outline', 18)}</span
+                                        >
+                                        <span class="recent-name">${p.name}</span>
+                                        <span class="recent-backend">Cloud</span>
+                                        <span class="recent-time"
+                                          >${this.formatTime(new Date(p.updated_at).getTime())}</span
+                                        >
+                                      </button>
+                                      ${this.isCloudProjectOwner(p)
+                                        ? html`
+                                            <button
+                                              class="cloud-project-delete"
+                                              type="button"
+                                              data-cloud-delete-id="${p.id}"
+                                              ?disabled=${isDeleting}
+                                              @click=${this.onDeleteCloudProject}
+                                              aria-label="Delete cloud project ${p.name}"
+                                            >
+                                              ${isDeleting ? 'Deleting...' : 'Delete'}
+                                            </button>
+                                          `
+                                        : null}
+                                    </div>
+                                  </li>`;
+                                }
                               )}
-                            </ul>`
+                            </ul>
+                            ${this.cloudProjectsError
+                              ? html`<div class="recent-error">${this.cloudProjectsError}</div>`
+                              : null}`
                           : html`<div class="recent-empty">No cloud projects yet.</div>`}
                   `
                 : html`

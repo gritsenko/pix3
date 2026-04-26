@@ -76,6 +76,12 @@ const PROJECT_MANIFEST_PATH = 'pix3project.yaml';
 
 const IGNORED_DIRECTORY_NAMES = new Set(['.git', 'node_modules', 'dist', 'coverage']);
 const IGNORED_FILE_NAMES = new Set(['.DS_Store']);
+const LOCAL_MAPPING_SEED_FILE_NAMES = new Set([
+  '.gitattributes',
+  '.gitignore',
+  '.gitkeep',
+  '.gitmodules',
+]);
 
 @injectable()
 export class LocalSyncService {
@@ -410,17 +416,18 @@ export class LocalSyncService {
     const handle = await this.fileSystem.requestProjectDirectory('readwrite');
     const cloudProjectId = appState.project.id;
     const currentLocalManifest = await this.buildLocalManifest(handle);
+    const currentLocalProjectContent = this.excludeLocalMappingSeedEntries(currentLocalManifest);
     const linkedCloudId = await this.readLinkedCloudProjectIdFromHandle(handle);
 
     if (
-      currentLocalManifest.size > 0 &&
+      currentLocalProjectContent.size > 0 &&
       linkedCloudId !== null &&
       linkedCloudId !== cloudProjectId
     ) {
       throw new Error('Selected folder is already linked to a different cloud project.');
     }
 
-    if (currentLocalManifest.size > 0 && linkedCloudId === null) {
+    if (currentLocalProjectContent.size > 0 && linkedCloudId === null) {
       throw new Error(
         'Choose an empty folder, a Git-only folder, or a folder already linked to this cloud project.'
       );
@@ -831,7 +838,13 @@ export class LocalSyncService {
           uploadToCloud: [],
           downloadToLocal: Array.from(cloudManifest.keys()),
           deleteFromCloud: [],
-          deleteFromLocal: Array.from(localManifest.keys()),
+          deleteFromLocal: Array.from(localManifest.keys()).filter(filePath => {
+            if (cloudManifest.has(filePath)) {
+              return false;
+            }
+
+            return !this.isLocalMappingSeedPath(filePath);
+          }),
           conflicts: [],
           unchanged: [],
         },
@@ -1276,6 +1289,24 @@ export class LocalSyncService {
 
   private uniqueSortedPaths(paths: string[]): string[] {
     return Array.from(new Set(paths)).sort((a, b) => a.localeCompare(b));
+  }
+
+  private excludeLocalMappingSeedEntries(
+    manifest: Map<string, FileHashEntry>
+  ): Map<string, FileHashEntry> {
+    return new Map(
+      Array.from(manifest.entries()).filter(([filePath]) => !this.isLocalMappingSeedPath(filePath))
+    );
+  }
+
+  private isLocalMappingSeedPath(path: string): boolean {
+    const normalized = path.replace(/\\+/g, '/').replace(/^\/+/, '');
+    const segments = normalized.split('/').filter(Boolean);
+    if (segments.length !== 1) {
+      return false;
+    }
+
+    return LOCAL_MAPPING_SEED_FILE_NAMES.has(segments[0] ?? '');
   }
 
   private getOversizeLocalEntries(

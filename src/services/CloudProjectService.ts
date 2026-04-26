@@ -35,6 +35,41 @@ export interface OpenCloudProjectOptions {
   readonly shareToken?: string;
 }
 
+const HYDRATED_MEDIA_EXTENSIONS = new Set([
+  'aac',
+  'avif',
+  'basis',
+  'bmp',
+  'dds',
+  'exr',
+  'flac',
+  'fbx',
+  'gif',
+  'glb',
+  'gltf',
+  'hdr',
+  'jpeg',
+  'jpg',
+  'ktx2',
+  'm4a',
+  'mp3',
+  'obj',
+  'ogg',
+  'otf',
+  'png',
+  'svg',
+  'tif',
+  'tiff',
+  'ttf',
+  'wav',
+  'webm',
+  'webp',
+  'woff',
+  'woff2',
+]);
+const HYDRATED_SCRIPT_DIRECTORIES = ['scripts', 'src/scripts'] as const;
+const HYDRATED_SCRIPT_EXTENSIONS = new Set(['css', 'glsl', 'ts']);
+
 @injectable()
 export class CloudProjectService {
   @inject(ProjectService)
@@ -356,14 +391,15 @@ export class CloudProjectService {
     shareToken?: string
   ): Promise<void> {
     const fileEntries = manifest.filter(entry => entry.kind === 'file');
-    const totalBytes = fileEntries.reduce((sum, entry) => sum + entry.size, 0);
+    const hydratedEntries = fileEntries.filter(entry => this.shouldHydrateEntry(entry.path));
+    const totalBytes = hydratedEntries.reduce((sum, entry) => sum + entry.size, 0);
     let processedFileCount = 0;
     let processedBytes = 0;
 
     this.updateOpenProgress('hydrating-cache', 'Preparing project files for local access.', {
       currentPath: null,
       processedFileCount: 0,
-      totalFileCount: fileEntries.length,
+      totalFileCount: hydratedEntries.length,
       processedBytes: 0,
       totalBytes,
     });
@@ -371,7 +407,16 @@ export class CloudProjectService {
     await this.cloudCache.reconcileManifest(projectId, manifest);
 
     for (const entry of fileEntries) {
-      if (!(await this.cloudCache.isEntryFresh(projectId, entry))) {
+      const isFresh = await this.cloudCache.isEntryFresh(projectId, entry);
+
+      if (!this.shouldHydrateEntry(entry.path)) {
+        if (!isFresh) {
+          await this.cloudCache.invalidatePath(projectId, entry.path);
+        }
+        continue;
+      }
+
+      if (!isFresh) {
         try {
           const response = await ApiClient.downloadFile(projectId, entry.path, shareToken);
           await this.cloudCache.storeBlobFile(projectId, entry.path, await response.blob(), {
@@ -397,11 +442,52 @@ export class CloudProjectService {
       this.updateOpenProgress('hydrating-cache', 'Preparing project files for local access.', {
         currentPath: entry.path,
         processedFileCount,
-        totalFileCount: fileEntries.length,
+        totalFileCount: hydratedEntries.length,
         processedBytes,
         totalBytes,
       });
     }
+  }
+
+  private shouldHydrateEntry(path: string): boolean {
+    const normalizedPath = this.normalizeProjectPath(path);
+    if (!normalizedPath || normalizedPath === '.') {
+      return false;
+    }
+
+    const segments = normalizedPath.split('/').filter(Boolean);
+    if (segments.length === 0 || segments.some(segment => segment.startsWith('.'))) {
+      return false;
+    }
+
+    const fileName = segments[segments.length - 1] ?? '';
+    const extension = fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() ?? '' : '';
+
+    if (extension === 'pix3scene') {
+      return true;
+    }
+
+    if (
+      HYDRATED_SCRIPT_EXTENSIONS.has(extension) &&
+      HYDRATED_SCRIPT_DIRECTORIES.some(directory => {
+        return normalizedPath === directory || normalizedPath.startsWith(`${directory}/`);
+      })
+    ) {
+      return true;
+    }
+
+    return HYDRATED_MEDIA_EXTENSIONS.has(extension);
+  }
+
+  private normalizeProjectPath(path: string): string {
+    return (
+      path
+        .replace(/^res:\/\//i, '')
+        .replace(/^\.\/+/, '')
+        .replace(/^\/+/, '')
+        .replace(/\/+$/, '')
+        .replace(/\\+/g, '/') || '.'
+    );
   }
 
   private shouldSkipHydrationError(error: unknown): boolean {

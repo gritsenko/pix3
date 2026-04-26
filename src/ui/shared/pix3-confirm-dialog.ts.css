@@ -21,6 +21,7 @@ pix3-confirm-dialog {
   border-radius: 8px;
   padding: 1.5rem;
   max-width: 400px;
+  width: min(100%, 400px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
   animation: slideUp 0.2s ease-out;
 }
@@ -48,6 +49,45 @@ pix3-confirm-dialog {
   line-height: 1.5;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.dialog-disclaimer {
+  margin: 0.9rem 0 0;
+  padding: 0.8rem 0.9rem;
+  border-radius: 6px;
+  border: 1px solid rgba(211, 47, 47, 0.45);
+  background: rgba(211, 47, 47, 0.14);
+  color: #ffd7d7;
+  line-height: 1.45;
+}
+
+.dialog-confirmation {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.dialog-confirmation__label {
+  color: var(--color-text-primary, #fff);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.dialog-confirmation__input {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border-radius: 6px;
+  border: 1px solid var(--color-border, #444);
+  background: var(--color-bg-tertiary, #202020);
+  color: var(--color-text-primary, #fff);
+  font-size: 0.95rem;
+}
+
+.dialog-confirmation__input:focus {
+  outline: 2px solid rgba(var(--pix3-accent-rgb), 0.55);
+  outline-offset: 1px;
+  border-color: rgba(var(--pix3-accent-rgb), 0.6);
 }
 
 .dialog-actions {
@@ -86,6 +126,15 @@ pix3-confirm-dialog {
   background: var(--color-primary-hover, #1976d2);
 }
 
+.btn-confirm:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.btn-confirm:hover:disabled {
+  background: var(--color-primary, #2196f3);
+}
+
 .btn-confirm.dangerous {
   background: var(--color-danger, #d32f2f);
   color: #fff;
@@ -93,4 +142,8 @@ pix3-confirm-dialog {
 
 .btn-confirm.dangerous:hover {
   background: var(--color-danger-hover, #b71c1c);
+}
+
+.btn-confirm.dangerous:hover:disabled {
+  background: var(--color-danger, #d32f2f);
 }

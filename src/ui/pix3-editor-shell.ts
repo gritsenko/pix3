@@ -1097,6 +1097,10 @@ export class Pix3EditorShell extends ComponentBase {
               .cancelLabel=${dialog.options.cancelLabel || 'Cancel'}
               .isDangerous=${dialog.options.isDangerous || false}
               .secondaryIsDangerous=${dialog.options.secondaryIsDangerous || false}
+              .requiredInputLabel=${dialog.options.requiredInputLabel || ''}
+              .requiredInputValue=${dialog.options.requiredInputValue || ''}
+              .requiredInputPlaceholder=${dialog.options.requiredInputPlaceholder || ''}
+              .disclaimer=${dialog.options.disclaimer || ''}
             ></pix3-confirm-dialog>
           `
         )}

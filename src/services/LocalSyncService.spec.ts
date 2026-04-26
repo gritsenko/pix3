@@ -458,4 +458,112 @@ describe('LocalSyncService', () => {
     expect(appState.project.hybridSync.errorMessage).toContain('upload limit is 100 MB');
     expect(logger.warn).toHaveBeenCalled();
   });
+
+  it('allows syncing into a Git-only folder and keeps cloud .gitignore files', async () => {
+    const localRoot = createDirectoryTree({
+      '.git/config': '[core]\n  repositoryformatversion = 0\n',
+      '.gitignore': 'node_modules/\n',
+    });
+
+    const cloudGitignore = 'dist/\n.cache/\n';
+    const sceneContents = 'root:\n  id: scene-1\n';
+    const cloudManifest = stringify(
+      createManifest({
+        pix3Hybrid: {
+          cloudProjectId: 'cloud-1',
+        },
+      })
+    );
+
+    appState.project.id = 'cloud-1';
+    appState.project.backend = 'cloud';
+    appState.project.status = 'ready';
+    appState.project.projectName = 'Cloud Hybrid';
+    appState.project.manifest = createManifest();
+    appState.auth.isAuthenticated = true;
+
+    mockApiClient.getManifestWithAccess.mockResolvedValue({
+      files: [
+        {
+          path: '.gitignore',
+          kind: 'file',
+          size: cloudGitignore.length,
+          hash: await hashText(cloudGitignore),
+          modified: '2026-04-09T10:00:00.000Z',
+        },
+        {
+          path: 'pix3project.yaml',
+          kind: 'file',
+          size: cloudManifest.length,
+          hash: await hashText(cloudManifest),
+          modified: '2026-04-09T10:00:01.000Z',
+        },
+        {
+          path: 'Scenes/main.pix3scene',
+          kind: 'file',
+          size: sceneContents.length,
+          hash: await hashText(sceneContents),
+          modified: '2026-04-09T10:00:02.000Z',
+        },
+      ],
+    });
+
+    mockApiClient.downloadFile.mockImplementation(async (_projectId: string, filePath: string) => {
+      switch (filePath) {
+        case '.gitignore':
+          return new Response(new Blob([cloudGitignore]));
+        case 'pix3project.yaml':
+          return new Response(new Blob([cloudManifest]));
+        case 'Scenes/main.pix3scene':
+          return new Response(new Blob([sceneContents]));
+        default:
+          throw new Error(`Unexpected download: ${filePath}`);
+      }
+    });
+
+    const saveProjectManifest = vi.fn(async (manifest: ProjectManifest) => {
+      appState.project.manifest = manifest;
+    });
+    const projectService = {
+      saveProjectManifest,
+      createProjectSessionId: vi.fn(() => 'local-session-1'),
+      persistProjectDirectoryHandle: vi.fn().mockResolvedValue(undefined),
+      addRecentProject: vi.fn(),
+      syncProjectMetadata: vi.fn(),
+    };
+    const fileSystem = {
+      requestProjectDirectory: vi.fn().mockResolvedValue(localRoot),
+      ensurePermission: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const service = new LocalSyncService();
+    Object.defineProperty(service, 'projectService', { value: projectService });
+    Object.defineProperty(service, 'dialogService', {
+      value: { showConfirmation: vi.fn(), showChoice: vi.fn() },
+    });
+    Object.defineProperty(service, 'fileSystem', { value: fileSystem });
+    Object.defineProperty(service, 'cloudProjectService', { value: { createProject: vi.fn() } });
+    Object.defineProperty(service, 'logger', {
+      value: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+    });
+
+    await service.syncCurrentCloudProjectToLocalFolder();
+
+    const gitignoreHandle = await (localRoot as unknown as FakeDirectoryHandle).getFileHandle(
+      '.gitignore'
+    );
+    expect(await (await gitignoreHandle.getFile()).text()).toBe(cloudGitignore);
+
+    const sceneHandle = await (await (localRoot as unknown as FakeDirectoryHandle).getDirectoryHandle(
+      'Scenes'
+    )).getFileHandle('main.pix3scene');
+    expect(await (await sceneHandle.getFile()).text()).toBe(sceneContents);
+    expect(projectService.addRecentProject).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'local-session-1',
+        backend: 'local',
+        linkedCloudProjectId: 'cloud-1',
+      })
+    );
+  });
 });
