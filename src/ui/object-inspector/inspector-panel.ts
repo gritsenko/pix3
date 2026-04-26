@@ -1377,7 +1377,7 @@ export class InspectorPanel extends ComponentBase {
                 </div>
               `
             : ''}
-          ${isText && textPreview?.lineCount !== null
+          ${isText && textPreview !== null && textPreview.lineCount !== null
             ? html`
                 <div class="property-group">
                   <span class="property-label">Lines</span>

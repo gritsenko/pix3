@@ -76,7 +76,7 @@ function stubTreeServices(
   };
 
   const iconService = {
-    getIcon: vi.fn(() => 'icon' as unknown as ReturnType<AssetTree['caretIcon']>),
+    getIcon: vi.fn(() => 'icon'),
   };
 
   const assetsPreviewService = {

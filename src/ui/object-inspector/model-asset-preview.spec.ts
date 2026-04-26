@@ -69,7 +69,7 @@ describe('ModelAssetPreview', () => {
       };
     });
 
-    const preview = new ModelAssetPreview() as ModelAssetPreview & {
+    const preview = new ModelAssetPreview() as unknown as {
       renderer: object;
       camera: PerspectiveCamera;
       previewRoot: Group;

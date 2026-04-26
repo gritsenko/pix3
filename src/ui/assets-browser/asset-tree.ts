@@ -631,7 +631,7 @@ export class AssetTree extends ComponentBase {
         children: isExpanded ? [] : null,
       };
 
-      if (isExpanded) {
+      if (isExpanded && expandedPaths) {
         directoryNode.children = await this.buildTreeFromExpandedPaths(entry.path, expandedPaths);
       }
 
