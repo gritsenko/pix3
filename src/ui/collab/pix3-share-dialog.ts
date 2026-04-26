@@ -1,35 +1,82 @@
 import { ComponentBase, customElement, html, inject, state } from '@/fw';
 import { query } from 'lit/decorators.js';
 import { nothing } from 'lit';
-import { ServiceContainer } from '@/fw/di';
 import { appState } from '@/state';
 import { CollabSessionService } from '@/services/CollabSessionService';
 import { CloudProjectService } from '@/services/CloudProjectService';
-import { LocalSyncService } from '@/services/LocalSyncService';
+import { DialogService } from '@/services/DialogService';
+import * as ApiClient from '@/services/ApiClient';
+import type {
+  ApiAssignableProjectMemberRole,
+  ApiProjectMember,
+  ApiProjectUserSuggestion,
+} from '@/services/ApiClient';
 import { subscribe } from 'valtio/vanilla';
 import './pix3-share-dialog.ts.css';
 
+type ShareScope = 'private' | 'selected' | 'link';
+
+const sortMembers = (members: ApiProjectMember[]): ApiProjectMember[] =>
+  [...members].sort((left, right) => {
+    const leftRank = left.role === 'owner' ? 0 : left.role === 'editor' ? 1 : 2;
+    const rightRank = right.role === 'owner' ? 0 : right.role === 'editor' ? 1 : 2;
+    if (leftRank !== rightRank) {
+      return leftRank - rightRank;
+    }
+    return left.email.localeCompare(right.email);
+  });
+
 @customElement('pix3-share-dialog')
 export class Pix3ShareDialog extends ComponentBase {
-  @inject(LocalSyncService)
-  private readonly localSyncService!: LocalSyncService;
+  @inject(CloudProjectService)
+  private readonly cloudProjectService!: CloudProjectService;
+
+  @inject(CollabSessionService)
+  private readonly collabSessionService!: CollabSessionService;
+
+  @inject(DialogService)
+  private readonly dialogService!: DialogService;
 
   @state() private isOpen = false;
   @state() private link = '';
   @state() private copyLabel = 'Copy link';
   @state() private errorMessage = '';
-  @state() private isSharing = false;
-  @state() private isSyncing = false;
-  @state()
-  private shareMode: 'private' | 'link' = appState.collaboration.shareEnabled ? 'link' : 'private';
+  @state() private isLoadingMembers = false;
+  @state() private isUpdatingScope = false;
+  @state() private isSubmittingInvite = false;
+  @state() private isSearchingUsers = false;
+  @state() private removingUserId: string | null = null;
+  @state() private updatingRoleUserId: string | null = null;
+  @state() private inviteEmail = '';
+  @state() private inviteRole: ApiAssignableProjectMemberRole = 'viewer';
+  @state() private members: ApiProjectMember[] = [];
+  @state() private suggestions: ApiProjectUserSuggestion[] = [];
+  @state() private isSuggestionsOpen = false;
+  @state() private shareScope: ShareScope = appState.collaboration.shareEnabled ? 'link' : 'private';
 
   @query('#shareLinkInput') private inputEl!: HTMLInputElement | null;
 
   private disposeProjectSubscription?: () => void;
+  private disposeCollaborationSubscription?: () => void;
+  private disposeAuthSubscription?: () => void;
+  private inviteBlurTimeout: number | null = null;
+  private searchRequestId = 0;
 
   connectedCallback(): void {
     super.connectedCallback();
     this.disposeProjectSubscription = subscribe(appState.project, () => {
+      if (this.isOpen) {
+        this.updateLink();
+      }
+      this.requestUpdate();
+    });
+    this.disposeCollaborationSubscription = subscribe(appState.collaboration, () => {
+      if (this.isOpen) {
+        this.updateLink();
+      }
+      this.requestUpdate();
+    });
+    this.disposeAuthSubscription = subscribe(appState.auth, () => {
       this.requestUpdate();
     });
   }
@@ -37,6 +84,14 @@ export class Pix3ShareDialog extends ComponentBase {
   disconnectedCallback(): void {
     this.disposeProjectSubscription?.();
     this.disposeProjectSubscription = undefined;
+    this.disposeCollaborationSubscription?.();
+    this.disposeCollaborationSubscription = undefined;
+    this.disposeAuthSubscription?.();
+    this.disposeAuthSubscription = undefined;
+    if (this.inviteBlurTimeout !== null) {
+      window.clearTimeout(this.inviteBlurTimeout);
+      this.inviteBlurTimeout = null;
+    }
     super.disconnectedCallback();
   }
 
@@ -44,32 +99,42 @@ export class Pix3ShareDialog extends ComponentBase {
     this.isOpen = true;
     this.copyLabel = 'Copy link';
     this.errorMessage = '';
-    this.shareMode = appState.collaboration.shareEnabled ? 'link' : 'private';
+    this.inviteEmail = '';
+    this.inviteRole = 'viewer';
+    this.members = [];
+    this.suggestions = [];
+    this.isSuggestionsOpen = false;
+    this.shareScope = appState.collaboration.shareEnabled ? 'link' : 'private';
     this.updateLink();
-    void this.localSyncService.refreshCurrentProjectStatus().finally(() => this.requestUpdate());
-    window.setTimeout(() => this.inputEl?.select(), 50);
+    void this.initializeDialog();
   }
 
   public closeDialog(): void {
     this.isOpen = false;
     this.copyLabel = 'Copy link';
     this.errorMessage = '';
+    this.suggestions = [];
+    this.isSuggestionsOpen = false;
+  }
+
+  private async initializeDialog(): Promise<void> {
+    await this.loadMembers();
+    if (this.shareScope === 'link') {
+      window.setTimeout(() => this.inputEl?.select(), 50);
+    }
   }
 
   private updateLink(): void {
     const projectId = appState.project.id;
     const sceneId = appState.scenes.activeSceneId;
+    const shareToken = appState.collaboration.shareToken;
 
-    if (!projectId || !sceneId) {
+    if (!projectId || !sceneId || !appState.collaboration.shareEnabled || !shareToken) {
       this.link = '';
       return;
     }
 
-    const container = ServiceContainer.getInstance();
-    const sessionService = container.getService<CollabSessionService>(
-      container.getOrCreateToken(CollabSessionService)
-    );
-    this.link = sessionService.buildInviteLink(projectId, sceneId);
+    this.link = this.collabSessionService.buildInviteLink(projectId, sceneId, shareToken);
   }
 
   private buildLinkFromShareToken(shareToken?: string): string {
@@ -79,50 +144,161 @@ export class Pix3ShareDialog extends ComponentBase {
       return '';
     }
 
-    const container = ServiceContainer.getInstance();
-    const sessionService = container.getService<CollabSessionService>(
-      container.getOrCreateToken(CollabSessionService)
+    return this.collabSessionService.buildInviteLink(projectId, sceneId, shareToken);
+  }
+
+  private get canManageShareSettings(): boolean {
+    return appState.collaboration.role === 'owner';
+  }
+
+  private get canManageMembers(): boolean {
+    return appState.collaboration.role === 'owner';
+  }
+
+  private get nonOwnerMembers(): ApiProjectMember[] {
+    return this.members.filter(member => member.role !== 'owner');
+  }
+
+  private get isBusy(): boolean {
+    return (
+      this.isUpdatingScope ||
+      this.isSubmittingInvite ||
+      this.isLoadingMembers ||
+      this.removingUserId !== null ||
+      this.updatingRoleUserId !== null
     );
-    return sessionService.buildInviteLink(projectId, sceneId, shareToken);
   }
 
-  private get canManageSharing(): boolean {
-    return appState.collaboration.role === 'owner' || appState.collaboration.role === 'editor';
+  private get isCloudProject(): boolean {
+    return appState.project.backend === 'cloud';
   }
 
-  private async onShareModeChange(event: Event): Promise<void> {
+  private syncScopeFromState(preserveSelectedScope = false): void {
+    if (appState.collaboration.shareEnabled) {
+      this.shareScope = 'link';
+      return;
+    }
+
+    if (this.nonOwnerMembers.length > 0 || (preserveSelectedScope && this.shareScope === 'selected')) {
+      this.shareScope = 'selected';
+      return;
+    }
+
+    this.shareScope = 'private';
+  }
+
+  private async loadMembers(options?: { preserveSelectedScope?: boolean }): Promise<void> {
+    if (!this.isCloudProject || !appState.project.id || !appState.auth.isAuthenticated) {
+      this.members = [];
+      this.syncScopeFromState(options?.preserveSelectedScope ?? false);
+      return;
+    }
+
+    this.isLoadingMembers = true;
+
+    try {
+      const { members } = await ApiClient.getProjectMembers(appState.project.id);
+      this.members = sortMembers(members);
+      this.syncScopeFromState(options?.preserveSelectedScope ?? false);
+    } catch (error) {
+      this.errorMessage =
+        error instanceof Error ? error.message : 'Failed to load project access members.';
+    } finally {
+      this.isLoadingMembers = false;
+    }
+  }
+
+  private async confirmSwitchToPrivate(): Promise<boolean> {
+    const shouldRevokeLink = appState.collaboration.shareEnabled;
+    const shouldRemoveMembers = this.nonOwnerMembers.length > 0;
+
+    if (!shouldRevokeLink && !shouldRemoveMembers) {
+      return true;
+    }
+
+    const effects: string[] = [];
+    if (shouldRevokeLink) {
+      effects.push('revoke the public link');
+    }
+    if (shouldRemoveMembers) {
+      effects.push('remove all selected users');
+    }
+
+    return this.dialogService.showConfirmation({
+      title: 'Restrict Access to Only Me',
+      message: `This will ${effects.join(' and ')}.`,
+      confirmLabel: 'Restrict access',
+      cancelLabel: 'Cancel',
+      isDangerous: true,
+    });
+  }
+
+  private async onShareScopeChange(event: Event): Promise<void> {
     const target = event.target as HTMLSelectElement;
-    const nextMode = target.value as 'private' | 'link';
-    if (!appState.project.id || nextMode === this.shareMode || !this.canManageSharing) {
+    const nextScope = target.value as ShareScope;
+    const previousScope = this.shareScope;
+
+    if (
+      !this.isCloudProject ||
+      !appState.project.id ||
+      nextScope === this.shareScope ||
+      !this.canManageShareSettings ||
+      this.isBusy
+    ) {
+      target.value = this.shareScope;
       return;
     }
 
     this.errorMessage = '';
-    this.isSharing = true;
+    this.isUpdatingScope = true;
 
     try {
-      const container = ServiceContainer.getInstance();
-      const cloudProjectService = container.getService<CloudProjectService>(
-        container.getOrCreateToken(CloudProjectService)
-      );
-
-      if (nextMode === 'link') {
-        if (!appState.scenes.activeSceneId) {
-          throw new Error('Open a scene before enabling link sharing.');
+      if (nextScope === 'private') {
+        const confirmed = await this.confirmSwitchToPrivate();
+        if (!confirmed) {
+          target.value = previousScope;
+          return;
         }
-        const shareToken = await cloudProjectService.generateShareToken(appState.project.id);
-        this.link = this.buildLinkFromShareToken(shareToken);
-      } else {
-        await cloudProjectService.revokeShareToken(appState.project.id);
+
+        if (appState.collaboration.shareEnabled) {
+          await this.cloudProjectService.revokeShareToken(appState.project.id);
+        }
+
+        if (this.nonOwnerMembers.length > 0) {
+          await ApiClient.removeAllNonOwnerProjectMembers(appState.project.id);
+          this.members = this.members.filter(member => member.role === 'owner');
+        }
+
         this.link = '';
+        this.shareScope = 'private';
+        return;
       }
-      this.shareMode = nextMode;
+
+      if (nextScope === 'selected') {
+        if (appState.collaboration.shareEnabled) {
+          await this.cloudProjectService.revokeShareToken(appState.project.id);
+        }
+
+        this.link = '';
+        this.shareScope = 'selected';
+        return;
+      }
+
+      if (!appState.scenes.activeSceneId) {
+        throw new Error('Open a scene before enabling link sharing.');
+      }
+
+      const shareToken = await this.cloudProjectService.generateShareToken(appState.project.id);
+      this.link = this.buildLinkFromShareToken(shareToken);
       this.copyLabel = 'Copy link';
+      this.shareScope = 'link';
       window.setTimeout(() => this.inputEl?.select(), 50);
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : 'Failed to update link sharing.';
+      this.errorMessage = error instanceof Error ? error.message : 'Failed to update sharing.';
+      target.value = previousScope;
     } finally {
-      this.isSharing = false;
+      this.isUpdatingScope = false;
+      this.requestUpdate();
     }
   }
 
@@ -153,188 +329,375 @@ export class Pix3ShareDialog extends ComponentBase {
     }, 1400);
   }
 
-  private onOverlayClick(): void {
-    this.closeDialog();
+  private closeSuggestionPopup(): void {
+    if (this.inviteBlurTimeout !== null) {
+      window.clearTimeout(this.inviteBlurTimeout);
+      this.inviteBlurTimeout = null;
+    }
+    this.isSuggestionsOpen = false;
   }
 
-  private requestAuthentication(): void {
-    this.dispatchEvent(
-      new CustomEvent('pix3-auth:request', {
-        detail: {
-          projectId: null,
-        },
-        bubbles: true,
-        composed: true,
-      })
-    );
-  }
-
-  private get syncStatusLabel(): string {
-    switch (appState.project.hybridSync.status) {
-      case 'checking':
-        return 'Checking sync status';
-      case 'up-to-date':
-        return 'Up to date';
-      case 'local-changes':
-        return 'Local folder changed';
-      case 'cloud-changes':
-        return 'Cloud project changed';
-      case 'conflict':
-        return 'Sync conflict';
-      case 'syncing':
-        return 'Syncing';
-      case 'auth-required':
-        return 'Sign in required';
-      case 'error':
-        return 'Sync needs attention';
-      default:
-        return 'Not linked';
+  private openSuggestionPopup(): void {
+    if (this.suggestions.length > 0 || this.isSearchingUsers || this.inviteEmail.trim().length >= 2) {
+      this.isSuggestionsOpen = true;
     }
   }
 
-  private get syncHint(): string {
-    const { hybridSync } = appState.project;
-    if (hybridSync.errorMessage) {
-      return hybridSync.errorMessage;
+  private onInviteFocus = (): void => {
+    if (this.inviteBlurTimeout !== null) {
+      window.clearTimeout(this.inviteBlurTimeout);
+      this.inviteBlurTimeout = null;
+    }
+    this.openSuggestionPopup();
+  };
+
+  private onInviteBlur = (): void => {
+    this.inviteBlurTimeout = window.setTimeout(() => {
+      this.isSuggestionsOpen = false;
+      this.inviteBlurTimeout = null;
+    }, 140);
+  };
+
+  private async updateSuggestions(emailQuery: string): Promise<void> {
+    const projectId = appState.project.id;
+    if (!projectId || !this.canManageMembers || emailQuery.trim().length < 2) {
+      this.suggestions = [];
+      this.isSearchingUsers = false;
+      this.isSuggestionsOpen = false;
+      return;
     }
 
-    switch (hybridSync.status) {
-      case 'up-to-date':
-        return hybridSync.lastSyncAt
-          ? `Last sync: ${new Date(hybridSync.lastSyncAt).toLocaleString()}`
-          : 'Local folder and cloud project match.';
-      case 'local-changes':
-        return `${hybridSync.localChangeCount} local file change(s) are ready to upload.`;
-      case 'cloud-changes':
-        return `${hybridSync.cloudChangeCount} cloud file change(s) are ready to download.`;
-      case 'conflict':
-        return `${hybridSync.conflictCount} file(s) changed on both sides since the last sync.`;
-      case 'auth-required':
-        return 'Open your account to compare and sync with the cloud project.';
-      case 'checking':
-        return 'Scanning the local folder and cloud manifest.';
-      case 'syncing':
-        return 'Applying file updates between the linked folder and cloud project.';
-      case 'error':
-        return 'Reconnect the link or rerun sync to recover.';
-      default:
-        return appState.project.backend === 'local'
-          ? 'Create a cloud copy of this local project and keep both sides in sync.'
-          : 'Download this cloud project into a linked local folder for Git and external tools.';
+    this.isSearchingUsers = true;
+    const requestId = ++this.searchRequestId;
+
+    try {
+      const { users } = await ApiClient.searchProjectUsersByEmail(projectId, emailQuery.trim());
+      if (requestId !== this.searchRequestId) {
+        return;
+      }
+
+      this.suggestions = users;
+      this.isSuggestionsOpen = true;
+    } catch {
+      if (requestId !== this.searchRequestId) {
+        return;
+      }
+      this.suggestions = [];
+      this.isSuggestionsOpen = false;
+    } finally {
+      if (requestId === this.searchRequestId) {
+        this.isSearchingUsers = false;
+      }
     }
   }
 
-  private get syncProgressLabel(): string | null {
-    const { processedFileCount, totalFileCount, status } = appState.project.hybridSync;
-    if (status !== 'syncing' || totalFileCount <= 0) {
-      return null;
+  private onInviteEmailInput = (event: Event): void => {
+    this.inviteEmail = (event.target as HTMLInputElement).value;
+    void this.updateSuggestions(this.inviteEmail);
+  };
+
+  private onInviteKeyDown = (event: KeyboardEvent): void => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      void this.addMember();
+      return;
     }
 
-    return `Processed ${processedFileCount}/${totalFileCount} files`;
+    if (event.key === 'Escape') {
+      this.closeSuggestionPopup();
+    }
+  };
+
+  private selectSuggestion = (suggestion: ApiProjectUserSuggestion): void => {
+    if (this.inviteBlurTimeout !== null) {
+      window.clearTimeout(this.inviteBlurTimeout);
+      this.inviteBlurTimeout = null;
+    }
+    this.inviteEmail = suggestion.email;
+    this.suggestions = [];
+    this.isSuggestionsOpen = false;
+  };
+
+  private async addMember(): Promise<void> {
+    const projectId = appState.project.id;
+    const email = this.inviteEmail.trim();
+    if (!projectId || !email || !this.canManageMembers || this.isBusy) {
+      return;
+    }
+
+    const previousScope = this.shareScope;
+    this.errorMessage = '';
+    this.isSubmittingInvite = true;
+
+    try {
+      await ApiClient.addProjectMember(projectId, email, this.inviteRole);
+      this.inviteEmail = '';
+      this.suggestions = [];
+      this.isSuggestionsOpen = false;
+      this.shareScope = this.shareScope === 'private' ? 'selected' : this.shareScope;
+      await this.loadMembers({ preserveSelectedScope: true });
+    } catch (error) {
+      this.shareScope = previousScope;
+      this.errorMessage = error instanceof Error ? error.message : 'Failed to add project member.';
+    } finally {
+      this.isSubmittingInvite = false;
+    }
   }
 
-  private get syncPrimaryActionLabel(): string {
-    if (appState.project.backend === 'local') {
-      return appState.project.hybridSync.linkedCloudProjectId ? 'Sync Changes' : 'Sync to Cloud';
-    }
-
-    if (appState.project.hybridSync.linkedLocalSessionId) {
-      return appState.project.hybridSync.status === 'error' ? 'Reconnect Folder' : 'Sync Changes';
-    }
-
-    return 'Sync to Local Folder';
-  }
-
-  private async handleSyncAction(): Promise<void> {
-    if (appState.project.backend === 'local' && !appState.auth.isAuthenticated) {
-      this.requestAuthentication();
+  private async updateMemberRole(
+    member: ApiProjectMember,
+    event: Event
+  ): Promise<void> {
+    const projectId = appState.project.id;
+    const nextRole = (event.target as HTMLSelectElement).value as ApiAssignableProjectMemberRole;
+    if (
+      !projectId ||
+      member.role === 'owner' ||
+      member.role === nextRole ||
+      !this.canManageMembers
+    ) {
       return;
     }
 
     this.errorMessage = '';
-    this.isSyncing = true;
+    this.updatingRoleUserId = member.user_id;
+
     try {
-      if (appState.project.backend === 'local') {
-        if (appState.project.hybridSync.linkedCloudProjectId) {
-          await this.localSyncService.syncCurrentProject();
-        } else {
-          await this.localSyncService.syncCurrentLocalProjectToCloud();
-        }
-      } else if (
-        appState.project.hybridSync.linkedLocalSessionId &&
-        appState.project.hybridSync.status !== 'error'
-      ) {
-        await this.localSyncService.syncCurrentProject();
-      } else {
-        await this.localSyncService.syncCurrentCloudProjectToLocalFolder();
-      }
+      await ApiClient.updateProjectMemberRole(projectId, member.user_id, nextRole);
+      await this.loadMembers({ preserveSelectedScope: this.shareScope === 'selected' });
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : 'Failed to synchronize project.';
+      this.errorMessage = error instanceof Error ? error.message : 'Failed to update member role.';
     } finally {
-      this.isSyncing = false;
+      this.updatingRoleUserId = null;
     }
   }
 
-  private renderSyncIssues() {
-    const issues = appState.project.hybridSync.issues;
-    if (issues.length === 0) {
+  private async removeMember(member: ApiProjectMember): Promise<void> {
+    const projectId = appState.project.id;
+    if (!projectId || member.role === 'owner' || !this.canManageMembers) {
+      return;
+    }
+
+    this.errorMessage = '';
+    this.removingUserId = member.user_id;
+
+    try {
+      await ApiClient.removeProjectMember(projectId, member.user_id);
+      await this.loadMembers({ preserveSelectedScope: this.shareScope === 'selected' });
+    } catch (error) {
+      this.errorMessage = error instanceof Error ? error.message : 'Failed to remove project member.';
+    } finally {
+      this.removingUserId = null;
+    }
+  }
+
+  private getRoleLabel(role: ApiProjectMember['role']): string {
+    switch (role) {
+      case 'owner':
+        return 'Owner';
+      case 'editor':
+        return 'Editor';
+      default:
+        return 'Viewer';
+    }
+  }
+
+  private renderShareHint() {
+    if (this.shareScope === 'link') {
+      return html`
+        <div class="pix3-share-hint">
+          Anyone with the link can open the project in view-only mode. Explicit members keep
+          their assigned roles.
+        </div>
+      `;
+    }
+
+    if (this.shareScope === 'selected') {
+      return html`
+        <div class="pix3-share-hint">
+          Only invited Pix3 users can access this project. Add people by email below.
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="pix3-share-hint">
+        Only the project owner can access this workspace until you invite specific users or
+        enable a public link.
+      </div>
+    `;
+  }
+
+  private renderInviteSuggestions() {
+    const shouldRenderEmptyState =
+      this.inviteEmail.trim().length >= 2 && !this.isSearchingUsers && this.suggestions.length === 0;
+
+    if (!this.isSuggestionsOpen || (!this.isSearchingUsers && !shouldRenderEmptyState && this.suggestions.length === 0)) {
       return nothing;
     }
 
     return html`
-      <div class="pix3-share-issues">
-        <div class="pix3-share-issues__title">Problems</div>
-        <ul class="pix3-share-issues__list">
-          ${issues.map(
-            issue => html`
-              <li class="pix3-share-issues__item">
-                <div class="pix3-share-issues__path">${issue.path}</div>
-                <div class="pix3-share-issues__reason">${issue.reason}</div>
-              </li>
-            `
-          )}
-        </ul>
+      <div class="pix3-share-suggestions" role="listbox">
+        ${this.isSearchingUsers
+          ? html`<div class="pix3-share-suggestions__status">Searching users…</div>`
+          : nothing}
+        ${!this.isSearchingUsers && this.suggestions.length > 0
+          ? this.suggestions.map(
+              suggestion => html`
+                <button
+                  class="pix3-share-suggestion"
+                  type="button"
+                  @pointerdown=${(event: PointerEvent) => {
+                    event.preventDefault();
+                    this.selectSuggestion(suggestion);
+                  }}
+                >
+                  <span class="pix3-share-suggestion__email">${suggestion.email}</span>
+                  <span class="pix3-share-suggestion__name">${suggestion.username}</span>
+                </button>
+              `
+            )
+          : nothing}
+        ${shouldRenderEmptyState
+          ? html`<div class="pix3-share-suggestions__status">No registered users found.</div>`
+          : nothing}
       </div>
     `;
   }
 
-  private renderSyncSection() {
-    const hasLink = Boolean(
-      appState.project.backend === 'local'
-        ? appState.project.hybridSync.linkedCloudProjectId
-        : appState.project.hybridSync.linkedLocalSessionId
-    );
-    const linkedTarget =
-      appState.project.backend === 'local'
-        ? appState.project.hybridSync.linkedCloudProjectId
-        : (appState.project.hybridSync.linkedLocalPath ??
-          appState.project.hybridSync.linkedLocalSessionId);
+  private renderMembersSection() {
+    if (!this.isCloudProject) {
+      return nothing;
+    }
+
+    const isAuthenticatedMember = appState.auth.isAuthenticated;
+    const currentUserId = appState.auth.user?.id ?? null;
 
     return html`
       <div class="pix3-share-section">
         <div class="pix3-share-section__header">
-          <div class="pix3-share-section__title">Sync</div>
-          <div class="pix3-share-section__badge">${this.syncStatusLabel}</div>
+          <div class="pix3-share-section__title">Selected Users</div>
         </div>
-        ${hasLink && linkedTarget
-          ? html`<div class="pix3-share-linkage">Linked to ${linkedTarget}</div>`
+        ${!isAuthenticatedMember
+          ? html`
+              <div class="pix3-share-empty">
+                Sign in as a project member to manage explicit user access.
+              </div>
+            `
           : nothing}
-        <div class="pix3-share-hint">${this.syncHint}</div>
-        <div class="pix3-share-actions pix3-share-actions--inline">
-          <button
-            class="pix3-share-button pix3-share-button--primary"
-            @click=${() => void this.handleSyncAction()}
-            ?disabled=${this.isSyncing || this.isSharing || appState.project.status !== 'ready'}
-          >
-            ${this.isSyncing ? 'Working...' : this.syncPrimaryActionLabel}
-          </button>
-          ${this.syncProgressLabel
-            ? html`<div class="pix3-share-progress">${this.syncProgressLabel}</div>`
-            : nothing}
-        </div>
-        ${this.renderSyncIssues()}
+        ${isAuthenticatedMember && this.canManageMembers
+          ? html`
+              <div class="pix3-share-row">
+                <label class="pix3-share-field-label" for="inviteEmailInput">Add user</label>
+                <div class="pix3-share-invite">
+                  <div class="pix3-share-invite__field">
+                    <input
+                      id="inviteEmailInput"
+                      class="pix3-share-input"
+                      .value=${this.inviteEmail}
+                      @input=${this.onInviteEmailInput}
+                      @focus=${this.onInviteFocus}
+                      @blur=${this.onInviteBlur}
+                      @keydown=${this.onInviteKeyDown}
+                      placeholder="Search registered user by email"
+                      autocomplete="off"
+                    />
+                    ${this.renderInviteSuggestions()}
+                  </div>
+                  <select
+                    class="pix3-share-select pix3-share-select--compact"
+                    .value=${this.inviteRole}
+                    ?disabled=${this.isBusy}
+                    @change=${(event: Event) => {
+                      this.inviteRole = (event.target as HTMLSelectElement)
+                        .value as ApiAssignableProjectMemberRole;
+                    }}
+                  >
+                    <option value="viewer">Viewer</option>
+                    <option value="editor">Editor</option>
+                  </select>
+                  <button
+                    class="pix3-share-button pix3-share-button--primary"
+                    @click=${() => void this.addMember()}
+                    ?disabled=${this.isBusy || this.inviteEmail.trim().length === 0}
+                  >
+                    ${this.isSubmittingInvite ? 'Adding...' : 'Add'}
+                  </button>
+                </div>
+              </div>
+            `
+          : nothing}
+        ${isAuthenticatedMember && this.isLoadingMembers
+          ? html`<div class="pix3-share-empty">Loading members…</div>`
+          : nothing}
+        ${isAuthenticatedMember && !this.isLoadingMembers && this.members.length === 0
+          ? html`
+              <div class="pix3-share-empty">
+                No project members loaded yet. Reopen the dialog if this persists.
+              </div>
+            `
+          : nothing}
+        ${isAuthenticatedMember && !this.isLoadingMembers && this.members.length > 0
+          ? html`
+              <ul class="pix3-share-members">
+                ${this.members.map(
+                  member => html`
+                    <li class="pix3-share-member">
+                      <div class="pix3-share-member__info">
+                        <div class="pix3-share-member__identity">
+                          <span class="pix3-share-member__email">${member.email}</span>
+                          ${member.user_id === currentUserId
+                            ? html`<span class="pix3-share-member__tag">You</span>`
+                            : nothing}
+                        </div>
+                        <div class="pix3-share-member__name">${member.username}</div>
+                      </div>
+                      <div class="pix3-share-member__actions">
+                        ${member.role === 'owner' || !this.canManageMembers
+                          ? html`
+                              <span class="pix3-share-role-pill">
+                                ${this.getRoleLabel(member.role)}
+                              </span>
+                            `
+                          : html`
+                              <select
+                                class="pix3-share-select pix3-share-select--compact"
+                                .value=${member.role}
+                                ?disabled=${
+                                  this.isBusy && this.updatingRoleUserId !== member.user_id
+                                }
+                                @change=${(event: Event) => void this.updateMemberRole(member, event)}
+                              >
+                                <option value="viewer">Viewer</option>
+                                <option value="editor">Editor</option>
+                              </select>
+                            `}
+                        ${member.role !== 'owner' && this.canManageMembers
+                          ? html`
+                              <button
+                                class="pix3-share-button pix3-share-button--danger"
+                                @click=${() => void this.removeMember(member)}
+                                ?disabled=${
+                                  this.isBusy && this.removingUserId !== member.user_id
+                                }
+                              >
+                                ${this.removingUserId === member.user_id ? 'Removing...' : 'Remove'}
+                              </button>
+                            `
+                          : nothing}
+                      </div>
+                    </li>
+                  `
+                )}
+              </ul>
+            `
+          : nothing}
       </div>
     `;
+  }
+
+  private onOverlayClick(): void {
+    this.closeDialog();
   }
 
   protected render() {
@@ -348,17 +711,14 @@ export class Pix3ShareDialog extends ComponentBase {
           <div class="pix3-share-header">
             <div class="pix3-share-title">Share Project</div>
             <div class="pix3-share-subtitle">
-              ${appState.project.backend === 'local'
-                ? 'Link this local folder with a cloud project and keep both copies synchronized.'
-                : 'Manage cloud sharing and linked local-folder synchronization.'}
+              Manage who can open this cloud project and whether a view-only share link is active.
             </div>
           </div>
           <div class="pix3-share-body">
             ${this.errorMessage
               ? html`<div class="pix3-share-error">${this.errorMessage}</div>`
               : nothing}
-            ${this.renderSyncSection()}
-            ${appState.project.backend === 'cloud'
+            ${this.isCloudProject
               ? html`
                   <div class="pix3-share-section">
                     <div class="pix3-share-section__header">
@@ -369,53 +729,43 @@ export class Pix3ShareDialog extends ComponentBase {
                       <select
                         id="sharedForSelect"
                         class="pix3-share-select"
-                        .value=${this.shareMode}
-                        ?disabled=${this.isSharing || !this.canManageSharing}
-                        @change=${(event: Event) => void this.onShareModeChange(event)}
+                        .value=${this.shareScope}
+                        ?disabled=${this.isUpdatingScope || !this.canManageShareSettings}
+                        @change=${(event: Event) => void this.onShareScopeChange(event)}
                       >
                         <option value="private">Only me</option>
+                        <option value="selected">Selected users</option>
                         <option value="link">Any user with the link</option>
                       </select>
                     </div>
-                    ${this.shareMode === 'link'
+                    ${this.renderShareHint()}
+                    ${this.shareScope === 'link'
                       ? html`
-                          <div class="pix3-share-row">
-                            <label class="pix3-share-field-label" for="accessModeSelect"
-                              >Access</label
-                            >
-                            <select id="accessModeSelect" class="pix3-share-select" disabled>
-                              <option selected>Can edit</option>
-                            </select>
-                          </div>
                           <input
                             id="shareLinkInput"
                             class="pix3-share-input"
                             .value=${this.link}
                             readonly
                           />
-                          <div class="pix3-share-hint">
-                            Anyone with the link can open the project. Editing still requires
-                            membership.
-                          </div>
                         `
-                      : html`
-                          <div class="pix3-share-empty">
-                            ${appState.project.id
-                              ? 'Only project members can access this workspace right now.'
-                              : 'Open a cloud project to manage sharing.'}
-                          </div>
-                        `}
+                      : nothing}
                   </div>
+                  ${this.renderMembersSection()}
                 `
-              : nothing}
+              : html`
+                  <div class="pix3-share-empty">
+                    Open a cloud project to manage sharing. Local-folder synchronization now lives
+                    in Project / Sync to Local Folder.
+                  </div>
+                `}
           </div>
           <div class="pix3-share-actions">
-            ${appState.project.backend === 'cloud'
+            ${this.isCloudProject
               ? html`
                   <button
                     class="pix3-share-button"
                     @click=${this.copyLink}
-                    ?disabled=${this.shareMode !== 'link' || !this.link}
+                    ?disabled=${this.shareScope !== 'link' || !this.link}
                   >
                     ${this.copyLabel}
                   </button>

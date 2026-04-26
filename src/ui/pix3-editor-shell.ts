@@ -17,6 +17,7 @@ import {
   ProjectSettingsService,
   type ProjectSettingsDialogInstance,
 } from '@/services/ProjectSettingsService';
+import { ProjectSyncService, type ProjectSyncDialogInstance } from '@/services/ProjectSyncService';
 import {
   EditorSettingsService,
   type EditorSettingsDialogInstance,
@@ -44,6 +45,7 @@ import { StopGameCommand } from '@/features/scripts/StopGameCommand';
 import { RestartGameCommand } from '@/features/scripts/RestartGameCommand';
 import { OpenGamePopoutWindowCommand } from '@/features/scripts/OpenGamePopoutWindowCommand';
 import { OpenProjectSettingsCommand } from '@/features/project/OpenProjectSettingsCommand';
+import { OpenProjectSyncCommand } from '@/features/project/OpenProjectSyncCommand';
 import { OpenProjectInIdeCommand } from '@/features/project/OpenProjectInIdeCommand';
 import { BuildProjectCommand } from '@/features/project/BuildProjectCommand';
 import { NewProjectCommand } from '@/features/project/NewProjectCommand';
@@ -77,6 +79,7 @@ import './shared/pix3-behavior-picker';
 import './shared/pix3-script-creator';
 import './shared/pix3-create-project-dialog';
 import './shared/pix3-project-settings-dialog';
+import './shared/pix3-project-sync-dialog';
 import './shared/pix3-editor-settings-dialog';
 import './shared/pix3-node-type-picker';
 import './shared/pix3-status-bar';
@@ -146,6 +149,9 @@ export class Pix3EditorShell extends ComponentBase {
   @inject(ProjectSettingsService)
   private readonly projectSettingsService!: ProjectSettingsService;
 
+  @inject(ProjectSyncService)
+  private readonly projectSyncService!: ProjectSyncService;
+
   @inject(EditorSettingsService)
   private readonly editorSettingsService!: EditorSettingsService;
 
@@ -192,6 +198,9 @@ export class Pix3EditorShell extends ComponentBase {
   private activeProjectSettingsDialog: ProjectSettingsDialogInstance | null = null;
 
   @state()
+  private activeProjectSyncDialog: ProjectSyncDialogInstance | null = null;
+
+  @state()
   private activeEditorSettingsDialog: EditorSettingsDialogInstance | null = null;
 
   @state()
@@ -218,6 +227,7 @@ export class Pix3EditorShell extends ComponentBase {
   private disposeProjectSubscription?: () => void;
   private disposeDialogsSubscription?: () => void;
   private disposeProjectSettingsSubscription?: () => void;
+  private disposeProjectSyncSubscription?: () => void;
   private disposeEditorSettingsSubscription?: () => void;
   private disposeCreateProjectSubscription?: () => void;
   private disposeNodeTypePickerSubscription?: () => void;
@@ -254,6 +264,7 @@ export class Pix3EditorShell extends ComponentBase {
       this.gamePlaySessionService
     );
     const projectSettingsCommand = new OpenProjectSettingsCommand();
+    const projectSyncCommand = new OpenProjectSyncCommand();
     const openProjectInIdeCommand = new OpenProjectInIdeCommand();
     const buildProjectCommand = new BuildProjectCommand();
     const newProjectCommand = new NewProjectCommand();
@@ -290,6 +301,7 @@ export class Pix3EditorShell extends ComponentBase {
       newProjectCommand,
       closeProjectCommand,
       projectSettingsCommand,
+      projectSyncCommand,
       openProjectInIdeCommand,
       buildProjectCommand,
       selectModeCommand,
@@ -314,6 +326,11 @@ export class Pix3EditorShell extends ComponentBase {
     // Subscribe to project settings dialog changes
     this.disposeProjectSettingsSubscription = this.projectSettingsService.subscribe(dialog => {
       this.activeProjectSettingsDialog = dialog;
+      this.requestUpdate();
+    });
+
+    this.disposeProjectSyncSubscription = this.projectSyncService.subscribe(dialog => {
+      this.activeProjectSyncDialog = dialog;
       this.requestUpdate();
     });
 
@@ -509,6 +526,8 @@ export class Pix3EditorShell extends ComponentBase {
     this.disposeDialogsSubscription = undefined;
     this.disposeProjectSettingsSubscription?.();
     this.disposeProjectSettingsSubscription = undefined;
+    this.disposeProjectSyncSubscription?.();
+    this.disposeProjectSyncSubscription = undefined;
     this.disposeEditorSettingsSubscription?.();
     this.disposeEditorSettingsSubscription = undefined;
     this.disposeCreateProjectSubscription?.();
@@ -745,7 +764,8 @@ export class Pix3EditorShell extends ComponentBase {
         ${this.renderWorkspaceOverlay()}
         <pix3-share-dialog @pix3-auth:request=${this.onAuthRequest}></pix3-share-dialog>
         ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
-        ${this.renderProjectSettingsHost()} ${this.renderEditorSettingsHost()}
+        ${this.renderProjectSettingsHost()} ${this.renderProjectSyncHost()}
+        ${this.renderEditorSettingsHost()}
         ${this.renderCreateProjectHost()} ${this.renderNodeTypePickerHost()}
         ${this.renderAuthModal()}
       </div>
@@ -1116,6 +1136,18 @@ export class Pix3EditorShell extends ComponentBase {
     return html`
       <div class="project-settings-host">
         <pix3-project-settings-dialog></pix3-project-settings-dialog>
+      </div>
+    `;
+  }
+
+  private renderProjectSyncHost() {
+    if (!this.activeProjectSyncDialog) {
+      return null;
+    }
+
+    return html`
+      <div class="project-sync-host" @pix3-auth:request=${this.onAuthRequest}>
+        <pix3-project-sync-dialog></pix3-project-sync-dialog>
       </div>
     `;
   }

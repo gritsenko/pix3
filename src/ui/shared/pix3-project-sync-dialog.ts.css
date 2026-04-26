@@ -1,0 +1,218 @@
+pix3-project-sync-dialog {
+  display: contents;
+}
+
+.project-sync-backdrop {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(12, 14, 18, 0.62);
+  backdrop-filter: blur(10px);
+  z-index: var(--pix3-z-modal);
+}
+
+.project-sync-dialog {
+  box-sizing: border-box;
+  width: min(100%, 520px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 20px;
+  background:
+    linear-gradient(180deg, rgba(33, 39, 48, 0.98), rgba(22, 26, 33, 0.98)), rgba(22, 26, 33, 0.98);
+  color: rgba(243, 244, 246, 0.94);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.42);
+}
+
+.project-sync-header {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.project-sync-title {
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.project-sync-subtitle {
+  color: rgba(243, 244, 246, 0.66);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.project-sync-body {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.project-sync-section {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.project-sync-section__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.project-sync-section__title {
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.project-sync-section__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.26rem 0.56rem;
+  border-radius: 999px;
+  background: rgba(var(--pix3-accent-rgb), 0.12);
+  border: 1px solid rgba(var(--pix3-accent-rgb), 0.22);
+  color: rgba(255, 244, 204, 0.95);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.project-sync-linkage {
+  color: rgba(243, 244, 246, 0.78);
+  font-size: 0.8rem;
+  word-break: break-word;
+}
+
+.project-sync-progress {
+  display: inline-flex;
+  align-items: center;
+  color: rgba(243, 244, 246, 0.72);
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.project-sync-issues {
+  display: grid;
+  gap: 8px;
+  padding-top: 2px;
+}
+
+.project-sync-issues__title {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255, 244, 204, 0.92);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.project-sync-issues__list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 8px;
+}
+
+.project-sync-issues__item {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.project-sync-issues__path {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.94);
+  word-break: break-word;
+}
+
+.project-sync-issues__reason {
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: rgba(243, 244, 246, 0.72);
+}
+
+.project-sync-hint {
+  color: rgba(243, 244, 246, 0.64);
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.project-sync-error {
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  line-height: 1.45;
+  background: rgba(239, 68, 68, 0.12);
+  color: rgba(254, 202, 202, 0.95);
+  border: 1px solid rgba(239, 68, 68, 0.22);
+}
+
+.project-sync-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.project-sync-actions--inline {
+  justify-content: flex-start;
+}
+
+.project-sync-button {
+  min-width: 96px;
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(243, 244, 246, 0.94);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.project-sync-button:hover:not([disabled]) {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.09);
+}
+
+.project-sync-button--primary {
+  background: rgba(var(--pix3-accent-rgb), 0.16);
+  border-color: rgba(var(--pix3-accent-rgb), 0.3);
+}
+
+.project-sync-button--primary:hover:not([disabled]) {
+  background: rgba(var(--pix3-accent-rgb), 0.24);
+}
+
+.project-sync-button[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .project-sync-backdrop {
+    padding: 14px;
+  }
+
+  .project-sync-dialog {
+    padding: 16px;
+  }
+
+  .project-sync-actions {
+    justify-content: stretch;
+  }
+
+  .project-sync-button {
+    flex: 1 1 100%;
+  }
+}

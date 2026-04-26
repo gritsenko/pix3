@@ -13,18 +13,79 @@ export interface ProjectRow {
   updated_at: string;
 }
 
+export type ProjectMemberRole = 'owner' | 'editor' | 'viewer';
+export type AssignableProjectMemberRole = Exclude<ProjectMemberRole, 'owner'>;
+
 export interface ProjectMemberRow {
   project_id: string;
   user_id: string;
-  role: string;
+  role: ProjectMemberRole;
+}
+
+export interface ProjectMemberInfo {
+  user_id: string;
+  email: string;
+  username: string;
+  role: ProjectMemberRole;
+}
+
+export interface ProjectUserSuggestion {
+  id: string;
+  email: string;
+  username: string;
 }
 
 export interface ProjectAccessInfo {
   project: ProjectRow;
-  role: 'owner' | 'editor' | 'viewer';
+  role: ProjectMemberRole;
   authSource: 'member' | 'share-token';
   accessMode: 'edit' | 'view';
   shareEnabled: boolean;
+}
+
+export class ProjectsServiceError extends Error {
+  constructor(
+    public readonly code:
+      | 'invalid-role'
+      | 'member-exists'
+      | 'member-not-found'
+      | 'user-not-found'
+      | 'cannot-remove-owner'
+      | 'cannot-change-owner',
+    message: string
+  ) {
+    super(message);
+    this.name = 'ProjectsServiceError';
+  }
+}
+
+const ASSIGNABLE_PROJECT_MEMBER_ROLES = new Set<AssignableProjectMemberRole>(['editor', 'viewer']);
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+function getMemberInfo(projectId: string, userId: string): ProjectMemberInfo | undefined {
+  return getDb()
+    .prepare(
+      `SELECT pm.user_id, u.email, u.username, pm.role
+       FROM project_members pm
+       INNER JOIN users u ON u.id = pm.user_id
+       WHERE pm.project_id = ? AND pm.user_id = ?`
+    )
+    .get(projectId, userId) as ProjectMemberInfo | undefined;
+}
+
+function getUserByEmail(email: string): ProjectUserSuggestion | undefined {
+  return getDb()
+    .prepare('SELECT id, email, username FROM users WHERE LOWER(email) = ?')
+    .get(normalizeEmail(email)) as ProjectUserSuggestion | undefined;
+}
+
+export function isAssignableProjectMemberRole(
+  value: unknown
+): value is AssignableProjectMemberRole {
+  return typeof value === 'string' && ASSIGNABLE_PROJECT_MEMBER_ROLES.has(value as AssignableProjectMemberRole);
 }
 
 export function listUserProjects(userId: string): ProjectRow[] {
@@ -93,11 +154,155 @@ export function revokeShareToken(projectId: string): void {
   getDb().prepare('UPDATE projects SET share_token = NULL WHERE id = ?').run(projectId);
 }
 
-export function getUserRole(projectId: string, userId: string): string | null {
+export function getUserRole(projectId: string, userId: string): ProjectMemberRole | null {
   const row = getDb()
     .prepare('SELECT role FROM project_members WHERE project_id = ? AND user_id = ?')
-    .get(projectId, userId) as { role: string } | undefined;
+    .get(projectId, userId) as { role: ProjectMemberRole } | undefined;
   return row?.role ?? null;
+}
+
+export function listProjectMembers(projectId: string): ProjectMemberInfo[] {
+  return getDb()
+    .prepare(
+      `SELECT pm.user_id, u.email, u.username, pm.role
+       FROM project_members pm
+       INNER JOIN users u ON u.id = pm.user_id
+       WHERE pm.project_id = ?
+       ORDER BY
+         CASE pm.role
+           WHEN 'owner' THEN 0
+           WHEN 'editor' THEN 1
+           ELSE 2
+         END,
+         LOWER(u.email) ASC`
+    )
+    .all(projectId) as ProjectMemberInfo[];
+}
+
+export function searchProjectUsersByEmail(
+  projectId: string,
+  emailQuery: string,
+  limit = 8
+): ProjectUserSuggestion[] {
+  const normalizedQuery = normalizeEmail(emailQuery);
+  if (normalizedQuery.length < 2) {
+    return [];
+  }
+
+  const safeLimit = Math.max(1, Math.min(limit, 20));
+  return getDb()
+    .prepare(
+      `SELECT u.id, u.email, u.username
+       FROM users u
+       WHERE LOWER(u.email) LIKE ?
+         AND NOT EXISTS (
+           SELECT 1
+           FROM project_members pm
+           WHERE pm.project_id = ? AND pm.user_id = u.id
+         )
+       ORDER BY
+         CASE
+           WHEN LOWER(u.email) = ? THEN 0
+           WHEN LOWER(u.email) LIKE ? THEN 1
+           ELSE 2
+         END,
+         LOWER(u.email) ASC
+       LIMIT ?`
+    )
+    .all(
+      `%${normalizedQuery}%`,
+      projectId,
+      normalizedQuery,
+      `${normalizedQuery}%`,
+      safeLimit
+    ) as ProjectUserSuggestion[];
+}
+
+export function addProjectMember(
+  projectId: string,
+  email: string,
+  role: AssignableProjectMemberRole
+): ProjectMemberInfo {
+  if (!isAssignableProjectMemberRole(role)) {
+    throw new ProjectsServiceError('invalid-role', 'Role must be editor or viewer.');
+  }
+
+  const user = getUserByEmail(email);
+  if (!user) {
+    throw new ProjectsServiceError('user-not-found', 'No Pix3 user found with that email address.');
+  }
+
+  const existingMember = getUserRole(projectId, user.id);
+  if (existingMember) {
+    throw new ProjectsServiceError('member-exists', 'That user is already a project member.');
+  }
+
+  getDb()
+    .prepare('INSERT INTO project_members (project_id, user_id, role) VALUES (?, ?, ?)')
+    .run(projectId, user.id, role);
+  touchProject(projectId);
+
+  return {
+    user_id: user.id,
+    email: user.email,
+    username: user.username,
+    role,
+  };
+}
+
+export function updateProjectMemberRole(
+  projectId: string,
+  userId: string,
+  role: AssignableProjectMemberRole
+): ProjectMemberInfo {
+  if (!isAssignableProjectMemberRole(role)) {
+    throw new ProjectsServiceError('invalid-role', 'Role must be editor or viewer.');
+  }
+
+  const member = getMemberInfo(projectId, userId);
+  if (!member) {
+    throw new ProjectsServiceError('member-not-found', 'Project member not found.');
+  }
+
+  if (member.role === 'owner') {
+    throw new ProjectsServiceError('cannot-change-owner', 'The project owner role cannot be changed.');
+  }
+
+  getDb()
+    .prepare('UPDATE project_members SET role = ? WHERE project_id = ? AND user_id = ?')
+    .run(role, projectId, userId);
+  touchProject(projectId);
+
+  return {
+    ...member,
+    role,
+  };
+}
+
+export function removeProjectMember(projectId: string, userId: string): void {
+  const member = getMemberInfo(projectId, userId);
+  if (!member) {
+    throw new ProjectsServiceError('member-not-found', 'Project member not found.');
+  }
+
+  if (member.role === 'owner') {
+    throw new ProjectsServiceError('cannot-remove-owner', 'The project owner cannot be removed.');
+  }
+
+  getDb().prepare('DELETE FROM project_members WHERE project_id = ? AND user_id = ?').run(projectId, userId);
+  touchProject(projectId);
+}
+
+export function removeAllNonOwnerMembers(projectId: string): number {
+  const result = getDb()
+    .prepare("DELETE FROM project_members WHERE project_id = ? AND role != 'owner'")
+    .run(projectId);
+
+  if (result.changes > 0) {
+    touchProject(projectId);
+  }
+
+  return result.changes;
 }
 
 export function resolveProjectAccess(

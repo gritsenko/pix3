@@ -52,6 +52,22 @@ export interface ApiProjectAccess {
   auth_source: 'member' | 'share-token';
   access_mode: 'edit' | 'view';
   share_enabled: boolean;
+  share_token: string | null;
+}
+
+export type ApiAssignableProjectMemberRole = 'editor' | 'viewer';
+
+export interface ApiProjectMember {
+  user_id: string;
+  email: string;
+  username: string;
+  role: 'owner' | 'editor' | 'viewer';
+}
+
+export interface ApiProjectUserSuggestion {
+  id: string;
+  email: string;
+  username: string;
 }
 
 export interface ManifestEntry {
@@ -165,6 +181,54 @@ export function getProjectAccess(id: string, shareToken?: string): Promise<ApiPr
 
 export function revokeShareToken(id: string): Promise<{ ok: boolean }> {
   return request(`/api/projects/${encodeURIComponent(id)}/share`, {
+    method: 'DELETE',
+  });
+}
+
+export function getProjectMembers(id: string): Promise<{ members: ApiProjectMember[] }> {
+  return request(`/api/projects/${encodeURIComponent(id)}/members`);
+}
+
+export function searchProjectUsersByEmail(
+  id: string,
+  email: string
+): Promise<{ users: ApiProjectUserSuggestion[] }> {
+  const params = new URLSearchParams({ email });
+  return request(`/api/projects/${encodeURIComponent(id)}/members/search?${params.toString()}`);
+}
+
+export function addProjectMember(
+  id: string,
+  email: string,
+  role: ApiAssignableProjectMemberRole
+): Promise<ApiProjectMember> {
+  return request(`/api/projects/${encodeURIComponent(id)}/members`, {
+    method: 'POST',
+    body: JSON.stringify({ email, role }),
+  });
+}
+
+export function updateProjectMemberRole(
+  id: string,
+  userId: string,
+  role: ApiAssignableProjectMemberRole
+): Promise<ApiProjectMember> {
+  return request(`/api/projects/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ role }),
+  });
+}
+
+export function removeProjectMember(id: string, userId: string): Promise<{ ok: boolean }> {
+  return request(`/api/projects/${encodeURIComponent(id)}/members/${encodeURIComponent(userId)}`, {
+    method: 'DELETE',
+  });
+}
+
+export function removeAllNonOwnerProjectMembers(
+  id: string
+): Promise<{ ok: boolean; removed_count: number }> {
+  return request(`/api/projects/${encodeURIComponent(id)}/members/non-owner`, {
     method: 'DELETE',
   });
 }

@@ -184,6 +184,7 @@ export class CloudProjectService {
     const result = await ApiClient.generateShareToken(id);
     if (appState.project.id === id) {
       appState.collaboration.shareEnabled = true;
+      appState.collaboration.shareToken = result.share_token;
     }
     await this.loadProjects();
     return result.share_token;
@@ -193,6 +194,7 @@ export class CloudProjectService {
     await ApiClient.revokeShareToken(id);
     if (appState.project.id === id) {
       appState.collaboration.shareEnabled = false;
+      appState.collaboration.shareToken = null;
     }
     await this.loadProjects();
   }
@@ -208,7 +210,7 @@ export class CloudProjectService {
     this.beginProjectOpening(
       projectId,
       listedProject?.name ?? 'Cloud Project',
-      options?.shareToken ?? null
+      options?.shareToken ?? listedProject?.share_token ?? null
     );
 
     try {
@@ -222,6 +224,7 @@ export class CloudProjectService {
       appState.collaboration.accessMode =
         access.access_mode === 'view' ? 'cloud-view' : 'cloud-edit';
       appState.collaboration.shareEnabled = access.share_enabled;
+      appState.collaboration.shareToken = options?.shareToken ?? access.share_token;
 
       this.updateOpenProgress('loading-manifest', 'Loading project manifest.');
       appState.project.manifest = await this.projectService.loadProjectManifest();

@@ -26,6 +26,31 @@ function requireProjectAccess(...allowedRoles: string[]) {
   };
 }
 
+function handleProjectsServiceError(res: Response, error: unknown): void {
+  if (!(error instanceof projectsService.ProjectsServiceError)) {
+    throw error;
+  }
+
+  switch (error.code) {
+    case 'invalid-role':
+      res.status(400).json({ error: error.message });
+      return;
+    case 'user-not-found':
+    case 'member-not-found':
+      res.status(404).json({ error: error.message });
+      return;
+    case 'member-exists':
+      res.status(409).json({ error: error.message });
+      return;
+    case 'cannot-remove-owner':
+    case 'cannot-change-owner':
+      res.status(400).json({ error: error.message });
+      return;
+    default:
+      res.status(500).json({ error: 'Internal server error' });
+  }
+}
+
 // GET /api/projects — list user's projects
 projectsRouter.get('/', requireAuth, (req: AuthenticatedRequest, res: Response) => {
   const projects = projectsService.listUserProjects(req.user!.id);
@@ -67,7 +92,100 @@ projectsRouter.get(
       auth_source: access.authSource,
       access_mode: access.accessMode,
       share_enabled: access.shareEnabled,
+      share_token: access.authSource === 'member' ? access.project.share_token : null,
     });
+  }
+);
+
+projectsRouter.get(
+  '/:id/members',
+  requireAuth,
+  requireProjectAccess('owner', 'editor', 'viewer'),
+  (req: AuthenticatedRequest, res: Response) => {
+    const members = projectsService.listProjectMembers(req.params.id);
+    res.json({ members });
+  }
+);
+
+projectsRouter.get(
+  '/:id/members/search',
+  requireAuth,
+  requireProjectAccess('owner'),
+  (req: AuthenticatedRequest, res: Response) => {
+    const emailQuery = typeof req.query.email === 'string' ? req.query.email : '';
+    const users = projectsService.searchProjectUsersByEmail(req.params.id, emailQuery);
+    res.json({ users });
+  }
+);
+
+projectsRouter.post(
+  '/:id/members',
+  requireAuth,
+  requireProjectAccess('owner'),
+  (req: AuthenticatedRequest, res: Response) => {
+    const email = typeof req.body?.email === 'string' ? req.body.email.trim() : '';
+    const role = req.body?.role;
+
+    if (!email) {
+      res.status(400).json({ error: 'Email is required.' });
+      return;
+    }
+
+    if (!projectsService.isAssignableProjectMemberRole(role)) {
+      res.status(400).json({ error: 'Role must be editor or viewer.' });
+      return;
+    }
+
+    try {
+      const member = projectsService.addProjectMember(req.params.id, email, role);
+      res.status(201).json(member);
+    } catch (error) {
+      handleProjectsServiceError(res, error);
+    }
+  }
+);
+
+projectsRouter.delete(
+  '/:id/members/non-owner',
+  requireAuth,
+  requireProjectAccess('owner'),
+  (req: AuthenticatedRequest, res: Response) => {
+    const removedCount = projectsService.removeAllNonOwnerMembers(req.params.id);
+    res.json({ ok: true, removed_count: removedCount });
+  }
+);
+
+projectsRouter.patch(
+  '/:id/members/:userId',
+  requireAuth,
+  requireProjectAccess('owner'),
+  (req: AuthenticatedRequest, res: Response) => {
+    const role = req.body?.role;
+    if (!projectsService.isAssignableProjectMemberRole(role)) {
+      res.status(400).json({ error: 'Role must be editor or viewer.' });
+      return;
+    }
+
+    try {
+      const member = projectsService.updateProjectMemberRole(req.params.id, req.params.userId, role);
+      res.json(member);
+    } catch (error) {
+      handleProjectsServiceError(res, error);
+    }
+  }
+);
+
+projectsRouter.delete(
+  '/:id/members/:userId',
+  requireAuth,
+  requireProjectAccess('owner'),
+  (req: AuthenticatedRequest, res: Response) => {
+    try {
+      projectsService.removeProjectMember(req.params.id, req.params.userId);
+      res.json({ ok: true });
+    } catch (error) {
+      handleProjectsServiceError(res, error);
+    }
   }
 );
 

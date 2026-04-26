@@ -31,6 +31,7 @@ export { CommandRegistry, type CommandMenuItem, type MenuSection } from './Comma
 export { KeybindingService } from './KeybindingService';
 export { FileWatchService } from './FileWatchService';
 export { LocalSyncService, type SyncResult } from './LocalSyncService';
+export { ProjectSyncService, type ProjectSyncDialogInstance } from './ProjectSyncService';
 export {
   DialogService,
   type DialogOptions,
