@@ -126,7 +126,17 @@ describe('ProjectStorageService', () => {
     });
 
     await expect(service.listDirectory('.')).resolves.toEqual([
-      { name: 'folder', path: 'folder', kind: 'directory' },
+      { name: 'folder', path: 'folder', kind: 'directory', size: 0 },
+    ]);
+  });
+
+  it('preserves file size metadata for direct cloud entries', async () => {
+    mockApiClient.getManifestWithAccess.mockResolvedValue({
+      files: [{ path: 'hero.png', kind: 'file', size: 1536, hash: '', modified: '2026-04-03' }],
+    });
+
+    await expect(service.listDirectory('.')).resolves.toEqual([
+      { name: 'hero.png', path: 'hero.png', kind: 'file', size: 1536 },
     ]);
   });
 

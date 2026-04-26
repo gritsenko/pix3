@@ -67,12 +67,14 @@ export class ProjectStorageService {
       const childPath = normalizedPath === '.' ? head : `${normalizedPath}/${head}`;
       const kind: FileSystemHandleKind = rest.length > 0 ? 'directory' : entry.kind;
       const existing = entries.get(childPath);
+      const size = rest.length === 0 ? (entry.kind === 'file' ? entry.size : 0) : null;
 
       if (!existing || existing.kind === 'file') {
         entries.set(childPath, {
           name: head,
           kind,
           path: childPath,
+          size,
         });
       }
     }

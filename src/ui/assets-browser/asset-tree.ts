@@ -16,6 +16,7 @@ type Node = {
   name: string;
   path: string;
   kind: FileSystemHandleKind;
+  sizeBytes: number | null;
   children?: Node[] | null; // null = not loaded yet, [] = loaded and empty
   expanded?: boolean;
   editing?: boolean;
@@ -286,30 +287,7 @@ export class AssetTree extends ComponentBase {
     const nextNodes: Node[] = [];
 
     for (const entry of entries) {
-      if (entry.kind === 'directory') {
-        const isExpanded = expandedPaths.has(this.normalizePath(entry.path));
-        const directoryNode: Node = {
-          name: entry.name,
-          path: entry.path,
-          kind: entry.kind,
-          expanded: isExpanded,
-          children: isExpanded ? [] : null,
-        };
-
-        if (isExpanded) {
-          directoryNode.children = await this.buildTreeFromExpandedPaths(entry.path, expandedPaths);
-        }
-
-        nextNodes.push(directoryNode);
-        continue;
-      }
-
-      nextNodes.push({
-        name: entry.name,
-        path: entry.path,
-        kind: entry.kind,
-        children: [],
-      });
+      nextNodes.push(await this.createNodeFromEntry(entry, expandedPaths));
     }
 
     return this.sortNodes(nextNodes);
@@ -495,18 +473,11 @@ export class AssetTree extends ComponentBase {
     if (node.kind !== 'directory') return;
     if (node.children === null) {
       const entries = await this.listDirectory(node.path);
-      node.children = entries
-        .map(e => ({
-          name: e.name,
-          path: e.path,
-          kind: e.kind,
-          children: e.kind === 'directory' ? null : [],
-        }))
-        .sort(
-          (a, b) =>
-            Number(b.kind === 'directory') - Number(a.kind === 'directory') ||
-            a.name.localeCompare(b.name)
-        );
+      const children: Node[] = [];
+      for (const entry of entries) {
+        children.push(await this.createNodeFromEntry(entry));
+      }
+      node.children = this.sortNodes(children);
     }
     node.expanded = true;
     // trigger update
@@ -643,9 +614,89 @@ export class AssetTree extends ComponentBase {
     return name.substring(lastDot + 1).toLowerCase();
   }
 
+  private async createNodeFromEntry(
+    entry: FileDescriptor,
+    expandedPaths?: ReadonlySet<string>
+  ): Promise<Node> {
+    const sizeBytes = await this.getNodeSizeBytes(entry);
+
+    if (entry.kind === 'directory') {
+      const isExpanded = expandedPaths?.has(this.normalizePath(entry.path)) ?? false;
+      const directoryNode: Node = {
+        name: entry.name,
+        path: entry.path,
+        kind: entry.kind,
+        sizeBytes,
+        expanded: isExpanded,
+        children: isExpanded ? [] : null,
+      };
+
+      if (isExpanded) {
+        directoryNode.children = await this.buildTreeFromExpandedPaths(entry.path, expandedPaths);
+      }
+
+      return directoryNode;
+    }
+
+    return {
+      name: entry.name,
+      path: entry.path,
+      kind: entry.kind,
+      sizeBytes,
+      children: [],
+    };
+  }
+
+  private async getNodeSizeBytes(entry: FileDescriptor): Promise<number | null> {
+    if (entry.kind === 'file') {
+      return entry.size ?? null;
+    }
+
+    return await this.getDirectoryContentSize(entry.path);
+  }
+
+  private async getDirectoryContentSize(directoryPath: string): Promise<number> {
+    const entries = await this.listDirectory(directoryPath);
+    let totalSize = 0;
+
+    for (const entry of entries) {
+      if (entry.kind === 'directory') {
+        totalSize += await this.getDirectoryContentSize(entry.path);
+        continue;
+      }
+
+      totalSize += entry.size ?? 0;
+    }
+
+    return totalSize;
+  }
+
+  private getNodeMetaLabel(node: Node): string | null {
+    if (node.sizeBytes === null) {
+      return null;
+    }
+
+    return this.formatFileSize(node.sizeBytes);
+  }
+
+  private formatFileSize(sizeBytes: number): string {
+    if (sizeBytes < 1024) {
+      return `${sizeBytes} B`;
+    }
+
+    const kb = sizeBytes / 1024;
+    if (kb < 1024) {
+      return `${kb.toFixed(1)} KB`;
+    }
+
+    const mb = kb / 1024;
+    return `${mb.toFixed(2)} MB`;
+  }
+
   private renderNode(node: Node, depth = 0): ReturnType<typeof html> {
     const isSelected = this.selectedPath === node.path;
     const isDragOver = this.dragOverPath === node.path && node.kind === 'directory';
+    const metaLabel = this.getNodeMetaLabel(node);
     return html`<div
       class="tree-node"
       data-path=${node.path}
@@ -690,7 +741,7 @@ export class AssetTree extends ComponentBase {
               @blur=${() => this.commitCreateFolder(node)}
             />`
           : html`<span class="node-name">${node.name}</span>`}
-        <span class="node-kind">${node.kind}</span>
+        ${metaLabel ? html`<span class="node-meta">${metaLabel}</span>` : null}
       </div>
       ${node.expanded && node.children && node.children.length
         ? html`<div class="node-children" role="group">
@@ -1135,6 +1186,7 @@ export class AssetTree extends ComponentBase {
       name: `${newName}.pix3scene`,
       path: newPath,
       kind: 'file',
+      sizeBytes: null,
       children: [],
       editing: true,
     };
@@ -1185,6 +1237,7 @@ export class AssetTree extends ComponentBase {
       name: newName,
       path: newPath,
       kind: 'directory',
+      sizeBytes: 0,
       children: [],
       editing: true,
     };

@@ -1,5 +1,5 @@
 import { ComponentBase, customElement, html, property, state } from '@/fw';
-import { resolveFileSystemAPIService } from '@/services/FileSystemAPIService';
+import { resolveProjectStorageService } from '@/services/ProjectStorageService';
 import {
   ACESFilmicToneMapping,
   AmbientLight,
@@ -25,7 +25,7 @@ type InteractivePreviewState = 'idle' | 'loading' | 'ready' | 'error';
 
 @customElement('pix3-model-asset-preview')
 export class ModelAssetPreview extends ComponentBase {
-  private readonly fileSystemAPI = resolveFileSystemAPIService();
+  private readonly storage = resolveProjectStorageService();
 
   @property({ type: String })
   resourcePath: string = '';
@@ -211,11 +211,11 @@ export class ModelAssetPreview extends ComponentBase {
     }
 
     try {
-      const blob = await this.fileSystemAPI.readBlob(this.resourcePath);
+      const blob = await this.storage.readBlob(this.resourcePath);
       const { gltf, cleanup } = await loadGltfFromBlob({
         blob,
         sourcePath: this.resourcePath,
-        readBlob: path => this.fileSystemAPI.readBlob(path),
+        readBlob: path => this.storage.readBlob(path),
       });
       const previewRoot = createCenteredPreviewRoot(gltf.scene);
 

@@ -27,6 +27,7 @@ export interface FileDescriptor {
   readonly name: string;
   readonly kind: FileSystemHandleKind;
   readonly path: string;
+  readonly size?: number | null;
 }
 
 export interface FileSystemAPIServiceOptions {
@@ -185,6 +186,7 @@ export class FileSystemAPIService {
   async listDirectory(path = '.', options?: { mode?: PermissionMode }): Promise<FileDescriptor[]> {
     const directory = await this.resolveDirectoryHandle(path, options?.mode ?? 'read');
     const entries: FileDescriptor[] = [];
+    const mode = options?.mode ?? 'read';
 
     try {
       const directoryWithEntries = directory as FileSystemDirectoryHandle & {
@@ -194,11 +196,7 @@ export class FileSystemAPIService {
 
       if (directoryWithEntries.entries) {
         for await (const [name, handle] of directoryWithEntries.entries()) {
-          entries.push({
-            name,
-            kind: handle.kind,
-            path: this.joinPath(path, name),
-          });
+          entries.push(await this.describeEntry(handle, name, this.joinPath(path, name), mode));
         }
         return entries;
       }
@@ -206,10 +204,9 @@ export class FileSystemAPIService {
       if (directoryWithEntries.values) {
         let index = 0;
         for await (const handle of directoryWithEntries.values()) {
+          const name = (handle as FileSystemHandle).name ?? `entry-${index}`;
           entries.push({
-            name: (handle as FileSystemHandle).name ?? `entry-${index}`,
-            kind: handle.kind,
-            path: this.joinPath(path, (handle as FileSystemHandle).name ?? `entry-${index}`),
+            ...(await this.describeEntry(handle, name, this.joinPath(path, name), mode)),
           });
           index += 1;
         }
@@ -220,6 +217,32 @@ export class FileSystemAPIService {
     }
 
     return entries;
+  }
+
+  private async describeEntry(
+    handle: FileSystemHandle,
+    name: string,
+    path: string,
+    mode: PermissionMode
+  ): Promise<FileDescriptor> {
+    if (handle.kind === 'file') {
+      const fileHandle = handle as FileSystemFileHandle;
+      await this.ensurePermission(fileHandle, mode);
+      const file = await fileHandle.getFile();
+      return {
+        name,
+        kind: handle.kind,
+        path,
+        size: file.size,
+      };
+    }
+
+    return {
+      name,
+      kind: handle.kind,
+      path,
+      size: null,
+    };
   }
 
   async getFileHandle(

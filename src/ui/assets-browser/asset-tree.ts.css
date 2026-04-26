@@ -125,10 +125,11 @@ asset-tree {
   min-width: 0;
 }
 
-.node-kind {
+.node-meta {
   color: rgba(255, 255, 255, 0.5);
   font-size: 0.78rem;
   margin-left: 0.5rem;
+  flex: 0 0 auto;
 }
 
 .empty {
