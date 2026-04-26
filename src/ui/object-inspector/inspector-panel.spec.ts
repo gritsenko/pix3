@@ -61,6 +61,20 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+function createAudioBufferMock(): AudioBuffer {
+  const channelA = new Float32Array([0, 0.2, -0.4, 0.8, -0.6, 0.1]);
+  const channelB = new Float32Array([0.1, -0.3, 0.5, -0.7, 0.4, -0.2]);
+
+  return {
+    duration: 2.4,
+    numberOfChannels: 2,
+    sampleRate: 44100,
+    getChannelData(index: number) {
+      return index === 0 ? channelA : channelB;
+    },
+  } as unknown as AudioBuffer;
+}
+
 describe('InspectorPanel audio resource handling', () => {
   it('marks AudioPlayer and PlaySoundBehavior audioTrack with the audio editor', () => {
     const nodeProp = getAudioTrackProperty(AudioPlayer);
@@ -357,6 +371,10 @@ describe('InspectorPanel asset preview rendering', () => {
       value: { readBlob: vi.fn(), listDirectory: vi.fn(async () => []) },
       configurable: true,
     });
+    Object.defineProperty(panel, 'projectStorage', {
+      value: { readTextFile: vi.fn(async () => '') },
+      configurable: true,
+    });
     Object.defineProperty(panel, 'assetsPreviewService', {
       value: {
         requestThumbnail: vi.fn(),
@@ -368,12 +386,16 @@ describe('InspectorPanel asset preview rendering', () => {
               kind: 'file',
               previewType: 'model',
               thumbnailUrl: 'data:image/webp;base64,thumb',
+              previewUrl: null,
               thumbnailStatus: 'ready',
               iconName: 'box',
               extension: 'glb',
               sizeBytes: 1024,
               width: null,
               height: null,
+              durationSeconds: null,
+              channelCount: null,
+              sampleRate: null,
               lastModified: 10,
             },
           });
@@ -396,6 +418,285 @@ describe('InspectorPanel asset preview rendering', () => {
     expect((preview as { resourcePath?: string }).resourcePath).toBe(
       'res://assets/models/crate.glb'
     );
+  });
+
+  it('renders playable audio preview for selected audio assets', async () => {
+    const panel = document.createElement('pix3-inspector-panel') as InstanceType<
+      typeof InspectorPanel
+    >;
+
+    Object.defineProperty(panel, 'sceneManager', {
+      value: { getSceneGraph: vi.fn(() => null), getActiveSceneGraph: vi.fn(() => null) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'commandDispatcher', {
+      value: { execute: vi.fn().mockResolvedValue(undefined) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'behaviorPickerService', {
+      value: { showPicker: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'scriptCreatorService', {
+      value: { showCreator: vi.fn(), createScript: vi.fn(), checkIfScriptExists: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'scriptRegistry', {
+      value: { getComponentPropertySchema: vi.fn(() => null), getComponentType: vi.fn(() => null) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'iconService', {
+      value: { getIcon: vi.fn(() => 'icon') },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'dialogService', {
+      value: { showConfirmation: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'fileSystemAPI', {
+      value: { readBlob: vi.fn(), listDirectory: vi.fn(async () => []) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'projectStorage', {
+      value: { readTextFile: vi.fn(async () => '') },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'assetsPreviewService', {
+      value: {
+        subscribe: (listener: (snapshot: { selectedItem: unknown }) => void) => {
+          listener({
+            selectedItem: {
+              name: 'click.wav',
+              path: 'assets/audio/click.wav',
+              kind: 'file',
+              previewType: 'audio',
+              thumbnailUrl: 'data:image/svg+xml;charset=utf-8,waveform',
+              previewUrl: 'blob:audio-preview',
+              thumbnailStatus: 'ready',
+              iconName: 'music',
+              extension: 'wav',
+              sizeBytes: 2048,
+              width: null,
+              height: null,
+              durationSeconds: 2.4,
+              channelCount: 2,
+              sampleRate: 44100,
+              lastModified: 10,
+            },
+          });
+          return () => undefined;
+        },
+      },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'viewportService', {
+      value: { setPreviewAnimation: vi.fn() },
+      configurable: true,
+    });
+
+    document.body.appendChild(panel);
+    await panel.updateComplete;
+
+    const preview = panel.querySelector('pix3-audio-resource-editor') as
+      | (HTMLElement & {
+          updateComplete?: Promise<unknown>;
+          shadowRoot: ShadowRoot | null;
+          showResourceControls?: boolean;
+        })
+      | null;
+    expect(preview).not.toBeNull();
+    expect(preview?.showResourceControls).toBe(false);
+    await preview?.updateComplete;
+    expect(preview?.shadowRoot?.querySelector('audio')).not.toBeNull();
+    expect(preview?.shadowRoot?.querySelector('.waveform')).not.toBeNull();
+  });
+
+  it('renders text content for selected text assets', async () => {
+    const panel = document.createElement('pix3-inspector-panel') as InstanceType<
+      typeof InspectorPanel
+    >;
+    const readTextFile = vi.fn(async () => 'title: Demo\nmode: editor\nenabled: true');
+
+    Object.defineProperty(panel, 'sceneManager', {
+      value: { getSceneGraph: vi.fn(() => null), getActiveSceneGraph: vi.fn(() => null) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'commandDispatcher', {
+      value: { execute: vi.fn().mockResolvedValue(undefined) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'behaviorPickerService', {
+      value: { showPicker: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'scriptCreatorService', {
+      value: { showCreator: vi.fn(), createScript: vi.fn(), checkIfScriptExists: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'scriptRegistry', {
+      value: { getComponentPropertySchema: vi.fn(() => null), getComponentType: vi.fn(() => null) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'iconService', {
+      value: { getIcon: vi.fn(() => 'icon') },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'dialogService', {
+      value: { showConfirmation: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'fileSystemAPI', {
+      value: { readBlob: vi.fn(), listDirectory: vi.fn(async () => []) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'projectStorage', {
+      value: { readTextFile },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'assetsPreviewService', {
+      value: {
+        subscribe: (listener: (snapshot: { selectedItem: unknown }) => void) => {
+          listener({
+            selectedItem: {
+              name: 'config.yaml',
+              path: 'assets/config.yaml',
+              kind: 'file',
+              previewType: 'text',
+              thumbnailUrl: null,
+              previewUrl: null,
+              previewText: 'title: Demo',
+              thumbnailStatus: 'ready',
+              iconName: 'file-text',
+              extension: 'yaml',
+              sizeBytes: 120,
+              width: null,
+              height: null,
+              durationSeconds: null,
+              channelCount: null,
+              sampleRate: null,
+              lastModified: 10,
+            },
+          });
+          return () => undefined;
+        },
+      },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'viewportService', {
+      value: { setPreviewAnimation: vi.fn() },
+      configurable: true,
+    });
+
+    document.body.appendChild(panel);
+    await panel.updateComplete;
+
+    await vi.waitFor(() => {
+      const textPreview = panel.querySelector('.asset-text-preview');
+      expect(textPreview?.textContent).toContain('mode: editor');
+      expect(textPreview?.textContent).toContain('enabled: true');
+    });
+
+    expect(readTextFile).toHaveBeenCalledWith('assets/config.yaml');
+  });
+
+  it('loads playable audio previews for object inspector audio properties', async () => {
+    const decodeAudioData = vi.fn().mockResolvedValue(createAudioBufferMock());
+    vi.stubGlobal(
+      'AudioContext',
+      class {
+        decodeAudioData = decodeAudioData;
+      } as unknown as typeof AudioContext
+    );
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:loaded-audio'),
+      revokeObjectURL: vi.fn(),
+    });
+
+    const panel = document.createElement('pix3-inspector-panel') as InstanceType<
+      typeof InspectorPanel
+    >;
+    const readBlob = vi.fn().mockResolvedValue(new File(['audio-data'], 'click.wav', { type: 'audio/wav' }));
+    const node = new AudioPlayer({
+      id: 'audio-player',
+      name: 'Audio Player',
+      audioTrack: 'res://assets/sfx/click.wav',
+    });
+
+    Object.defineProperty(panel, 'fileSystemAPI', {
+      value: { readBlob, listDirectory: vi.fn(async () => []) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'sceneManager', {
+      value: { getSceneGraph: vi.fn(() => null), getActiveSceneGraph: vi.fn(() => null) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'commandDispatcher', {
+      value: { execute: vi.fn().mockResolvedValue(undefined) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'behaviorPickerService', {
+      value: { showPicker: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'scriptCreatorService', {
+      value: { showCreator: vi.fn(), createScript: vi.fn(), checkIfScriptExists: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'scriptRegistry', {
+      value: { getComponentPropertySchema: vi.fn(() => null), getComponentType: vi.fn(() => null) },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'iconService', {
+      value: { getIcon: vi.fn(() => 'icon') },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'dialogService', {
+      value: { showConfirmation: vi.fn() },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'assetsPreviewService', {
+      value: {
+        subscribe: (listener: (snapshot: { selectedItem: null }) => void) => {
+          listener({ selectedItem: null });
+          return () => undefined;
+        },
+      },
+      configurable: true,
+    });
+    Object.defineProperty(panel, 'viewportService', {
+      value: { setPreviewAnimation: vi.fn() },
+      configurable: true,
+    });
+
+    document.body.appendChild(panel);
+    (
+      panel as unknown as {
+        selectedNodes: NodeBase[];
+        primaryNode: NodeBase;
+        syncValuesFromNode: () => void;
+      }
+    ).selectedNodes = [node];
+    (panel as unknown as { primaryNode: NodeBase }).primaryNode = node;
+    (
+      panel as unknown as {
+        syncValuesFromNode: () => void;
+      }
+    ).syncValuesFromNode();
+
+    panel.requestUpdate();
+    await panel.updateComplete;
+
+    await vi.waitFor(async () => {
+      const preview = panel.querySelector('pix3-audio-resource-editor') as
+        | (HTMLElement & { updateComplete?: Promise<unknown>; shadowRoot: ShadowRoot | null })
+        | null;
+      await preview?.updateComplete;
+      expect(preview?.shadowRoot?.querySelector('audio')).not.toBeNull();
+      expect(preview?.shadowRoot?.querySelector('.waveform')).not.toBeNull();
+    });
+
+    expect(readBlob).toHaveBeenCalledWith('res://assets/sfx/click.wav');
+    expect(decodeAudioData).toHaveBeenCalledOnce();
   });
 });
 
@@ -437,6 +738,10 @@ async function setupInspectorForNode(
   });
   Object.defineProperty(panel, 'fileSystemAPI', {
     value: { readBlob: vi.fn(), listDirectory: vi.fn(async () => []) },
+    configurable: true,
+  });
+  Object.defineProperty(panel, 'projectStorage', {
+    value: { readTextFile: vi.fn(async () => '') },
     configurable: true,
   });
   Object.defineProperty(panel, 'assetsPreviewService', {

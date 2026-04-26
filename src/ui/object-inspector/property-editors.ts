@@ -19,6 +19,18 @@ export interface Vector3Value {
   z: number;
 }
 
+function formatBytes(size: number): string {
+  if (size < 1024) {
+    return `${size} B`;
+  }
+  const kb = size / 1024;
+  if (kb < 1024) {
+    return `${kb.toFixed(1)} KB`;
+  }
+  const mb = kb / 1024;
+  return `${mb.toFixed(2)} MB`;
+}
+
 /**
  * Vector2 Editor - Displays x, y fields in one row
  */
@@ -631,6 +643,27 @@ export class AudioResourceEditor extends ComponentBase {
   @property({ type: String })
   resourceUrl: string = '';
 
+  @property({ type: String })
+  previewUrl: string = '';
+
+  @property({ type: String })
+  waveformUrl: string = '';
+
+  @property({ type: Number })
+  durationSeconds: number = 0;
+
+  @property({ type: Number })
+  channelCount: number = 0;
+
+  @property({ type: Number })
+  sampleRate: number = 0;
+
+  @property({ type: Number })
+  fileSize: number = 0;
+
+  @property({ type: Boolean, attribute: 'show-resource-controls' })
+  showResourceControls: boolean = true;
+
   @property({ type: Boolean })
   disabled: boolean = false;
 
@@ -670,6 +703,67 @@ export class AudioResourceEditor extends ComponentBase {
       font-size: 0.75rem;
       text-align: center;
       line-height: 1.35;
+    }
+
+    .audio-card {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      padding: 0.625rem;
+      border: 1px solid var(--color-border, #333);
+      border-radius: 0.5rem;
+      background: linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02));
+    }
+
+    .waveform {
+      display: block;
+      width: 100%;
+      min-height: 5rem;
+      border-radius: 0.4rem;
+      overflow: hidden;
+      background: rgba(0, 0, 0, 0.22);
+      object-fit: cover;
+    }
+
+    .waveform-empty {
+      display: grid;
+      place-items: center;
+      min-height: 5rem;
+      border-radius: 0.4rem;
+      border: 1px dashed var(--color-border, #333);
+      background: rgba(0, 0, 0, 0.15);
+      color: var(--color-text-subtle, #888);
+      font-size: 0.75rem;
+      text-align: center;
+      padding: 0.75rem;
+      box-sizing: border-box;
+    }
+
+    .audio-player {
+      width: 100%;
+      height: 2rem;
+    }
+
+    .info-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem;
+    }
+
+    .info-item {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.2rem 0.45rem;
+      border-radius: 999px;
+      background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.12);
+      color: var(--color-text-primary, #eee);
+      font-size: 0.72rem;
+      line-height: 1.2;
+    }
+
+    .info-label {
+      color: var(--color-text-subtle, #888);
     }
 
     .url-row {
@@ -759,29 +853,88 @@ export class AudioResourceEditor extends ComponentBase {
     );
   }
 
-  protected render() {
-    return html`
-      <div
-        class="drop-zone ${this.isDragOver ? 'is-dragover' : ''}"
-        @dragover=${(event: DragEvent) => this.onDragOver(event)}
-        @dragleave=${() => this.onDragLeave()}
-        @drop=${(event: DragEvent) => this.onDrop(event)}
-      >
-        <span class="drop-label">Drop audio from Assets here</span>
-      </div>
+  private formatDuration(durationSeconds: number): string {
+    if (!Number.isFinite(durationSeconds) || durationSeconds <= 0) {
+      return '';
+    }
 
-      <div class="url-row">
-        <input
-          type="text"
-          .value=${this.resourceUrl}
-          ?disabled=${this.disabled}
-          placeholder="res://path/to/sound.wav"
-          @change=${(e: Event) => this.emitChange((e.target as HTMLInputElement).value)}
-        />
-        <button type="button" ?disabled=${this.disabled} @click=${() => this.emitChange('')}>
-          Clear
-        </button>
-      </div>
+    const totalSeconds = Math.round(durationSeconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  private formatSampleRate(sampleRate: number): string {
+    if (!Number.isFinite(sampleRate) || sampleRate <= 0) {
+      return '';
+    }
+
+    const khz = sampleRate / 1000;
+    return `${khz % 1 === 0 ? khz.toFixed(0) : khz.toFixed(1)} kHz`;
+  }
+
+  protected render() {
+    const hasAudioValue = this.resourceUrl.trim().length > 0;
+    const durationLabel = this.formatDuration(this.durationSeconds);
+    const sampleRateLabel = this.formatSampleRate(this.sampleRate);
+
+    return html`
+      ${hasAudioValue
+        ? html`
+            <div class="audio-card">
+              ${this.waveformUrl
+                ? html`<img class="waveform" src=${this.waveformUrl} alt="Audio waveform preview" />`
+                : html`<div class="waveform-empty">Audio preview will appear here.</div>`}
+              ${this.previewUrl
+                ? html`<audio class="audio-player" controls preload="metadata" src=${this.previewUrl}></audio>`
+                : ''}
+              ${durationLabel || this.channelCount > 0 || sampleRateLabel || this.fileSize > 0
+                ? html`
+                    <div class="info-row">
+                      ${durationLabel
+                        ? html`<span class="info-item"><span class="info-label">Duration</span>${durationLabel}</span>`
+                        : ''}
+                      ${this.channelCount > 0
+                        ? html`<span class="info-item"><span class="info-label">Channels</span>${this.channelCount}</span>`
+                        : ''}
+                      ${sampleRateLabel
+                        ? html`<span class="info-item"><span class="info-label">Rate</span>${sampleRateLabel}</span>`
+                        : ''}
+                      ${this.fileSize > 0
+                        ? html`<span class="info-item"><span class="info-label">Size</span>${formatBytes(this.fileSize)}</span>`
+                        : ''}
+                    </div>
+                  `
+                : ''}
+            </div>
+          `
+        : ''}
+
+      ${this.showResourceControls
+        ? html`
+            <div
+              class="drop-zone ${this.isDragOver ? 'is-dragover' : ''}"
+              @dragover=${(event: DragEvent) => this.onDragOver(event)}
+              @dragleave=${() => this.onDragLeave()}
+              @drop=${(event: DragEvent) => this.onDrop(event)}
+            >
+              <span class="drop-label">Drop audio from Assets here</span>
+            </div>
+
+            <div class="url-row">
+              <input
+                type="text"
+                .value=${this.resourceUrl}
+                ?disabled=${this.disabled}
+                placeholder="res://path/to/sound.wav"
+                @change=${(e: Event) => this.emitChange((e.target as HTMLInputElement).value)}
+              />
+              <button type="button" ?disabled=${this.disabled} @click=${() => this.emitChange('')}>
+                Clear
+              </button>
+            </div>
+          `
+        : ''}
     `;
   }
 }

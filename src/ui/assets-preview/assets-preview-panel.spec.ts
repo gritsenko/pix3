@@ -115,6 +115,29 @@ describe('AssetsPreviewPanel', () => {
     expect(services.assetsPreviewService.requestThumbnail).toHaveBeenCalledWith('assets/crate.glb');
   });
 
+  it('renders text snippets for text preview assets', async () => {
+    const panel = document.createElement('pix3-assets-preview-panel') as AssetsPreviewPanelElement;
+    stubPanelServices(
+      panel,
+      createSnapshot([
+        createItem({
+          name: 'config.yaml',
+          path: 'assets/config.yaml',
+          kind: 'file',
+          previewType: 'text',
+          previewText: 'name: demo\nmode: editor',
+        }),
+      ])
+    );
+
+    document.body.appendChild(panel);
+    await panel.updateComplete;
+
+    const textThumb = panel.querySelector('.text-thumb');
+    expect(textThumb?.textContent).toContain('name: demo');
+    expect(textThumb?.textContent).toContain('mode: editor');
+  });
+
   it('formats bytes, KB, and MB consistently', () => {
     const panel = new AssetsPreviewPanel();
     const formatFileSize = (
@@ -177,12 +200,17 @@ function createItem(
     kind: overrides.kind,
     previewType: overrides.previewType ?? 'icon',
     thumbnailUrl: overrides.thumbnailUrl ?? null,
+    previewUrl: overrides.previewUrl ?? null,
+    previewText: overrides.previewText ?? null,
     thumbnailStatus: overrides.thumbnailStatus ?? 'idle',
     iconName: overrides.iconName ?? 'file',
     extension: overrides.extension ?? '',
     sizeBytes: overrides.sizeBytes ?? null,
     width: overrides.width ?? null,
     height: overrides.height ?? null,
+    durationSeconds: overrides.durationSeconds ?? null,
+    channelCount: overrides.channelCount ?? null,
+    sampleRate: overrides.sampleRate ?? null,
     lastModified: overrides.lastModified ?? null,
   };
 }

@@ -5,11 +5,31 @@ import { resolveProjectService } from './ProjectService';
 import { resolveProjectStorageService } from './ProjectStorageService';
 import { resolveThumbnailCacheService } from './ThumbnailCacheService';
 import { resolveThumbnailGenerator } from './ThumbnailGenerator';
+import { analyzeAudioBlob } from './audio-preview-utils';
 
 const IMAGE_EXTENSIONS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg']);
+const AUDIO_EXTENSIONS = new Set(['wav', 'mp3', 'ogg']);
 const MODEL_EXTENSIONS = new Set(['glb', 'gltf']);
+const TEXT_PREVIEW_EXTENSIONS = new Set([
+  'ts',
+  'tsx',
+  'js',
+  'jsx',
+  'mjs',
+  'cjs',
+  'json',
+  'md',
+  'markdown',
+  'yml',
+  'yaml',
+  'txt',
+  'html',
+  'css',
+  'scss',
+  'less',
+]);
 
-export type AssetPreviewType = 'image' | 'model' | 'icon';
+export type AssetPreviewType = 'image' | 'model' | 'audio' | 'text' | 'icon';
 export type AssetThumbnailStatus = 'idle' | 'loading' | 'ready' | 'error';
 
 export interface AssetPreviewItem {
@@ -18,12 +38,17 @@ export interface AssetPreviewItem {
   readonly kind: FileSystemHandleKind;
   readonly previewType: AssetPreviewType;
   readonly thumbnailUrl: string | null;
+  readonly previewUrl: string | null;
+  readonly previewText: string | null;
   readonly thumbnailStatus: AssetThumbnailStatus;
   readonly iconName: string;
   readonly extension: string;
   readonly sizeBytes: number | null;
   readonly width: number | null;
   readonly height: number | null;
+  readonly durationSeconds: number | null;
+  readonly channelCount: number | null;
+  readonly sampleRate: number | null;
   readonly lastModified: number | null;
 }
 
@@ -140,9 +165,26 @@ export class AssetsPreviewService {
       return;
     }
 
+    const normalizedPath = this.normalizePath(path);
     const selectedFolderPath =
-      kind === 'directory' ? this.normalizePath(path) : this.getParentPath(path);
-    await this.setSelectedFolder(selectedFolderPath);
+      kind === 'directory' ? normalizedPath : this.getParentPath(normalizedPath);
+    const normalizedFolderPath = this.normalizePath(selectedFolderPath);
+
+    if (this.state.selectedFolderPath === normalizedFolderPath) {
+      if (kind === 'file') {
+        this.selectItem(normalizedPath);
+      } else {
+        this.clearSelectedItem();
+      }
+      return;
+    }
+
+    this.state.selectedItemPath = kind === 'file' ? normalizedPath : null;
+    this.state.selectedItem =
+      kind === 'file'
+        ? this.state.items.find(item => this.normalizePath(item.path) === normalizedPath) ?? null
+        : null;
+    await this.setSelectedFolder(normalizedFolderPath);
   }
 
   public async refreshCurrentFolder(): Promise<void> {
@@ -293,11 +335,16 @@ export class AssetsPreviewService {
         extension,
         previewType: 'icon',
         thumbnailUrl: null,
+        previewUrl: null,
+        previewText: null,
         thumbnailStatus: 'idle',
         iconName: 'folder',
         sizeBytes: null,
         width: null,
         height: null,
+        durationSeconds: null,
+        channelCount: null,
+        sampleRate: null,
         lastModified: null,
       };
     }
@@ -323,14 +370,70 @@ export class AssetsPreviewService {
           extension,
           previewType: 'image',
           thumbnailUrl,
+          previewUrl: thumbnailUrl,
+          previewText: null,
           thumbnailStatus: 'ready',
           iconName: 'image',
           sizeBytes,
           width: dimensions.width,
           height: dimensions.height,
+          durationSeconds: null,
+          channelCount: null,
+          sampleRate: null,
           lastModified,
         };
       }
+    }
+
+    if (AUDIO_EXTENSIONS.has(extension)) {
+      if (fileBlob) {
+        const previewUrl = URL.createObjectURL(fileBlob);
+        const analysis = await analyzeAudioBlob(fileBlob);
+
+        return {
+          name,
+          path,
+          kind,
+          extension,
+          previewType: 'audio',
+          thumbnailUrl: analysis.waveformUrl,
+          previewUrl,
+          previewText: null,
+          thumbnailStatus: analysis.waveformUrl ? 'ready' : 'error',
+          iconName: 'music',
+          sizeBytes,
+          width: null,
+          height: null,
+          durationSeconds: analysis.durationSeconds,
+          channelCount: analysis.channelCount,
+          sampleRate: analysis.sampleRate,
+          lastModified,
+        };
+      }
+    }
+
+    if (TEXT_PREVIEW_EXTENSIONS.has(extension)) {
+      const previewText = fileBlob ? await this.buildTextPreview(fileBlob) : null;
+
+      return {
+        name,
+        path,
+        kind,
+        extension,
+        previewType: 'text',
+        thumbnailUrl: null,
+        previewUrl: null,
+        previewText,
+        thumbnailStatus: previewText !== null ? 'ready' : 'error',
+        iconName: 'file-text',
+        sizeBytes,
+        width: null,
+        height: null,
+        durationSeconds: null,
+        channelCount: null,
+        sampleRate: null,
+        lastModified,
+      };
     }
 
     if (MODEL_EXTENSIONS.has(extension)) {
@@ -344,11 +447,16 @@ export class AssetsPreviewService {
         extension,
         previewType: 'model',
         thumbnailUrl: cachedThumbnail,
+        previewUrl: null,
+        previewText: null,
         thumbnailStatus: cachedThumbnail ? 'ready' : fileBlob ? 'loading' : 'idle',
         iconName: 'box',
         sizeBytes,
         width: null,
         height: null,
+        durationSeconds: null,
+        channelCount: null,
+        sampleRate: null,
         lastModified,
       };
     }
@@ -360,11 +468,16 @@ export class AssetsPreviewService {
       extension,
       previewType: 'icon',
       thumbnailUrl: null,
+      previewUrl: null,
+      previewText: null,
       thumbnailStatus: 'idle',
       iconName: this.resolveIconForExtension(extension),
       sizeBytes,
       width: null,
       height: null,
+      durationSeconds: null,
+      channelCount: null,
+      sampleRate: null,
       lastModified,
     };
   }
@@ -571,6 +684,19 @@ export class AssetsPreviewService {
     });
   }
 
+  private async buildTextPreview(blob: Blob): Promise<string> {
+    const rawText = await blob.text();
+    const normalized = rawText.replace(/\r\n/g, '\n').replace(/\t/g, '  ').trim();
+
+    if (!normalized) {
+      return 'Empty file';
+    }
+
+    const lines = normalized.split('\n').slice(0, 6);
+    const snippet = lines.join('\n');
+    return snippet.length > 280 ? `${snippet.slice(0, 277)}...` : snippet;
+  }
+
   private getExtension(name: string): string {
     const lastDot = name.lastIndexOf('.');
     if (lastDot < 0 || lastDot === name.length - 1) {
@@ -648,6 +774,9 @@ export class AssetsPreviewService {
       if (item.thumbnailUrl?.startsWith('blob:')) {
         this.objectUrls.add(item.thumbnailUrl);
       }
+      if (item.previewUrl?.startsWith('blob:')) {
+        this.objectUrls.add(item.previewUrl);
+      }
     }
   }
 
@@ -655,6 +784,9 @@ export class AssetsPreviewService {
     for (const item of items) {
       if (item.thumbnailUrl?.startsWith('blob:')) {
         URL.revokeObjectURL(item.thumbnailUrl);
+      }
+      if (item.previewUrl?.startsWith('blob:')) {
+        URL.revokeObjectURL(item.previewUrl);
       }
     }
   }

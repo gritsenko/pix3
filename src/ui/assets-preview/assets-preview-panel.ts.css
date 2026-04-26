@@ -81,6 +81,24 @@ pix3-assets-preview-panel .thumb img {
   object-fit: contain;
 }
 
+pix3-assets-preview-panel .text-thumb {
+  display: block;
+  width: 100%;
+  height: 100%;
+  padding: 0.55rem;
+  box-sizing: border-box;
+  overflow: hidden;
+  color: rgba(245, 247, 250, 0.9);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.58rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(0, 0, 0, 0.22);
+}
+
 pix3-assets-preview-panel .icon {
   color: rgba(245, 247, 250, 0.72);
 }

@@ -758,6 +758,45 @@ pix3-panel {
   color: rgba(245, 247, 250, 0.8);
 }
 
+.asset-text-preview-shell {
+  width: 100%;
+  min-height: 190px;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0.35rem;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.02)),
+    rgba(0, 0, 0, 0.2);
+}
+
+.asset-text-preview {
+  margin: 0;
+  padding: 0.85rem;
+  min-height: 190px;
+  box-sizing: border-box;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--color-text-primary, #eee);
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 0.73rem;
+  line-height: 1.55;
+}
+
+.asset-text-preview-state {
+  min-height: 190px;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  box-sizing: border-box;
+  color: var(--color-text-secondary, #aaa);
+  font-size: 0.8rem;
+}
+
+.asset-text-preview-state--error {
+  color: #e98f8f;
+}
+
 .asset-value {
   font-size: 0.8rem;
   color: var(--color-text-primary, #eee);

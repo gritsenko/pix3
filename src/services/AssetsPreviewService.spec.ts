@@ -20,6 +20,12 @@ const mockThumbnailGenerator = {
   generate: vi.fn(),
 };
 
+const mockDecodeAudioData = vi.fn();
+
+class MockAudioContext {
+  decodeAudioData = mockDecodeAudioData;
+}
+
 vi.mock('./ProjectService', () => ({
   ProjectService: class ProjectService {},
   resolveProjectService: () => mockProjectService,
@@ -52,10 +58,16 @@ describe('AssetsPreviewService', () => {
     mockThumbnailCacheService.get.mockReset();
     mockThumbnailCacheService.set.mockReset();
     mockThumbnailGenerator.generate.mockReset();
+    mockDecodeAudioData.mockReset();
 
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
       return 1;
+    });
+    vi.stubGlobal('AudioContext', MockAudioContext as unknown as typeof AudioContext);
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:audio-preview'),
+      revokeObjectURL: vi.fn(),
     });
   });
 
@@ -124,8 +136,103 @@ describe('AssetsPreviewService', () => {
       service.dispose();
     }
   });
+
+  it('builds waveform previews and metadata for audio assets', async () => {
+    mockProjectService.listDirectory.mockResolvedValue([
+      { name: 'click.wav', path: 'audio/click.wav', kind: 'file' },
+    ]);
+    mockProjectStorageService.readBlob.mockResolvedValue(
+      createFile('click.wav', 'audio-data', 'audio/wav', 88)
+    );
+    mockDecodeAudioData.mockResolvedValue(createAudioBufferMock());
+
+    const service = new AssetsPreviewService();
+    try {
+      await vi.waitFor(() => expect(service.getSnapshot().items).toHaveLength(1));
+
+      const [item] = service.getSnapshot().items;
+      expect(item.previewType).toBe('audio');
+      expect(item.thumbnailStatus).toBe('ready');
+      expect(item.thumbnailUrl).toContain('data:image/svg+xml');
+      expect(item.previewUrl).toBe('blob:audio-preview');
+      expect(item.durationSeconds).toBe(1.75);
+      expect(item.channelCount).toBe(2);
+      expect(item.sampleRate).toBe(44100);
+      expect(mockDecodeAudioData).toHaveBeenCalledOnce();
+    } finally {
+      service.dispose();
+    }
+  });
+
+  it('selects files in the current folder without reloading the preview folder', async () => {
+    mockProjectService.listDirectory.mockResolvedValue([
+      { name: 'config.json', path: 'config.json', kind: 'file' },
+      { name: 'notes.md', path: 'notes.md', kind: 'file' },
+    ]);
+    mockProjectStorageService.readBlob.mockImplementation(async (path: string) => {
+      if (path === 'config.json') {
+        return createFile('config.json', '{"name":"pix3"}', 'application/json', 11);
+      }
+      return createFile('notes.md', '# Notes', 'text/markdown', 12);
+    });
+
+    const service = new AssetsPreviewService();
+    try {
+      await vi.waitFor(() => expect(service.getSnapshot().items).toHaveLength(2));
+      expect(mockProjectService.listDirectory).toHaveBeenCalledTimes(1);
+
+      await service.syncFromAssetSelection('notes.md', 'file');
+
+      expect(mockProjectService.listDirectory).toHaveBeenCalledTimes(1);
+      expect(service.getSnapshot().selectedItemPath).toBe('notes.md');
+      expect(service.getSnapshot().selectedItem?.path).toBe('notes.md');
+    } finally {
+      service.dispose();
+    }
+  });
+
+  it('builds text previews for code and content files', async () => {
+    mockProjectService.listDirectory.mockResolvedValue([
+      { name: 'scene.yaml', path: 'configs/scene.yaml', kind: 'file' },
+    ]);
+    mockProjectStorageService.readBlob.mockResolvedValue(
+      createFile(
+        'scene.yaml',
+        'name: Example\ncomponents:\n  - camera\n  - light\n  - mesh',
+        'application/yaml',
+        90
+      )
+    );
+
+    const service = new AssetsPreviewService();
+    try {
+      await vi.waitFor(() => expect(service.getSnapshot().items).toHaveLength(1));
+
+      const [item] = service.getSnapshot().items;
+      expect(item.previewType).toBe('text');
+      expect(item.previewText).toContain('name: Example');
+      expect(item.previewText).toContain('components:');
+      expect(item.thumbnailStatus).toBe('ready');
+    } finally {
+      service.dispose();
+    }
+  });
 });
 
 function createFile(name: string, content: string, type: string, lastModified: number): File {
   return new File([content], name, { type, lastModified });
+}
+
+function createAudioBufferMock(): AudioBuffer {
+  const channelA = new Float32Array([0, 0.2, -0.4, 0.8, -0.6, 0.1]);
+  const channelB = new Float32Array([0.1, -0.3, 0.5, -0.7, 0.4, -0.2]);
+
+  return {
+    duration: 1.75,
+    numberOfChannels: 2,
+    sampleRate: 44100,
+    getChannelData(index: number) {
+      return index === 0 ? channelA : channelB;
+    },
+  } as unknown as AudioBuffer;
 }

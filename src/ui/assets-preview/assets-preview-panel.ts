@@ -83,7 +83,9 @@ export class AssetsPreviewPanel extends ComponentBase {
         @dragstart=${(event: DragEvent) => this.onItemDragStart(event, item)}
       >
         <span class="thumb">
-          ${item.thumbnailUrl
+          ${item.previewType === 'text' && item.previewText
+            ? html`<span class="text-thumb">${item.previewText}</span>`
+            : item.thumbnailUrl
             ? html`<img src=${item.thumbnailUrl} alt=${item.name} loading="lazy" />`
             : html`
                 <span class="icon">${this.iconService.getIcon(item.iconName, 24)}</span>
@@ -160,8 +162,25 @@ export class AssetsPreviewPanel extends ComponentBase {
   private buildTooltip(item: AssetPreviewItem): string {
     const lines: string[] = [item.name];
 
+    if (item.previewType === 'text' && item.previewText) {
+      lines.push('');
+      lines.push(item.previewText);
+    }
+
     if (item.width !== null && item.height !== null) {
       lines.push(`Resolution: ${item.width} x ${item.height}`);
+    }
+
+    if (item.durationSeconds !== null) {
+      lines.push(`Duration: ${this.formatDuration(item.durationSeconds)}`);
+    }
+
+    if (item.channelCount !== null) {
+      lines.push(`Channels: ${item.channelCount}`);
+    }
+
+    if (item.sampleRate !== null) {
+      lines.push(`Sample rate: ${this.formatSampleRate(item.sampleRate)}`);
     }
 
     if (item.sizeBytes !== null) {
@@ -181,6 +200,18 @@ export class AssetsPreviewPanel extends ComponentBase {
     }
     const mb = kb / 1024;
     return `${mb.toFixed(2)} MB`;
+  }
+
+  private formatDuration(durationSeconds: number): string {
+    const totalSeconds = Math.round(durationSeconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  private formatSampleRate(sampleRate: number): string {
+    const khz = sampleRate / 1000;
+    return `${khz % 1 === 0 ? khz.toFixed(0) : khz.toFixed(1)} kHz`;
   }
 }
 

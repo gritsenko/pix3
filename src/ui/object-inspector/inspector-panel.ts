@@ -22,7 +22,7 @@ import { ScriptRegistry } from '@pix3/runtime';
 import { IconService } from '@/services/IconService';
 import { DialogService } from '@/services/DialogService';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
-import { AssetsPreviewService, type AssetPreviewItem } from '@/services';
+import { AssetsPreviewService, ProjectStorageService, type AssetPreviewItem } from '@/services';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { AddComponentCommand } from '@/features/scripts/AddComponentCommand';
 import { RemoveComponentCommand } from '@/features/scripts/RemoveComponentCommand';
@@ -35,6 +35,7 @@ import {
   getPrefabMetadata,
   type PrefabMetadata,
 } from '@/features/scene/prefab-utils';
+import { analyzeAudioBlob } from '@/services/audio-preview-utils';
 
 import '../shared/pix3-panel';
 import './inspector-panel.ts.css';
@@ -54,6 +55,22 @@ interface SelectOption {
 interface TextureResourceValue {
   type: 'texture';
   url: string;
+}
+
+interface AudioPreviewState {
+  readonly previewUrl: string;
+  readonly waveformUrl: string;
+  readonly durationSeconds: number | null;
+  readonly channelCount: number | null;
+  readonly sampleRate: number | null;
+  readonly size: number;
+}
+
+interface TextAssetPreviewState {
+  readonly content: string;
+  readonly lineCount: number | null;
+  readonly isLoading: boolean;
+  readonly error: string | null;
 }
 
 type ReadOnlyValue = boolean | ((target: unknown) => boolean) | undefined;
@@ -100,6 +117,9 @@ export class InspectorPanel extends ComponentBase {
 
   @inject(FileSystemAPIService)
   private readonly fileSystemAPI!: FileSystemAPIService;
+
+  @inject(ProjectStorageService)
+  private readonly projectStorage!: ProjectStorageService;
 
   @inject(AssetsPreviewService)
   private readonly assetsPreviewService!: AssetsPreviewService;
@@ -148,6 +168,24 @@ export class InspectorPanel extends ComponentBase {
     { width: number; height: number; size: number }
   >();
   private readonly texturePreviewLoads = new Set<string>();
+  private readonly audioPreviewUrls = new Map<string, string>();
+  private readonly audioPreviewMetadata = new Map<
+    string,
+    {
+      waveformUrl: string;
+      durationSeconds: number | null;
+      channelCount: number | null;
+      sampleRate: number | null;
+      size: number;
+    }
+  >();
+  private readonly audioPreviewLoads = new Set<string>();
+  private readonly textAssetPreviewContent = new Map<
+    string,
+    { content: string; lineCount: number; isTruncated: boolean }
+  >();
+  private readonly textAssetPreviewLoads = new Set<string>();
+  private readonly textAssetPreviewErrors = new Map<string, string>();
   private readonly propertyPreviewStartValues = new Map<string, unknown>();
   private readonly componentPropertyPreviewStartValues = new Map<string, unknown>();
 
@@ -205,6 +243,15 @@ export class InspectorPanel extends ComponentBase {
     this.texturePreviewUrls.clear();
     this.texturePreviewMetadata.clear();
     this.texturePreviewLoads.clear();
+    for (const previewUrl of this.audioPreviewUrls.values()) {
+      URL.revokeObjectURL(previewUrl);
+    }
+    this.audioPreviewUrls.clear();
+    this.audioPreviewMetadata.clear();
+    this.audioPreviewLoads.clear();
+    this.textAssetPreviewContent.clear();
+    this.textAssetPreviewLoads.clear();
+    this.textAssetPreviewErrors.clear();
   }
 
   private toUrlSafeClassName(name: string): string {
@@ -520,6 +567,114 @@ export class InspectorPanel extends ComponentBase {
 
   private isImageResource(path: string): boolean {
     return this.hasSupportedExtension(path, IMAGE_EXTENSIONS);
+  }
+
+  private getTextAssetPreview(assetPath: string, fallbackText: string | null): TextAssetPreviewState {
+    const normalizedPath = assetPath.trim();
+    if (!normalizedPath) {
+      return {
+        content: '',
+        lineCount: null,
+        isLoading: false,
+        error: null,
+      };
+    }
+
+    const cached = this.textAssetPreviewContent.get(normalizedPath);
+    if (!cached && !this.textAssetPreviewLoads.has(normalizedPath)) {
+      this.textAssetPreviewLoads.add(normalizedPath);
+      void (async () => {
+        try {
+          const rawText = await this.projectStorage.readTextFile(normalizedPath);
+          const normalizedText = rawText.replace(/\r\n/g, '\n');
+          const lineCount = normalizedText.length === 0 ? 0 : normalizedText.split('\n').length;
+          const maxLength = 24000;
+          const isTruncated = normalizedText.length > maxLength;
+          const content = isTruncated
+            ? `${normalizedText.slice(0, maxLength)}\n\n... Preview truncated`
+            : normalizedText;
+
+          this.textAssetPreviewContent.set(normalizedPath, {
+            content: content || 'Empty file',
+            lineCount,
+            isTruncated,
+          });
+          this.textAssetPreviewErrors.delete(normalizedPath);
+        } catch (error) {
+          this.textAssetPreviewErrors.set(
+            normalizedPath,
+            error instanceof Error ? error.message : 'Failed to load file content.'
+          );
+        } finally {
+          this.textAssetPreviewLoads.delete(normalizedPath);
+          this.requestUpdate();
+        }
+      })();
+    }
+
+    return {
+      content: cached?.content ?? fallbackText ?? '',
+      lineCount: cached?.lineCount ?? null,
+      isLoading: this.textAssetPreviewLoads.has(normalizedPath),
+      error: this.textAssetPreviewErrors.get(normalizedPath) ?? null,
+    };
+  }
+
+  private getAudioPreview(resourceUrl: string): AudioPreviewState {
+    const normalizedUrl = resourceUrl.trim();
+    if (!normalizedUrl || !this.isAudioResource(normalizedUrl)) {
+      return {
+        previewUrl: '',
+        waveformUrl: '',
+        durationSeconds: null,
+        channelCount: null,
+        sampleRate: null,
+        size: 0,
+      };
+    }
+
+    const previewUrl =
+      normalizedUrl.startsWith('http://') || normalizedUrl.startsWith('https://')
+        ? normalizedUrl
+        : (this.audioPreviewUrls.get(normalizedUrl) ?? '');
+    const metadata = this.audioPreviewMetadata.get(normalizedUrl);
+
+    if (normalizedUrl.startsWith('res://') && !this.audioPreviewLoads.has(normalizedUrl)) {
+      const hasLoadedPreview = previewUrl.length > 0 || metadata !== undefined;
+      if (!hasLoadedPreview) {
+        this.audioPreviewLoads.add(normalizedUrl);
+        void (async () => {
+          try {
+            const blob = await this.fileSystemAPI.readBlob(normalizedUrl);
+            const objectUrl = URL.createObjectURL(blob);
+            const analysis = await analyzeAudioBlob(blob);
+
+            this.audioPreviewUrls.set(normalizedUrl, objectUrl);
+            this.audioPreviewMetadata.set(normalizedUrl, {
+              waveformUrl: analysis.waveformUrl ?? '',
+              durationSeconds: analysis.durationSeconds,
+              channelCount: analysis.channelCount,
+              sampleRate: analysis.sampleRate,
+              size: blob.size,
+            });
+            this.requestUpdate();
+          } catch {
+            // Keep empty preview when read fails.
+          } finally {
+            this.audioPreviewLoads.delete(normalizedUrl);
+          }
+        })();
+      }
+    }
+
+    return {
+      previewUrl,
+      waveformUrl: metadata?.waveformUrl ?? '',
+      durationSeconds: metadata?.durationSeconds ?? null,
+      channelCount: metadata?.channelCount ?? null,
+      sampleRate: metadata?.sampleRate ?? null,
+      size: metadata?.size ?? 0,
+    };
   }
 
   private isAudioResource(path: string): boolean {
@@ -1106,6 +1261,9 @@ export class InspectorPanel extends ComponentBase {
     const asset = this.selectedAssetItem;
     const isImage = asset.previewType === 'image' && asset.thumbnailUrl !== null;
     const isModel = asset.previewType === 'model';
+    const isAudio = asset.previewType === 'audio';
+    const isText = asset.previewType === 'text';
+    const textPreview = isText ? this.getTextAssetPreview(asset.path, asset.previewText) : null;
     const resourceUrl = asset.path === '.' ? 'res://' : `res://${asset.path}`;
 
     return html`
@@ -1126,6 +1284,31 @@ export class InspectorPanel extends ComponentBase {
                   .thumbnailStatus=${asset.thumbnailStatus}
                 ></pix3-model-asset-preview>
               `
+            : isAudio
+              ? html`
+                  <pix3-audio-resource-editor
+                    .resourceUrl=${resourceUrl}
+                    .previewUrl=${asset.previewUrl ?? ''}
+                    .waveformUrl=${asset.thumbnailUrl ?? ''}
+                    .durationSeconds=${asset.durationSeconds ?? 0}
+                    .channelCount=${asset.channelCount ?? 0}
+                    .sampleRate=${asset.sampleRate ?? 0}
+                    .fileSize=${asset.sizeBytes ?? 0}
+                    .showResourceControls=${false}
+                  ></pix3-audio-resource-editor>
+                `
+              : isText
+                ? html`
+                    <div class="asset-text-preview-shell">
+                      ${textPreview?.isLoading && !textPreview.content
+                        ? html`<div class="asset-text-preview-state">Loading content...</div>`
+                        : textPreview?.error
+                          ? html`<div class="asset-text-preview-state asset-text-preview-state--error">
+                              ${textPreview.error}
+                            </div>`
+                          : html`<pre class="asset-text-preview">${textPreview?.content || 'Empty file'}</pre>`}
+                    </div>
+                  `
             : isImage
               ? html`
                   <div class="asset-image-preview checker-bg">
@@ -1170,6 +1353,38 @@ export class InspectorPanel extends ComponentBase {
                 </div>
               `
             : ''}
+          ${isAudio && asset.durationSeconds !== null
+            ? html`
+                <div class="property-group">
+                  <span class="property-label">Duration</span>
+                  <span class="asset-value">${this.formatDuration(asset.durationSeconds)}</span>
+                </div>
+              `
+            : ''}
+          ${isAudio && asset.channelCount !== null
+            ? html`
+                <div class="property-group">
+                  <span class="property-label">Channels</span>
+                  <span class="asset-value">${asset.channelCount}</span>
+                </div>
+              `
+            : ''}
+          ${isAudio && asset.sampleRate !== null
+            ? html`
+                <div class="property-group">
+                  <span class="property-label">Sample Rate</span>
+                  <span class="asset-value">${this.formatSampleRate(asset.sampleRate)}</span>
+                </div>
+              `
+            : ''}
+          ${isText && textPreview?.lineCount !== null
+            ? html`
+                <div class="property-group">
+                  <span class="property-label">Lines</span>
+                  <span class="asset-value">${textPreview.lineCount}</span>
+                </div>
+              `
+            : ''}
           <div class="property-group">
             <span class="property-label">Size</span>
             <span class="asset-value">${this.formatFileSize(asset.sizeBytes)}</span>
@@ -1192,6 +1407,26 @@ export class InspectorPanel extends ComponentBase {
     }
     const mb = kb / 1024;
     return `${mb.toFixed(2)} MB`;
+  }
+
+  private formatDuration(durationSeconds: number | null): string {
+    if (durationSeconds === null || !Number.isFinite(durationSeconds) || durationSeconds < 0) {
+      return '-';
+    }
+
+    const totalSeconds = Math.round(durationSeconds);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+  }
+
+  private formatSampleRate(sampleRate: number | null): string {
+    if (sampleRate === null || !Number.isFinite(sampleRate) || sampleRate <= 0) {
+      return '-';
+    }
+
+    const khz = sampleRate / 1000;
+    return `${khz % 1 === 0 ? khz.toFixed(0) : khz.toFixed(1)} kHz`;
   }
 
   private renderProperties() {
@@ -2041,11 +2276,18 @@ export class InspectorPanel extends ComponentBase {
     const readOnly = this.isPropertyReadOnly(prop.ui?.readOnly, component);
 
     if (prop.type === 'string' && prop.ui?.editor === 'audio-resource') {
+      const audioPreview = this.getAudioPreview(state.value);
       return html`
         <div class="property-group component-property-group">
           <span class="property-label">${label}</span>
           <pix3-audio-resource-editor
             .resourceUrl=${state.value}
+            .previewUrl=${audioPreview.previewUrl}
+            .waveformUrl=${audioPreview.waveformUrl}
+            .durationSeconds=${audioPreview.durationSeconds ?? 0}
+            .channelCount=${audioPreview.channelCount ?? 0}
+            .sampleRate=${audioPreview.sampleRate ?? 0}
+            .fileSize=${audioPreview.size}
             ?disabled=${readOnly}
             @change=${(event: CustomEvent<{ url: string }>) =>
               this.applyComponentPropertyChange(component.id, prop, event.detail.url.trim())}
@@ -2373,11 +2615,18 @@ export class InspectorPanel extends ComponentBase {
     }
 
     if (prop.type === 'string' && prop.ui?.editor === 'audio-resource') {
+      const audioPreview = this.getAudioPreview(state.value);
       return html`
         <div class="property-group">
           ${labelTemplate}
           <pix3-audio-resource-editor
             .resourceUrl=${state.value}
+            .previewUrl=${audioPreview.previewUrl}
+            .waveformUrl=${audioPreview.waveformUrl}
+            .durationSeconds=${audioPreview.durationSeconds ?? 0}
+            .channelCount=${audioPreview.channelCount ?? 0}
+            .sampleRate=${audioPreview.sampleRate ?? 0}
+            .fileSize=${audioPreview.size}
             ?disabled=${readOnly}
             @change=${(event: CustomEvent<{ url: string }>) =>
               this.applyPropertyChange(prop.name, event.detail.url.trim())}
