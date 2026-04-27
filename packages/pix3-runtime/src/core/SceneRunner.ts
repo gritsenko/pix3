@@ -18,6 +18,7 @@ import { AssetLoader } from './AssetLoader';
 import { ResourceManager } from './ResourceManager';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
+import { Node2D } from '../nodes/Node2D';
 import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { AnimatedSprite3D } from '../nodes/3D/AnimatedSprite3D';
@@ -52,12 +53,14 @@ export class SceneRunner {
   private viewportSize = { width: 0, height: 0 };
   /** Adaptive logical camera dimensions computed from viewportBaseSize + viewport aspect. */
   private logicalCameraSize = { width: 1, height: 1 };
+  private readonly rootLayoutAuthoredSize: { width: number; height: number };
 
   constructor(
     sceneManager: SceneManager,
     renderer: RuntimeRenderer,
     audioService: AudioService,
-    assetLoader: AssetLoader
+    assetLoader: AssetLoader,
+    rootLayoutAuthoredSize: { width: number; height: number } = { width: 1920, height: 1080 }
   ) {
     this.sceneManager = sceneManager;
     this.renderer = renderer;
@@ -69,6 +72,10 @@ export class SceneRunner {
     this.resourceManager = assetLoader.getResourceManager();
     this.clock = new Clock();
     this.scene = new Scene();
+    this.rootLayoutAuthoredSize = {
+      width: Math.max(1, rootLayoutAuthoredSize.width),
+      height: Math.max(1, rootLayoutAuthoredSize.height),
+    };
     // Default background
     this.scene.background = new Color('#202020');
 
@@ -340,6 +347,8 @@ export class SceneRunner {
         this.orthographicCamera.updateProjectionMatrix();
       }
     }
+
+    this.reflowRoot2DNodes();
 
     // Notify scripts of viewport change AFTER camera matrices are updated so that
     // pin/projection-based scripts (e.g. PinToNodeBehavior) project with correct matrices.
@@ -672,6 +681,26 @@ export class SceneRunner {
     }
 
     return { x: fallbackX, y: fallbackY };
+  }
+
+  private reflowRoot2DNodes(): void {
+    if (!this.runtimeGraph) {
+      return;
+    }
+
+    const currentRootSize = {
+      width: Math.max(1, this.logicalCameraSize.width),
+      height: Math.max(1, this.logicalCameraSize.height),
+    };
+
+    for (const node of this.runtimeGraph.rootNodes) {
+      if (node instanceof Layout2D) {
+        continue;
+      }
+      if (node instanceof Node2D) {
+        node.applyAnchoredLayoutRecursive(currentRootSize, this.rootLayoutAuthoredSize);
+      }
+    }
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {

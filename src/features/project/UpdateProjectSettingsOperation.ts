@@ -4,8 +4,10 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
+import { Layout2D, Node2D, SceneManager } from '@pix3/runtime';
 import { createDefaultProjectManifest, type ProjectManifest } from '@/core/ProjectManifest';
 import { ProjectService } from '@/services/ProjectService';
+import { ViewportRendererService } from '@/services/ViewportRenderService';
 
 export interface UpdateProjectSettingsParams {
   projectName?: string;
@@ -116,6 +118,7 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
       state.project.projectName = newName;
       state.project.localAbsolutePath = newPath;
       state.project.manifest = nextManifest;
+      this.rebakeRootAnchors(context, prevManifest.viewportBaseSize, nextManifest.viewportBaseSize);
     } catch {
       return { didMutate: false };
     }
@@ -142,6 +145,7 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
           state.project.projectName = prevName;
           state.project.localAbsolutePath = prevPath;
           state.project.manifest = prevManifest;
+          this.rebakeRootAnchors(context, nextManifest.viewportBaseSize, prevManifest.viewportBaseSize);
           if (state.project.status === 'ready' && state.project.id) {
             persistRecentProject({
               id: state.project.id,
@@ -159,6 +163,7 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
           state.project.projectName = newName;
           state.project.localAbsolutePath = newPath;
           state.project.manifest = nextManifest;
+          this.rebakeRootAnchors(context, prevManifest.viewportBaseSize, nextManifest.viewportBaseSize);
           if (state.project.status === 'ready' && state.project.id) {
             persistRecentProject({
               id: state.project.id,
@@ -173,5 +178,55 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
         },
       },
     };
+  }
+
+  private rebakeRootAnchors(
+    context: OperationContext,
+    previousBaseSize: { width: number; height: number },
+    nextBaseSize: { width: number; height: number }
+  ): void {
+    const sceneManager = this.tryGetService<SceneManager>(context, SceneManager);
+    if (!sceneManager) {
+      return;
+    }
+
+    const sceneGraph = sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return;
+    }
+
+    for (const node of sceneGraph.rootNodes) {
+      if (node instanceof Layout2D) {
+        continue;
+      }
+      if (node instanceof Node2D) {
+        node.applyAnchoredLayoutRecursive(nextBaseSize, previousBaseSize);
+        node.captureAuthoredLayoutRectFromCurrent();
+        this.captureAnchoredDescendantRects(node);
+      }
+    }
+
+    const viewportService = this.tryGetService<ViewportRendererService>(
+      context,
+      ViewportRendererService
+    );
+    viewportService?.reflow2DLayout();
+  }
+
+  private captureAnchoredDescendantRects(parent: Node2D): void {
+    for (const child of parent.children) {
+      if (child instanceof Node2D) {
+        child.captureAuthoredLayoutRectFromCurrent();
+        this.captureAnchoredDescendantRects(child);
+      }
+    }
+  }
+
+  private tryGetService<T>(context: OperationContext, token: unknown): T | null {
+    try {
+      return context.container.getService<T>(token);
+    } catch {
+      return null;
+    }
   }
 }

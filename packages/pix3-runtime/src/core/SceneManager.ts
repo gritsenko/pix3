@@ -3,6 +3,7 @@ import { SceneLoader, type ParseSceneOptions } from './SceneLoader';
 import { SceneSaver } from './SceneSaver';
 import { Group2D } from '../nodes/2D/Group2D';
 import { Layout2D } from '../nodes/2D/Layout2D';
+import { Node2D } from '../nodes/Node2D';
 
 export interface SceneGraph {
   version: string;
@@ -90,18 +91,8 @@ export class SceneManager {
     }
 
     for (const node of graph.rootNodes) {
-      if (node instanceof Group2D) {
-        if (skipLayout2D) {
-          // Editor mode: use adaptive camera dimensions so root Group2D nodes
-          // also anchor to the visible camera boundary.
-          node.updateLayout(width, height);
-        } else {
-          // Runtime mode (skipLayout2D=false): use Layout2D authored dimensions
-          // since the Layout2D itself is scaled by calculateScaleTransform.
-          const layout2dWidth = layout2dNode?.width ?? width;
-          const layout2dHeight = layout2dNode?.height ?? height;
-          node.updateLayout(layout2dWidth, layout2dHeight);
-        }
+      if (node instanceof Node2D && node !== layout2dNode) {
+        node.applyAnchoredLayoutRecursive({ width, height }, { width, height });
       }
     }
   }

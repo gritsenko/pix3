@@ -138,6 +138,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       this.applyVisibilityPreservation(node, visibilityPreservation);
       // Set the property value using the schema's setValue method
       propDef.setValue(node, value);
+      this.afterNodePropertyApplied(node, propertyPath);
     }
 
     const activeSceneId = state.scenes.activeSceneId;
@@ -158,6 +159,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
         undo: async () => {
           this.restoreVisibilityPreservation(node, visibilityPreservation);
           propDef.setValue(node, previousValue);
+          this.afterNodePropertyApplied(node, propertyPath);
           if (activeSceneId) {
             state.scenes.lastLoadedAt = Date.now();
             const descriptor = state.scenes.descriptors[activeSceneId];
@@ -168,6 +170,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
         redo: async () => {
           this.applyVisibilityPreservation(node, visibilityPreservation);
           propDef.setValue(node, value);
+          this.afterNodePropertyApplied(node, propertyPath);
           if (activeSceneId) {
             state.scenes.lastLoadedAt = Date.now();
             const descriptor = state.scenes.descriptors[activeSceneId];
@@ -191,9 +194,13 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       } else if (this.is3DVisualProperty(propertyPath) && node instanceof Sprite3D) {
         vr.updateNodeTransform(node);
       } else if (is2DVisualProperty && node instanceof Node2D) {
-        vr.updateNodeTransform(node);
-        if (this.isParentSizeProperty(propertyPath) && this.is2DContainer(node)) {
-          this.updateDescendant2DTransforms(vr, node);
+        if (this.requires2DLayoutReflow(propertyPath)) {
+          vr.reflow2DLayout();
+        } else {
+          vr.updateNodeTransform(node);
+          if (this.isParentSizeProperty(propertyPath) && this.is2DContainer(node)) {
+            this.updateDescendant2DTransforms(vr, node);
+          }
         }
       } else if (propertyPath === 'visible') {
         vr.updateNodeVisibility(node);
@@ -253,6 +260,9 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
   private is2DVisualProperty(propertyPath: string): boolean {
     return [
       'anchor',
+      'layoutEnabled',
+      'horizontalAlign',
+      'verticalAlign',
       'width',
       'height',
       'size',
@@ -302,7 +312,7 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
   }
 
   private isParentSizeProperty(propertyPath: string): boolean {
-    return ['width', 'height', 'resolutionPreset'].includes(propertyPath);
+    return ['width', 'height', 'size', 'radius', 'resolutionPreset'].includes(propertyPath);
   }
 
   private is2DContainer(node: NodeBase): node is Layout2D | Group2D {
@@ -327,5 +337,46 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
       return { isValid: false, reason: 'Value cannot be null or undefined' };
     }
     return { isValid: true };
+  }
+
+  private afterNodePropertyApplied(node: NodeBase, propertyPath: string): void {
+    if (!(node instanceof Node2D)) {
+      return;
+    }
+
+    if (this.affects2DAuthoredRect(propertyPath)) {
+      node.captureAuthoredLayoutRectFromCurrent();
+    }
+
+    if (this.isParentSizeProperty(propertyPath) && node.isContainer) {
+      node.reflowAnchoredChildren();
+      this.captureAnchoredDescendantRects(node);
+    }
+  }
+
+  private affects2DAuthoredRect(propertyPath: string): boolean {
+    return ['position', 'width', 'height', 'size', 'radius'].includes(propertyPath);
+  }
+
+  private requires2DLayoutReflow(propertyPath: string): boolean {
+    return [
+      'layoutEnabled',
+      'horizontalAlign',
+      'verticalAlign',
+      'width',
+      'height',
+      'size',
+      'radius',
+      'resolutionPreset',
+    ].includes(propertyPath);
+  }
+
+  private captureAnchoredDescendantRects(parent: NodeBase): void {
+    for (const child of parent.children) {
+      if (child instanceof Node2D) {
+        child.captureAuthoredLayoutRectFromCurrent();
+      }
+      this.captureAnchoredDescendantRects(child);
+    }
   }
 }

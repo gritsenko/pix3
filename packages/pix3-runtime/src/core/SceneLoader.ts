@@ -32,7 +32,7 @@ import { InstancedMesh3D } from '../nodes/3D/InstancedMesh3D';
 
 import { Camera3D } from '../nodes/3D/Camera3D';
 
-import { Node2D } from '../nodes/Node2D';
+import { Node2D, type Node2DLayoutConfig } from '../nodes/Node2D';
 import { AssetLoader } from './AssetLoader';
 import { ResourceManager } from './ResourceManager';
 import { ScriptRegistry } from './ScriptRegistry';
@@ -892,6 +892,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
           color: typeof props.color === 'string' ? props.color : undefined,
@@ -912,6 +913,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           frames,
           width: this.asNumber(props.width, undefined),
@@ -954,6 +956,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           texture,
           width: this.asNumber(props.width, undefined),
@@ -1009,6 +1012,7 @@ export class SceneLoader {
           position: this.readVector2(props.position, ZERO_VECTOR2),
           scale: this.readVector2(props.scale, UNIT_VECTOR2),
           rotation: props.rotation ?? 0,
+          layout: this.parseNode2DLayout(baseProps.properties as Record<string, unknown>),
           opacity: this.asNumber(props.opacity, undefined),
         });
       }
@@ -1023,6 +1027,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, 1920),
           height: this.asNumber(props.height, 1080),
@@ -1048,6 +1053,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, 100),
           height: this.asNumber(props.height, 100),
@@ -1076,6 +1082,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           radius: this.asNumber(props.radius, undefined),
           handleRadius: this.asNumber(props.handleRadius, undefined),
@@ -1097,6 +1104,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
@@ -1124,6 +1132,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           label: this.asString(props.label),
           labelFontFamily: this.asString(props.labelFontFamily),
@@ -1144,6 +1153,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
@@ -1175,6 +1185,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
@@ -1206,6 +1217,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           size: this.asNumber(props.size, undefined),
           checked: typeof props.checked === 'boolean' ? props.checked : undefined,
@@ -1233,6 +1245,7 @@ export class SceneLoader {
             typeof (transform?.rotation ?? props.rotation) === 'number'
               ? ((transform?.rotation ?? props.rotation) as number)
               : 0,
+          layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
@@ -1762,5 +1775,19 @@ export class SceneLoader {
     }
 
     return undefined;
+  }
+
+  private parseNode2DLayout(props: Record<string, unknown>): Node2DLayoutConfig | undefined {
+    const layout = this.asRecord(props.layout);
+    if (!layout) {
+      return undefined;
+    }
+
+    return {
+      enabled: typeof layout.enabled === 'boolean' ? layout.enabled : undefined,
+      horizontalAlign:
+        typeof layout.horizontalAlign === 'string' ? layout.horizontalAlign : undefined,
+      verticalAlign: typeof layout.verticalAlign === 'string' ? layout.verticalAlign : undefined,
+    };
   }
 }

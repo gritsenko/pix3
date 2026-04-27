@@ -2,18 +2,49 @@ import { MathUtils, type Material, Vector2 } from 'three';
 
 import { NodeBase, type NodeBaseProps } from './NodeBase';
 import type { PropertySchema } from '../fw/property-schema';
+import {
+  getNodePropertySchema,
+  getPropertyDefinition,
+  setNodePropertyValue,
+} from '../fw/property-schema-utils';
 import { LAYER_2D } from '../constants';
+
+export type Node2DHorizontalAlign = 'left' | 'center' | 'right' | 'stretch';
+export type Node2DVerticalAlign = 'top' | 'center' | 'bottom' | 'stretch';
+
+export interface Node2DLayoutConfig {
+  enabled?: boolean;
+  horizontalAlign?: Node2DHorizontalAlign;
+  verticalAlign?: Node2DVerticalAlign;
+}
+
+export interface Node2DLayoutSize {
+  width: number;
+  height: number;
+}
+
+export interface Node2DLayoutPosition {
+  x: number;
+  y: number;
+}
 
 export interface Node2DProps extends Omit<NodeBaseProps, 'type'> {
   position?: Vector2;
   scale?: Vector2;
   rotation?: number; // degrees
   opacity?: number;
+  layout?: Node2DLayoutConfig;
 }
 
 export class Node2D extends NodeBase {
   private _opacity: number;
   private _computedOpacity: number;
+  private _layoutEnabled: boolean;
+  private _horizontalAlign: Node2DHorizontalAlign;
+  private _verticalAlign: Node2DVerticalAlign;
+  private readonly authoredLayoutPosition = new Vector2();
+  private readonly authoredLayoutSize = new Vector2();
+  private hasAuthoredLayoutSize = false;
   private readonly opacityMaterials: Set<Material> = new Set();
   private visibleOpacity: number;
   private visibilityFade: {
@@ -40,12 +71,26 @@ export class Node2D extends NodeBase {
     const rotationRadians = MathUtils.degToRad(rotationDegrees);
     this.rotation.set(0, 0, rotationRadians);
 
+    const layout = Node2D.normalizeLayout(props.layout);
+    this._layoutEnabled = layout.enabled;
+    this._horizontalAlign = layout.horizontalAlign;
+    this._verticalAlign = layout.verticalAlign;
+    this.authoredLayoutPosition.set(position.x, position.y);
+
+    const initialLayoutSize = Node2D.readInitialLayoutSize(props);
+    if (initialLayoutSize) {
+      this.authoredLayoutSize.copy(initialLayoutSize);
+      this.hasAuthoredLayoutSize = true;
+    }
+
     this._opacity = Node2D.clampOpacity(props.opacity ?? 1);
     this._computedOpacity = this._opacity;
     this.visibleOpacity = this._opacity > 0 ? this._opacity : 1;
     if (props.opacity !== undefined || typeof this.properties.opacity === 'number') {
       this.properties.opacity = this._opacity;
     }
+
+    this.syncLayoutProperties();
   }
 
   get opacity(): number {
@@ -68,6 +113,148 @@ export class Node2D extends NodeBase {
 
   get computedOpacity(): number {
     return this._computedOpacity;
+  }
+
+  get layoutEnabled(): boolean {
+    return this._layoutEnabled;
+  }
+
+  set layoutEnabled(value: boolean) {
+    const nextValue = Boolean(value);
+    if (this._layoutEnabled === nextValue) {
+      return;
+    }
+
+    this.captureAuthoredLayoutRectFromCurrent();
+    this._layoutEnabled = nextValue;
+    this.syncLayoutProperties();
+  }
+
+  get horizontalAlign(): Node2DHorizontalAlign {
+    return this._horizontalAlign;
+  }
+
+  set horizontalAlign(value: Node2DHorizontalAlign) {
+    const nextValue = Node2D.normalizeHorizontalAlign(value);
+    if (this._horizontalAlign === nextValue) {
+      return;
+    }
+
+    this._horizontalAlign = nextValue;
+    this.syncLayoutProperties();
+  }
+
+  get verticalAlign(): Node2DVerticalAlign {
+    return this._verticalAlign;
+  }
+
+  set verticalAlign(value: Node2DVerticalAlign) {
+    const nextValue = Node2D.normalizeVerticalAlign(value);
+    if (this._verticalAlign === nextValue) {
+      return;
+    }
+
+    this._verticalAlign = nextValue;
+    this.syncLayoutProperties();
+  }
+
+  getLayoutConfig(): Node2DLayoutConfig {
+    return {
+      enabled: this._layoutEnabled,
+      horizontalAlign: this._horizontalAlign,
+      verticalAlign: this._verticalAlign,
+    };
+  }
+
+  setLayoutConfig(layout: Node2DLayoutConfig | null | undefined): void {
+    const normalized = Node2D.normalizeLayout(layout);
+    this.captureAuthoredLayoutRectFromCurrent();
+    this._layoutEnabled = normalized.enabled;
+    this._horizontalAlign = normalized.horizontalAlign;
+    this._verticalAlign = normalized.verticalAlign;
+    this.syncLayoutProperties();
+  }
+
+  captureAuthoredLayoutRectFromCurrent(): void {
+    this.authoredLayoutPosition.set(this.position.x, this.position.y);
+    const currentSize = this.getCurrentLayoutSize();
+    if (currentSize.width > 0 && currentSize.height > 0) {
+      this.authoredLayoutSize.set(currentSize.width, currentSize.height);
+      this.hasAuthoredLayoutSize = true;
+    }
+  }
+
+  getAuthoredLayoutPosition(): Node2DLayoutPosition {
+    return { x: this.authoredLayoutPosition.x, y: this.authoredLayoutPosition.y };
+  }
+
+  setAuthoredLayoutPosition(x: number, y: number): void {
+    this.authoredLayoutPosition.set(x, y);
+  }
+
+  getAuthoredLayoutSize(): Node2DLayoutSize {
+    this.ensureAuthoredLayoutSize();
+    return {
+      width: this.authoredLayoutSize.x,
+      height: this.authoredLayoutSize.y,
+    };
+  }
+
+  setAuthoredLayoutSize(width: number, height: number): void {
+    this.authoredLayoutSize.set(Math.max(0, width), Math.max(0, height));
+    this.hasAuthoredLayoutSize = true;
+  }
+
+  applyAnchoredLayoutRecursive(
+    referenceCurrentSize: Node2DLayoutSize,
+    referenceAuthoredSize?: Node2DLayoutSize
+  ): void {
+    if (this._layoutEnabled) {
+      this.applyAnchoredLayout(referenceCurrentSize, referenceAuthoredSize);
+    }
+
+    const nextCurrentSize = this.getCurrentLayoutSize();
+    const nextAuthoredSize = this.getAuthoredLayoutSize();
+    for (const child of this.children) {
+      if (child instanceof Node2D) {
+        child.applyAnchoredLayoutRecursive(nextCurrentSize, nextAuthoredSize);
+      }
+    }
+  }
+
+  reflowAnchoredChildren(): void {
+    const currentSize = this.getCurrentLayoutSize();
+    const authoredSize = this.getAuthoredLayoutSize();
+    for (const child of this.children) {
+      if (child instanceof Node2D) {
+        child.applyAnchoredLayoutRecursive(currentSize, authoredSize);
+      }
+    }
+  }
+
+  getCurrentLayoutSize(): Node2DLayoutSize {
+    const currentSize = this.readCurrentLayoutSize();
+    if (currentSize) {
+      return currentSize;
+    }
+
+    if (this.hasAuthoredLayoutSize) {
+      return { width: this.authoredLayoutSize.x, height: this.authoredLayoutSize.y };
+    }
+
+    return { width: 0, height: 0 };
+  }
+
+  serializeLayout(): Record<string, unknown> | undefined {
+    if (!this._layoutEnabled) {
+      return undefined;
+    }
+
+    return {
+      enabled: true,
+      horizontalAlign: this._horizontalAlign,
+      verticalAlign: this._verticalAlign,
+    };
   }
 
   /**
@@ -220,6 +407,61 @@ export class Node2D extends NodeBase {
     return Math.max(0, Math.min(1, safe));
   }
 
+  private static normalizeLayout(layout: Node2DLayoutConfig | null | undefined): {
+    enabled: boolean;
+    horizontalAlign: Node2DHorizontalAlign;
+    verticalAlign: Node2DVerticalAlign;
+  } {
+    return {
+      enabled: Boolean(layout?.enabled),
+      horizontalAlign: Node2D.normalizeHorizontalAlign(layout?.horizontalAlign),
+      verticalAlign: Node2D.normalizeVerticalAlign(layout?.verticalAlign),
+    };
+  }
+
+  private static normalizeHorizontalAlign(value: unknown): Node2DHorizontalAlign {
+    switch (value) {
+      case 'left':
+      case 'right':
+      case 'stretch':
+        return value;
+      default:
+        return 'center';
+    }
+  }
+
+  private static normalizeVerticalAlign(value: unknown): Node2DVerticalAlign {
+    switch (value) {
+      case 'top':
+      case 'bottom':
+      case 'stretch':
+        return value;
+      default:
+        return 'center';
+    }
+  }
+
+  private static readInitialLayoutSize(props: Node2DProps): Vector2 | null {
+    const record = props as Record<string, unknown>;
+    const width = typeof record.width === 'number' ? record.width : undefined;
+    const height = typeof record.height === 'number' ? record.height : undefined;
+    if (Number.isFinite(width) && Number.isFinite(height)) {
+      return new Vector2(Math.max(0, width), Math.max(0, height));
+    }
+
+    const size = typeof record.size === 'number' ? record.size : undefined;
+    if (Number.isFinite(size)) {
+      return new Vector2(Math.max(0, size), Math.max(0, size));
+    }
+
+    const radius = typeof record.radius === 'number' ? record.radius : undefined;
+    if (Number.isFinite(radius)) {
+      return new Vector2(Math.max(0, radius * 2), Math.max(0, radius * 2));
+    }
+
+    return null;
+  }
+
   private static toNonNegativeSeconds(value: number): number {
     if (!Number.isFinite(value)) {
       return 0;
@@ -230,6 +472,177 @@ export class Node2D extends NodeBase {
   private setVisibleState(value: boolean): void {
     this.visible = value;
     this.properties.visible = value;
+  }
+
+  private ensureAuthoredLayoutSize(): void {
+    if (this.hasAuthoredLayoutSize) {
+      return;
+    }
+
+    const currentSize = this.readCurrentLayoutSize();
+    if (!currentSize) {
+      return;
+    }
+
+    this.authoredLayoutSize.copy(new Vector2(currentSize.width, currentSize.height));
+    this.hasAuthoredLayoutSize = true;
+  }
+
+  private readCurrentLayoutSize(): Node2DLayoutSize | null {
+    const record = this as unknown as Record<string, unknown>;
+    const width = typeof record.width === 'number' ? record.width : undefined;
+    const height = typeof record.height === 'number' ? record.height : undefined;
+    if (Number.isFinite(width) && Number.isFinite(height)) {
+      return { width: Math.max(0, width), height: Math.max(0, height) };
+    }
+
+    const size = typeof record.size === 'number' ? record.size : undefined;
+    if (Number.isFinite(size)) {
+      const normalizedSize = Math.max(0, size);
+      return { width: normalizedSize, height: normalizedSize };
+    }
+
+    const radius = typeof record.radius === 'number' ? record.radius : undefined;
+    if (Number.isFinite(radius)) {
+      const diameter = Math.max(0, radius * 2);
+      return { width: diameter, height: diameter };
+    }
+
+    return null;
+  }
+
+  private applyAnchoredLayout(
+    referenceCurrentSize: Node2DLayoutSize,
+    referenceAuthoredSize?: Node2DLayoutSize
+  ): void {
+    this.ensureAuthoredLayoutSize();
+
+    const authoredSize = this.getAuthoredLayoutSize();
+    const authoredReference = this.normalizeReferenceSize(referenceAuthoredSize ?? referenceCurrentSize);
+    const currentReference = this.normalizeReferenceSize(referenceCurrentSize);
+
+    const resolvedHorizontal = this.resolveHorizontalLayout(
+      currentReference.width,
+      authoredReference.width,
+      this.authoredLayoutPosition.x,
+      authoredSize.width
+    );
+    const resolvedVertical = this.resolveVerticalLayout(
+      currentReference.height,
+      authoredReference.height,
+      this.authoredLayoutPosition.y,
+      authoredSize.height
+    );
+
+    this.position.set(resolvedHorizontal.center, resolvedVertical.center, this.position.z);
+    this.applyCurrentLayoutSize(resolvedHorizontal.size, resolvedVertical.size);
+  }
+
+  private normalizeReferenceSize(size: Node2DLayoutSize): Node2DLayoutSize {
+    return {
+      width: Math.max(1, size.width || 0),
+      height: Math.max(1, size.height || 0),
+    };
+  }
+
+  private resolveHorizontalLayout(
+    currentReferenceWidth: number,
+    authoredReferenceWidth: number,
+    authoredCenterX: number,
+    authoredWidth: number
+  ): { center: number; size: number } {
+    const safeAuthoredWidth = Math.max(0, authoredWidth);
+    const authoredLeft = authoredCenterX - safeAuthoredWidth / 2;
+    const authoredRight = authoredCenterX + safeAuthoredWidth / 2;
+    const leftMargin = authoredLeft + authoredReferenceWidth / 2;
+    const rightMargin = authoredReferenceWidth / 2 - authoredRight;
+
+    switch (this._horizontalAlign) {
+      case 'left': {
+        const left = -currentReferenceWidth / 2 + leftMargin;
+        return { center: left + safeAuthoredWidth / 2, size: safeAuthoredWidth };
+      }
+      case 'right': {
+        const right = currentReferenceWidth / 2 - rightMargin;
+        return { center: right - safeAuthoredWidth / 2, size: safeAuthoredWidth };
+      }
+      case 'stretch': {
+        const left = -currentReferenceWidth / 2 + leftMargin;
+        const right = currentReferenceWidth / 2 - rightMargin;
+        const size = Math.max(1, right - left);
+        return { center: (left + right) / 2, size };
+      }
+      default:
+        return { center: authoredCenterX, size: safeAuthoredWidth };
+    }
+  }
+
+  private resolveVerticalLayout(
+    currentReferenceHeight: number,
+    authoredReferenceHeight: number,
+    authoredCenterY: number,
+    authoredHeight: number
+  ): { center: number; size: number } {
+    const safeAuthoredHeight = Math.max(0, authoredHeight);
+    const authoredBottom = authoredCenterY - safeAuthoredHeight / 2;
+    const authoredTop = authoredCenterY + safeAuthoredHeight / 2;
+    const bottomMargin = authoredBottom + authoredReferenceHeight / 2;
+    const topMargin = authoredReferenceHeight / 2 - authoredTop;
+
+    switch (this._verticalAlign) {
+      case 'bottom': {
+        const bottom = -currentReferenceHeight / 2 + bottomMargin;
+        return { center: bottom + safeAuthoredHeight / 2, size: safeAuthoredHeight };
+      }
+      case 'top': {
+        const top = currentReferenceHeight / 2 - topMargin;
+        return { center: top - safeAuthoredHeight / 2, size: safeAuthoredHeight };
+      }
+      case 'stretch': {
+        const bottom = -currentReferenceHeight / 2 + bottomMargin;
+        const top = currentReferenceHeight / 2 - topMargin;
+        const size = Math.max(1, top - bottom);
+        return { center: (top + bottom) / 2, size };
+      }
+      default:
+        return { center: authoredCenterY, size: safeAuthoredHeight };
+    }
+  }
+
+  private applyCurrentLayoutSize(width: number, height: number): void {
+    const schema = getNodePropertySchema(this);
+    const widthProp = getPropertyDefinition(schema, 'width');
+    const heightProp = getPropertyDefinition(schema, 'height');
+
+    if (widthProp && heightProp) {
+      setNodePropertyValue(this, widthProp, width);
+      setNodePropertyValue(this, heightProp, height);
+      return;
+    }
+
+    const sizeProp = getPropertyDefinition(schema, 'size');
+    if (sizeProp) {
+      setNodePropertyValue(this, sizeProp, Math.max(width, height));
+      return;
+    }
+
+    const radiusProp = getPropertyDefinition(schema, 'radius');
+    if (radiusProp) {
+      setNodePropertyValue(this, radiusProp, Math.min(width, height) / 2);
+    }
+  }
+
+  private syncLayoutProperties(): void {
+    if (!this._layoutEnabled) {
+      delete this.properties.layout;
+      return;
+    }
+
+    this.properties.layout = {
+      enabled: true,
+      horizontalAlign: this._horizontalAlign,
+      verticalAlign: this._verticalAlign,
+    };
   }
 
   /**
@@ -282,6 +695,7 @@ export class Node2D extends NodeBase {
             const v = value as { x: number; y: number };
             n.position.x = v.x;
             n.position.y = v.y;
+            n.setAuthoredLayoutPosition(v.x, v.y);
           },
         },
         {
@@ -342,6 +756,49 @@ export class Node2D extends NodeBase {
             (node as Node2D).opacity = Number(value);
           },
         },
+        {
+          name: 'layoutEnabled',
+          type: 'boolean',
+          ui: {
+            label: 'Anchor',
+            description: 'Enable anchor-based layout for this 2D node',
+            group: 'Anchor',
+          },
+          getValue: (node: unknown) => (node as Node2D).layoutEnabled,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Node2D).layoutEnabled = Boolean(value);
+          },
+        },
+        {
+          name: 'horizontalAlign',
+          type: 'select',
+          ui: {
+            label: 'Horizontal',
+            description: 'Horizontal anchor mode',
+            group: 'Anchor',
+            options: ['left', 'center', 'right', 'stretch'],
+            readOnly: target => !(target instanceof Node2D) || !target.layoutEnabled,
+          },
+          getValue: (node: unknown) => (node as Node2D).horizontalAlign,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Node2D).horizontalAlign = value as Node2DHorizontalAlign;
+          },
+        },
+        {
+          name: 'verticalAlign',
+          type: 'select',
+          ui: {
+            label: 'Vertical',
+            description: 'Vertical anchor mode',
+            group: 'Anchor',
+            options: ['top', 'center', 'bottom', 'stretch'],
+            readOnly: target => !(target instanceof Node2D) || !target.layoutEnabled,
+          },
+          getValue: (node: unknown) => (node as Node2D).verticalAlign,
+          setValue: (node: unknown, value: unknown) => {
+            (node as Node2D).verticalAlign = value as Node2DVerticalAlign;
+          },
+        },
       ],
       groups: {
         ...baseSchema.groups,
@@ -353,6 +810,11 @@ export class Node2D extends NodeBase {
         Style: {
           label: 'Style',
           description: '2D visual styling properties',
+          expanded: false,
+        },
+        Anchor: {
+          label: 'Anchor',
+          description: 'Anchor-based layout relative to the containing frame',
           expanded: false,
         },
       },

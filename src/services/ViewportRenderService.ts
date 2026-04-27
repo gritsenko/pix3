@@ -1077,10 +1077,10 @@ export class ViewportRendererService {
       this.orthographicCamera.updateProjectionMatrix();
     }
 
-    // Trigger layout recalculation using adaptive camera dimensions so that
-    // anchored Group2D children align to the visible camera edges, not the
-    // fixed authoring canvas.
-    this.sceneManager.resizeRoot(cameraWidth, cameraHeight, true);
+    // Reflow root-anchored 2D nodes against the authored base viewport frame.
+    // The orthographic camera can expand beyond the yellow frame for previewing,
+    // but authored root anchors stay relative to the base frame itself.
+    this.sceneManager.resizeRoot(viewportBaseSize.width, viewportBaseSize.height, true);
 
     // Sync all 2D visuals after layout recalculation
     this.syncAll2DVisuals();
@@ -1089,6 +1089,10 @@ export class ViewportRendererService {
     // Trigger a single frame render to ensure the viewport is updated
     // even if rendering is currently paused (e.g. window unfocused).
     this.requestRender();
+  }
+
+  reflow2DLayout(): void {
+    this.resize(this.viewportSize.width || 1, this.viewportSize.height || 1);
   }
 
   /**

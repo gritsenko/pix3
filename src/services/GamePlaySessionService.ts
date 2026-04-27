@@ -225,7 +225,11 @@ export class GamePlaySessionService {
       this.sceneManager,
       renderer,
       this.audioService,
-      this.assetLoader
+      this.assetLoader,
+      {
+        width: appState.project.manifest?.viewportBaseSize?.width ?? 1920,
+        height: appState.project.manifest?.viewportBaseSize?.height ?? 1080,
+      }
     );
 
     this.renderer = renderer;

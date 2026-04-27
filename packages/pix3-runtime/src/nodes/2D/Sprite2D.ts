@@ -216,7 +216,7 @@ export class Sprite2D extends Node2D {
           name: 'anchor',
           type: 'vector2',
           ui: {
-            label: 'Anchor',
+            label: 'Pivot',
             description: 'Normalized pivot point used to position the sprite image',
             group: 'Sprite',
             step: 0.01,

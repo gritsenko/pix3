@@ -147,6 +147,12 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
         node.offsetMax.set(state.offsetMax.x, state.offsetMax.y);
       }
     }
+
+    node.captureAuthoredLayoutRectFromCurrent();
+    if (node.isContainer && (typeof state.width === 'number' || typeof state.height === 'number')) {
+      node.reflowAnchoredChildren();
+      this.captureAnchoredDescendantRects(node);
+    }
   }
 
   private isStateEqual(a: Transform2DState, b: Transform2DState): boolean {
@@ -218,5 +224,14 @@ export class Transform2DCompleteOperation implements Operation<OperationInvokeRe
     }
 
     return true;
+  }
+
+  private captureAnchoredDescendantRects(parent: Node2D): void {
+    for (const child of parent.children) {
+      if (child instanceof Node2D) {
+        child.captureAuthoredLayoutRectFromCurrent();
+        this.captureAnchoredDescendantRects(child);
+      }
+    }
   }
 }

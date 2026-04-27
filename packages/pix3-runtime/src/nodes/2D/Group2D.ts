@@ -545,6 +545,7 @@ export class Group2D extends Node2D {
           ui: {
             label: 'Anchor Min',
             group: 'Layout',
+            hidden: true,
             step: 0.01,
             precision: 2,
             min: 0,
@@ -566,6 +567,7 @@ export class Group2D extends Node2D {
           ui: {
             label: 'Anchor Max',
             group: 'Layout',
+            hidden: true,
             step: 0.01,
             precision: 2,
             min: 0,
@@ -587,6 +589,7 @@ export class Group2D extends Node2D {
           ui: {
             label: 'Offset Min',
             group: 'Layout',
+            hidden: true,
             step: 1,
             precision: 0,
           },
@@ -606,6 +609,7 @@ export class Group2D extends Node2D {
           ui: {
             label: 'Offset Max',
             group: 'Layout',
+            hidden: true,
             step: 1,
             precision: 0,
           },

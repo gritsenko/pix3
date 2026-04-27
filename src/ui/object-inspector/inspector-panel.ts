@@ -7,6 +7,7 @@ import {
   LAYOUT_PRESETS,
   type LayoutPreset,
   MeshInstance,
+  Node2D,
   Sprite2D,
 } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
@@ -1782,6 +1783,11 @@ export class InspectorPanel extends ComponentBase {
       return this.renderTransformGroup(label, visibleProps);
     }
 
+    // Special handling for Anchor group - compact toggle by default
+    if (groupName === 'Anchor' && this.primaryNode instanceof Node2D) {
+      return this.renderAnchorGroup(label, visibleProps);
+    }
+
     // Special handling for Layout group - render with presets
     if (groupName === 'Layout' && this.primaryNode instanceof Group2D) {
       return this.renderLayoutGroup(label, visibleProps);
@@ -1796,6 +1802,48 @@ export class InspectorPanel extends ComponentBase {
       <div class="property-group-section">
         <h4 class="group-title">${label}</h4>
         ${visibleProps.map(prop => this.renderPropertyInput(prop))}
+      </div>
+    `;
+  }
+
+  private renderAnchorGroup(label: string, props: PropertyDefinition[]) {
+    if (!this.primaryNode || !(this.primaryNode instanceof Node2D)) {
+      return '';
+    }
+
+    const enabled = this.propertyValues['layoutEnabled']?.value === 'true';
+    const toggleDisabled = appState.collaboration.isReadOnly;
+    const anchorProps = props.filter(prop => prop.name !== 'layoutEnabled');
+
+    const toggleButton = html`
+      <button
+        class=${`anchor-toggle-button ${enabled ? 'is-active' : ''}`}
+        type="button"
+        title=${enabled ? 'Disable anchor layout' : 'Enable anchor layout'}
+        aria-label=${enabled ? 'Disable anchor layout' : 'Enable anchor layout'}
+        ?disabled=${toggleDisabled}
+        @click=${() => this.applyPropertyChange('layoutEnabled', !enabled)}
+      >
+        ${this.iconService.getIcon('anchor', 14)}
+        <span>Anchor</span>
+      </button>
+    `;
+
+    if (!enabled) {
+      return html`
+        <div class="property-group-section anchor-section anchor-section--collapsed">
+          <div class="anchor-toggle-row">${toggleButton}</div>
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="property-group-section anchor-section anchor-section--expanded">
+        <div class="anchor-section-header">
+          <h4 class="group-title">${label}</h4>
+          ${toggleButton}
+        </div>
+        <div class="anchor-fields">${anchorProps.map(prop => this.renderPropertyInput(prop))}</div>
       </div>
     `;
   }
