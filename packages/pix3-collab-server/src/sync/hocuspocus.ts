@@ -1,7 +1,7 @@
-import { Server, Hocuspocus } from '@hocuspocus/server';
+import { Hocuspocus } from '@hocuspocus/server';
 import type { IncomingMessage } from 'node:http';
 import type { Socket } from 'node:net';
-import { SQLite } from '@hocuspocus/extension-sqlite';
+import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import { WebSocketServer } from 'ws';
@@ -10,6 +10,14 @@ import { config } from '../config.js';
 import { verifyToken } from '../core/auth/auth-middleware.js';
 import { getProjectByShareToken, getUserRole } from '../core/projects/projects-service.js';
 
+const CRDT_DOCUMENTS_SCHEMA_SQL = `
+  CREATE TABLE IF NOT EXISTS documents (
+    name TEXT PRIMARY KEY,
+    data BLOB NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  )
+`;
+
 export interface CollaborationServer {
   instance: Hocuspocus;
   handleUpgrade(request: IncomingMessage, socket: Socket, head: Buffer): Promise<void>;
@@ -17,18 +25,10 @@ export interface CollaborationServer {
 }
 
 export function createHocuspocusServer(): CollaborationServer {
-  // Ensure CRDT sqlite directory exists
-  const crdtDir = path.dirname(path.resolve(config.HOCUSPOCUS_DB_PATH));
-  fs.mkdirSync(crdtDir, { recursive: true });
+  const crdtDb = openCrdtDb();
 
-  const hocuspocus = Server.configure({
-    extensions: [
-      new SQLite({
-        database: config.HOCUSPOCUS_DB_PATH,
-      }),
-    ],
-
-    async onAuthenticate({ token, connection, documentName }) {
+  const hocuspocus = new Hocuspocus({
+    async onAuthenticate({ token, connectionConfig, documentName }) {
       // Document name format: project:{projectId}
       const projectId = documentName.replace(/^project:/, '');
 
@@ -38,7 +38,7 @@ export function createHocuspocusServer(): CollaborationServer {
           const payload = verifyToken(token);
           const role = getUserRole(projectId, payload.userId);
           if (role) {
-            connection.readOnly = role === 'viewer';
+            connectionConfig.readOnly = role === 'viewer';
             return { userId: payload.userId, role };
           }
         } catch {
@@ -48,7 +48,7 @@ export function createHocuspocusServer(): CollaborationServer {
         // Try as share token
         const project = getProjectByShareToken(token);
         if (project && project.id === projectId) {
-          connection.readOnly = true;
+          connectionConfig.readOnly = true;
           return { userId: 'guest', role: 'viewer' };
         }
       }
@@ -57,12 +57,15 @@ export function createHocuspocusServer(): CollaborationServer {
     },
 
     async onLoadDocument({ document, documentName }) {
+      loadStoredDocumentState(crdtDb, documentName, document);
+
       const projectId = documentName.replace(/^project:/, '');
       const projectDir = path.resolve(config.PROJECTS_STORAGE_DIR, projectId);
+      const scriptsMap = document.getMap('scripts');
 
-      // If the CRDT document already has data, skip loading from files
+      // If the CRDT document already has data, skip loading from files.
       const scenesMap = document.getMap<Y.Map<unknown>>('scenes');
-      if (scenesMap.size > 0) {
+      if (scenesMap.size > 0 || scriptsMap.size > 0) {
         return;
       }
 
@@ -77,10 +80,9 @@ export function createHocuspocusServer(): CollaborationServer {
       }
 
       // Load scripts
-      const scriptsMap = document.getMap('scripts');
       const scriptsDir = path.join(projectDir, 'scripts');
       if (fs.existsSync(scriptsDir)) {
-        loadScriptsRecursive(scriptsDir, scriptsDir, scriptsMap, document);
+        loadScriptsRecursive(scriptsDir, scriptsDir, scriptsMap);
       }
     },
 
@@ -127,6 +129,8 @@ export function createHocuspocusServer(): CollaborationServer {
         }
       }
       reconcileFiles(scriptsDir, scriptFilePaths, '.ts');
+
+      storeStoredDocumentState(crdtDb, documentName, document);
 
       console.log(`[pix3-collab] Persisted snapshot for ${documentName}`);
     },
@@ -179,7 +183,11 @@ export function createHocuspocusServer(): CollaborationServer {
 
       const documents = Array.from(hocuspocus.documents.values());
       await Promise.all(documents.map(document => hocuspocus.unloadDocument(document)));
-      await hocuspocus.hooks('onDestroy', { instance: hocuspocus });
+      try {
+        await hocuspocus.hooks('onDestroy', { instance: hocuspocus });
+      } finally {
+        crdtDb.close();
+      }
     },
   };
 }
@@ -187,14 +195,13 @@ export function createHocuspocusServer(): CollaborationServer {
 function loadScriptsRecursive(
   rootDir: string,
   currentDir: string,
-  scriptsMap: Y.Map<unknown>,
-  doc: Y.Doc
+  scriptsMap: Y.Map<unknown>
 ): void {
   const items = fs.readdirSync(currentDir, { withFileTypes: true });
   for (const item of items) {
     const fullPath = path.join(currentDir, item.name);
     if (item.isDirectory()) {
-      loadScriptsRecursive(rootDir, fullPath, scriptsMap, doc);
+      loadScriptsRecursive(rootDir, fullPath, scriptsMap);
     } else if (item.isFile() && item.name.endsWith('.ts')) {
       const relativePath = path.relative(rootDir, fullPath).split(path.sep).join('/');
       const content = fs.readFileSync(fullPath, 'utf-8');
@@ -259,4 +266,45 @@ function pruneEmptyDirectories(startDir: string, stopDir: string): void {
     fs.rmdirSync(currentDir);
     currentDir = path.dirname(currentDir);
   }
+}
+
+function openCrdtDb(): Database.Database {
+  const dbPath = path.resolve(config.HOCUSPOCUS_DB_PATH);
+  fs.mkdirSync(path.dirname(dbPath), { recursive: true });
+
+  const db = new Database(dbPath);
+  db.pragma('journal_mode = WAL');
+  db.exec(CRDT_DOCUMENTS_SCHEMA_SQL);
+  return db;
+}
+
+function loadStoredDocumentState(
+  db: Database.Database,
+  documentName: string,
+  document: Y.Doc
+): void {
+  const row = db
+    .prepare('SELECT data FROM documents WHERE name = ?')
+    .get(documentName) as { data: Buffer } | undefined;
+
+  if (row) {
+    Y.applyUpdate(document, row.data);
+  }
+}
+
+function storeStoredDocumentState(
+  db: Database.Database,
+  documentName: string,
+  document: Y.Doc
+): void {
+  const state = Buffer.from(Y.encodeStateAsUpdate(document));
+  db.prepare(
+    `
+      INSERT INTO documents (name, data, updated_at)
+      VALUES (?, ?, datetime('now'))
+      ON CONFLICT(name) DO UPDATE SET
+        data = excluded.data,
+        updated_at = excluded.updated_at
+    `
+  ).run(documentName, state);
 }

@@ -4,6 +4,8 @@
 
 Pix3 is a browser-based editor for building rich HTML5 scenes that combine 2D and 3D layers.
 
+The workspace targets Node.js 24.15.0 or newer within the Node 24 LTS line.
+
 ## Architecture Overview
 
 Pix3 employs an **operations-first architecture** where all state mutations are handled by `OperationService`. Actions are initiated via `CommandDispatcher`, which wraps operations. Core functionalities are provided by **injectable services** (`@injectable()`, `@inject()`). UI and metadata are managed by **Valtio reactive proxies** (`appState`), while **scene nodes are non-reactive** and owned by `SceneManager` in `SceneGraph` objects. The rendering is handled by a single **Three.js pipeline**. UI components extend `ComponentBase`, defaulting to **light DOM**. A **Property Schema System** dynamically renders UI in the Inspector based on node schemas.
@@ -54,6 +56,8 @@ cd packages/pix3-collab-server
 npm install
 npm run dev     # tsx watch src/server.ts
 ```
+
+Use Node.js 24.15.0+ when working in this repo.
 
 ## Frontend Collaboration Integration
 
