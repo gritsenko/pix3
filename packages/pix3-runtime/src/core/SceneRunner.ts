@@ -269,28 +269,32 @@ export class SceneRunner {
       this.viewportSize.height = cssHeight;
 
       // Compute adaptive logical camera dimensions (Expand / Match-Min mode).
-      // The Layout2D's authored size is the base resolution that must always
-      // fit entirely within the camera view.
-      let cameraWidth = cssWidth;
-      let cameraHeight = cssHeight;
+      // Use Layout2D authored size when present, otherwise fall back to the
+      // project/root authored viewport size so root Node2D scenes scale against
+      // the same reference frame.
+      let baseW = this.rootLayoutAuthoredSize.width;
+      let baseH = this.rootLayoutAuthoredSize.height;
 
       if (this.runtimeGraph) {
         const layout2d = this.runtimeGraph.rootNodes.find(
           (n): n is Layout2D => n instanceof Layout2D
         );
         if (layout2d && layout2d.width > 0 && layout2d.height > 0) {
-          const baseW = layout2d.width;
-          const baseH = layout2d.height;
-          const baseAspect = baseW / baseH;
-          const viewportAspect = cssWidth / cssHeight;
-          if (viewportAspect >= baseAspect) {
-            cameraHeight = baseH;
-            cameraWidth = cameraHeight * viewportAspect;
-          } else {
-            cameraWidth = baseW;
-            cameraHeight = cameraWidth / viewportAspect;
-          }
+          baseW = layout2d.width;
+          baseH = layout2d.height;
         }
+      }
+
+      const baseAspect = baseW / baseH;
+      const viewportAspect = cssWidth / cssHeight;
+      let cameraWidth = baseW;
+      let cameraHeight = baseH;
+      if (viewportAspect >= baseAspect) {
+        cameraHeight = baseH;
+        cameraWidth = cameraHeight * viewportAspect;
+      } else {
+        cameraWidth = baseW;
+        cameraHeight = cameraWidth / viewportAspect;
       }
 
       this.logicalCameraSize = { width: cameraWidth, height: cameraHeight };

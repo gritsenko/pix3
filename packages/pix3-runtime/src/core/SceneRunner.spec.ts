@@ -37,6 +37,39 @@ function createGraph(cameraNode: Camera3D): SceneGraph {
 }
 
 describe('SceneRunner camera projection updates', () => {
+  it('uses the project viewport base size for the 2D camera when no Layout2D exists', () => {
+    const renderer = createRendererStub(300, 150);
+    const runner = new SceneRunner(
+      createSceneManagerStub(),
+      renderer,
+      new AudioService(),
+      new AssetLoader(new ResourceManager('/'), new AudioService()),
+      { width: 1920, height: 1080 }
+    );
+    const cameraNode = new Camera3D({
+      id: 'runtime-perspective-base',
+      name: 'Camera',
+      projection: 'perspective',
+    });
+
+    (
+      runner as unknown as {
+        runtimeGraph: SceneGraph;
+        render: () => void;
+      }
+    ).runtimeGraph = createGraph(cameraNode);
+
+    (runner as unknown as { render: () => void }).render();
+
+    const overlayCamera = (
+      runner as unknown as { orthographicCamera: import('three').OrthographicCamera }
+    ).orthographicCamera;
+    expect(overlayCamera.left).toBe(-1080);
+    expect(overlayCamera.right).toBe(1080);
+    expect(overlayCamera.top).toBe(540);
+    expect(overlayCamera.bottom).toBe(-540);
+  });
+
   it('updates orthographic active camera bounds from viewport aspect and size', () => {
     const renderer = createRendererStub(300, 150);
     const runner = new SceneRunner(
