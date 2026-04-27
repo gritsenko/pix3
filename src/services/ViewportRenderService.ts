@@ -1328,6 +1328,23 @@ export class ViewportRendererService {
     return dpr / safeZoom;
   }
 
+  private get2DWorldUnitsPerCssPixel(): THREE.Vector2 | null {
+    if (!this.orthographicCamera) {
+      return null;
+    }
+
+    const { width, height } = this.viewportSize;
+    if (width <= 0 || height <= 0) {
+      return null;
+    }
+
+    const safeZoom = Math.max(0.0001, this.orthographicCamera.zoom || 1);
+    return new THREE.Vector2(
+      Math.abs(this.orthographicCamera.right - this.orthographicCamera.left) / (safeZoom * width),
+      Math.abs(this.orthographicCamera.top - this.orthographicCamera.bottom) / (safeZoom * height)
+    );
+  }
+
   private updateRectFrameEdges(
     frame: THREE.Group,
     width: number,
@@ -1375,7 +1392,6 @@ export class ViewportRendererService {
       }
     }
 
-    const safeZoom = Math.max(0.0001, zoom);
     for (const visualRoot of this.group2DVisuals.values()) {
       const sizeGroup = visualRoot.userData.sizeGroup as THREE.Group | undefined;
       if (!sizeGroup) {
@@ -1426,7 +1442,11 @@ export class ViewportRendererService {
     }
 
     if (this.selection2DOverlay) {
-      this.transformTool2d.updateHandlePositions(this.selection2DOverlay, safeZoom);
+      this.transformTool2d.updateHandlePositions(
+        this.selection2DOverlay,
+        this.orthographicCamera!,
+        this.viewportSize
+      );
     }
   }
 
@@ -1674,6 +1694,36 @@ export class ViewportRendererService {
   }
 
   /**
+   * Pan the 2D camera by a drag delta in CSS pixels.
+   * This path keeps direct-manipulation panning aligned with the pointer/finger.
+   */
+  pan2DByDrag(deltaX: number, deltaY: number): void {
+    if (
+      !this.orthographicControls ||
+      !this.orthographicCamera ||
+      appState.ui.navigationMode !== '2d'
+    ) {
+      return;
+    }
+
+    const worldUnitsPerCssPixel = this.get2DWorldUnitsPerCssPixel();
+    if (!worldUnitsPerCssPixel) {
+      return;
+    }
+
+    const right = new THREE.Vector3(1, 0, 0).applyQuaternion(this.orthographicCamera.quaternion);
+    const up = new THREE.Vector3(0, 1, 0).applyQuaternion(this.orthographicCamera.quaternion);
+    const panOffset = right
+      .multiplyScalar(deltaX * worldUnitsPerCssPixel.x)
+      .add(up.multiplyScalar(-deltaY * worldUnitsPerCssPixel.y));
+
+    this.orthographicCamera.position.add(panOffset);
+    this.orthographicControls.target.add(panOffset);
+    this.panVelocity.x = panOffset.x;
+    this.panVelocity.y = panOffset.y;
+  }
+
+  /**
    * Zoom the 2D camera by the given factor (multiplied into current zoom).
    * Only active in 2D mode.
    */
@@ -1691,6 +1741,38 @@ export class ViewportRendererService {
     if (this.selection2DOverlay) {
       this.refreshGizmoPositions();
     }
+
+    this.saveZoomToState();
+  }
+
+  zoom2DAroundPoint(factor: number, screenX: number, screenY: number): void {
+    if (!this.orthographicCamera || appState.ui.navigationMode !== '2d') {
+      return;
+    }
+
+    const anchorBeforeZoom = this.screenToWorld2D(screenX, screenY);
+    if (!anchorBeforeZoom) {
+      this.zoom2D(factor);
+      return;
+    }
+
+    const newZoom = Math.max(0.1, this.orthographicCamera.zoom * factor);
+    this.orthographicCamera.zoom = newZoom;
+    this.orthographicCamera.updateProjectionMatrix();
+
+    const anchorAfterZoom = this.screenToWorld2D(screenX, screenY);
+    if (anchorAfterZoom) {
+      const anchorDelta = anchorBeforeZoom.sub(anchorAfterZoom);
+      this.orthographicCamera.position.add(anchorDelta);
+      this.orthographicControls?.target.add(anchorDelta);
+    }
+
+    this.sync2DServiceFrameThickness();
+    if (this.selection2DOverlay) {
+      this.refreshGizmoPositions();
+    }
+
+    this.saveZoomToState();
   }
 
   /**
@@ -1716,37 +1798,67 @@ export class ViewportRendererService {
     if (this.selection2DOverlay) {
       this.refreshGizmoPositions();
     }
+
+    this.saveZoomToState();
   }
 
   /**
-   * Save current 2D zoom to app state for persistence.
+   * Save current 2D camera state to app state for persistence.
    */
   saveZoomToState(): void {
     const sceneId = appState.scenes.activeSceneId;
     if (!sceneId) return;
 
-    const currentZoom = this.getZoom2D();
-    const cameraState = appState.scenes.cameraStates[sceneId] ?? {
-      position: { x: 0, y: 0, z: 0 },
-      target: { x: 0, y: 0, z: 0 },
-    };
+    if (!this.orthographicCamera || !this.orthographicControls) {
+      return;
+    }
 
     appState.scenes.cameraStates[sceneId] = {
-      ...cameraState,
-      zoom: currentZoom,
+      position: {
+        x: this.orthographicCamera.position.x,
+        y: this.orthographicCamera.position.y,
+        z: this.orthographicCamera.position.z,
+      },
+      target: {
+        x: this.orthographicControls.target.x,
+        y: this.orthographicControls.target.y,
+        z: this.orthographicControls.target.z,
+      },
+      zoom: this.getZoom2D(),
     };
   }
 
   /**
-   * Restore 2D zoom from app state.
+   * Restore 2D camera state from app state.
    */
   restoreZoomFromState(): void {
     const sceneId = appState.scenes.activeSceneId;
-    if (!sceneId) return;
+    if (!sceneId || !this.orthographicCamera || !this.orthographicControls) return;
 
     const cameraState = appState.scenes.cameraStates[sceneId];
-    if (cameraState?.zoom) {
+    if (!cameraState) {
+      return;
+    }
+
+    this.orthographicCamera.position.set(
+      cameraState.position.x,
+      cameraState.position.y,
+      cameraState.position.z
+    );
+    this.orthographicControls.target.set(
+      cameraState.target.x,
+      cameraState.target.y,
+      cameraState.target.z
+    );
+
+    if (typeof cameraState.zoom === 'number') {
       this.setZoom2D(cameraState.zoom);
+      return;
+    }
+
+    this.sync2DServiceFrameThickness();
+    if (this.selection2DOverlay) {
+      this.refreshGizmoPositions();
     }
   }
 
@@ -4584,6 +4696,19 @@ export class ViewportRendererService {
     const { width, height } = this.viewportSize;
     if (width <= 0 || height <= 0) return null;
     return new THREE.Vector2((screenX / width) * 2 - 1, -(screenY / height) * 2 + 1);
+  }
+
+  private screenToWorld2D(screenX: number, screenY: number): THREE.Vector3 | null {
+    if (!this.orthographicCamera) {
+      return null;
+    }
+
+    const ndc = this.toNdc(screenX, screenY);
+    if (!ndc) {
+      return null;
+    }
+
+    return new THREE.Vector3(ndc.x, ndc.y, 0).unproject(this.orthographicCamera);
   }
 
   private get2DVisual(node: Node2D): THREE.Object3D | undefined {

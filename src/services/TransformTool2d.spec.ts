@@ -21,6 +21,41 @@ import { Vector2 } from 'three';
 describe('TransformTool2d', () => {
   let tool: TransformTool2d;
 
+  const createCamera = (): THREE.OrthographicCamera => {
+    const camera = new THREE.OrthographicCamera(-400, 400, 300, -300, 0.1, 1000);
+    camera.position.z = 100;
+    camera.updateProjectionMatrix();
+    return camera;
+  };
+
+  const toScreen = (
+    world: THREE.Vector3,
+    camera: THREE.OrthographicCamera,
+    viewportSize: { width: number; height: number }
+  ) => {
+    const projected = world.clone().project(camera);
+    return {
+      x: ((projected.x + 1) / 2) * viewportSize.width,
+      y: ((1 - projected.y) / 2) * viewportSize.height,
+    };
+  };
+
+  const measureScreenSize = (
+    object: THREE.Object3D,
+    camera: THREE.OrthographicCamera,
+    viewportSize: { width: number; height: number }
+  ) => {
+    const bounds = new THREE.Box3().setFromObject(object);
+    const visibleWorldWidth = Math.abs(camera.right - camera.left) / Math.max(0.0001, camera.zoom);
+    const visibleWorldHeight =
+      Math.abs(camera.top - camera.bottom) / Math.max(0.0001, camera.zoom);
+
+    return {
+      width: ((bounds.max.x - bounds.min.x) / visibleWorldWidth) * viewportSize.width,
+      height: ((bounds.max.y - bounds.min.y) / visibleWorldHeight) * viewportSize.height,
+    };
+  };
+
   beforeEach(() => {
     tool = new TransformTool2d();
     // Mock window.devicePixelRatio
@@ -50,7 +85,7 @@ describe('TransformTool2d', () => {
 
       const frame = tool.createFrame(bounds);
 
-      expect(frame).toBeInstanceOf(THREE.LineSegments);
+      expect(frame).toBeInstanceOf(THREE.Group);
       expect(frame.userData.is2DFrame).toBe(true);
       expect(frame.renderOrder).toBe(1000);
     });
@@ -115,9 +150,7 @@ describe('TransformTool2d', () => {
     beforeEach(() => {
       const bounds = new THREE.Box3(new THREE.Vector3(100, 100, 0), new THREE.Vector3(200, 200, 0));
 
-      camera = new THREE.OrthographicCamera(-400, 400, 300, -300, 0.1, 1000);
-      camera.position.z = 100;
-      camera.updateProjectionMatrix();
+      camera = createCamera();
 
       overlay = {
         group: new THREE.Group(),
@@ -206,14 +239,9 @@ describe('TransformTool2d', () => {
 
   describe('hover state', () => {
     let overlay: Selection2DOverlay;
-    let camera: THREE.OrthographicCamera;
 
     beforeEach(() => {
       const bounds = new THREE.Box3(new THREE.Vector3(0, 0, 0), new THREE.Vector3(100, 100, 0));
-
-      camera = new THREE.OrthographicCamera(-400, 400, 300, -300, 0.1, 1000);
-      camera.position.z = 100;
-      camera.updateProjectionMatrix();
 
       overlay = {
         group: new THREE.Group(),
@@ -237,15 +265,77 @@ describe('TransformTool2d', () => {
     });
   });
 
-  describe('axis-constrained move', () => {
+  describe('zoom-invariant handle sizing', () => {
     const viewportSize = { width: 800, height: 600 };
 
-    const createCamera = (): THREE.OrthographicCamera => {
-      const camera = new THREE.OrthographicCamera(-400, 400, 300, -300, 0.1, 1000);
-      camera.position.z = 100;
-      camera.updateProjectionMatrix();
-      return camera;
+    const createOverlay = (): Selection2DOverlay => {
+      const bounds = new THREE.Box3(new THREE.Vector3(100, 100, 0), new THREE.Vector3(200, 200, 0));
+      const overlay: Selection2DOverlay = {
+        group: new THREE.Group(),
+        handles: tool.createHandles(bounds),
+        frame: tool.createFrame(bounds),
+        nodeIds: ['test-node'],
+        combinedBounds: bounds,
+        centerWorld: new THREE.Vector3(150, 150, 0),
+      };
+
+      overlay.group.add(overlay.frame, ...overlay.handles);
+      return overlay;
     };
+
+    it('keeps resize handles at a constant screen size across zoom levels', () => {
+      const overlay = createOverlay();
+      const handle = overlay.handles.find(item => item.userData?.handleType === 'scale-ne');
+
+      expect(handle).toBeDefined();
+
+      const zoomedOutCamera = createCamera();
+      zoomedOutCamera.zoom = 0.5;
+      zoomedOutCamera.updateProjectionMatrix();
+      tool.updateHandlePositions(overlay, zoomedOutCamera, viewportSize);
+      overlay.group.updateMatrixWorld(true);
+      const zoomedOutSize = measureScreenSize(handle!, zoomedOutCamera, viewportSize);
+
+      const zoomedInCamera = createCamera();
+      zoomedInCamera.zoom = 2;
+      zoomedInCamera.updateProjectionMatrix();
+      tool.updateHandlePositions(overlay, zoomedInCamera, viewportSize);
+      overlay.group.updateMatrixWorld(true);
+      const zoomedInSize = measureScreenSize(handle!, zoomedInCamera, viewportSize);
+
+      expect(zoomedOutSize.width).toBeCloseTo(zoomedInSize.width, 5);
+      expect(zoomedOutSize.height).toBeCloseTo(zoomedInSize.height, 5);
+    });
+
+    it('keeps handle hit area constant across zoom levels', () => {
+      const overlay = createOverlay();
+      const rotateHandle = overlay.handles.find(item => item.userData?.handleType === 'rotate');
+
+      expect(rotateHandle).toBeDefined();
+
+      for (const zoom of [0.5, 2]) {
+        const camera = createCamera();
+        camera.zoom = zoom;
+        camera.updateProjectionMatrix();
+
+        tool.updateHandlePositions(overlay, camera, viewportSize);
+        overlay.group.updateMatrixWorld(true);
+
+        const handleCenter = rotateHandle!.getWorldPosition(new THREE.Vector3());
+        const centerScreen = toScreen(handleCenter, camera, viewportSize);
+
+        expect(tool.getHandleAt(centerScreen.x + 6, centerScreen.y, overlay, camera, viewportSize)).toBe(
+          'rotate'
+        );
+        expect(tool.getHandleAt(centerScreen.x + 8, centerScreen.y, overlay, camera, viewportSize)).toBe(
+          'idle'
+        );
+      }
+    });
+  });
+
+  describe('axis-constrained move', () => {
+    const viewportSize = { width: 800, height: 600 };
 
     const toScreen = (worldX: number, worldY: number) => ({
       x: worldX + 400,

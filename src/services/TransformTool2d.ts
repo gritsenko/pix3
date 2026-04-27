@@ -162,7 +162,39 @@ export class TransformTool2d {
     return typeof window !== 'undefined' && window.devicePixelRatio ? window.devicePixelRatio : 1;
   }
 
-  private getMin2DSizeWorldPx(): number {
+  private getWorldUnitsPerCssPixel(
+    orthographicCamera: THREE.OrthographicCamera,
+    viewportSize: { width: number; height: number }
+  ): THREE.Vector2 {
+    const safeZoom = Math.max(0.0001, orthographicCamera.zoom || 1);
+    const safeViewportWidth = Math.max(1, viewportSize.width);
+    const safeViewportHeight = Math.max(1, viewportSize.height);
+    const visibleWorldWidth =
+      Math.abs(orthographicCamera.right - orthographicCamera.left) / safeZoom;
+    const visibleWorldHeight =
+      Math.abs(orthographicCamera.top - orthographicCamera.bottom) / safeZoom;
+
+    return new THREE.Vector2(
+      visibleWorldWidth / safeViewportWidth,
+      visibleWorldHeight / safeViewportHeight
+    );
+  }
+
+  private getMin2DSizeWorldPx(
+    orthographicCamera?: THREE.OrthographicCamera,
+    viewportSize?: { width: number; height: number }
+  ): number {
+    if (orthographicCamera && viewportSize) {
+      const worldUnitsPerCssPixel = this.getWorldUnitsPerCssPixel(
+        orthographicCamera,
+        viewportSize
+      );
+      return Math.max(
+        this.min2DSizeCssPx * worldUnitsPerCssPixel.x,
+        this.min2DSizeCssPx * worldUnitsPerCssPixel.y
+      );
+    }
+
     return this.min2DSizeCssPx * this.getDpr();
   }
 
@@ -173,6 +205,28 @@ export class TransformTool2d {
   private getFrameThicknessWorldPx(zoom: number): number {
     const safeZoom = Math.max(0.0001, zoom);
     return (this.frameWidthCssPx * this.getDpr()) / safeZoom;
+  }
+
+  private getHandleWorldSize(
+    orthographicCamera: THREE.OrthographicCamera,
+    viewportSize: { width: number; height: number }
+  ): THREE.Vector2 {
+    const worldUnitsPerCssPixel = this.getWorldUnitsPerCssPixel(orthographicCamera, viewportSize);
+    return new THREE.Vector2(
+      this.handleSizeCssPx * worldUnitsPerCssPixel.x,
+      this.handleSizeCssPx * worldUnitsPerCssPixel.y
+    );
+  }
+
+  private getFrameThicknessWorldSize(
+    orthographicCamera: THREE.OrthographicCamera,
+    viewportSize: { width: number; height: number }
+  ): THREE.Vector2 {
+    const worldUnitsPerCssPixel = this.getWorldUnitsPerCssPixel(orthographicCamera, viewportSize);
+    return new THREE.Vector2(
+      this.frameWidthCssPx * worldUnitsPerCssPixel.x,
+      this.frameWidthCssPx * worldUnitsPerCssPixel.y
+    );
   }
 
   /**
@@ -421,7 +475,11 @@ export class TransformTool2d {
   /**
    * Update the positions of handles when selection bounds change
    */
-  updateHandlePositions(overlay: Selection2DOverlay, zoom = 1): void {
+  updateHandlePositions(
+    overlay: Selection2DOverlay,
+    orthographicCamera: THREE.OrthographicCamera,
+    viewportSize: { width: number; height: number }
+  ): void {
     const bounds = overlay.combinedBounds;
     const min = bounds.min;
     const max = bounds.max;
@@ -434,7 +492,9 @@ export class TransformTool2d {
     const midY = (min.y + max.y) / 2;
     const center = bounds.getCenter(new THREE.Vector3());
 
-    const thickness = this.getFrameThicknessWorldPx(zoom);
+    const frameThickness = this.getFrameThicknessWorldSize(orthographicCamera, viewportSize);
+    const handleSize = this.getHandleWorldSize(orthographicCamera, viewportSize);
+    const handleBaseSize = Math.max(0.0001, this.getHandleSizeWorldPx());
 
     // Update frame edges
     overlay.frame.position.set(centerX, centerY, z);
@@ -442,23 +502,23 @@ export class TransformTool2d {
       if (child instanceof THREE.Mesh) {
         const edge = child.userData.edge as 'top' | 'bottom' | 'left' | 'right' | undefined;
         if (edge === 'top') {
-          child.position.set(0, height / 2 - thickness / 2, 0);
-          child.scale.set(width, thickness, 1);
+          child.position.set(0, height / 2 - frameThickness.y / 2, 0);
+          child.scale.set(width, frameThickness.y, 1);
         } else if (edge === 'bottom') {
-          child.position.set(0, -height / 2 + thickness / 2, 0);
-          child.scale.set(width, thickness, 1);
+          child.position.set(0, -height / 2 + frameThickness.y / 2, 0);
+          child.scale.set(width, frameThickness.y, 1);
         } else if (edge === 'left') {
-          child.position.set(-width / 2 + thickness / 2, 0, 0);
-          child.scale.set(thickness, height, 1);
+          child.position.set(-width / 2 + frameThickness.x / 2, 0, 0);
+          child.scale.set(frameThickness.x, height, 1);
         } else if (edge === 'right') {
-          child.position.set(width / 2 - thickness / 2, 0, 0);
-          child.scale.set(thickness, height, 1);
+          child.position.set(width / 2 - frameThickness.x / 2, 0, 0);
+          child.scale.set(frameThickness.x, height, 1);
         }
       }
     });
 
     // Fixed rotation handle offset (3x handle size for consistent distance)
-    const rotationOffset = this.getHandleSizeWorldPx() * 3;
+    const rotationOffset = handleSize.y * 3;
 
     const handlePositions: Record<string, THREE.Vector3> = {
       'scale-nw': new THREE.Vector3(min.x, max.y, z),
@@ -488,7 +548,7 @@ export class TransformTool2d {
         handle.position.set(0, 0, 0);
       }
       if (handle instanceof THREE.Group || handle instanceof THREE.Mesh) {
-        handle.scale.setScalar(1 / Math.max(0.0001, zoom));
+        handle.scale.set(handleSize.x / handleBaseSize, handleSize.y / handleBaseSize, 1);
       }
     }
 
@@ -511,11 +571,11 @@ export class TransformTool2d {
       return 'idle';
     }
 
-    // Handle effective half-size in world units, accounting for zoom.
-    // Handles are counter-scaled by 1/zoom, so their world extent is handleSize/zoom.
-    const zoom = orthographicCamera.zoom || 1;
-    const hitHalfSize =
-      ((this.handleSizeCssPx + this.handleHitMarginCssPx) * this.getDpr()) / zoom / 2;
+    const worldUnitsPerCssPixel = this.getWorldUnitsPerCssPixel(orthographicCamera, viewportSize);
+    const hitHalfWidth =
+      ((this.handleSizeCssPx + this.handleHitMarginCssPx) * worldUnitsPerCssPixel.x) / 2;
+    const hitHalfHeight =
+      ((this.handleSizeCssPx + this.handleHitMarginCssPx) * worldUnitsPerCssPixel.y) / 2;
 
     // Test each handle position (prefer specific handles over 'move')
     let bestHandle: TwoDHandle = 'idle';
@@ -537,7 +597,7 @@ export class TransformTool2d {
       const dx = Math.abs(point.x - handleWorldPos.x);
       const dy = Math.abs(point.y - handleWorldPos.y);
 
-      if (dx <= hitHalfSize && dy <= hitHalfSize) {
+      if (dx <= hitHalfWidth && dy <= hitHalfHeight) {
         const dist = dx + dy; // Manhattan distance for tie-breaking
         if (dist < bestDist) {
           bestDist = dist;
@@ -763,7 +823,7 @@ export class TransformTool2d {
       let width = startSize.x;
       let height = startSize.y;
 
-      const minSize = this.getMin2DSizeWorldPx();
+      const minSize = this.getMin2DSizeWorldPx(orthographicCamera, viewportSize);
 
       const affectsX =
         handle === 'scale-e' ||

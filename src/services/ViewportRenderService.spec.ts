@@ -359,6 +359,85 @@ describe('ViewportRendererService', () => {
     expect(orthographicCamera.zoom).toBe(1);
   });
 
+  it('maps drag pan deltas to exact 2D world offsets', () => {
+    resetAppState();
+    appState.ui.navigationMode = '2d';
+
+    const service = new ViewportRendererService();
+    const orthographicCamera = new THREE.OrthographicCamera(-1000, 1000, 500, -500, 0.1, 1000);
+    orthographicCamera.position.set(10, 20, 100);
+    orthographicCamera.zoom = 2;
+    const orthographicControls = {
+      target: new THREE.Vector3(3, 4, 0),
+    };
+
+    Object.defineProperty(service, 'orthographicCamera', {
+      value: orthographicCamera,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'orthographicControls', {
+      value: orthographicControls,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'viewportSize', {
+      value: { width: 500, height: 250 },
+      configurable: true,
+    });
+
+    service.pan2DByDrag(40, 30);
+
+    expect(orthographicCamera.position.x).toBeCloseTo(90);
+    expect(orthographicCamera.position.y).toBeCloseTo(-40);
+    expect(orthographicControls.target.x).toBeCloseTo(83);
+    expect(orthographicControls.target.y).toBeCloseTo(-56);
+  });
+
+  it('persists and restores the full 2D camera state after direct zoom changes', () => {
+    resetAppState();
+    appState.ui.navigationMode = '2d';
+    appState.scenes.activeSceneId = 'scene-2d';
+
+    const service = new ViewportRendererService();
+    const orthographicCamera = new THREE.OrthographicCamera(-960, 960, 540, -540, 0.1, 1000);
+    orthographicCamera.position.set(140, -80, 100);
+    orthographicCamera.zoom = 1.75;
+    const orthographicControls = {
+      target: new THREE.Vector3(140, -80, 0),
+    };
+
+    Object.defineProperty(service, 'orthographicCamera', {
+      value: orthographicCamera,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'orthographicControls', {
+      value: orthographicControls,
+      configurable: true,
+    });
+    Object.defineProperty(service, 'viewportSize', {
+      value: { width: 1280, height: 720 },
+      configurable: true,
+    });
+
+    service.zoom2D(1.2);
+
+    const savedState = appState.scenes.cameraStates['scene-2d'];
+    expect(savedState?.zoom).toBeCloseTo(2.1);
+    expect(savedState?.position.x).toBeCloseTo(140);
+    expect(savedState?.position.y).toBeCloseTo(-80);
+
+    orthographicCamera.position.set(-25, 60, 100);
+    orthographicControls.target.set(-25, 60, 0);
+    orthographicCamera.zoom = 1;
+
+    service.restoreZoomFromState();
+
+    expect(orthographicCamera.position.x).toBeCloseTo(140);
+    expect(orthographicCamera.position.y).toBeCloseTo(-80);
+    expect(orthographicControls.target.x).toBeCloseTo(140);
+    expect(orthographicControls.target.y).toBeCloseTo(-80);
+    expect(orthographicCamera.zoom).toBeCloseTo(2.1);
+  });
+
   it('ticks previewable components in editor mode', () => {
     resetAppState();
     appState.ui.isPlaying = false;

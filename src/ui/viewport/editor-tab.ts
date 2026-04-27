@@ -67,6 +67,8 @@ export class EditorTabComponent extends ComponentBase {
   private pointerDownPos?: { x: number; y: number };
   private pointerDownTime?: number;
   private isDragging = false;
+  private touchGestureInProgress = false;
+  private singleTouchPanPointerId: number | null = null;
   private readonly dragThreshold = 5;
   private wheelCanvas?: HTMLCanvasElement;
 
@@ -114,6 +116,7 @@ export class EditorTabComponent extends ComponentBase {
     this.addEventListener('pointerdown', this.handleCanvasPointerDown);
     this.addEventListener('pointermove', this.handleCanvasPointerMove);
     this.addEventListener('pointerup', this.handleCanvasPointerUp);
+    this.addEventListener('pointercancel', this.handleCanvasPointerCancel);
 
     // Re-observe canvas host if it exists (handles reconnection/reparenting by Golden Layout)
     if (this.canvasHost) {
@@ -142,6 +145,9 @@ export class EditorTabComponent extends ComponentBase {
     this.removeEventListener('pointerdown', this.handleCanvasPointerDown);
     this.removeEventListener('pointermove', this.handleCanvasPointerMove);
     this.removeEventListener('pointerup', this.handleCanvasPointerUp);
+    this.removeEventListener('pointercancel', this.handleCanvasPointerCancel);
+    this.navigation2D.clearTouchState();
+    this.singleTouchPanPointerId = null;
     super.disconnectedCallback();
   }
 
@@ -375,29 +381,57 @@ export class EditorTabComponent extends ComponentBase {
       );
     if (isToolbar) return;
 
+    const canvas = this.viewportRenderer.getCanvasElement();
+    const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
+    const screenX = event.clientX - rect.left;
+    const screenY = event.clientY - rect.top;
+    const handleType = this.viewportRenderer.get2DHandleAt?.(screenX, screenY) ?? 'idle';
+    const shouldStartSingleTouchPan =
+      event.pointerType === 'touch' &&
+      this.shouldStartSingleTouchPan(handleType, screenX, screenY, canvas, rect);
+
+    if (event.pointerType === 'touch' && appState.ui.navigationMode === '2d') {
+      this.capturePointerSafely(event.pointerId);
+
+      if (this.singleTouchPanPointerId !== null && this.singleTouchPanPointerId !== event.pointerId) {
+        this.navigation2D.endPan();
+        this.singleTouchPanPointerId = null;
+      }
+
+      if (!this.viewportRenderer.has2DTransform?.()) {
+        this.navigation2D.startTouchPointer(event.pointerId, screenX, screenY);
+      }
+
+      if (this.navigation2D.isTouchGestureActive()) {
+        this.navigation2D.endPan();
+        this.singleTouchPanPointerId = null;
+        this.touchGestureInProgress = true;
+        this.clearPointerInteraction();
+        this.isDragging = true;
+        return;
+      }
+    }
+
     // Handle right-click pan in 2D mode
     if (event.button === 2 && appState.ui.navigationMode === '2d') {
-      const canvas = this.viewportRenderer.getCanvasElement();
-      const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
-      const screenX = event.clientX - rect.left;
-      const screenY = event.clientY - rect.top;
       this.navigation2D.startPan(event.pointerId, screenX, screenY);
       this.isDragging = true;
       return;
     }
 
-    const canvas = this.viewportRenderer.getCanvasElement();
-    const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
-    const screenX = event.clientX - rect.left;
-    const screenY = event.clientY - rect.top;
-
-    const handleType = this.viewportRenderer.get2DHandleAt?.(screenX, screenY);
     if (handleType && handleType !== 'idle') {
       this.viewportRenderer.start2DTransform?.(screenX, screenY, handleType);
       this.pointerDownPos = { x: event.clientX, y: event.clientY };
       this.pointerDownTime = Date.now();
       this.isDragging = true;
       return;
+    }
+
+    if (shouldStartSingleTouchPan) {
+      this.navigation2D.startPan(event.pointerId, screenX, screenY);
+      this.singleTouchPanPointerId = event.pointerId;
+    } else if (event.pointerType === 'touch') {
+      this.singleTouchPanPointerId = null;
     }
 
     this.pointerDownPos = { x: event.clientX, y: event.clientY };
@@ -408,22 +442,53 @@ export class EditorTabComponent extends ComponentBase {
   private handleCanvasPointerMove = (event: PointerEvent): void => {
     if (appState.tabs.activeTabId !== this.tabId) return;
 
+    const canvas = this.viewportRenderer.getCanvasElement();
+    const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
+    const screenX = event.clientX - rect.left;
+    const screenY = event.clientY - rect.top;
+
+    if (
+      event.pointerType === 'touch' &&
+      appState.ui.navigationMode === '2d' &&
+      this.navigation2D.isTouchPointerTracked(event.pointerId)
+    ) {
+      const didUpdateGesture = this.navigation2D.updateTouchPointer(event.pointerId, screenX, screenY);
+      if (didUpdateGesture) {
+        this.touchGestureInProgress = true;
+        this.clearPointerInteraction();
+        this.isDragging = true;
+        return;
+      }
+
+      if (this.touchGestureInProgress || this.navigation2D.isTouchGestureActive()) {
+        return;
+      }
+    }
+
+    if (
+      event.pointerType === 'touch' &&
+      appState.ui.navigationMode === '2d' &&
+      this.singleTouchPanPointerId === event.pointerId
+    ) {
+      const dx = event.clientX - (this.pointerDownPos?.x ?? event.clientX);
+      const dy = event.clientY - (this.pointerDownPos?.y ?? event.clientY);
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance > this.dragThreshold) {
+        this.navigation2D.updateTouchPan(screenX, screenY);
+        this.isDragging = true;
+      }
+      return;
+    }
+
     // Handle right-click pan in 2D mode
     if (event.buttons === 2 && appState.ui.navigationMode === '2d') {
-      const canvas = this.viewportRenderer.getCanvasElement();
-      const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
-      const screenX = event.clientX - rect.left;
-      const screenY = event.clientY - rect.top;
       this.navigation2D.updatePan(screenX, screenY);
       this.isDragging = true;
       return;
     }
 
     if (!this.pointerDownPos || !this.pointerDownTime) {
-      const canvas = this.viewportRenderer.getCanvasElement();
-      const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
-      const screenX = event.clientX - rect.left;
-      const screenY = event.clientY - rect.top;
       this.viewportRenderer.updateHandleHover?.(screenX, screenY);
       this.viewportRenderer.update2DHoverPreview?.(screenX, screenY);
       return;
@@ -431,10 +496,6 @@ export class EditorTabComponent extends ComponentBase {
 
     const has2DTransform = this.viewportRenderer.has2DTransform?.();
     if (has2DTransform) {
-      const canvas = this.viewportRenderer.getCanvasElement();
-      const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
-      const screenX = event.clientX - rect.left;
-      const screenY = event.clientY - rect.top;
       this.viewportRenderer.update2DTransform?.(screenX, screenY, {
         preserveAspectRatio: event.shiftKey,
         constrainMoveToAxis: event.shiftKey,
@@ -453,6 +514,31 @@ export class EditorTabComponent extends ComponentBase {
 
   private handleCanvasPointerUp = (event: PointerEvent): void => {
     if (appState.tabs.activeTabId !== this.tabId) return;
+
+    if (event.pointerType === 'touch') {
+      this.releasePointerSafely(event.pointerId);
+
+      if (this.singleTouchPanPointerId === event.pointerId) {
+        this.navigation2D.endPan();
+        this.singleTouchPanPointerId = null;
+      }
+
+      const touchGestureWasActive =
+        this.touchGestureInProgress || this.navigation2D.isTouchGestureActive();
+      const hadTrackedTouch = this.navigation2D.endTouchPointer(event.pointerId);
+
+      if (touchGestureWasActive) {
+        this.clearPointerInteraction();
+        this.touchGestureInProgress = this.navigation2D.isTouchGestureActive();
+        return;
+      }
+
+      if (hadTrackedTouch && this.navigation2D.isTouchGestureActive()) {
+        this.touchGestureInProgress = true;
+        this.clearPointerInteraction();
+        return;
+      }
+    }
 
     // End right-click pan if active
     if (event.button === 2 && appState.ui.navigationMode === '2d') {
@@ -513,6 +599,73 @@ export class EditorTabComponent extends ComponentBase {
     this.pointerDownTime = undefined;
     this.isDragging = false;
   };
+
+  private handleCanvasPointerCancel = (event: PointerEvent): void => {
+    if (appState.tabs.activeTabId !== this.tabId) return;
+
+    if (event.pointerType === 'touch') {
+      this.releasePointerSafely(event.pointerId);
+      if (this.singleTouchPanPointerId === event.pointerId) {
+        this.navigation2D.endPan();
+        this.singleTouchPanPointerId = null;
+      }
+      this.navigation2D.endTouchPointer(event.pointerId);
+      this.touchGestureInProgress = this.navigation2D.isTouchGestureActive();
+    }
+
+    if (event.button === 2 && appState.ui.navigationMode === '2d') {
+      this.navigation2D.endPan();
+    }
+
+    this.clearPointerInteraction();
+  };
+
+  private clearPointerInteraction(): void {
+    this.pointerDownPos = undefined;
+    this.pointerDownTime = undefined;
+    this.isDragging = false;
+  }
+
+  private shouldStartSingleTouchPan(
+    handleType: string,
+    screenX: number,
+    screenY: number,
+    canvas: HTMLCanvasElement | undefined,
+    rect: DOMRect
+  ): boolean {
+    if (appState.ui.navigationMode !== '2d' || handleType !== 'idle') {
+      return false;
+    }
+
+    if (appState.selection.nodeIds.length === 0) {
+      return true;
+    }
+
+    if (!canvas || rect.width <= 0 || rect.height <= 0) {
+      return false;
+    }
+
+    const hitNode = this.viewportRenderer.raycastObject(screenX / rect.width, screenY / rect.height);
+    return !hitNode;
+  }
+
+  private capturePointerSafely(pointerId: number): void {
+    try {
+      this.setPointerCapture(pointerId);
+    } catch {
+      // Ignore browsers that reject capture during synthetic or retargeted events.
+    }
+  }
+
+  private releasePointerSafely(pointerId: number): void {
+    try {
+      if (this.hasPointerCapture(pointerId)) {
+        this.releasePointerCapture(pointerId);
+      }
+    } catch {
+      // Ignore capture cleanup failures.
+    }
+  }
 
   static styles = css`
     ${unsafeCSS(styles)}
