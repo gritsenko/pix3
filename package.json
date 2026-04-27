@@ -1,7 +1,7 @@
 {
   "name": "pix3",
   "private": true,
-  "version": "0.8.7",
+  "version": "0.8.8",
   "type": "module",
   "engines": {
     "node": ">=24.15.0 <25"

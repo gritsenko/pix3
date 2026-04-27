@@ -1783,11 +1783,16 @@ export class SceneLoader {
       return undefined;
     }
 
+    const horizontalAlignValues = ['left', 'center', 'right', 'stretch'] as const;
+    const verticalAlignValues = ['top', 'center', 'bottom', 'stretch'] as const;
+
+    const horizontalAlign = horizontalAlignValues.find(v => v === layout.horizontalAlign);
+    const verticalAlign = verticalAlignValues.find(v => v === layout.verticalAlign);
+
     return {
       enabled: typeof layout.enabled === 'boolean' ? layout.enabled : undefined,
-      horizontalAlign:
-        typeof layout.horizontalAlign === 'string' ? layout.horizontalAlign : undefined,
-      verticalAlign: typeof layout.verticalAlign === 'string' ? layout.verticalAlign : undefined,
+      horizontalAlign,
+      verticalAlign,
     };
   }
 }

@@ -222,9 +222,12 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
     }
   }
 
-  private tryGetService<T>(context: OperationContext, token: unknown): T | null {
+  private tryGetService<T>(
+    context: OperationContext,
+    token: symbol | string | (new (...args: never[]) => T)
+  ): T | null {
     try {
-      return context.container.getService<T>(token);
+      return context.container.getService<T>(context.container.getOrCreateToken(token));
     } catch {
       return null;
     }

@@ -442,24 +442,28 @@ export class Node2D extends NodeBase {
   }
 
   private static readInitialLayoutSize(props: Node2DProps): Vector2 | null {
-    const record = props as Record<string, unknown>;
-    const width = typeof record.width === 'number' ? record.width : undefined;
-    const height = typeof record.height === 'number' ? record.height : undefined;
-    if (Number.isFinite(width) && Number.isFinite(height)) {
+    const record = props as unknown as Record<string, unknown>;
+    const width = Node2D.toFiniteNumber(record.width);
+    const height = Node2D.toFiniteNumber(record.height);
+    if (width !== undefined && height !== undefined) {
       return new Vector2(Math.max(0, width), Math.max(0, height));
     }
 
-    const size = typeof record.size === 'number' ? record.size : undefined;
-    if (Number.isFinite(size)) {
+    const size = Node2D.toFiniteNumber(record.size);
+    if (size !== undefined) {
       return new Vector2(Math.max(0, size), Math.max(0, size));
     }
 
-    const radius = typeof record.radius === 'number' ? record.radius : undefined;
-    if (Number.isFinite(radius)) {
+    const radius = Node2D.toFiniteNumber(record.radius);
+    if (radius !== undefined) {
       return new Vector2(Math.max(0, radius * 2), Math.max(0, radius * 2));
     }
 
     return null;
+  }
+
+  private static toFiniteNumber(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
   }
 
   private static toNonNegativeSeconds(value: number): number {
@@ -490,20 +494,20 @@ export class Node2D extends NodeBase {
 
   private readCurrentLayoutSize(): Node2DLayoutSize | null {
     const record = this as unknown as Record<string, unknown>;
-    const width = typeof record.width === 'number' ? record.width : undefined;
-    const height = typeof record.height === 'number' ? record.height : undefined;
-    if (Number.isFinite(width) && Number.isFinite(height)) {
+    const width = Node2D.toFiniteNumber(record.width);
+    const height = Node2D.toFiniteNumber(record.height);
+    if (width !== undefined && height !== undefined) {
       return { width: Math.max(0, width), height: Math.max(0, height) };
     }
 
-    const size = typeof record.size === 'number' ? record.size : undefined;
-    if (Number.isFinite(size)) {
+    const size = Node2D.toFiniteNumber(record.size);
+    if (size !== undefined) {
       const normalizedSize = Math.max(0, size);
       return { width: normalizedSize, height: normalizedSize };
     }
 
-    const radius = typeof record.radius === 'number' ? record.radius : undefined;
-    if (Number.isFinite(radius)) {
+    const radius = Node2D.toFiniteNumber(record.radius);
+    if (radius !== undefined) {
       const diameter = Math.max(0, radius * 2);
       return { width: diameter, height: diameter };
     }

@@ -1,7 +1,6 @@
 import type { NodeBase } from '../nodes/NodeBase';
 import { SceneLoader, type ParseSceneOptions } from './SceneLoader';
 import { SceneSaver } from './SceneSaver';
-import { Group2D } from '../nodes/2D/Group2D';
 import { Layout2D } from '../nodes/2D/Layout2D';
 import { Node2D } from '../nodes/Node2D';
 
