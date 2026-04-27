@@ -52,6 +52,7 @@ import {
   TransformTool2d,
   type TwoDHandle,
   type Active2DTransform,
+  type Transform2DUpdateOptions,
   type Selection2DOverlay,
 } from '@/services/TransformTool2d';
 import { isDocumentActive } from './page-activity';
@@ -4454,7 +4455,11 @@ export class ViewportRendererService {
     }
   }
 
-  update2DTransform(screenX: number, screenY: number): void {
+  update2DTransform(
+    screenX: number,
+    screenY: number,
+    options: Transform2DUpdateOptions = {}
+  ): void {
     if (!this.active2DTransform) {
       return;
     }
@@ -4470,7 +4475,8 @@ export class ViewportRendererService {
       this.active2DTransform,
       sceneGraph,
       this.orthographicCamera!,
-      this.viewportSize
+      this.viewportSize,
+      options
     );
 
     // Update visuals for each transformed node

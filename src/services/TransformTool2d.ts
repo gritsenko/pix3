@@ -60,6 +60,12 @@ export interface Active2DTransform {
   anchorWorld: THREE.Vector3;
   anchorLocal: THREE.Vector3;
   startSize: THREE.Vector2;
+  moveConstraintAxis?: 'x' | 'y' | null;
+}
+
+export interface Transform2DUpdateOptions {
+  preserveAspectRatio?: boolean;
+  constrainMoveToAxis?: boolean;
 }
 
 export class TransformTool2d {
@@ -632,6 +638,7 @@ export class TransformTool2d {
       anchorWorld,
       anchorLocal,
       startSize,
+      moveConstraintAxis: null,
     };
   }
 
@@ -676,7 +683,8 @@ export class TransformTool2d {
     transform: Active2DTransform,
     sceneGraph: SceneGraph,
     orthographicCamera: THREE.OrthographicCamera,
-    viewportSize: { width: number; height: number }
+    viewportSize: { width: number; height: number },
+    options: Transform2DUpdateOptions = {}
   ): void {
     const pointerWorld = this.screenToWorld2D(screenX, screenY, orthographicCamera, viewportSize);
     if (!pointerWorld) return;
@@ -693,6 +701,20 @@ export class TransformTool2d {
 
     if (handle === 'move') {
       const delta = pointerWorld.clone().sub(startPointerWorld);
+      if (options.constrainMoveToAxis) {
+        if (!transform.moveConstraintAxis && (delta.x !== 0 || delta.y !== 0)) {
+          transform.moveConstraintAxis = Math.abs(delta.x) >= Math.abs(delta.y) ? 'x' : 'y';
+        }
+
+        if (transform.moveConstraintAxis === 'x') {
+          delta.y = 0;
+        } else if (transform.moveConstraintAxis === 'y') {
+          delta.x = 0;
+        }
+      } else {
+        transform.moveConstraintAxis = null;
+      }
+
       for (const [nodeId, startState] of startStates) {
         const node = sceneGraph.nodeMap.get(nodeId);
         if (node && node instanceof Node2D) {
@@ -765,12 +787,11 @@ export class TransformTool2d {
         height = Math.max(minSize, Math.abs(localPoint.y - anchorLocal.y));
       }
 
-      let preserveAspect = false;
-      if (transform.nodeIds.length === 1) {
-        const primaryNode = sceneGraph.nodeMap.get(transform.nodeIds[0]);
-        if (primaryNode && 'aspectRatioLocked' in primaryNode && primaryNode.aspectRatioLocked) {
-          preserveAspect = true;
-        }
+      const primaryNode =
+        transform.nodeIds.length === 1 ? sceneGraph.nodeMap.get(transform.nodeIds[0]) ?? null : null;
+      let preserveAspect = Boolean(options.preserveAspectRatio && primaryNode);
+      if (primaryNode && 'aspectRatioLocked' in primaryNode && primaryNode.aspectRatioLocked) {
+        preserveAspect = true;
       }
 
       if (preserveAspect && startSize.x > 0 && startSize.y > 0) {

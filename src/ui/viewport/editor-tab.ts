@@ -435,7 +435,10 @@ export class EditorTabComponent extends ComponentBase {
       const rect = canvas?.getBoundingClientRect() ?? this.getBoundingClientRect();
       const screenX = event.clientX - rect.left;
       const screenY = event.clientY - rect.top;
-      this.viewportRenderer.update2DTransform?.(screenX, screenY);
+      this.viewportRenderer.update2DTransform?.(screenX, screenY, {
+        preserveAspectRatio: event.shiftKey,
+        constrainMoveToAxis: event.shiftKey,
+      });
       this.isDragging = true;
       return;
     }

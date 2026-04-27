@@ -10,8 +10,12 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import * as THREE from 'three';
-import { TransformTool2d, type Selection2DOverlay } from './TransformTool2d';
-import { Group2D, Layout2D } from '@pix3/runtime';
+import {
+  TransformTool2d,
+  type Active2DTransform,
+  type Selection2DOverlay,
+} from './TransformTool2d';
+import { Group2D, Layout2D, Sprite2D, type SceneGraph } from '@pix3/runtime';
 import { Vector2 } from 'three';
 
 describe('TransformTool2d', () => {
@@ -230,6 +234,217 @@ describe('TransformTool2d', () => {
     it('clearHover resets hover state', () => {
       tool.clearHover(overlay);
       expect(tool.getHoveredHandle()).toBe('idle');
+    });
+  });
+
+  describe('axis-constrained move', () => {
+    const viewportSize = { width: 800, height: 600 };
+
+    const createCamera = (): THREE.OrthographicCamera => {
+      const camera = new THREE.OrthographicCamera(-400, 400, 300, -300, 0.1, 1000);
+      camera.position.z = 100;
+      camera.updateProjectionMatrix();
+      return camera;
+    };
+
+    const toScreen = (worldX: number, worldY: number) => ({
+      x: worldX + 400,
+      y: 300 - worldY,
+    });
+
+    const createSceneGraph = (sprite: Sprite2D): SceneGraph => ({
+      version: '1.0',
+      rootNodes: [sprite],
+      nodeMap: new Map([[sprite.nodeId, sprite]]),
+      metadata: {},
+    });
+
+    const createMoveTransform = (sprite: Sprite2D): Active2DTransform => {
+      sprite.updateWorldMatrix(true, false);
+      return {
+        nodeIds: [sprite.nodeId],
+        handle: 'move',
+        startPointerWorld: new THREE.Vector3(0, 0, 0),
+        startStates: new Map([
+          [
+            sprite.nodeId,
+            {
+              position: sprite.position.clone(),
+              rotation: sprite.rotation.z,
+              scale: new THREE.Vector2(sprite.scale.x, sprite.scale.y),
+              width: sprite.width,
+              height: sprite.height,
+              worldPosition: sprite.getWorldPosition(new THREE.Vector3()),
+              worldRotationZ: sprite.rotation.z,
+            },
+          ],
+        ]),
+        combinedBounds: new THREE.Box3(
+          new THREE.Vector3(-50, -25, 0),
+          new THREE.Vector3(50, 25, 0)
+        ),
+        startCenterWorld: new THREE.Vector3(0, 0, 0),
+        anchorWorld: new THREE.Vector3(0, 0, 0),
+        anchorLocal: new THREE.Vector3(0, 0, 0),
+        startSize: new THREE.Vector2(100, 50),
+        moveConstraintAxis: null,
+      };
+    };
+
+    it('locks move to the dominant x axis while shift is held', () => {
+      const sprite = new Sprite2D({
+        id: 'sprite-move-x',
+        name: 'Sprite Move X',
+        width: 100,
+        height: 50,
+      });
+      const sceneGraph = createSceneGraph(sprite);
+      const transform = createMoveTransform(sprite);
+      const camera = createCamera();
+      const pointer = toScreen(40, 10);
+
+      tool.updateTransform(pointer.x, pointer.y, transform, sceneGraph, camera, viewportSize, {
+        constrainMoveToAxis: true,
+      });
+
+      expect(sprite.position.x).toBeCloseTo(40);
+      expect(sprite.position.y).toBeCloseTo(0);
+      expect(transform.moveConstraintAxis).toBe('x');
+    });
+
+    it('releases axis lock when shift is no longer held', () => {
+      const sprite = new Sprite2D({
+        id: 'sprite-move-release',
+        name: 'Sprite Move Release',
+        width: 100,
+        height: 50,
+      });
+      const sceneGraph = createSceneGraph(sprite);
+      const transform = createMoveTransform(sprite);
+      const camera = createCamera();
+      const firstPointer = toScreen(40, 10);
+      const secondPointer = toScreen(40, 10);
+
+      tool.updateTransform(
+        firstPointer.x,
+        firstPointer.y,
+        transform,
+        sceneGraph,
+        camera,
+        viewportSize,
+        { constrainMoveToAxis: true }
+      );
+
+      tool.updateTransform(
+        secondPointer.x,
+        secondPointer.y,
+        transform,
+        sceneGraph,
+        camera,
+        viewportSize
+      );
+
+      expect(sprite.position.x).toBeCloseTo(40);
+      expect(sprite.position.y).toBeCloseTo(10);
+      expect(transform.moveConstraintAxis).toBeNull();
+    });
+  });
+
+  describe('aspect-ratio constrained resize', () => {
+    const viewportSize = { width: 800, height: 600 };
+
+    const createCamera = (): THREE.OrthographicCamera => {
+      const camera = new THREE.OrthographicCamera(-400, 400, 300, -300, 0.1, 1000);
+      camera.position.z = 100;
+      camera.updateProjectionMatrix();
+      return camera;
+    };
+
+    const toScreen = (worldX: number, worldY: number) => ({
+      x: worldX + 400,
+      y: 300 - worldY,
+    });
+
+    const createSceneGraph = (sprite: Sprite2D): SceneGraph => ({
+      version: '1.0',
+      rootNodes: [sprite],
+      nodeMap: new Map([[sprite.nodeId, sprite]]),
+      metadata: {},
+    });
+
+    const createScaleEastTransform = (sprite: Sprite2D): Active2DTransform => {
+      sprite.updateWorldMatrix(true, false);
+      return {
+        nodeIds: [sprite.nodeId],
+        handle: 'scale-e',
+        startPointerWorld: new THREE.Vector3(50, 0, 0),
+        startStates: new Map([
+          [
+            sprite.nodeId,
+            {
+              position: sprite.position.clone(),
+              rotation: sprite.rotation.z,
+              scale: new THREE.Vector2(sprite.scale.x, sprite.scale.y),
+              width: sprite.width,
+              height: sprite.height,
+              worldPosition: sprite.getWorldPosition(new THREE.Vector3()),
+              worldRotationZ: sprite.rotation.z,
+            },
+          ],
+        ]),
+        combinedBounds: new THREE.Box3(
+          new THREE.Vector3(-50, -25, 0),
+          new THREE.Vector3(50, 25, 0)
+        ),
+        startCenterWorld: new THREE.Vector3(0, 0, 0),
+        anchorWorld: new THREE.Vector3(-50, 0, 0),
+        anchorLocal: new THREE.Vector3(-50, 0, 0),
+        startSize: new THREE.Vector2(100, 50),
+      };
+    };
+
+    it('preserves aspect ratio while shift-constrained resizing a single sprite', () => {
+      const sprite = new Sprite2D({
+        id: 'sprite-shift',
+        name: 'Sprite Shift',
+        width: 100,
+        height: 50,
+      });
+      const sceneGraph = createSceneGraph(sprite);
+      const transform = createScaleEastTransform(sprite);
+      const camera = createCamera();
+      const pointer = toScreen(100, 0);
+
+      tool.updateTransform(
+        pointer.x,
+        pointer.y,
+        transform,
+        sceneGraph,
+        camera,
+        viewportSize,
+        { preserveAspectRatio: true }
+      );
+
+      expect(sprite.width).toBeCloseTo(150);
+      expect(sprite.height).toBeCloseTo(75);
+    });
+
+    it('keeps freeform resizing when shift is not pressed and aspect lock is off', () => {
+      const sprite = new Sprite2D({
+        id: 'sprite-freeform',
+        name: 'Sprite Freeform',
+        width: 100,
+        height: 50,
+      });
+      const sceneGraph = createSceneGraph(sprite);
+      const transform = createScaleEastTransform(sprite);
+      const camera = createCamera();
+      const pointer = toScreen(100, 0);
+
+      tool.updateTransform(pointer.x, pointer.y, transform, sceneGraph, camera, viewportSize);
+
+      expect(sprite.width).toBeCloseTo(150);
+      expect(sprite.height).toBeCloseTo(50);
     });
   });
 });

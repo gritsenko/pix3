@@ -511,7 +511,10 @@ export class ViewportPanel extends ComponentBase {
     // Handle 2D transform updates when a 2D handle is engaged
     const has2DTransform = this.viewportRenderer.has2DTransform?.();
     if (has2DTransform) {
-      this.viewportRenderer.update2DTransform?.(screenX, screenY);
+      this.viewportRenderer.update2DTransform?.(screenX, screenY, {
+        preserveAspectRatio: event.shiftKey,
+        constrainMoveToAxis: event.shiftKey,
+      });
       this.isDragging = true;
       return;
     }
