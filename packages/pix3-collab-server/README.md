@@ -95,12 +95,12 @@ Workflow `.github/workflows/deploy-collab-server.yml`:
 
 - запускается при `push` в `main` для изменений backend-сервера и вручную через `workflow_dispatch`;
 - собирает `@pix3/collab-server`;
-- упаковывает `dist/`, `package.json`, `package-lock.json` и `src/admin/index.html`;
+- упаковывает корневые `package.json` и `package-lock.json`, а также workspace `packages/pix3-collab-server` с `dist/`, `package.json` и `src/admin/index.html`;
 - загружает релиз на `cloud.pix3.dev` по SSH;
 - раскладывает релиз в `${DEPLOY_PATH}/releases/<sha>`;
-- привязывает `shared/.env` и `shared/data`;
-- выполняет `npm ci --omit=dev`;
-- переключает `${DEPLOY_PATH}/current` на новый релиз;
+- привязывает `shared/.env` и `shared/data` внутрь `packages/pix3-collab-server`;
+- выполняет `npm ci --omit=dev --workspace packages/pix3-collab-server`;
+- переключает `${DEPLOY_PATH}/current` на `packages/pix3-collab-server` внутри нового релиза;
 - перезапускает `systemd`-сервис `pix3-collab-server`.
 
 ### GitHub Secrets
@@ -116,7 +116,7 @@ Workflow `.github/workflows/deploy-collab-server.yml`:
 
 На `cloud.pix3.dev` нужно один раз подготовить runtime-окружение.
 
-1. Установить Node.js `24.14.1` и проверить путь к бинарнику:
+1. Установить Node.js `24.15.0` или новее в рамках диапазона `>=24.15.0 <25` и проверить путь к бинарнику:
 
 ```bash
 node -v
