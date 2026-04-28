@@ -35,3 +35,4 @@ public/esbuild.wasm
 # Collab server runtime data
 packages/pix3-collab-server/data/
 packages/pix3-collab-server/projects/
+repomix-output.xml
