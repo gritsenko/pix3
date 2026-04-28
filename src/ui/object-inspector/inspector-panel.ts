@@ -28,6 +28,7 @@ import { ToggleScriptEnabledCommand } from '@/features/scripts/ToggleScriptEnabl
 import { UpdateComponentPropertyCommand } from '@/features/scripts/UpdateComponentPropertyCommand';
 import { AddNodeToGroupCommand } from '@/features/scene/AddNodeToGroupCommand';
 import { RemoveNodeFromGroupCommand } from '@/features/scene/RemoveNodeFromGroupCommand';
+import { getNodeVisuals } from '@/ui/scene-tree/node-visuals.helper';
 import {
   findPrefabInstanceRoot,
   getPrefabMetadata,
@@ -72,6 +73,10 @@ interface TextAssetPreviewState {
 }
 
 type ReadOnlyValue = boolean | ((target: unknown) => boolean) | undefined;
+type PropertySectionOptions = {
+  className?: string;
+  hideTitle?: boolean;
+};
 
 const ASSET_RESOURCE_MIME = 'application/x-pix3-asset-resource';
 const ASSET_PATH_MIME = 'application/x-pix3-asset-path';
@@ -89,6 +94,10 @@ const IMAGE_EXTENSIONS = new Set([
 ]);
 const AUDIO_EXTENSIONS = new Set(['wav', 'mp3', 'ogg']);
 const MODEL_EXTENSIONS = new Set(['glb', 'gltf']);
+const PROPERTY_GROUP_ORDER = ['Transform', 'Size', 'Anchor', 'Style', 'Sprite'];
+const PROPERTY_GROUP_ORDER_INDEX = new Map(
+  PROPERTY_GROUP_ORDER.map((groupName, index) => [groupName, index])
+);
 
 @customElement('pix3-inspector-panel')
 export class InspectorPanel extends ComponentBase {
@@ -141,9 +150,6 @@ export class InspectorPanel extends ComponentBase {
   private componentPropertyValues: Record<string, PropertyUIState> = {};
 
   @state()
-  private expandedComponentIds: string[] = [];
-
-  @state()
   private selectedAssetItem: AssetPreviewItem | null = null;
 
   @state()
@@ -154,6 +160,9 @@ export class InspectorPanel extends ComponentBase {
 
   @state()
   private newGroupError: string | null = null;
+
+  @state()
+  private isGroupsEditorOpen = false;
 
   private disposeSelectionSubscription?: () => void;
   private disposeSceneSubscription?: () => void;
@@ -187,6 +196,16 @@ export class InspectorPanel extends ComponentBase {
   private readonly propertyPreviewStartValues = new Map<string, unknown>();
   private readonly componentPropertyPreviewStartValues = new Map<string, unknown>();
 
+  private readonly onDocumentPointerDown = (event: PointerEvent) => {
+    if (!this.isGroupsEditorOpen) {
+      return;
+    }
+
+    if (!event.composedPath().includes(this)) {
+      this.isGroupsEditorOpen = false;
+    }
+  };
+
   connectedCallback() {
     super.connectedCallback();
     this.disposeSelectionSubscription = subscribe(appState.selection, () => {
@@ -217,6 +236,7 @@ export class InspectorPanel extends ComponentBase {
       'script-creator-requested',
       this.scriptCreatorRequestedHandler as EventListener
     );
+    document.addEventListener('pointerdown', this.onDocumentPointerDown);
   }
 
   disconnectedCallback() {
@@ -234,6 +254,7 @@ export class InspectorPanel extends ComponentBase {
       );
       this.scriptCreatorRequestedHandler = undefined;
     }
+    document.removeEventListener('pointerdown', this.onDocumentPointerDown);
 
     for (const previewUrl of this.texturePreviewUrls.values()) {
       URL.revokeObjectURL(previewUrl);
@@ -375,6 +396,7 @@ export class InspectorPanel extends ComponentBase {
     if (previousPrimaryNodeId !== nextPrimaryNodeId) {
       this.propertyPreviewStartValues.clear();
       this.componentPropertyPreviewStartValues.clear();
+      this.isGroupsEditorOpen = false;
     }
 
     // Reset animation preview when selection changes
@@ -407,9 +429,9 @@ export class InspectorPanel extends ComponentBase {
       this.propertySchema = null;
       this.propertyValues = {};
       this.componentPropertyValues = {};
-      this.expandedComponentIds = [];
       this.propertyPreviewStartValues.clear();
       this.componentPropertyPreviewStartValues.clear();
+      this.isGroupsEditorOpen = false;
       return;
     }
 
@@ -457,9 +479,6 @@ export class InspectorPanel extends ComponentBase {
       }
     }
     this.componentPropertyValues = values;
-    this.expandedComponentIds = this.expandedComponentIds.filter(componentId =>
-      this.primaryNode?.components.some(component => component.id === componentId)
-    );
   }
 
   private getPropertyDisplayValue(target: unknown, prop: PropertyDefinition): string {
@@ -567,7 +586,10 @@ export class InspectorPanel extends ComponentBase {
     return this.hasSupportedExtension(path, IMAGE_EXTENSIONS);
   }
 
-  private getTextAssetPreview(assetPath: string, fallbackText: string | null): TextAssetPreviewState {
+  private getTextAssetPreview(
+    assetPath: string,
+    fallbackText: string | null
+  ): TextAssetPreviewState {
     const normalizedPath = assetPath.trim();
     if (!normalizedPath) {
       return {
@@ -1301,21 +1323,27 @@ export class InspectorPanel extends ComponentBase {
                       ${textPreview?.isLoading && !textPreview.content
                         ? html`<div class="asset-text-preview-state">Loading content...</div>`
                         : textPreview?.error
-                          ? html`<div class="asset-text-preview-state asset-text-preview-state--error">
+                          ? html`<div
+                              class="asset-text-preview-state asset-text-preview-state--error"
+                            >
                               ${textPreview.error}
                             </div>`
-                          : html`<pre class="asset-text-preview">${textPreview?.content || 'Empty file'}</pre>`}
+                          : html`<pre class="asset-text-preview">
+${textPreview?.content || 'Empty file'}</pre
+                            >`}
                     </div>
                   `
-            : isImage
-              ? html`
-                  <div class="asset-image-preview checker-bg">
-                    <img src=${asset.thumbnailUrl!} alt=${asset.name} />
-                  </div>
-                `
-              : html`
-                  <div class="asset-file-icon">${this.iconService.getIcon(asset.iconName, 42)}</div>
-                `}
+                : isImage
+                  ? html`
+                      <div class="asset-image-preview checker-bg">
+                        <img src=${asset.thumbnailUrl!} alt=${asset.name} />
+                      </div>
+                    `
+                  : html`
+                      <div class="asset-file-icon">
+                        ${this.iconService.getIcon(asset.iconName, 42)}
+                      </div>
+                    `}
         </div>
 
         <div class="property-group-section asset-section">
@@ -1432,60 +1460,146 @@ export class InspectorPanel extends ComponentBase {
       return '';
     }
 
-    const nodeType = this.primaryNode.type;
     const groupedProps = getPropertiesByGroup(this.propertySchema);
+    const baseProps = groupedProps.get('Base') ?? [];
+    const editorProps = groupedProps.get('Editor') ?? [];
+    const summaryPropertyNames = new Set(['id', 'name', 'type', 'groups']);
+    const editorFlagNames = new Set(['visible', 'locked']);
 
-    // Sort groups: 'Base' first, then others
-    const sortedGroups = Array.from(groupedProps.entries()).sort(([nameA], [nameB]) => {
-      if (nameA === 'Base') return -1;
-      if (nameB === 'Base') return 1;
-      return nameA.localeCompare(nameB);
-    });
+    const supplementaryProps = [...baseProps, ...editorProps].filter(
+      prop =>
+        !summaryPropertyNames.has(prop.name) && !editorFlagNames.has(prop.name) && !prop.ui?.hidden
+    );
+
+    const sortedGroups = Array.from(groupedProps.entries())
+      .filter(([groupName]) => groupName !== 'Base' && groupName !== 'Editor')
+      .sort(([nameA], [nameB]) => {
+        const orderA = PROPERTY_GROUP_ORDER_INDEX.get(nameA) ?? PROPERTY_GROUP_ORDER.length;
+        const orderB = PROPERTY_GROUP_ORDER_INDEX.get(nameB) ?? PROPERTY_GROUP_ORDER.length;
+
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+
+        return nameA.localeCompare(nameB);
+      });
 
     return html`
-      <div class="property-section">
-        <div class="section-header">
-          <h3 class="section-title">Object Inspector</h3>
-          <p class="node-id">ID: ${this.primaryNode.nodeId}</p>
-          ${this.selectedNodes.length > 1
-            ? html`<p class="selection-info">${this.selectedNodes.length} objects selected</p>`
-            : ''}
-          <p class="node-type">${nodeType}</p>
-        </div>
-
+      <div class="property-section property-section--object">
+        ${this.renderInspectorSummary()} ${this.renderEditorFlagsRow()}
+        ${supplementaryProps.length > 0
+          ? html`
+              <div class="property-group-section property-group-section--compact">
+                ${supplementaryProps.map(prop => this.renderPropertyInput(prop))}
+              </div>
+            `
+          : ''}
         ${sortedGroups.map(([groupName, props]) => this.renderPropertyGroup(groupName, props))}
-        ${this.renderGroupsSection()} ${this.renderAnimationsSection()}
-        ${this.renderScriptsSection()}
+        ${this.renderAnimationsSection()} ${this.renderScriptsSection()}
       </div>
     `;
   }
 
-  private renderGroupsSection() {
-    if (!this.primaryNode) return '';
+  private renderInspectorSummary() {
+    if (!this.primaryNode) {
+      return '';
+    }
+
+    const { icon, color } = getNodeVisuals(this.primaryNode);
+    const nameState = this.propertyValues['name'];
+    const groups = Array.from(this.primaryNode.groups).sort((a, b) => a.localeCompare(b));
+    const nameProp = this.propertySchema?.properties.find(prop => prop.name === 'name');
+    const nameReadOnly = this.isPropertyReadOnly(nameProp?.ui?.readOnly, this.primaryNode);
+
+    return html`
+      <div class="inspector-summary">
+        <div class="inspector-summary-main">
+          <div class="inspector-type-icon" style=${`--node-type-color: ${color};`}>
+            ${this.iconService.getIcon(icon, 18)}
+          </div>
+          <div class="inspector-summary-text">
+            <input
+              type="text"
+              class="property-input property-input--text inspector-name-input ${nameState?.isValid ===
+              false
+                ? 'property-input--invalid'
+                : ''}"
+              .value=${nameState?.value ?? this.primaryNode.name}
+              ?disabled=${nameReadOnly}
+              @input=${(e: Event) => this.handlePropertyInput('name', e)}
+              @blur=${(e: Event) => this.handlePropertyBlur('name', e)}
+            />
+            <div class="inspector-summary-meta">
+              <span class="inspector-summary-type">${this.primaryNode.type}</span>
+              <span class="inspector-summary-meta-separator"></span>
+              <span class="inspector-summary-id">${this.primaryNode.nodeId}</span>
+              ${this.selectedNodes.length > 1
+                ? html`
+                    <span class="inspector-summary-meta-separator"></span>
+                    <span class="selection-info">
+                      ${this.selectedNodes.length} objects selected
+                    </span>
+                  `
+                : ''}
+            </div>
+            ${groups.length > 0
+              ? html`
+                  <div class="group-chip-list group-chip-list--summary">
+                    ${groups.map(
+                      group => html`<span class="group-chip group-chip--readonly">${group}</span>`
+                    )}
+                  </div>
+                `
+              : ''}
+          </div>
+        </div>
+
+        <div class="inspector-summary-actions">
+          <button
+            class="summary-toolbar-button ${this.isGroupsEditorOpen ? 'is-open' : ''}"
+            type="button"
+            title="Edit groups"
+            aria-expanded=${String(this.isGroupsEditorOpen)}
+            @click=${(event: Event) => this.toggleGroupsEditor(event)}
+          >
+            ${this.iconService.getIcon('grid', 14)}
+            <span>Groups</span>
+            ${this.iconService.getIcon('chevron-down-caret', 12)}
+          </button>
+          ${this.isGroupsEditorOpen ? this.renderGroupsPopover() : ''}
+        </div>
+      </div>
+    `;
+  }
+
+  private renderGroupsPopover() {
+    if (!this.primaryNode) {
+      return '';
+    }
 
     const groups = Array.from(this.primaryNode.groups).sort((a, b) => a.localeCompare(b));
     return html`
-      <div class="property-group-section groups-section">
-        <h4 class="group-title">Groups</h4>
-        <div class="group-chip-list">
+      <div class="groups-popover" @click=${(event: Event) => event.stopPropagation()}>
+        <div class="groups-popover-list">
           ${groups.length === 0
             ? html`<div class="groups-empty">No groups assigned</div>`
             : groups.map(
                 group => html`
-                  <span class="group-chip">
-                    ${group}
+                  <div class="groups-popover-item">
+                    <span class="group-chip group-chip--readonly">${group}</span>
                     <button
-                      class="group-chip-remove"
+                      class="btn-icon"
+                      type="button"
                       title="Remove from group"
                       @click=${() => this.removeFromGroup(group)}
                     >
-                      ×
+                      ${this.iconService.getIcon('x', 14)}
                     </button>
-                  </span>
+                  </div>
                 `
               )}
         </div>
-        <div class="group-add-row">
+        <div class="group-add-row group-add-row--popover">
           <input
             class="property-input property-input--text group-input"
             .value=${this.newGroupName}
@@ -1498,9 +1612,51 @@ export class InspectorPanel extends ComponentBase {
               }
             }}
           />
-          <button class="btn-add-group" @click=${() => this.addToGroup()}>Add</button>
+          <button class="btn-add-group" type="button" @click=${() => this.addToGroup()}>Add</button>
         </div>
         ${this.newGroupError ? html`<div class="groups-error">${this.newGroupError}</div>` : ''}
+      </div>
+    `;
+  }
+
+  private toggleGroupsEditor(event: Event): void {
+    event.stopPropagation();
+    this.isGroupsEditorOpen = !this.isGroupsEditorOpen;
+  }
+
+  private renderEditorFlagsRow() {
+    if (!this.primaryNode) {
+      return '';
+    }
+
+    const visible = this.propertyValues['visible']?.value === 'true';
+    const locked = this.propertyValues['locked']?.value === 'true';
+    const readOnly = appState.collaboration.isReadOnly;
+
+    return html`
+      <div class="property-group-section property-group-section--flags">
+        <div class="editor-flags-row">
+          <button
+            class="editor-flag-button ${visible ? 'is-active' : ''}"
+            type="button"
+            ?disabled=${readOnly}
+            aria-pressed=${String(visible)}
+            @click=${() => this.applyPropertyChange('visible', !visible)}
+          >
+            ${this.iconService.getIcon('eye', 14)}
+            <span>Visible</span>
+          </button>
+          <button
+            class="editor-flag-button ${locked ? 'is-active' : ''}"
+            type="button"
+            ?disabled=${readOnly}
+            aria-pressed=${String(locked)}
+            @click=${() => this.applyPropertyChange('locked', !locked)}
+          >
+            ${this.iconService.getIcon(locked ? 'lock' : 'unlock', 14)}
+            <span>Locked</span>
+          </button>
+        </div>
       </div>
     `;
   }
@@ -1618,10 +1774,11 @@ export class InspectorPanel extends ComponentBase {
     return html`
       <div class="property-group-section scripts-section">
         <div class="group-header">
-          <h4 class="group-title">Script Components</h4>
+          <h4 class="group-title">Components</h4>
           <div class="group-actions">
             <button class="btn-add-behavior" @click=${this.onAddBehavior} title="Add Component">
               ${this.iconService.getIcon('plus', 14)}
+              <span>Add</span>
             </button>
           </div>
         </div>
@@ -1629,41 +1786,33 @@ export class InspectorPanel extends ComponentBase {
         <div class="scripts-list">
           ${components.map(
             component => html`
-              <div class="script-item component-item">
-                <button
-                  class="script-foldout-btn"
-                  @click=${() => this.toggleComponentExpanded(component.id)}
-                  title=${this.isComponentExpanded(component.id) ? 'Collapse' : 'Expand'}
-                >
-                  ${this.iconService.getIcon(
-                    this.isComponentExpanded(component.id) ? 'chevron-down' : 'chevron-right',
-                    14
-                  )}
-                </button>
-                <div class="script-icon">
-                  ${this.iconService.getIcon(this.getComponentIconName(component.type), 16)}
+              <div class="component-block ${component.enabled ? '' : 'component-block--disabled'}">
+                <div class="script-item component-item">
+                  <div class="script-icon">
+                    ${this.iconService.getIcon(this.getComponentIconName(component.type), 16)}
+                  </div>
+                  <div class="script-info">
+                    <div class="script-name">${component.type}</div>
+                  </div>
+                  <div class="script-actions">
+                    <button
+                      class="component-action-link"
+                      type="button"
+                      @click=${() => this.onToggleComponent(component.id, !component.enabled)}
+                    >
+                      ${component.enabled ? 'Disable' : 'Enable'}
+                    </button>
+                    <button
+                      class="component-action-link component-action-link--danger"
+                      type="button"
+                      @click=${() => this.onRemoveComponent(component.id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
                 </div>
-                <div class="script-info">
-                  <div class="script-name">${component.type}</div>
-                </div>
-                <div class="script-actions">
-                  <button
-                    class="btn-icon"
-                    @click=${() => this.onToggleComponent(component.id, !component.enabled)}
-                    title=${component.enabled ? 'Disable' : 'Enable'}
-                  >
-                    ${this.iconService.getIcon(component.enabled ? 'check-circle' : 'circle', 16)}
-                  </button>
-                  <button
-                    class="btn-icon"
-                    @click=${() => this.onRemoveComponent(component.id)}
-                    title="Remove"
-                  >
-                    ${this.iconService.getIcon('trash-2', 16)}
-                  </button>
-                </div>
+                ${this.renderComponentProperties(component)}
               </div>
-              ${this.renderComponentProperties(component)}
             `
           )}
           ${components.length === 0
@@ -1674,23 +1823,7 @@ export class InspectorPanel extends ComponentBase {
     `;
   }
 
-  private isComponentExpanded(componentId: string): boolean {
-    return this.expandedComponentIds.includes(componentId);
-  }
-
-  private toggleComponentExpanded(componentId: string): void {
-    if (this.isComponentExpanded(componentId)) {
-      this.expandedComponentIds = this.expandedComponentIds.filter(id => id !== componentId);
-      return;
-    }
-    this.expandedComponentIds = [...this.expandedComponentIds, componentId];
-  }
-
   private renderComponentProperties(component: ScriptComponent) {
-    if (!this.isComponentExpanded(component.id)) {
-      return '';
-    }
-
     const schema = this.scriptRegistry.getComponentPropertySchema(component.type);
     if (!schema || schema.properties.length === 0) {
       return html`<div class="script-props-empty">No editable properties</div>`;
@@ -1768,76 +1901,98 @@ export class InspectorPanel extends ComponentBase {
     const groupDef = this.propertySchema?.groups?.[groupName];
     const label = groupDef?.label || groupName;
 
-    // Filter out hidden and read-only properties
     const visibleProps = props.filter(p => !p.ui?.hidden);
 
     if (visibleProps.length === 0) {
       return '';
     }
 
-    // Special handling for Transform group - render as grid
     if (groupName === 'Transform') {
       return this.renderTransformGroup(label, visibleProps);
     }
 
-    // Special handling for Anchor group - compact toggle by default
     if (groupName === 'Anchor' && this.primaryNode instanceof Node2D) {
-      return this.renderAnchorGroup(label, visibleProps);
+      return this.renderAnchorGroup('Align', visibleProps);
     }
 
-    // Special handling for Size group - render with reset/aspect ratio buttons
     if (groupName === 'Size') {
       return this.renderSizeGroup(label, visibleProps);
     }
 
-    return html`
-      <div class="property-group-section">
-        <h4 class="group-title">${label}</h4>
-        ${visibleProps.map(prop => this.renderPropertyInput(prop))}
-      </div>
-    `;
+    return this.renderPropertySection(label, visibleProps.map(prop => this.renderPropertyInput(prop)), {
+      hideTitle: groupName === 'Style' && visibleProps.length === 1,
+    });
   }
 
-  private renderAnchorGroup(label: string, props: PropertyDefinition[]) {
+  private renderAnchorGroup(label: string, _props: PropertyDefinition[]) {
     if (!this.primaryNode || !(this.primaryNode instanceof Node2D)) {
       return '';
     }
 
-    const enabled = this.propertyValues['layoutEnabled']?.value === 'true';
-    const toggleDisabled = appState.collaboration.isReadOnly;
-    const anchorProps = props.filter(prop => prop.name !== 'layoutEnabled');
+    const enabled = this.propertyValues['layoutEnabled']?.value === 'true' || this.primaryNode.layoutEnabled;
+    const readOnly = appState.collaboration.isReadOnly;
+    const horizontal =
+      this.propertyValues['horizontalAlign']?.value ?? this.primaryNode.horizontalAlign;
+    const vertical = this.propertyValues['verticalAlign']?.value ?? this.primaryNode.verticalAlign;
+    const previewClass = `anchor-preview anchor-preview--h-${horizontal} anchor-preview--v-${vertical}`;
 
-    const toggleButton = html`
-      <button
-        class=${`anchor-toggle-button ${enabled ? 'is-active' : ''}`}
-        type="button"
-        title=${enabled ? 'Disable anchor layout' : 'Enable anchor layout'}
-        aria-label=${enabled ? 'Disable anchor layout' : 'Enable anchor layout'}
-        ?disabled=${toggleDisabled}
-        @click=${() => this.applyPropertyChange('layoutEnabled', !enabled)}
-      >
-        ${this.iconService.getIcon('anchor', 14)}
-        <span>Anchor</span>
-      </button>
-    `;
-
-    if (!enabled) {
-      return html`
-        <div class="property-group-section anchor-section anchor-section--collapsed">
-          <div class="anchor-toggle-row">${toggleButton}</div>
-        </div>
-      `;
-    }
-
-    return html`
-      <div class="property-group-section anchor-section anchor-section--expanded">
+    return this.renderPropertySection(
+      label,
+      html`
         <div class="anchor-section-header">
           <h4 class="group-title">${label}</h4>
-          ${toggleButton}
+          <button
+            class=${`anchor-toggle-button ${enabled ? 'is-active' : ''}`}
+            type="button"
+            title=${enabled ? 'Disable anchor layout' : 'Enable anchor layout'}
+            aria-label=${enabled ? 'Disable anchor layout' : 'Enable anchor layout'}
+            ?disabled=${readOnly}
+            @click=${() => this.applyPropertyChange('layoutEnabled', !enabled)}
+          >
+            ${this.iconService.getIcon('anchor', 14)}
+            <span>${enabled ? 'Enabled' : 'Disabled'}</span>
+          </button>
         </div>
-        <div class="anchor-fields">${anchorProps.map(prop => this.renderPropertyInput(prop))}</div>
-      </div>
-    `;
+        ${enabled
+          ? html`
+              <div class="anchor-visual-editor">
+                <div class="anchor-preview-shell">
+                  <div class="anchor-preview-frame">
+                    <div class=${previewClass}></div>
+                    ${this.renderAnchorPreviewEdge('left', horizontal, vertical, readOnly)}
+                    ${this.renderAnchorPreviewEdge('right', horizontal, vertical, readOnly)}
+                    ${this.renderAnchorPreviewEdge('top', horizontal, vertical, readOnly)}
+                    ${this.renderAnchorPreviewEdge('bottom', horizontal, vertical, readOnly)}
+                    ${this.renderAnchorPreviewEdge('center', horizontal, vertical, readOnly)}
+                  </div>
+                </div>
+                <div class="anchor-controls">
+                  <div class="anchor-control-row">
+                    <span class="anchor-axis-label">H</span>
+                    <div class="anchor-mode-group">
+                      ${['left', 'center', 'right', 'stretch'].map(option =>
+                        this.renderAnchorModeButton('horizontal', option, horizontal, enabled, readOnly)
+                      )}
+                    </div>
+                  </div>
+                  <div class="anchor-control-row">
+                    <span class="anchor-axis-label">V</span>
+                    <div class="anchor-mode-group">
+                      ${['top', 'center', 'bottom', 'stretch'].map(option =>
+                        this.renderAnchorModeButton('vertical', option, vertical, enabled, readOnly)
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            `
+          : ''}
+      `,
+      {
+        className: 'anchor-section anchor-section--visual',
+        hideTitle: true,
+      }
+    );
   }
 
   private renderTransformGroup(label: string, props: PropertyDefinition[]) {
@@ -1845,197 +2000,48 @@ export class InspectorPanel extends ComponentBase {
       return '';
     }
 
-    return html`
-      <div class="property-group-section transform-section">
-        <h4 class="group-title">${label}</h4>
-        ${props.map(prop => this.renderTransformProperty(prop))}
-      </div>
-    `;
+    return this.renderPropertySection(label, props.map(prop => this.renderTransformProperty(prop)), {
+      className: 'transform-section',
+    });
   }
 
   private renderTransformProperty(prop: PropertyDefinition) {
-    if (!this.primaryNode || !this.propertyValues[prop.name]) {
-      return '';
-    }
-
-    const state = this.propertyValues[prop.name];
-    const label = prop.ui?.label || prop.name;
-    const readOnly = this.isPropertyReadOnly(prop.ui?.readOnly, this.primaryNode);
-
-    // For vector properties, render as grid
-    if (prop.type === 'vector2' || prop.type === 'vector3' || prop.type === 'euler') {
-      let value = { x: 0, y: 0, z: 0 };
-      try {
-        value = typeof state.value === 'string' ? JSON.parse(state.value) : state.value;
-      } catch {
-        console.warn(`Failed to parse vector value for ${prop.name}:`, state.value);
+    if (this.primaryNode instanceof Node2D && prop.name === 'rotation' && prop.type === 'number') {
+      const state = this.propertyValues[prop.name];
+      if (!state) {
+        return '';
       }
 
-      if (prop.type === 'vector2') {
-        return html`
-          <div class="transform-subsection">
-            <div class="subsection-title">
-              ${label}
-              <button class="reset-button" title="Reset to default">↻</button>
-            </div>
-            <div class="transform-fields">
-              <div class="transform-field-label">X</div>
-              <input
-                type="number"
-                class="transform-field-input"
-                step=${prop.ui?.step ?? 0.01}
-                .value=${value.x.toFixed(prop.ui?.precision ?? 2)}
-                ?disabled=${readOnly}
-                @change=${(e: Event) => {
-                  const newX = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: newX, y: value.y });
-                }}
-              />
+      const label = prop.ui?.label || prop.name;
+      const readOnly = this.isPropertyReadOnly(prop.ui?.readOnly, this.primaryNode);
+      const isOverridden = this.isPropertyOverriddenForPrimaryNode(prop);
 
-              <div class="transform-field-label">Y</div>
-              <input
-                type="number"
-                class="transform-field-input"
-                step=${prop.ui?.step ?? 0.01}
-                .value=${value.y.toFixed(prop.ui?.precision ?? 2)}
-                ?disabled=${readOnly}
-                @change=${(e: Event) => {
-                  const newY = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: newY });
-                }}
-              />
-
-              <div></div>
-              <div></div>
-            </div>
-          </div>
-        `;
-      }
-
-      if (prop.type === 'vector3') {
-        return html`
-          <div class="transform-subsection">
-            <div class="subsection-title">
-              ${label}
-              <button class="reset-button" title="Reset to default">↻</button>
-            </div>
-            <div class="transform-fields">
-              <div class="transform-field-label">X</div>
-              <input
-                type="number"
-                class="transform-field-input"
-                step=${prop.ui?.step ?? 0.01}
-                .value=${value.x.toFixed(prop.ui?.precision ?? 2)}
-                ?disabled=${readOnly}
-                @change=${(e: Event) => {
-                  const newX = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
-                }}
-              />
-
-              <div class="transform-field-label">Y</div>
-              <input
-                type="number"
-                class="transform-field-input"
-                step=${prop.ui?.step ?? 0.01}
-                .value=${value.y.toFixed(prop.ui?.precision ?? 2)}
-                ?disabled=${readOnly}
-                @change=${(e: Event) => {
-                  const newY = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
-                }}
-              />
-
-              <div class="transform-field-label">Z</div>
-              <input
-                type="number"
-                class="transform-field-input"
-                step=${prop.ui?.step ?? 0.01}
-                .value=${value.z.toFixed(prop.ui?.precision ?? 2)}
-                ?disabled=${readOnly}
-                @change=${(e: Event) => {
-                  const newZ = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
-                }}
-              />
-            </div>
-          </div>
-        `;
-      }
-
-      if (prop.type === 'euler') {
-        return html`
-          <div class="transform-subsection">
-            <div class="subsection-title">
-              ${label}
-              <button class="reset-button" title="Reset to default">↻</button>
-            </div>
-            <div class="transform-fields">
-              <div class="transform-field-label">X</div>
-              <input
-                type="number"
-                class="transform-field-input"
-                step=${prop.ui?.step ?? 0.1}
-                .value=${value.x.toFixed(prop.ui?.precision ?? 1)}
-                ?disabled=${readOnly}
-                @change=${(e: Event) => {
-                  const newX = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: newX, y: value.y, z: value.z });
-                }}
-              />
-
-              <div class="transform-field-label">Y</div>
-              <input
-                type="number"
-                class="transform-field-input"
-                step=${prop.ui?.step ?? 0.1}
-                .value=${value.y.toFixed(prop.ui?.precision ?? 1)}
-                ?disabled=${readOnly}
-                @change=${(e: Event) => {
-                  const newY = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: newY, z: value.z });
-                }}
-              />
-
-              <div class="transform-field-label">Z</div>
-              <input
-                type="number"
-                class="transform-field-input"
-                step=${prop.ui?.step ?? 0.1}
-                .value=${value.z.toFixed(prop.ui?.precision ?? 1)}
-                ?disabled=${readOnly}
-                @change=${(e: Event) => {
-                  const newZ = parseFloat((e.target as HTMLInputElement).value);
-                  this.applyPropertyChange(prop.name, { x: value.x, y: value.y, z: newZ });
-                }}
-              />
-            </div>
-          </div>
-        `;
-      }
-    }
-
-    // For single number properties in transform group
-    if (prop.type === 'number') {
       return html`
-        <div class="property-group">
-          <span class="property-label">${label}${prop.ui?.unit ? ` (${prop.ui.unit})` : ''}</span>
-          <input
-            type="number"
-            step=${prop.ui?.step ?? 0.01}
-            class="property-input property-input--number ${state.isValid
-              ? ''
-              : 'property-input--invalid'}"
-            .value=${state.value}
-            ?disabled=${readOnly}
-            @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
-            @blur=${(e: Event) => this.handlePropertyBlur(prop.name, e)}
-          />
+        <div class="property-group property-group--transform-single-axis">
+          ${this.renderPropertyLabel(
+            prop,
+            `${label}${prop.ui?.unit ? ` (${prop.ui.unit})` : ''}`,
+            isOverridden
+          )}
+          <div class="transform-single-axis-editor">
+            <span class="transform-single-axis-label transform-single-axis-label--z">Z</span>
+            <input
+              type="number"
+              step=${prop.ui?.step ?? 0.01}
+              class="property-input property-input--number ${state.isValid
+                ? ''
+                : 'property-input--invalid'}"
+              .value=${state.value}
+              ?disabled=${readOnly}
+              @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
+              @blur=${(e: Event) => this.handlePropertyBlur(prop.name, e)}
+            />
+          </div>
         </div>
       `;
     }
 
-    return '';
+    return this.renderPropertyInput(prop);
   }
 
   private renderSizeGroup(label: string, props: PropertyDefinition[]) {
@@ -2048,13 +2054,7 @@ export class InspectorPanel extends ComponentBase {
     const remainingProps = props.filter(p => p.name !== 'width' && p.name !== 'height');
 
     if (!widthProp || !heightProp) {
-      // Fallback to default rendering if missing props
-      return html`
-        <div class="property-group-section">
-          <h4 class="group-title">${label}</h4>
-          ${props.map(prop => this.renderPropertyInput(prop))}
-        </div>
-      `;
+      return this.renderPropertySection(label, props.map(prop => this.renderPropertyInput(prop)));
     }
 
     const widthState = this.propertyValues[widthProp.name];
@@ -2065,12 +2065,7 @@ export class InspectorPanel extends ComponentBase {
     const height = heightState ? parseFloat(heightState.value) : 64;
 
     if (!(this.primaryNode instanceof Sprite2D)) {
-      return html`
-        <div class="property-group-section">
-          <h4 class="group-title">${label}</h4>
-          ${props.map(prop => this.renderPropertyInput(prop))}
-        </div>
-      `;
+      return this.renderPropertySection(label, props.map(prop => this.renderPropertyInput(prop)));
     }
 
     const node = this.primaryNode;
@@ -2120,26 +2115,50 @@ export class InspectorPanel extends ComponentBase {
       void this.applyPropertyChange('aspectRatioLocked', newLocked);
     };
 
-    return html`
-      <div class="property-group-section size-section">
-        <div class="size-group-header">
-          <h4 class="group-title">${label}</h4>
-          <div class="size-group-actions">
-            ${hasOriginalSize
+    return this.renderPropertySection(
+      label,
+      html`
+        <div class="property-group property-group--size-inline">
+          ${this.renderPropertyLabel(
+            widthProp,
+            'Size',
+            this.isPropertyOverriddenForPrimaryNode(widthProp)
+          )}
+          <div class="size-inline-editor">
+            <label class="size-inline-field">
+              <span class="size-inline-axis">W</span>
+              <input
+                type="number"
+                class="property-input property-input--number size-inline-input"
+                step=${widthProp.ui?.step ?? 1}
+                .value=${width.toFixed(widthProp.ui?.precision ?? 0)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) =>
+                  handleWidthChange(parseFloat((e.target as HTMLInputElement).value))}
+              />
+            </label>
+            <label class="size-inline-field">
+              <span class="size-inline-axis">H</span>
+              <input
+                type="number"
+                class="property-input property-input--number size-inline-input"
+                step=${heightProp.ui?.step ?? 1}
+                .value=${height.toFixed(heightProp.ui?.precision ?? 0)}
+                ?disabled=${readOnly}
+                @change=${(e: Event) =>
+                  handleHeightChange(parseFloat((e.target as HTMLInputElement).value))}
+              />
+            </label>
+            ${widthProp.ui?.unit || heightProp.ui?.unit
               ? html`
-                  <button
-                    class="size-reset-button"
-                    title=${`Reset to original texture size (${originalWidth} x ${originalHeight})`}
-                    @click=${handleResetToOriginal}
-                  >
-                    ${this.iconService.getIcon('refresh-cw', 14)}
-                  </button>
+                  <span class="size-inline-unit">${widthProp.ui?.unit ?? heightProp.ui?.unit}</span>
                 `
               : ''}
             ${hasOriginalRatio
               ? html`
                   <button
                     class="size-lock-button ${aspectRatioLocked ? 'locked' : ''}"
+                    type="button"
                     title=${aspectRatioLocked ? 'Unlock aspect ratio' : 'Lock aspect ratio'}
                     @click=${handleToggleAspectRatio}
                   >
@@ -2147,45 +2166,27 @@ export class InspectorPanel extends ComponentBase {
                   </button>
                 `
               : ''}
-          </div>
-        </div>
-
-        <div class="size-fields">
-          <div class="size-field">
-            <label class="size-field-label">Width</label>
-            <input
-              type="number"
-              class="size-field-input"
-              step=${widthProp.ui?.step ?? 1}
-              .value=${width.toFixed(widthProp.ui?.precision ?? 0)}
-              ?disabled=${readOnly}
-              @change=${(e: Event) =>
-                handleWidthChange(parseFloat((e.target as HTMLInputElement).value))}
-            />
-            ${widthProp.ui?.unit
-              ? html`<span class="size-field-unit">${widthProp.ui.unit}</span>`
-              : ''}
-          </div>
-
-          <div class="size-field">
-            <label class="size-field-label">Height</label>
-            <input
-              type="number"
-              class="size-field-input"
-              step=${heightProp.ui?.step ?? 1}
-              .value=${height.toFixed(heightProp.ui?.precision ?? 0)}
-              ?disabled=${readOnly}
-              @change=${(e: Event) =>
-                handleHeightChange(parseFloat((e.target as HTMLInputElement).value))}
-            />
-            ${heightProp.ui?.unit
-              ? html`<span class="size-field-unit">${heightProp.ui.unit}</span>`
+            ${hasOriginalSize
+              ? html`
+                  <button
+                    class="size-reset-button"
+                    type="button"
+                    title=${`Reset to original texture size (${originalWidth} x ${originalHeight})`}
+                    @click=${handleResetToOriginal}
+                  >
+                    ${this.iconService.getIcon('refresh-cw', 14)}
+                  </button>
+                `
               : ''}
           </div>
         </div>
         ${remainingProps.map(prop => this.renderPropertyInput(prop))}
-      </div>
-    `;
+      `,
+      {
+        className: 'size-section',
+        hideTitle: true,
+      }
+    );
   }
 
   private getSelectOptions(prop: PropertyDefinition): SelectOption[] {
@@ -2277,7 +2278,7 @@ export class InspectorPanel extends ComponentBase {
 
     if (prop.type === 'boolean') {
       return html`
-        <div class="property-group component-property-group">
+        <div class="property-group property-group--checkbox component-property-group">
           <label class="property-label property-label--checkbox">
             <input
               type="checkbox"
@@ -2291,7 +2292,7 @@ export class InspectorPanel extends ComponentBase {
                   (e.target as HTMLInputElement).checked
                 )}
             />
-            ${label}
+            <span class="property-label-text">${label}</span>
           </label>
         </div>
       `;
@@ -2509,7 +2510,8 @@ export class InspectorPanel extends ComponentBase {
             />
             <input
               type="text"
-              class="property-input property-input--text ${state.isValid
+              maxlength="9"
+              class="property-input property-input--text property-input--color-text ${state.isValid
                 ? ''
                 : 'property-input--invalid'}"
               .value=${state.value}
@@ -2616,7 +2618,7 @@ export class InspectorPanel extends ComponentBase {
 
     if (prop.type === 'boolean') {
       return html`
-        <div class="property-group">
+        <div class="property-group property-group--checkbox">
           <label class="property-label property-label--checkbox">
             <input
               type="checkbox"
@@ -2626,7 +2628,10 @@ export class InspectorPanel extends ComponentBase {
               @change=${(e: Event) =>
                 this.applyPropertyChange(prop.name, (e.target as HTMLInputElement).checked)}
             />
-            <span class=${isOverridden ? 'property-label--overridden' : ''}>${label}</span>
+            <span
+              class=${`property-label-text ${isOverridden ? 'property-label--overridden' : ''}`}
+              >${label}</span
+            >
             ${isOverridden
               ? html`
                   <button
@@ -2816,6 +2821,31 @@ export class InspectorPanel extends ComponentBase {
     }
 
     if (prop.type === 'number') {
+      if (prop.name === 'opacity') {
+        const numericValue = Number.parseFloat(state.value);
+        const safeValue = Number.isFinite(numericValue)
+          ? Math.min(Math.max(numericValue, 0), 1)
+          : 1;
+
+        return html`
+          <div class="property-group property-group--opacity">
+            ${labelTemplate}
+            <pix3-slider-number-editor
+              .value=${safeValue * 100}
+              .min=${0}
+              .max=${100}
+              .step=${1}
+              .precision=${0}
+              ?disabled=${readOnly}
+              @preview-change=${(e: CustomEvent<{ value: number }>) =>
+                this.handleSliderPreview(prop.name, e.detail.value / 100)}
+              @commit-change=${(e: CustomEvent<{ value: number }>) =>
+                this.handleSliderCommit(prop.name, e.detail.value / 100)}
+            ></pix3-slider-number-editor>
+          </div>
+        `;
+      }
+
       const hasSlider =
         prop.ui?.slider === true &&
         typeof prop.ui?.min === 'number' &&
@@ -2894,7 +2924,8 @@ export class InspectorPanel extends ComponentBase {
             />
             <input
               type="text"
-              class="property-input property-input--text ${state.isValid
+              maxlength="9"
+              class="property-input property-input--text property-input--color-text ${state.isValid
                 ? ''
                 : 'property-input--invalid'}"
               .value=${state.value}
@@ -2910,29 +2941,15 @@ export class InspectorPanel extends ComponentBase {
     if (prop.type === 'string') {
       return html`
         <div class="property-group">
-          <label class="property-label">
-            <span class=${isOverridden ? 'property-label--overridden' : ''}>${label}:</span>
-            ${isOverridden
-              ? html`
-                  <button
-                    class="property-revert-button"
-                    type="button"
-                    title="Revert prefab override"
-                    @click=${(e: Event) => this.onRevertPropertyClick(e, prop)}
-                  >
-                    ↺
-                  </button>
-                `
-              : null}
-            <input
-              type="text"
-              class="property-input property-input--text"
-              .value=${state.value}
-              ?disabled=${readOnly}
-              @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
-              @blur=${(e: Event) => this.handlePropertyBlur(prop.name, e)}
-            />
-          </label>
+          ${labelTemplate}
+          <input
+            type="text"
+            class="property-input property-input--text"
+            .value=${state.value}
+            ?disabled=${readOnly}
+            @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
+            @blur=${(e: Event) => this.handlePropertyBlur(prop.name, e)}
+          />
         </div>
       `;
     }
@@ -2940,28 +2957,201 @@ export class InspectorPanel extends ComponentBase {
     // Default fallback for other types
     return html`
       <div class="property-group">
-        <label class="property-label">
-          <span class=${isOverridden ? 'property-label--overridden' : ''}>${label}:</span>
-          ${isOverridden
-            ? html`
-                <button
-                  class="property-revert-button"
-                  type="button"
-                  title="Revert prefab override"
-                  @click=${(e: Event) => this.onRevertPropertyClick(e, prop)}
-                >
-                  ↺
-                </button>
-              `
-            : null}
-          <input
-            type="text"
-            class="property-input property-input--text"
-            .value=${state.value}
-            ?disabled=${readOnly}
-            @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
-          />
-        </label>
+        ${labelTemplate}
+        <input
+          type="text"
+          class="property-input property-input--text"
+          .value=${state.value}
+          ?disabled=${readOnly}
+          @input=${(e: Event) => this.handlePropertyInput(prop.name, e)}
+        />
+      </div>
+    `;
+  }
+
+  private renderAnchorModeButton(
+    axis: 'horizontal' | 'vertical',
+    option: string,
+    currentValue: string,
+    enabled: boolean,
+    readOnly: boolean
+  ) {
+    const label =
+      axis === 'horizontal'
+        ? {
+            left: 'L',
+            center: 'C',
+            right: 'R',
+            stretch: 'S',
+          }[option]
+        : {
+            top: 'T',
+            center: 'C',
+            bottom: 'B',
+            stretch: 'S',
+          }[option];
+
+    return html`
+      <button
+        class="anchor-mode-button ${enabled && currentValue === option ? 'is-active' : ''}"
+        type="button"
+        ?disabled=${readOnly}
+        title=${option}
+        aria-label=${`${axis} ${option}`}
+        @click=${() => this.applyAnchorMode(axis, option)}
+      >
+        ${this.renderAnchorModeIcon(axis, option, label)}
+      </button>
+    `;
+  }
+
+  private renderAnchorModeIcon(axis: 'horizontal' | 'vertical', option: string, fallback: string) {
+    if (axis === 'horizontal') {
+      switch (option) {
+        case 'left':
+          return html`<svg viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M2 2v10"></path>
+            <rect x="3.5" y="4" width="6" height="6"></rect>
+          </svg>`;
+        case 'center':
+          return html`<svg viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M7 2v10"></path>
+            <rect x="4" y="4" width="6" height="6"></rect>
+          </svg>`;
+        case 'right':
+          return html`<svg viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M12 2v10"></path>
+            <rect x="4.5" y="4" width="6" height="6"></rect>
+          </svg>`;
+        case 'stretch':
+          return html`<svg viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M2 2v10M12 2v10"></path>
+            <rect x="3" y="4" width="8" height="6"></rect>
+          </svg>`;
+      }
+    }
+
+    if (axis === 'vertical') {
+      switch (option) {
+        case 'top':
+          return html`<svg viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M2 2h10"></path>
+            <rect x="4" y="3.5" width="6" height="6"></rect>
+          </svg>`;
+        case 'center':
+          return html`<svg viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M2 7h10"></path>
+            <rect x="4" y="4" width="6" height="6"></rect>
+          </svg>`;
+        case 'bottom':
+          return html`<svg viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M2 12h10"></path>
+            <rect x="4" y="4.5" width="6" height="6"></rect>
+          </svg>`;
+        case 'stretch':
+          return html`<svg viewBox="0 0 14 14" aria-hidden="true">
+            <path d="M2 2h10M2 12h10"></path>
+            <rect x="4" y="3" width="6" height="8"></rect>
+          </svg>`;
+      }
+    }
+
+    return fallback;
+  }
+
+  private renderAnchorPreviewEdge(
+    edge: 'left' | 'right' | 'top' | 'bottom' | 'center',
+    horizontal: string,
+    vertical: string,
+    readOnly: boolean
+  ) {
+    const isActive =
+      (edge === 'left' && horizontal === 'left') ||
+      (edge === 'right' && horizontal === 'right') ||
+      (edge === 'top' && vertical === 'top') ||
+      (edge === 'bottom' && vertical === 'bottom') ||
+      (edge === 'center' && horizontal === 'center' && vertical === 'center');
+
+    return html`
+      <button
+        class="anchor-preview-edge anchor-preview-edge--${edge} ${isActive ? 'is-active' : ''}"
+        type="button"
+        ?disabled=${readOnly}
+        title=${edge === 'center' ? 'Center both axes' : `Set ${edge} alignment`}
+        @click=${() => this.applyAnchorPreviewEdge(edge)}
+      ></button>
+    `;
+  }
+
+  private async applyAnchorMode(axis: 'horizontal' | 'vertical', value: string): Promise<void> {
+    if (!this.primaryNode || !(this.primaryNode instanceof Node2D)) {
+      return;
+    }
+
+    if (!(this.propertyValues['layoutEnabled']?.value === 'true' || this.primaryNode.layoutEnabled)) {
+      await this.applyPropertyChange('layoutEnabled', true);
+    }
+
+    await this.applyPropertyChange(
+      axis === 'horizontal' ? 'horizontalAlign' : 'verticalAlign',
+      value
+    );
+  }
+
+  private async applyAnchorPreviewEdge(
+    edge: 'left' | 'right' | 'top' | 'bottom' | 'center'
+  ): Promise<void> {
+    if (edge === 'center') {
+      await this.applyAnchorPreset({ horizontal: 'center', vertical: 'center' });
+      return;
+    }
+
+    if (edge === 'left' || edge === 'right') {
+      await this.applyAnchorMode('horizontal', edge);
+      return;
+    }
+
+    await this.applyAnchorMode('vertical', edge);
+  }
+
+  private async applyAnchorPreset(preset: {
+    horizontal?: 'left' | 'center' | 'right' | 'stretch';
+    vertical?: 'top' | 'center' | 'bottom' | 'stretch';
+  }): Promise<void> {
+    if (!this.primaryNode || !(this.primaryNode instanceof Node2D)) {
+      return;
+    }
+
+    if (!(this.propertyValues['layoutEnabled']?.value === 'true' || this.primaryNode.layoutEnabled)) {
+      await this.applyPropertyChange('layoutEnabled', true);
+    }
+
+    if (preset.horizontal) {
+      await this.applyPropertyChange('horizontalAlign', preset.horizontal);
+    }
+
+    if (preset.vertical) {
+      await this.applyPropertyChange('verticalAlign', preset.vertical);
+    }
+  }
+
+  private renderPropertySection(
+    label: string,
+    content: unknown,
+    options: PropertySectionOptions = {}
+  ) {
+    const classes = [
+      'property-group-section',
+      options.className,
+      options.hideTitle ? 'property-group-section--titleless' : '',
+    ]
+      .filter(Boolean)
+      .join(' ');
+
+    return html`
+      <div class=${classes}>
+        ${options.hideTitle ? '' : html`<h4 class="group-title">${label}</h4>`}
+        ${content}
       </div>
     `;
   }

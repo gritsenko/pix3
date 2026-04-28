@@ -4,6 +4,7 @@ import {
   AmbientLightNode,
   AudioPlayer,
   Camera3D,
+  Group2D,
   type NodeBase,
   PlaySoundBehavior,
   type PropertyDefinition,
@@ -249,6 +250,7 @@ describe('InspectorPanel color property editor', () => {
     expect(textInput).not.toBeNull();
     expect(colorInput?.value).toBe(expectedColor);
     expect(textInput?.value).toBe(expectedColor);
+    expect(textInput?.classList.contains('property-input--color-text')).toBe(true);
   });
 
   it('dispatches UpdateObjectPropertyCommand when the color picker changes', async () => {
@@ -330,6 +332,160 @@ describe('InspectorPanel camera projection editor', () => {
     expect((projectionSelect as HTMLSelectElement).value).toBe('orthographic');
     expect(fovInput).toBeInstanceOf(HTMLInputElement);
     expect((fovInput as HTMLInputElement).disabled).toBe(true);
+  });
+});
+
+describe('InspectorPanel compact object layout', () => {
+  it('renders object identity in a compact summary without the old inspector title', async () => {
+    const { panel } = await setupInspectorForNode(
+      new Group2D({
+        id: 'group-root',
+        name: 'HUD Root',
+        width: 320,
+        height: 180,
+      })
+    );
+
+    const nameInput = panel.querySelector('.inspector-name-input') as HTMLInputElement | null;
+    const summaryType = panel.querySelector('.inspector-summary-type');
+    const summaryId = panel.querySelector('.inspector-summary-id');
+    const summaryGroups = panel.querySelector('.group-chip-list--summary');
+
+    expect(panel.textContent).not.toContain('Object Inspector');
+    expect(nameInput?.value).toBe('HUD Root');
+    expect(summaryType?.textContent).toContain('Group2D');
+    expect(summaryId?.textContent).toContain('group-root');
+    expect(summaryGroups).toBeNull();
+  });
+
+  it('shows groups as compact chips and opens the groups popover from the summary toolbar', async () => {
+    const node = new Group2D({
+      id: 'group-root',
+      name: 'HUD Root',
+      width: 320,
+      height: 180,
+    });
+    node.addToGroup('ui');
+    node.addToGroup('hud');
+
+    const { panel } = await setupInspectorForNode(node);
+    const chips = Array.from(panel.querySelectorAll('.group-chip-list--summary .group-chip')).map(
+      chip => chip.textContent?.trim()
+    );
+    const trigger = panel.querySelector('.summary-toolbar-button') as HTMLButtonElement | null;
+
+    expect(chips).toEqual(['hud', 'ui']);
+    expect(panel.querySelector('.groups-popover')).toBeNull();
+
+    trigger?.click();
+    await panel.updateComplete;
+
+    expect(panel.querySelector('.groups-popover')).not.toBeNull();
+  });
+
+  it('orders object sections with Transform before Anchor and hides the standalone Style title', async () => {
+    const { panel } = await setupInspectorForNode(
+      new Group2D({
+        id: 'group-root',
+        name: 'HUD Root',
+        width: 320,
+        height: 180,
+      })
+    );
+
+    const titles = Array.from(panel.querySelectorAll('.group-title')).map(title =>
+      title.textContent?.trim()
+    );
+
+    expect(titles).toContain('Transform');
+    expect(titles).toContain('Align');
+    expect(titles).not.toContain('Anchor');
+    expect(titles).not.toContain('Style');
+    expect(titles.indexOf('Transform')).toBeLessThan(titles.indexOf('Align'));
+    expect(panel.textContent).toContain('Opacity');
+    expect(panel.querySelector('.property-group--opacity')).not.toBeNull();
+  });
+
+  it('hides anchor controls until anchor layout is enabled', async () => {
+    const { panel } = await setupInspectorForNode(
+      new Group2D({
+        id: 'group-root',
+        name: 'HUD Root',
+        width: 320,
+        height: 180,
+      })
+    );
+
+    expect(panel.querySelector('.anchor-visual-editor')).toBeNull();
+  });
+
+  it('renders the visual anchor editor with icon buttons and dispatches anchor updates', async () => {
+    const execute = vi.fn().mockResolvedValue(undefined);
+    const node = new Group2D({
+      id: 'group-root',
+      name: 'HUD Root',
+      width: 320,
+      height: 180,
+    });
+    node.layoutEnabled = true;
+
+    const { panel } = await setupInspectorForNode(
+      node,
+      execute
+    );
+
+    const anchorEditor = panel.querySelector('.anchor-visual-editor');
+    const horizontalLeftButton = panel.querySelector('.anchor-control-row .anchor-mode-button');
+    const leftButtonIcon = horizontalLeftButton?.querySelector('svg');
+
+    expect(anchorEditor).not.toBeNull();
+    expect(leftButtonIcon).not.toBeNull();
+
+    horizontalLeftButton?.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    await vi.waitFor(() => {
+      const lastCommand = execute.mock.calls.at(-1)?.[0] as {
+        params?: { propertyPath: string; value: unknown };
+      };
+      expect(lastCommand.params?.propertyPath).toBe('horizontalAlign');
+    });
+
+    const firstCommand = execute.mock.calls[0]?.[0] as {
+      params?: { propertyPath: string; value: unknown };
+    };
+    const lastCommand = execute.mock.calls.at(-1)?.[0] as {
+      params?: { propertyPath: string; value: unknown };
+    };
+
+    expect(firstCommand.params?.propertyPath).not.toBe('layoutEnabled');
+
+    expect(lastCommand.params?.propertyPath).toBe('horizontalAlign');
+    expect(lastCommand.params?.value).toBe('left');
+  });
+
+  it('renders components as a flat section with text enable actions and no foldout button', async () => {
+    const node = new AudioPlayer({
+      id: 'audio-player',
+      name: 'Audio Player',
+    });
+    const component = new PlaySoundBehavior('behavior-1', 'core:PlaySound');
+    component.enabled = false;
+    node.addComponent(component);
+
+    const { panel } = await setupInspectorForNode(node);
+
+    const sectionTitle = Array.from(panel.querySelectorAll('.group-title')).find(
+      title => title.textContent?.trim() === 'Components'
+    );
+    const foldout = panel.querySelector('.script-foldout-btn');
+    const enableAction = Array.from(panel.querySelectorAll('.component-action-link')).find(
+      action => action.textContent?.trim() === 'Enable'
+    );
+    const disabledName = panel.querySelector('.component-block--disabled .script-name');
+
+    expect(sectionTitle).not.toBeUndefined();
+    expect(foldout).toBeNull();
+    expect(enableAction).not.toBeUndefined();
+    expect(disabledName?.textContent).toContain('core:PlaySound');
   });
 });
 
@@ -615,7 +771,9 @@ describe('InspectorPanel asset preview rendering', () => {
     const panel = document.createElement('pix3-inspector-panel') as InstanceType<
       typeof InspectorPanel
     >;
-    const readBlob = vi.fn().mockResolvedValue(new File(['audio-data'], 'click.wav', { type: 'audio/wav' }));
+    const readBlob = vi
+      .fn()
+      .mockResolvedValue(new File(['audio-data'], 'click.wav', { type: 'audio/wav' }));
     const node = new AudioPlayer({
       id: 'audio-player',
       name: 'Audio Player',

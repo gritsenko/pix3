@@ -49,22 +49,29 @@ export class Vector2Editor extends ComponentBase {
   @property({ type: Number })
   precision: number = 2;
 
+  @property({ type: Boolean })
+  disabled = false;
+
   static styles = css`
     :host {
       display: flex;
       gap: 0.5rem;
       align-items: center;
+      min-width: 0;
+      flex: 1;
     }
 
     .vector-input-group {
       display: flex;
       gap: 0.25rem;
       flex: 1;
+      min-width: 0;
+      align-items: center;
     }
 
     .vector-input {
-      flex: 1;
-      min-width: 3rem;
+      width: 4.4rem;
+      min-width: 4.4rem;
     }
 
     input {
@@ -90,22 +97,36 @@ export class Vector2Editor extends ComponentBase {
 
     .axis-label {
       font-size: 0.75rem;
-      color: var(--color-text-subtle, #888);
-      min-width: 1rem;
-      text-align: center;
+      min-width: 0.95rem;
+      height: 1.9rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-weight: 600;
+      text-align: center;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .axis-label--x {
+      color: #ff6b6b;
+    }
+
+    .axis-label--y {
+      color: #51cf66;
     }
   `;
 
   protected render() {
     return html`
       <div class="vector-input-group">
-        <div class="axis-label">X</div>
+        <div class="axis-label axis-label--x">X</div>
         <input
           type="number"
           class="vector-input"
           step=${this.step}
           .value=${this.x.toFixed(this.precision)}
+          ?disabled=${this.disabled}
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
@@ -114,12 +135,13 @@ export class Vector2Editor extends ComponentBase {
             )}
         />
 
-        <div class="axis-label">Y</div>
+        <div class="axis-label axis-label--y">Y</div>
         <input
           type="number"
           class="vector-input"
           step=${this.step}
           .value=${this.y.toFixed(this.precision)}
+          ?disabled=${this.disabled}
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
@@ -153,22 +175,29 @@ export class Vector3Editor extends ComponentBase {
   @property({ type: Number })
   precision: number = 2;
 
+  @property({ type: Boolean })
+  disabled = false;
+
   static styles = css`
     :host {
       display: flex;
       gap: 0.5rem;
       align-items: center;
+      min-width: 0;
+      flex: 1;
     }
 
     .vector-input-group {
       display: flex;
       gap: 0.25rem;
       flex: 1;
+      min-width: 0;
+      align-items: center;
     }
 
     .vector-input {
-      flex: 1;
-      min-width: 3rem;
+      width: 4.2rem;
+      min-width: 4.2rem;
     }
 
     input {
@@ -194,22 +223,40 @@ export class Vector3Editor extends ComponentBase {
 
     .axis-label {
       font-size: 0.75rem;
-      color: var(--color-text-subtle, #888);
-      min-width: 1rem;
-      text-align: center;
+      min-width: 0.95rem;
+      height: 1.9rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-weight: 600;
+      text-align: center;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .axis-label--x {
+      color: #ff6b6b;
+    }
+
+    .axis-label--y {
+      color: #51cf66;
+    }
+
+    .axis-label--z {
+      color: #4c6ef5;
     }
   `;
 
   protected render() {
     return html`
       <div class="vector-input-group">
-        <div class="axis-label">X</div>
+        <div class="axis-label axis-label--x">X</div>
         <input
           type="number"
           class="vector-input"
           step=${this.step}
           .value=${this.x.toFixed(this.precision)}
+          ?disabled=${this.disabled}
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
@@ -222,12 +269,13 @@ export class Vector3Editor extends ComponentBase {
             )}
         />
 
-        <div class="axis-label">Y</div>
+        <div class="axis-label axis-label--y">Y</div>
         <input
           type="number"
           class="vector-input"
           step=${this.step}
           .value=${this.y.toFixed(this.precision)}
+          ?disabled=${this.disabled}
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
@@ -240,12 +288,13 @@ export class Vector3Editor extends ComponentBase {
             )}
         />
 
-        <div class="axis-label">Z</div>
+        <div class="axis-label axis-label--z">Z</div>
         <input
           type="number"
           class="vector-input"
           step=${this.step}
           .value=${this.z.toFixed(this.precision)}
+          ?disabled=${this.disabled}
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
@@ -283,22 +332,29 @@ export class EulerEditor extends ComponentBase {
   @property({ type: Number })
   precision: number = 1;
 
+  @property({ type: Boolean })
+  disabled = false;
+
   static styles = css`
     :host {
       display: flex;
       gap: 0.5rem;
       align-items: center;
+      min-width: 0;
+      flex: 1;
     }
 
     .euler-input-group {
       display: flex;
       gap: 0.25rem;
       flex: 1;
+      min-width: 0;
+      align-items: center;
     }
 
     .euler-input {
-      flex: 1;
-      min-width: 3rem;
+      width: 4.2rem;
+      min-width: 4.2rem;
     }
 
     input {
@@ -324,10 +380,27 @@ export class EulerEditor extends ComponentBase {
 
     .axis-label {
       font-size: 0.75rem;
-      color: var(--color-text-subtle, #888);
-      min-width: 1rem;
-      text-align: center;
+      min-width: 0.95rem;
+      height: 1.9rem;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
       font-weight: 600;
+      text-align: center;
+      line-height: 1;
+      flex-shrink: 0;
+    }
+
+    .axis-label--x {
+      color: #ff6b6b;
+    }
+
+    .axis-label--y {
+      color: #51cf66;
+    }
+
+    .axis-label--z {
+      color: #4c6ef5;
     }
 
     .unit-label {
@@ -340,12 +413,13 @@ export class EulerEditor extends ComponentBase {
   protected render() {
     return html`
       <div class="euler-input-group">
-        <div class="axis-label">X</div>
+        <div class="axis-label axis-label--x">X</div>
         <input
           type="number"
           class="euler-input"
           step=${this.step}
           .value=${this.x.toFixed(this.precision)}
+          ?disabled=${this.disabled}
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
@@ -358,12 +432,13 @@ export class EulerEditor extends ComponentBase {
             )}
         />
 
-        <div class="axis-label">Y</div>
+        <div class="axis-label axis-label--y">Y</div>
         <input
           type="number"
           class="euler-input"
           step=${this.step}
           .value=${this.y.toFixed(this.precision)}
+          ?disabled=${this.disabled}
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
@@ -376,12 +451,13 @@ export class EulerEditor extends ComponentBase {
             )}
         />
 
-        <div class="axis-label">Z</div>
+        <div class="axis-label axis-label--z">Z</div>
         <input
           type="number"
           class="euler-input"
           step=${this.step}
           .value=${this.z.toFixed(this.precision)}
+          ?disabled=${this.disabled}
           @input=${(e: Event) =>
             this.dispatchEvent(
               new CustomEvent('change', {
@@ -883,25 +959,42 @@ export class AudioResourceEditor extends ComponentBase {
         ? html`
             <div class="audio-card">
               ${this.waveformUrl
-                ? html`<img class="waveform" src=${this.waveformUrl} alt="Audio waveform preview" />`
+                ? html`<img
+                    class="waveform"
+                    src=${this.waveformUrl}
+                    alt="Audio waveform preview"
+                  />`
                 : html`<div class="waveform-empty">Audio preview will appear here.</div>`}
               ${this.previewUrl
-                ? html`<audio class="audio-player" controls preload="metadata" src=${this.previewUrl}></audio>`
+                ? html`<audio
+                    class="audio-player"
+                    controls
+                    preload="metadata"
+                    src=${this.previewUrl}
+                  ></audio>`
                 : ''}
               ${durationLabel || this.channelCount > 0 || sampleRateLabel || this.fileSize > 0
                 ? html`
                     <div class="info-row">
                       ${durationLabel
-                        ? html`<span class="info-item"><span class="info-label">Duration</span>${durationLabel}</span>`
+                        ? html`<span class="info-item"
+                            ><span class="info-label">Duration</span>${durationLabel}</span
+                          >`
                         : ''}
                       ${this.channelCount > 0
-                        ? html`<span class="info-item"><span class="info-label">Channels</span>${this.channelCount}</span>`
+                        ? html`<span class="info-item"
+                            ><span class="info-label">Channels</span>${this.channelCount}</span
+                          >`
                         : ''}
                       ${sampleRateLabel
-                        ? html`<span class="info-item"><span class="info-label">Rate</span>${sampleRateLabel}</span>`
+                        ? html`<span class="info-item"
+                            ><span class="info-label">Rate</span>${sampleRateLabel}</span
+                          >`
                         : ''}
                       ${this.fileSize > 0
-                        ? html`<span class="info-item"><span class="info-label">Size</span>${formatBytes(this.fileSize)}</span>`
+                        ? html`<span class="info-item"
+                            ><span class="info-label">Size</span>${formatBytes(this.fileSize)}</span
+                          >`
                         : ''}
                     </div>
                   `
@@ -909,7 +1002,6 @@ export class AudioResourceEditor extends ComponentBase {
             </div>
           `
         : ''}
-
       ${this.showResourceControls
         ? html`
             <div
@@ -1119,7 +1211,6 @@ export class SizeEditor extends ComponentBase {
   static styles = css`
     :host {
       display: flex;
-      flex-direction: column;
       gap: 0.5rem;
       width: 100%;
     }
@@ -1127,30 +1218,24 @@ export class SizeEditor extends ComponentBase {
     .size-fields {
       display: flex;
       gap: 0.5rem;
-      align-items: flex-end;
+      align-items: center;
+      width: 100%;
     }
 
     .field-group {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      gap: 0.25rem;
-    }
-
-    .field-label {
-      font-size: 0.75rem;
-      color: var(--color-text-subtle, #888);
-      font-weight: 500;
-    }
-
-    .field-input-row {
       display: flex;
       gap: 0.25rem;
       align-items: center;
     }
 
+    .field-label {
+      font-size: 0.72rem;
+      color: var(--color-text-subtle, #888);
+      min-width: 0.9rem;
+    }
+
     input[type='number'] {
-      flex: 1;
+      width: 4.75rem;
       background: var(--color-input-bg, #222);
       color: var(--color-text-primary, #eee);
       border: 1px solid var(--color-border, #333);
@@ -1240,7 +1325,7 @@ export class SizeEditor extends ComponentBase {
     return html`
       <div class="size-fields">
         <div class="field-group">
-          <label class="field-label">Width</label>
+          <label class="field-label">W</label>
           <input
             type="number"
             ?disabled=${this.disabled}
@@ -1252,7 +1337,7 @@ export class SizeEditor extends ComponentBase {
         </div>
 
         <div class="field-group">
-          <label class="field-label">Height</label>
+          <label class="field-label">H</label>
           <input
             type="number"
             ?disabled=${this.disabled}
