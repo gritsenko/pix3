@@ -5,7 +5,6 @@ import { NodeBase } from '../nodes/NodeBase';
 import { Node3D } from '../nodes/Node3D';
 import { Node2D } from '../nodes/Node2D';
 import { Group2D } from '../nodes/2D/Group2D';
-import { Layout2D } from '../nodes/2D/Layout2D';
 import { Sprite2D } from '../nodes/2D/Sprite2D';
 import { Joystick2D } from '../nodes/2D/UI/Joystick2D';
 import { UIControl2D } from '../nodes/2D/UI/UIControl2D';
@@ -108,12 +107,6 @@ export class SceneSaver {
 
     // Replace expanded pivot arrays with inline format
     yaml = yaml.replace(/pivot:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'pivot: [$1, $2]');
-
-    // Replace expanded layout anchor/offset arrays with inline format
-    yaml = yaml.replace(/anchorMin:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'anchorMin: [$1, $2]');
-    yaml = yaml.replace(/anchorMax:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'anchorMax: [$1, $2]');
-    yaml = yaml.replace(/offsetMin:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'offsetMin: [$1, $2]');
-    yaml = yaml.replace(/offsetMax:\s*\n\s*- ([\d.-]+)\n\s*- ([\d.-]+)/g, 'offsetMax: [$1, $2]');
 
     // Replace expanded particle vectors with inline format
     yaml = yaml.replace(
@@ -279,21 +272,6 @@ export class SceneSaver {
         transform.rotationOrder = rotation.order;
       }
 
-      props.transform = transform;
-    } else if (node instanceof Layout2D) {
-      // Serialize Layout2D with viewport properties
-      props.width = node.width;
-      props.height = node.height;
-      props.resolutionPreset = node.resolutionPreset;
-      props.showViewportOutline = node.showViewportOutline;
-      props.scaleMode = node.scaleMode;
-
-      // Add 2D transform
-      const transform: Record<string, unknown> = {
-        position: [node.position.x, node.position.y],
-        scale: [node.scale.x, node.scale.y],
-        rotation: MathUtils.radToDeg(node.rotation.z),
-      };
       props.transform = transform;
     } else if (node instanceof Group2D) {
       // Serialize Group2D with size properties

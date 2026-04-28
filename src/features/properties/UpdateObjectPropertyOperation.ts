@@ -7,7 +7,6 @@ import type {
 import { NodeBase } from '@pix3/runtime';
 import { Node2D } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
-import { Layout2D } from '@pix3/runtime';
 import { Sprite3D } from '@pix3/runtime';
 import { SceneManager } from '@pix3/runtime';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
@@ -315,8 +314,8 @@ export class UpdateObjectPropertyOperation implements Operation<OperationInvokeR
     return ['width', 'height', 'size', 'radius', 'resolutionPreset'].includes(propertyPath);
   }
 
-  private is2DContainer(node: NodeBase): node is Layout2D | Group2D {
-    return node instanceof Layout2D || node instanceof Group2D;
+  private is2DContainer(node: NodeBase): node is Group2D {
+    return node instanceof Group2D;
   }
 
   private updateDescendant2DTransforms(vr: ViewportRendererService, parent: NodeBase): void {

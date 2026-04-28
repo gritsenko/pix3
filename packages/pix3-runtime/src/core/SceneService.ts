@@ -25,6 +25,7 @@ export type ViewportChangeListener = (info: ViewportInfo) => void;
 export interface SceneServiceDelegate {
   getActiveCameraNode(): Camera3D | null;
   getUICamera(): import('three').Camera | null;
+  getLogicalCameraSize(): { width: number; height: number };
   setActiveCameraNode(camera: Camera3D | null): void;
   findNodeById(id: string): NodeBase | null;
   getAudioService(): AudioService;
@@ -193,6 +194,10 @@ export class SceneService {
   getViewportSize(): { width: number; height: number } {
     const info = this.getViewportInfo();
     return { width: info.width, height: info.height };
+  }
+
+  getLogicalCameraSize(): { width: number; height: number } {
+    return this.delegate?.getLogicalCameraSize() ?? this.getViewportSize();
   }
 
   getOrientation(): ViewportOrientation {

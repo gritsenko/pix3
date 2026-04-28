@@ -160,7 +160,7 @@ export class IconService {
 </svg>`
     );
 
-    // Viewport icon for Layout2D nodes
+    // Viewport icon for 2D root containers and camera-space UI
     this.customIcons.set(
       'viewport',
       `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

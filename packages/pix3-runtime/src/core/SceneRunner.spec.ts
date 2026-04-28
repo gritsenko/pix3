@@ -37,7 +37,7 @@ function createGraph(cameraNode: Camera3D): SceneGraph {
 }
 
 describe('SceneRunner camera projection updates', () => {
-  it('uses the project viewport base size for the 2D camera when no Layout2D exists', () => {
+  it('uses the project viewport base size for the 2D camera without a legacy viewport node', () => {
     const renderer = createRendererStub(300, 150);
     const runner = new SceneRunner(
       createSceneManagerStub(),

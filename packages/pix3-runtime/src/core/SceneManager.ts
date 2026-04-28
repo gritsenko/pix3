@@ -1,7 +1,6 @@
 import type { NodeBase } from '../nodes/NodeBase';
 import { SceneLoader, type ParseSceneOptions } from './SceneLoader';
 import { SceneSaver } from './SceneSaver';
-import { Layout2D } from '../nodes/2D/Layout2D';
 import { Node2D } from '../nodes/Node2D';
 
 export interface SceneGraph {
@@ -60,49 +59,20 @@ export class SceneManager {
   }
 
   /**
-   * Resize the root layout containers to match viewport dimensions.
-   * Triggers layout recalculation for all Group2D root nodes and their children.
+   * Resize root 2D layout containers to match viewport dimensions.
    *
    * @param width Viewport width in pixels
    * @param height Viewport height in pixels
-   * @param skipLayout2D If true, skip Layout2D size updates (viewport resize only affects Group2D children)
    */
-  resizeRoot(width: number, height: number, skipLayout2D: boolean = false): void {
+  resizeRoot(width: number, height: number, _skipLegacyLayoutRoot: boolean = false): void {
     const graph = this.getActiveSceneGraph();
     if (!graph) return;
 
-    const layout2dNode = this.findLayout2D(graph);
-    if (layout2dNode && !skipLayout2D) {
-      layout2dNode.updateLayout(width, height);
-      
-      // Apply scale mode transformation
-      const transform = layout2dNode.calculateScaleTransform(width, height);
-      layout2dNode.scale.set(transform.scaleX, transform.scaleY, 1);
-      layout2dNode.position.set(transform.offsetX, transform.offsetY, 0);
-    }
-
-    // When skipLayout2D is true (editor mode), propagate the adaptive camera
-    // dimensions (width/height) to all Group2D children so that anchor-based
-    // layout places elements at the visible camera edges, not at the fixed
-    // authored canvas boundaries.
-    if (layout2dNode && skipLayout2D) {
-      layout2dNode.recalculateChildLayouts(width, height);
-    }
-
     for (const node of graph.rootNodes) {
-      if (node instanceof Node2D && node !== layout2dNode) {
+      if (node instanceof Node2D) {
         node.applyAnchoredLayoutRecursive({ width, height }, { width, height });
       }
     }
-  }
-
-  private findLayout2D(graph: SceneGraph): Layout2D | null {
-    for (const node of graph.rootNodes) {
-      if (node instanceof Layout2D) {
-        return node;
-      }
-    }
-    return null;
   }
 
   removeSceneGraph(sceneId: string): void {

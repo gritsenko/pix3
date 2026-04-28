@@ -19,7 +19,6 @@ import { ResourceManager } from './ResourceManager';
 import { Camera3D } from '../nodes/3D/Camera3D';
 import { NodeBase } from '../nodes/NodeBase';
 import { Node2D } from '../nodes/Node2D';
-import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
 import { Sprite3D } from '../nodes/3D/Sprite3D';
 import { AnimatedSprite3D } from '../nodes/3D/AnimatedSprite3D';
 import { Particles3D } from '../nodes/3D/Particles3D';
@@ -144,8 +143,7 @@ export class SceneRunner {
       this.activeCamera.camera.layers.enable(LAYER_3D);
     }
 
-    // Reset viewport tracking so render() recomputes logicalCameraSize with
-    // the new scene's Layout2D authored dimensions on the first tick.
+    // Reset viewport tracking so render() recomputes logicalCameraSize on the first tick.
     this.viewportSize = { width: 0, height: 0 };
     this.logicalCameraSize = { width: 1, height: 1 };
     this.fixedTimeAccumulator = 0;
@@ -268,22 +266,10 @@ export class SceneRunner {
       this.viewportSize.width = cssWidth;
       this.viewportSize.height = cssHeight;
 
-      // Compute adaptive logical camera dimensions (Expand / Match-Min mode).
-      // Use Layout2D authored size when present, otherwise fall back to the
-      // project/root authored viewport size so root Node2D scenes scale against
-      // the same reference frame.
-      let baseW = this.rootLayoutAuthoredSize.width;
-      let baseH = this.rootLayoutAuthoredSize.height;
-
-      if (this.runtimeGraph) {
-        const layout2d = this.runtimeGraph.rootNodes.find(
-          (n): n is Layout2D => n instanceof Layout2D
-        );
-        if (layout2d && layout2d.width > 0 && layout2d.height > 0) {
-          baseW = layout2d.width;
-          baseH = layout2d.height;
-        }
-      }
+      // Compute adaptive logical camera dimensions (Expand / Match-Min mode)
+      // from the authored project viewport size.
+      const baseW = this.rootLayoutAuthoredSize.width;
+      const baseH = this.rootLayoutAuthoredSize.height;
 
       const baseAspect = baseW / baseH;
       const viewportAspect = cssWidth / cssHeight;
@@ -299,15 +285,6 @@ export class SceneRunner {
 
       this.logicalCameraSize = { width: cameraWidth, height: cameraHeight };
 
-      // Update Layout2D nodes with the logical camera dimensions so that
-      // anchored children track the visible camera edges.
-      if (this.runtimeGraph) {
-        for (const node of this.runtimeGraph.rootNodes) {
-          if (node instanceof Layout2D) {
-            this.applyLayout2DViewportScaling(node, cameraWidth, cameraHeight);
-          }
-        }
-      }
     }
 
     // 1. Update Cameras
@@ -420,6 +397,9 @@ export class SceneRunner {
       },
       getUICamera(): Camera | null {
         return runner.orthographicCamera;
+      },
+      getLogicalCameraSize(): { width: number; height: number } {
+        return { ...runner.logicalCameraSize };
       },
       setActiveCameraNode(camera: Camera3D | null): void {
         runner.activeCamera = camera;
@@ -621,72 +601,6 @@ export class SceneRunner {
     return undefined;
   }
 
-  private applyLayout2DViewportScaling(
-    layout: Layout2D,
-    viewportWidth: number,
-    viewportHeight: number
-  ): void {
-    const usesViewportLayoutBounds = layout.scaleMode === ScaleMode.Scale;
-    if (usesViewportLayoutBounds) {
-      layout.recalculateChildLayouts(viewportWidth, viewportHeight);
-    } else {
-      layout.updateLayout();
-    }
-
-    const transform = layout.calculateScaleTransform(viewportWidth, viewportHeight);
-    const authoredTransform = this.getLayout2DAuthoredTransform(layout);
-
-    layout.scale.set(
-      authoredTransform.scaleX * transform.scaleX,
-      authoredTransform.scaleY * transform.scaleY,
-      layout.scale.z
-    );
-    layout.position.set(
-      authoredTransform.positionX + transform.offsetX,
-      authoredTransform.positionY + transform.offsetY,
-      layout.position.z
-    );
-  }
-
-  private getLayout2DAuthoredTransform(layout: Layout2D): {
-    positionX: number;
-    positionY: number;
-    scaleX: number;
-    scaleY: number;
-  } {
-    const transform = this.asRecord(layout.properties.transform);
-    const position = this.readVector2(transform?.position, 0, 0);
-    const scale = this.readVector2(transform?.scale, 1, 1);
-
-    return {
-      positionX: position.x,
-      positionY: position.y,
-      scaleX: scale.x,
-      scaleY: scale.y,
-    };
-  }
-
-  private readVector2(
-    value: unknown,
-    fallbackX: number,
-    fallbackY: number
-  ): { x: number; y: number } {
-    if (Array.isArray(value)) {
-      const x = typeof value[0] === 'number' && Number.isFinite(value[0]) ? value[0] : fallbackX;
-      const y = typeof value[1] === 'number' && Number.isFinite(value[1]) ? value[1] : fallbackY;
-      return { x, y };
-    }
-
-    if (value && typeof value === 'object') {
-      const record = value as Record<string, unknown>;
-      const x = typeof record.x === 'number' && Number.isFinite(record.x) ? record.x : fallbackX;
-      const y = typeof record.y === 'number' && Number.isFinite(record.y) ? record.y : fallbackY;
-      return { x, y };
-    }
-
-    return { x: fallbackX, y: fallbackY };
-  }
-
   private reflowRoot2DNodes(): void {
     if (!this.runtimeGraph) {
       return;
@@ -698,21 +612,10 @@ export class SceneRunner {
     };
 
     for (const node of this.runtimeGraph.rootNodes) {
-      if (node instanceof Layout2D) {
-        continue;
-      }
       if (node instanceof Node2D) {
         node.applyAnchoredLayoutRecursive(currentRootSize, this.rootLayoutAuthoredSize);
       }
     }
-  }
-
-  private asRecord(value: unknown): Record<string, unknown> | null {
-    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-      return null;
-    }
-
-    return value as Record<string, unknown>;
   }
 
   private stopAudioPlayers(node: NodeBase): void {

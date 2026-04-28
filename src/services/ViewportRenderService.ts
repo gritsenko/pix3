@@ -14,7 +14,6 @@ import { Node2D } from '@pix3/runtime';
 import { Node3D } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
 import { Sprite2D } from '@pix3/runtime';
-import { Layout2D } from '@pix3/runtime';
 import { UIControl2D } from '@pix3/runtime';
 import { Button2D } from '@pix3/runtime';
 import { Label2D } from '@pix3/runtime';
@@ -113,7 +112,6 @@ export class ViewportRendererService {
   private sprite2DVisuals = new Map<string, THREE.Group>();
   private sprite3DTexturePaths = new Map<string, string | null>();
   private particles3DTexturePaths = new Map<string, string | null>();
-  private layout2dVisuals = new Map<string, THREE.Group>();
   private uiControl2DVisuals = new Map<string, THREE.Group>();
   private baseViewportFrame?: THREE.Group;
   private selection2DOverlay?: Selection2DOverlay;
@@ -980,18 +978,13 @@ export class ViewportRendererService {
 
   private collect2DContentBounds(nodes: readonly NodeBase[]): THREE.Box3 | null {
     let bounds: THREE.Box3 | null = null;
-    let fallbackLayoutBounds: THREE.Box3 | null = null;
 
     const traverse = (currentNodes: readonly NodeBase[]) => {
       for (const node of currentNodes) {
         if (node instanceof Node2D && this.isVisibleInHierarchy(node)) {
           const nodeBounds = this.getNodeOnlyBounds(node);
           if (!this.isDegenerateBounds(nodeBounds)) {
-            if (node instanceof Layout2D && fallbackLayoutBounds === null) {
-              fallbackLayoutBounds = nodeBounds.clone();
-            } else {
-              bounds = bounds ? bounds.union(nodeBounds) : nodeBounds.clone();
-            }
+            bounds = bounds ? bounds.union(nodeBounds) : nodeBounds.clone();
           }
         }
 
@@ -1005,7 +998,7 @@ export class ViewportRendererService {
     };
 
     traverse(nodes);
-    return bounds ?? fallbackLayoutBounds;
+    return bounds;
   }
 
   private isDegenerateBounds(bounds: THREE.Box3): boolean {
@@ -1604,18 +1597,7 @@ export class ViewportRendererService {
     // Recursively update all 2D nodes in the scene
     const updateNode2DVisuals = (nodes: NodeBase[]) => {
       for (const node of nodes) {
-        if (node instanceof Layout2D) {
-          const visualRoot = this.layout2dVisuals.get(node.nodeId);
-          if (visualRoot) {
-            this.apply2DVisualTransform(node, visualRoot);
-            const borderGroup = visualRoot.userData.borderGroup as THREE.Group | undefined;
-            if (borderGroup) {
-              borderGroup.visible = node.showViewportOutline;
-              borderGroup.scale.set(node.width, node.height, 1);
-            }
-            this.apply2DVisualOpacity(node, visualRoot);
-          }
-        } else if (node instanceof Group2D) {
+        if (node instanceof Group2D) {
           const visualRoot = this.group2DVisuals.get(node.nodeId);
           if (visualRoot) {
             this.apply2DVisualTransform(node, visualRoot);
@@ -2261,17 +2243,6 @@ export class ViewportRendererService {
       if (node instanceof Particles3D) {
         this.syncParticles3DTexture(node);
       }
-    } else if (node instanceof Layout2D) {
-      const visualRoot = this.layout2dVisuals.get(node.nodeId);
-      if (visualRoot) {
-        this.apply2DVisualTransform(node, visualRoot);
-        const borderGroup = visualRoot.userData.borderGroup as THREE.Group | undefined;
-        if (borderGroup) {
-          borderGroup.visible = node.showViewportOutline;
-          borderGroup.scale.set(node.width, node.height, 1);
-        }
-        this.apply2DVisualOpacity(node, visualRoot);
-      }
     } else if (node instanceof Group2D) {
       const visualRoot = this.group2DVisuals.get(node.nodeId);
       if (visualRoot) {
@@ -2366,13 +2337,7 @@ export class ViewportRendererService {
   }
 
   updateNodeVisibility(node: NodeBase): void {
-    // Handle visibility changes for 2D nodes (Layout2D, Group2D and Sprite2D)
-    if (node instanceof Layout2D) {
-      const visualRoot = this.layout2dVisuals.get(node.nodeId);
-      if (visualRoot) {
-        visualRoot.visible = node.visible;
-      }
-    } else if (node instanceof Group2D) {
+    if (node instanceof Group2D) {
       const visualRoot = this.group2DVisuals.get(node.nodeId);
       if (visualRoot) {
         visualRoot.visible = node.visible;
@@ -2681,14 +2646,6 @@ export class ViewportRendererService {
       this.sprite3DTexturePaths.clear();
       this.particles3DTexturePaths.clear();
 
-      for (const visual of this.layout2dVisuals.values()) {
-        if (visual.parent) {
-          visual.parent.remove(visual);
-        }
-        this.disposeObject3D(visual);
-      }
-      this.layout2dVisuals.clear();
-
       for (const visual of this.uiControl2DVisuals.values()) {
         if (visual.parent) {
           visual.parent.remove(visual);
@@ -2759,13 +2716,7 @@ export class ViewportRendererService {
 
     let current2DVisualRoot = parent2DVisualRoot;
 
-    if (node instanceof Layout2D) {
-      const visualRoot = this.createLayout2DVisual(node);
-      this.layout2dVisuals.set(node.nodeId, visualRoot);
-      const parent = parent2DVisualRoot ?? this.scene;
-      parent.add(visualRoot);
-      current2DVisualRoot = visualRoot;
-    } else if (node instanceof Group2D) {
+    if (node instanceof Group2D) {
       const visualRoot = this.createGroup2DVisual(node);
       this.group2DVisuals.set(node.nodeId, visualRoot);
 
@@ -2909,60 +2860,6 @@ export class ViewportRendererService {
     root.userData.isGroup2DVisualRoot = true;
     root.userData.nodeId = node.nodeId;
     root.userData.sizeGroup = sizeGroup;
-    this.apply2DVisualOpacity(node, root);
-
-    return root;
-  }
-
-  private createLayout2DVisual(node: Layout2D): THREE.Group {
-    const points: THREE.Vector3[] = [
-      new THREE.Vector3(-0.5, -0.5, 0),
-      new THREE.Vector3(0.5, -0.5, 0),
-      new THREE.Vector3(0.5, -0.5, 0),
-      new THREE.Vector3(0.5, 0.5, 0),
-      new THREE.Vector3(0.5, 0.5, 0),
-      new THREE.Vector3(-0.5, 0.5, 0),
-      new THREE.Vector3(-0.5, 0.5, 0),
-      new THREE.Vector3(-0.5, -0.5, 0),
-    ];
-
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    geometry.computeBoundingBox();
-
-    const material = new THREE.LineBasicMaterial({
-      color: 0x00ffff,
-      linewidth: 2,
-      transparent: true,
-      opacity: 0.95,
-      depthTest: false,
-      depthWrite: false,
-    });
-    material.userData.baseOpacity = 1;
-
-    const root = new THREE.Group();
-    root.position.copy(node.position);
-    root.rotation.copy(node.rotation);
-    root.scale.set(node.scale.x, node.scale.y, 1);
-    root.visible = node.visible;
-    root.layers.set(LAYER_2D);
-
-    const borderGroup = new THREE.Group();
-    borderGroup.scale.set(node.width, node.height, 1);
-    borderGroup.visible = node.showViewportOutline;
-    borderGroup.layers.set(LAYER_2D);
-
-    const line = new THREE.LineSegments(geometry, material);
-    line.layers.set(LAYER_2D);
-    line.renderOrder = 420;
-    line.userData.isLayout2DVisual = true;
-    line.userData.nodeId = node.nodeId;
-
-    borderGroup.add(line);
-    root.add(borderGroup);
-
-    root.userData.isLayout2DVisualRoot = true;
-    root.userData.nodeId = node.nodeId;
-    root.userData.borderGroup = borderGroup;
     this.apply2DVisualOpacity(node, root);
 
     return root;
@@ -4630,17 +4527,6 @@ export class ViewportRendererService {
       return;
     }
 
-    // If this was a move operation, recalculate offsets for Group2D nodes
-    // so they maintain their new position relative to parent anchors
-    if (handle === 'move') {
-      for (const nodeId of nodeIds) {
-        const node = sceneGraph.nodeMap.get(nodeId);
-        if (node && node instanceof Group2D) {
-          node.recalculateOffsets();
-        }
-      }
-    }
-
     for (const nodeId of nodeIds) {
       const node = sceneGraph.nodeMap.get(nodeId);
       if (!node || !(node instanceof Node2D)) continue;
@@ -4667,12 +4553,6 @@ export class ViewportRendererService {
           ? { height: (node as unknown as { height?: number }).height }
           : {}),
       };
-
-      // Include offsets for Group2D nodes
-      if (node instanceof Group2D) {
-        currentState.offsetMin = { x: node.offsetMin.x, y: node.offsetMin.y };
-        currentState.offsetMax = { x: node.offsetMax.x, y: node.offsetMax.y };
-      }
 
       const op = new Transform2DCompleteOperation({
         nodeId,
@@ -4712,9 +4592,6 @@ export class ViewportRendererService {
   }
 
   private get2DVisual(node: Node2D): THREE.Object3D | undefined {
-    if (node instanceof Layout2D) {
-      return this.layout2dVisuals.get(node.nodeId);
-    }
     if (node instanceof Group2D) {
       return this.group2DVisuals.get(node.nodeId);
     }

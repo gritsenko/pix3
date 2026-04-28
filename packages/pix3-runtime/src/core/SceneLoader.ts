@@ -8,7 +8,6 @@ import { Sprite2D } from '../nodes/2D/Sprite2D';
 import { AnimatedSprite2D } from '../nodes/2D/AnimatedSprite2D';
 import { ColorRect2D } from '../nodes/2D/ColorRect2D';
 import { Group2D } from '../nodes/2D/Group2D';
-import { Layout2D, ScaleMode } from '../nodes/2D/Layout2D';
 import { DirectionalLightNode } from '../nodes/3D/DirectionalLightNode';
 import { PointLightNode } from '../nodes/3D/PointLightNode';
 import { SpotLightNode } from '../nodes/3D/SpotLightNode';
@@ -193,14 +192,6 @@ export interface Node2DProperties {
   scale?: Vector2 | [number, number];
   rotation?: number;
   opacity?: number;
-}
-
-export interface Layout2DProperties {
-  width?: number;
-  height?: number;
-  resolutionPreset?: string;
-  showViewportOutline?: boolean;
-  scaleMode?: string;
 }
 
 export interface Group2DProperties extends Node2DProperties {
@@ -1017,33 +1008,13 @@ export class SceneLoader {
         });
       }
       case 'Layout2D': {
-        const props = baseProps.properties as Record<string, unknown>;
-        const transform = this.asRecord(props.transform);
-        return new Layout2D({
-          ...baseProps,
-          position: this.readVector2(transform?.position ?? props.position, ZERO_VECTOR2),
-          scale: this.readVector2(transform?.scale ?? props.scale, UNIT_VECTOR2),
-          rotation:
-            typeof (transform?.rotation ?? props.rotation) === 'number'
-              ? ((transform?.rotation ?? props.rotation) as number)
-              : 0,
-          layout: this.parseNode2DLayout(props),
-          opacity: this.asNumber(props.opacity, undefined),
-          width: this.asNumber(props.width, 1920),
-          height: this.asNumber(props.height, 1080),
-          resolutionPreset:
-            typeof props.resolutionPreset === 'string'
-              ? (props.resolutionPreset as any)
-              : undefined,
-          showViewportOutline:
-            typeof props.showViewportOutline === 'boolean' ? props.showViewportOutline : true,
-          scaleMode: this.parseScaleMode(props.scaleMode),
-        });
+        throw new SceneValidationError('Layout2D nodes are no longer supported.', [
+          `Node ${definition.id} still uses legacy type Layout2D. Replace it with root Node2D/Group2D anchors and project viewport settings.`,
+        ]);
       }
       case 'Group2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
-        const layout = this.asRecord(props.layout);
 
         return new Group2D({
           ...baseProps,
@@ -1057,18 +1028,6 @@ export class SceneLoader {
           opacity: this.asNumber(props.opacity, undefined),
           width: this.asNumber(props.width, 100),
           height: this.asNumber(props.height, 100),
-          anchorMin: layout?.anchorMin
-            ? this.readVector2(layout.anchorMin, new Vector2(0.5, 0.5))
-            : undefined,
-          anchorMax: layout?.anchorMax
-            ? this.readVector2(layout.anchorMax, new Vector2(0.5, 0.5))
-            : undefined,
-          offsetMin: layout?.offsetMin
-            ? this.readVector2(layout.offsetMin, ZERO_VECTOR2)
-            : undefined,
-          offsetMax: layout?.offsetMax
-            ? this.readVector2(layout.offsetMax, ZERO_VECTOR2)
-            : undefined,
         });
       }
       case 'Joystick2D': {
@@ -1758,23 +1717,6 @@ export class SceneLoader {
 
   private asString(value: unknown): string | undefined {
     return typeof value === 'string' ? value : undefined;
-  }
-
-  private parseScaleMode(value: unknown): ScaleMode | undefined {
-    if (typeof value !== 'string') {
-      return undefined;
-    }
-
-    if (
-      value === ScaleMode.ScaleInner ||
-      value === ScaleMode.ScaleOuter ||
-      value === ScaleMode.Stretch ||
-      value === ScaleMode.Scale
-    ) {
-      return value;
-    }
-
-    return undefined;
   }
 
   private parseNode2DLayout(props: Record<string, unknown>): Node2DLayoutConfig | undefined {

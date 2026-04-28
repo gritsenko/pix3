@@ -9,7 +9,7 @@
  */
 
 import * as THREE from 'three';
-import { Node2D, Group2D } from '@pix3/runtime';
+import { Node2D } from '@pix3/runtime';
 import type { SceneGraph } from '@pix3/runtime';
 
 export type TwoDHandle =
@@ -33,11 +33,6 @@ export interface Transform2DState {
   height?: number;
   worldPosition?: THREE.Vector3;
   worldRotationZ?: number;
-  // Anchor data for Group2D nodes (for real-time offset updates during drag)
-  offsetMin?: THREE.Vector2;
-  offsetMax?: THREE.Vector2;
-  parentWidth?: number;
-  parentHeight?: number;
 }
 
 export interface Selection2DOverlay {
@@ -115,46 +110,6 @@ export class TransformTool2d {
     const parentQuat = parent.getWorldQuaternion(new THREE.Quaternion());
     const parentEuler = new THREE.Euler().setFromQuaternion(parentQuat, 'XYZ');
     node.rotation.set(0, 0, worldRotationZ - parentEuler.z);
-  }
-
-  /**
-   * Update Group2D offsets during drag to maintain proper anchor-relative positioning.
-   * This provides real-time preview by directly computing offsets from the delta.
-   */
-  private updateGroup2DOffsetsDuringDrag(
-    node: Group2D,
-    startState: Transform2DState,
-    worldDelta: THREE.Vector3
-  ): void {
-    // Convert world delta to local delta (accounting for parent rotation/scale)
-    const parent = node.parent as THREE.Object3D | null;
-    let localDeltaX = worldDelta.x;
-    let localDeltaY = worldDelta.y;
-
-    if (parent) {
-      // Get parent's inverse world matrix to convert delta to parent-local space
-      parent.updateWorldMatrix(true, false);
-      const parentMatrix = parent.matrixWorld.clone();
-      // We only need rotation and scale (not translation) for delta conversion
-      parentMatrix.setPosition(0, 0, 0);
-      const localDelta = new THREE.Vector3(worldDelta.x, worldDelta.y, 0).applyMatrix4(
-        parentMatrix.clone().invert()
-      );
-      localDeltaX = localDelta.x;
-      localDeltaY = localDelta.y;
-    }
-
-    // Apply delta to start offsets
-    if (startState.offsetMin && startState.offsetMax) {
-      node.offsetMin.set(
-        startState.offsetMin.x + localDeltaX,
-        startState.offsetMin.y + localDeltaY
-      );
-      node.offsetMax.set(
-        startState.offsetMax.x + localDeltaX,
-        startState.offsetMax.y + localDeltaY
-      );
-    }
   }
 
   private getDpr(): number {
@@ -669,16 +624,6 @@ export class TransformTool2d {
           worldRotationZ: worldEuler.z,
         };
 
-        // Capture anchor data for Group2D nodes (for real-time offset updates)
-        if (node instanceof Group2D) {
-          state.offsetMin = node.offsetMin.clone();
-          state.offsetMax = node.offsetMax.clone();
-          // Get parent dimensions
-          const parentGroup = node.parent instanceof Group2D ? node.parent : null;
-          state.parentWidth = parentGroup?.width ?? 0;
-          state.parentHeight = parentGroup?.height ?? 0;
-        }
-
         startStates.set(nodeId, state);
       }
     }
@@ -781,12 +726,6 @@ export class TransformTool2d {
           const startWorld = startState.worldPosition ?? node.getWorldPosition(new THREE.Vector3());
           const newWorld = startWorld.clone().add(delta);
           this.setNodeWorldPosition(node, newWorld);
-
-          // For Group2D, update offsets in real-time during drag
-          // This ensures proper anchor-relative positioning
-          if (node instanceof Group2D) {
-            this.updateGroup2DOffsetsDuringDrag(node, startState, delta);
-          }
         }
       }
     } else if (handle === 'rotate') {

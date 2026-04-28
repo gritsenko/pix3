@@ -4,7 +4,7 @@ import type {
   OperationInvokeResult,
   OperationMetadata,
 } from '@/core/Operation';
-import { Layout2D, Node2D, SceneManager } from '@pix3/runtime';
+import { Node2D, SceneManager } from '@pix3/runtime';
 import { createDefaultProjectManifest, type ProjectManifest } from '@/core/ProjectManifest';
 import { ProjectService } from '@/services/ProjectService';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
@@ -196,9 +196,6 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
     }
 
     for (const node of sceneGraph.rootNodes) {
-      if (node instanceof Layout2D) {
-        continue;
-      }
       if (node instanceof Node2D) {
         node.applyAnchoredLayoutRecursive(nextBaseSize, previousBaseSize);
         node.captureAuthoredLayoutRectFromCurrent();

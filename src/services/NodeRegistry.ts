@@ -9,7 +9,6 @@ import { CreateHemisphereLightCommand } from '@/features/scene/CreateHemisphereL
 import { CreateCamera3DCommand } from '@/features/scene/CreateCamera3DCommand';
 import { CreateMeshInstanceCommand } from '@/features/scene/CreateMeshInstanceCommand';
 import { CreateSprite3DCommand } from '@/features/scene/CreateSprite3DCommand';
-import { CreateLayout2DCommand } from '@/features/scene/CreateLayout2DCommand';
 import { CreateJoystick2DCommand } from '@/features/scene/CreateJoystick2DCommand';
 import { CreateButton2DCommand } from '@/features/scene/CreateButton2DCommand';
 import { CreateSlider2DCommand } from '@/features/scene/CreateSlider2DCommand';
@@ -58,18 +57,6 @@ export class NodeRegistry {
   private registerNodeTypes(): void {
     // 2D Node Types
     this.registerNodeType({
-      id: 'layout2d',
-      displayName: 'Layout2D',
-      description: '2D game viewport container',
-      category: '2D',
-      commandClass: CreateLayout2DCommand,
-      color: '#9b59b6ff',
-      icon: 'viewport',
-      keywords: ['create', 'layout2d', 'viewport', 'container', 'root'],
-      order: 0,
-    });
-
-    this.registerNodeType({
       id: 'group2d',
       displayName: 'Group2D',
       description: '2D group container for organizing nodes',
@@ -78,7 +65,7 @@ export class NodeRegistry {
       color: '#96cbf6ff',
       icon: 'layout',
       keywords: ['create', 'group', '2d', 'container', 'organize'],
-      order: 1,
+      order: 0,
     });
 
     this.registerNodeType({
@@ -90,7 +77,7 @@ export class NodeRegistry {
       color: '#96cbf6ff',
       icon: 'image',
       keywords: ['create', 'sprite', '2d', 'image', 'texture'],
-      order: 2,
+      order: 1,
     });
     this.registerNodeType({
       id: 'animatedsprite2d',

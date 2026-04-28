@@ -5,7 +5,6 @@ import { NodeBase } from '../nodes/NodeBase';
 import { Node2D } from '../nodes/Node2D';
 import { Object3D } from 'three';
 import { Camera3D } from '../nodes/3D/Camera3D';
-import { Layout2D } from '../nodes/2D/Layout2D';
 
 export class PinToNodeBehavior extends Script {
     targetNodeId: string = '';
@@ -13,7 +12,6 @@ export class PinToNodeBehavior extends Script {
 
     private targetNode: NodeBase | null = null;
     private cameraNode: Camera3D | null = null;
-    private _layout2D: Layout2D | null = null;
     private _unsubscribeViewport: (() => void) | null = null;
     private _tempWorldPos = new Vector3();
     private _tempPinnedWorldPos = new Vector3();
@@ -79,7 +77,6 @@ export class PinToNodeBehavior extends Script {
     override onStart() {
         this.targetNode = null;
         this.cameraNode = null;
-        this._layout2D = null;
 
         this._unsubscribeViewport?.();
         this._unsubscribeViewport = this.scene?.onViewportChanged(() => {
@@ -91,9 +88,6 @@ export class PinToNodeBehavior extends Script {
 
         const root = this.getSceneRoot();
         if (!root) return;
-
-        // Cache Layout2D for logical camera size computation
-        this._layout2D = this.findLayout2D(root);
 
         if (this.targetNodeId) {
             this.targetNode = this.findNodeById(root, this.targetNodeId);
@@ -117,15 +111,6 @@ export class PinToNodeBehavior extends Script {
         for (const child of root.children) {
             const match = this.findNodeById(child, id);
             if (match) return match;
-        }
-        return null;
-    }
-
-    private findLayout2D(root: Object3D): Layout2D | null {
-        if (root instanceof Layout2D) return root;
-        for (const child of root.children) {
-            const found = this.findLayout2D(child);
-            if (found) return found;
         }
         return null;
     }
@@ -190,36 +175,32 @@ export class PinToNodeBehavior extends Script {
         this._tempPinnedLocalPos.copy(this._tempPinnedWorldPos);
         parent.worldToLocal(this._tempPinnedLocalPos);
 
-        // Write local coordinates so pinning remains correct under scaled/moved parents (e.g. Layout2D).
+          // Write local coordinates so pinning remains correct under scaled or moved 2D parents.
         this.node.position.set(this._tempPinnedLocalPos.x, this._tempPinnedLocalPos.y, this.node.position.z);
     }
 
     /**
      * Returns the logical 2D camera dimensions used by SceneRunner's orthographic camera.
-     * Mirrors the Expand/Match-Min scaling that SceneRunner computes from Layout2D authored
-     * resolution vs. the current viewport aspect ratio.  Using CSS pixel dimensions here
+      * Mirrors the authored-base-size scaling that SceneRunner computes from project viewport
+      * settings vs. the current viewport aspect ratio. Using CSS pixel dimensions here
      * (instead of device pixels) keeps coordinate-space consistent regardless of DPR.
      */
     private getLogicalCameraSize(): { width: number; height: number } {
+        const logicalCamera = this.scene?.getLogicalCameraSize();
+        if (
+            logicalCamera &&
+            logicalCamera.width > 0 &&
+            logicalCamera.height > 0
+        ) {
+            return logicalCamera;
+        }
+
         const viewport = this.scene?.getViewportSize();
         const cssWidth = (viewport && viewport.width > 0) ? viewport.width : (window.innerWidth);
         const cssHeight = (viewport && viewport.height > 0) ? viewport.height : (window.innerHeight);
 
         if (cssWidth <= 0 || cssHeight <= 0) {
             return { width: 1, height: 1 };
-        }
-
-        const layout2D = this._layout2D;
-        if (layout2D && layout2D.width > 0 && layout2D.height > 0) {
-            const baseW = layout2D.width;
-            const baseH = layout2D.height;
-            const baseAspect = baseW / baseH;
-            const viewportAspect = cssWidth / cssHeight;
-            if (viewportAspect >= baseAspect) {
-                return { width: baseH * viewportAspect, height: baseH };
-            } else {
-                return { width: baseW, height: baseW / viewportAspect };
-            }
         }
 
         return { width: cssWidth, height: cssHeight };
