@@ -55,7 +55,7 @@ jobs:
             "$RELEASE_DIR/packages/pix3-collab-server/dist" \
             "$RELEASE_DIR/packages/pix3-collab-server/src/admin"
 
-          cp package.json "$RELEASE_DIR/package.json"
+          node -e "const fs = require('fs'); const pkg = JSON.parse(fs.readFileSync('package.json', 'utf8')); delete pkg.scripts?.postinstall; fs.writeFileSync(process.argv[1], JSON.stringify(pkg, null, 2) + '\n');" "$RELEASE_DIR/package.json"
           cp package-lock.json "$RELEASE_DIR/package-lock.json"
           cp packages/pix3-collab-server/package.json \
             "$RELEASE_DIR/packages/pix3-collab-server/package.json"

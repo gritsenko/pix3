@@ -95,7 +95,7 @@ Workflow `.github/workflows/deploy-collab-server.yml`:
 
 - запускается при `push` в `main` для изменений backend-сервера и вручную через `workflow_dispatch`;
 - собирает `@pix3/collab-server`;
-- упаковывает корневые `package.json` и `package-lock.json`, а также workspace `packages/pix3-collab-server` с `dist/`, `package.json` и `src/admin/index.html`;
+- упаковывает корневой `package.json` без editor `postinstall`, корневой `package-lock.json`, а также workspace `packages/pix3-collab-server` с `dist/`, `package.json` и `src/admin/index.html`;
 - загружает релиз на `cloud.pix3.dev` по SSH;
 - раскладывает релиз в `${DEPLOY_PATH}/releases/<sha>`;
 - привязывает `shared/.env` и `shared/data` внутрь `packages/pix3-collab-server`;
