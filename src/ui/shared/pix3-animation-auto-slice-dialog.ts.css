@@ -1,0 +1,238 @@
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(7, 10, 16, 0.7);
+  backdrop-filter: blur(6px);
+  z-index: 1200;
+}
+
+.dialog-content {
+  width: min(64rem, calc(100vw - 2rem));
+  max-height: calc(100vh - 2rem);
+  overflow: auto;
+  padding: 1.1rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #16191f;
+  color: #eceff4;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.45);
+}
+
+.dialog-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.1rem;
+}
+
+.dialog-copy {
+  margin: 0 0 1rem;
+  color: #b8c0cc;
+  line-height: 1.5;
+}
+
+.dialog-copy--compact {
+  margin-bottom: 0.35rem;
+}
+
+.dialog-copy--path {
+  margin-bottom: 0;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.dialog-highlight {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.82rem;
+  color: #ffcf33;
+}
+
+.dialog-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(18rem, 0.9fr);
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.preview-panel,
+.controls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.preview-stat {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 0.78rem;
+  color: #c8d0dc;
+}
+
+.preview-surface {
+  position: relative;
+  min-height: 20rem;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
+    #10141b;
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+}
+
+.preview-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+}
+
+.preview-grid {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 207, 51, 0.78) 0, rgba(255, 207, 51, 0.78) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 207, 51, 0.78) 0, rgba(255, 207, 51, 0.78) 1px, transparent 1px);
+  background-size:
+    calc(100% / var(--slice-columns)) 100%,
+    100% calc(100% / var(--slice-rows));
+}
+
+.preview-placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 20rem;
+  padding: 1rem;
+  text-align: center;
+  color: #94a0b2;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.field label {
+  font-size: 0.8rem;
+  color: #b8c0cc;
+}
+
+.field input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.55rem 0.65rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: #0f1318;
+  color: #eceff4;
+}
+
+.field input:focus {
+  outline: none;
+  border-color: #ffcf33;
+}
+
+.dialog-note {
+  margin: 0 0 1rem;
+  font-size: 0.8rem;
+  color: #94a0b2;
+}
+
+.preview-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.preview-stats-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  padding: 0.75rem;
+  border-radius: 0.55rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.stats-label {
+  font-size: 0.74rem;
+  color: #94a0b2;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+
+.btn-secondary,
+.btn-primary {
+  padding: 0.55rem 0.8rem;
+  border-radius: 0.45rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+}
+
+.btn-secondary {
+  background: #0f1318;
+  color: #d8dee9;
+}
+
+.btn-primary {
+  background: #ffcf33;
+  color: #171a20;
+  border-color: #ffcf33;
+  font-weight: 600;
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 640px) {
+  .dialog-layout,
+  .preview-header,
+  .dialog-actions {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .preview-stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

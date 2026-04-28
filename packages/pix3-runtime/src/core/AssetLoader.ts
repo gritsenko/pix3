@@ -1,9 +1,20 @@
 import { ResourceManager } from './ResourceManager';
 import { MeshInstance } from '../nodes/3D/MeshInstance';
 import { NodeBase } from '../nodes/NodeBase';
-import { AnimationClip, BufferGeometry, Material, Mesh, Texture, TextureLoader } from 'three';
+import {
+  AnimationClip as ThreeAnimationClip,
+  BufferGeometry,
+  Material,
+  Mesh,
+  Texture,
+  TextureLoader,
+} from 'three';
 import { AudioService } from './AudioService';
 import { GLTFLoader, type GLTF } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import {
+  normalizeAnimationResource,
+  type AnimationResource,
+} from './AnimationResource';
 
 export interface AssetLoaderResult {
   node: NodeBase;
@@ -30,6 +41,8 @@ export class AssetLoader {
   private textureLoader: TextureLoader;
   private readonly textureCache = new Map<string, Texture>();
   private readonly textureLoadInFlight = new Map<string, Promise<Texture>>();
+  private readonly animationResourceCache = new Map<string, AnimationResource>();
+  private readonly animationResourceLoadInFlight = new Map<string, Promise<AnimationResource>>();
   private readonly audioLoadInFlight = new Map<string, Promise<AudioBuffer>>();
 
   constructor(resources: ResourceManager, audioService?: AudioService) {
@@ -77,6 +90,12 @@ export class AssetLoader {
         await this.loadAudio(resourcePath);
         throw new Error(
           `[AssetLoader] Audio assets are not node assets. Use loadAudio() instead. Path: ${resourcePath}`
+        );
+
+      case 'pix3anim':
+        await this.loadAnimationResource(resourcePath);
+        throw new Error(
+          `[AssetLoader] Animation assets are metadata assets. Use loadAnimationResource() instead. Path: ${resourcePath}`
         );
 
       default:
@@ -214,6 +233,42 @@ export class AssetLoader {
     return loadPromise;
   }
 
+  async loadAnimationResource(resourcePath: string): Promise<AnimationResource> {
+    const cached = this.animationResourceCache.get(resourcePath);
+    if (cached) {
+      return cached;
+    }
+
+    const inFlight = this.animationResourceLoadInFlight.get(resourcePath);
+    if (inFlight) {
+      return inFlight;
+    }
+
+    const loadPromise = (async (): Promise<AnimationResource> => {
+      const source = await this.resources.readText(resourcePath);
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(source);
+      } catch (error) {
+        throw new Error(
+          `[AssetLoader] Failed to parse animation resource ${resourcePath}: ${error instanceof Error ? error.message : String(error)}`
+        );
+      }
+
+      const resource = normalizeAnimationResource(parsed);
+      this.animationResourceCache.set(resourcePath, resource);
+      return resource;
+    })();
+
+    this.animationResourceLoadInFlight.set(resourcePath, loadPromise);
+    loadPromise.finally(() => {
+      this.animationResourceLoadInFlight.delete(resourcePath);
+    });
+
+    return loadPromise;
+  }
+
   async loadInstancingModel(resourcePath: string): Promise<InstancingModelAsset> {
     const gltf = await this.loadGltf(resourcePath);
     const mesh = this.findFirstMesh(gltf.scene);
@@ -246,7 +301,7 @@ export class AssetLoader {
     try {
       const gltf = await this.loadGltf(resourcePath);
 
-      const animations = gltf.animations.map((clip: AnimationClip) => clip.clone());
+      const animations = gltf.animations.map((clip: ThreeAnimationClip) => clip.clone());
 
       const finalNodeId = nodeId || crypto.randomUUID();
       const finalNodeName = nodeName || 'mesh';

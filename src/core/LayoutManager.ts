@@ -15,6 +15,7 @@ const PANEL_COMPONENT_TYPES = {
   inspector: 'inspector',
   assetBrowser: 'asset-browser',
   assetsPreview: 'assets-preview',
+  animation: 'animation',
   logs: 'logs',
   background: 'background',
   game: 'game',
@@ -28,6 +29,7 @@ const PANEL_TAG_NAMES = {
   [PANEL_COMPONENT_TYPES.inspector]: 'pix3-inspector-panel',
   [PANEL_COMPONENT_TYPES.assetBrowser]: 'pix3-asset-browser-panel',
   [PANEL_COMPONENT_TYPES.assetsPreview]: 'pix3-assets-preview-panel',
+  [PANEL_COMPONENT_TYPES.animation]: 'pix3-animation-panel',
   [PANEL_COMPONENT_TYPES.logs]: 'pix3-logs-panel',
   [PANEL_COMPONENT_TYPES.background]: 'pix3-background',
   [PANEL_COMPONENT_TYPES.game]: 'pix3-game-tab',
@@ -39,6 +41,7 @@ const PANEL_DISPLAY_TITLES: Record<PanelComponentType, string> = {
   [PANEL_COMPONENT_TYPES.inspector]: 'Inspector',
   [PANEL_COMPONENT_TYPES.assetBrowser]: 'Asset Browser',
   [PANEL_COMPONENT_TYPES.assetsPreview]: 'Assets Preview',
+  [PANEL_COMPONENT_TYPES.animation]: 'Animation',
   [PANEL_COMPONENT_TYPES.logs]: 'Logs',
   [PANEL_COMPONENT_TYPES.background]: 'Pix3',
   [PANEL_COMPONENT_TYPES.game]: 'Game',
@@ -50,6 +53,7 @@ const DEFAULT_PANEL_VISIBILITY: PanelVisibilityState = {
   inspector: true,
   assetBrowser: true,
   assetsPreview: true,
+  animation: false,
   logs: true,
 };
 
@@ -261,7 +265,7 @@ export class LayoutManagerService {
     // corresponding GL item was closed/destroyed (or not tracked due to async timing).
     try {
       const root = (this.layout as unknown as { rootItem?: ContentItem }).rootItem;
-      const itemInLayout = this.findViewportByTabId(root, tab.id);
+      const itemInLayout = this.findEditorTabByTabId(root, tab.id);
       if (itemInLayout) {
         this.editorTabItems.set(tab.id, itemInLayout as ContentItem);
         this.updateEditorTabTitle(tab.id, tab.title);
@@ -290,7 +294,11 @@ export class LayoutManagerService {
       const itemConfig: ComponentItemConfig & { popoutEnabled?: boolean } = {
         type: 'component',
         componentType:
-          tab.type === 'game' ? PANEL_COMPONENT_TYPES.game : PANEL_COMPONENT_TYPES.viewport,
+          tab.type === 'game'
+            ? PANEL_COMPONENT_TYPES.game
+            : tab.type === 'animation'
+              ? PANEL_COMPONENT_TYPES.animation
+              : PANEL_COMPONENT_TYPES.viewport,
         title: tab.title,
         isClosable: true,
         // PREVENT DRAGGING to enforce Single Document Interface
@@ -382,7 +390,7 @@ export class LayoutManagerService {
     if (!item) {
       console.log('[LayoutManager] Item not in map, searching tree...');
       const rootItem = (this.layout as unknown as { rootItem?: ContentItem }).rootItem;
-      item = this.findViewportByTabId(rootItem, tabId);
+      item = this.findEditorTabByTabId(rootItem, tabId);
       if (item) {
         console.log('[LayoutManager] Found item in tree');
         this.editorTabItems.set(tabId, item);
@@ -401,7 +409,7 @@ export class LayoutManagerService {
         const itemTabId = ci.container?.state?.tabId;
         if (
           ci.type === 'component' &&
-          ci.componentType === PANEL_COMPONENT_TYPES.viewport &&
+          this.isEditorTabComponentType(ci.componentType) &&
           itemTabId === tabId
         ) {
           item = contentItem as ContentItem;
@@ -452,7 +460,24 @@ export class LayoutManagerService {
     }
   }
 
-  private findViewportByTabId(
+  focusPanel(componentType: PanelComponentType): void {
+    if (!this.layout) {
+      return;
+    }
+
+    const rootItem = (this.layout as unknown as { rootItem?: ContentItem }).rootItem;
+    const item = this.findPanelByComponentType(rootItem, componentType);
+    if (!item || item.type !== 'component') {
+      return;
+    }
+
+    const parentStack = this.findClosestStack(item);
+    if (parentStack && typeof parentStack.setActiveComponentItem === 'function') {
+      parentStack.setActiveComponentItem(item as ComponentItem, true);
+    }
+  }
+
+  private findEditorTabByTabId(
     node: ContentItem | null | undefined,
     tabId: string
   ): ContentItem | undefined {
@@ -464,16 +489,51 @@ export class LayoutManagerService {
     };
     if (
       nodeInfo.type === 'component' &&
-      nodeInfo.componentType === PANEL_COMPONENT_TYPES.viewport &&
+      this.isEditorTabComponentType(nodeInfo.componentType) &&
       nodeInfo.container?.state?.tabId === tabId
     ) {
       return node as ContentItem;
     }
     const children: ContentItem[] = nodeInfo.contentItems ?? [];
     for (const child of children) {
-      const found = this.findViewportByTabId(child, tabId);
+      const found = this.findEditorTabByTabId(child, tabId);
       if (found) return found;
     }
+    return undefined;
+  }
+
+  private isEditorTabComponentType(componentType: string | undefined): componentType is PanelComponentType {
+    return (
+      componentType === PANEL_COMPONENT_TYPES.viewport ||
+      componentType === PANEL_COMPONENT_TYPES.animation ||
+      componentType === PANEL_COMPONENT_TYPES.game
+    );
+  }
+
+  private findPanelByComponentType(
+    node: ContentItem | null | undefined,
+    componentType: PanelComponentType
+  ): ContentItem | undefined {
+    if (!node) {
+      return undefined;
+    }
+
+    const nodeInfo = node as ContentItem & {
+      type?: string;
+      componentType?: string;
+      contentItems?: ContentItem[];
+    };
+    if (nodeInfo.type === 'component' && nodeInfo.componentType === componentType) {
+      return node as ContentItem;
+    }
+
+    for (const child of nodeInfo.contentItems ?? []) {
+      const found = this.findPanelByComponentType(child, componentType);
+      if (found) {
+        return found;
+      }
+    }
+
     return undefined;
   }
 
@@ -527,8 +587,8 @@ export class LayoutManagerService {
 
           const componentType = itemInfo?.componentType;
           if (
-            componentType !== PANEL_COMPONENT_TYPES.viewport &&
-            componentType !== PANEL_COMPONENT_TYPES.background
+            componentType !== PANEL_COMPONENT_TYPES.background &&
+            !this.isEditorTabComponentType(componentType)
           )
             return;
 
@@ -543,7 +603,7 @@ export class LayoutManagerService {
             this.editorStack = parentStack;
           }
 
-          if (componentType !== PANEL_COMPONENT_TYPES.viewport) return;
+          if (!this.isEditorTabComponentType(componentType)) return;
 
           const tabId = itemInfo?.container?.state?.tabId;
           if (typeof tabId !== 'string' || !tabId) return;
@@ -574,6 +634,7 @@ export class LayoutManagerService {
         previousPanelVisibility.inspector === nextPanelVisibility.inspector &&
         previousPanelVisibility.assetBrowser === nextPanelVisibility.assetBrowser &&
         previousPanelVisibility.assetsPreview === nextPanelVisibility.assetsPreview &&
+        previousPanelVisibility.animation === nextPanelVisibility.animation &&
         previousPanelVisibility.logs === nextPanelVisibility.logs
       ) ||
       previousFocusedPanelId !== nextFocusedPanelId;
@@ -608,10 +669,7 @@ export class LayoutManagerService {
       layout.registerComponentFactoryFunction(componentType, container => {
         container.setTitle(PANEL_DISPLAY_TITLES[componentType as PanelComponentType]);
 
-        if (
-          componentType === PANEL_COMPONENT_TYPES.viewport ||
-          componentType === PANEL_COMPONENT_TYPES.game
-        ) {
+        if (this.isEditorTabComponentType(componentType)) {
           const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
           if (typeof tabId === 'string' && tabId) {
             this.editorTabContainers.set(tabId, container as unknown as ContentItem);
@@ -631,10 +689,7 @@ export class LayoutManagerService {
         element.setAttribute('data-panel-id', componentType);
 
         // Forward tab id into the element for the editor-tab component.
-        if (
-          componentType === PANEL_COMPONENT_TYPES.viewport ||
-          componentType === PANEL_COMPONENT_TYPES.game
-        ) {
+        if (this.isEditorTabComponentType(componentType)) {
           const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
           if (typeof tabId === 'string' && tabId) {
             element.setAttribute('tab-id', tabId);
@@ -645,8 +700,7 @@ export class LayoutManagerService {
         container.on('destroy', () => {
           try {
             if (
-              componentType === PANEL_COMPONENT_TYPES.viewport ||
-              componentType === PANEL_COMPONENT_TYPES.game
+              this.isEditorTabComponentType(componentType)
             ) {
               const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
               if (typeof tabId === 'string' && tabId) {
@@ -709,7 +763,7 @@ export class LayoutManagerService {
 
     if (
       node.type === 'component' &&
-      ((node as ComponentItem).componentType === PANEL_COMPONENT_TYPES.viewport ||
+      (this.isEditorTabComponentType((node as ComponentItem).componentType) ||
         (node as ComponentItem).componentType === PANEL_COMPONENT_TYPES.background)
     ) {
       return this.findClosestStack(
@@ -749,7 +803,7 @@ export class LayoutManagerService {
     };
     if (
       nodeInfo.type === 'component' &&
-      nodeInfo.componentType === PANEL_COMPONENT_TYPES.viewport &&
+      this.isEditorTabComponentType(nodeInfo.componentType) &&
       (node as ComponentItem).title === title
     ) {
       return nodeInfo.container?.state?.tabId ?? null;

@@ -9,6 +9,10 @@ import { KeybindingService } from '@/services/KeybindingService';
 import { FileWatchService } from '@/services/FileWatchService';
 import { DialogService, type DialogInstance } from '@/services/DialogService';
 import {
+  AnimationAutoSliceDialogService,
+  type AnimationAutoSliceDialogInstance,
+} from '@/services';
+import {
   BehaviorPickerService,
   type ComponentPickerInstance,
 } from '@/services/BehaviorPickerService';
@@ -81,6 +85,7 @@ import './shared/pix3-create-project-dialog';
 import './shared/pix3-project-settings-dialog';
 import './shared/pix3-project-sync-dialog';
 import './shared/pix3-editor-settings-dialog';
+import './shared/pix3-animation-auto-slice-dialog';
 import './shared/pix3-node-type-picker';
 import './shared/pix3-status-bar';
 import './shared/pix3-background';
@@ -90,6 +95,7 @@ import './welcome/pix3-welcome';
 import './auth/pix3-auth-screen';
 import './logs-view/logs-panel';
 import './assets-preview/assets-preview-panel';
+import './animation-editor/animation-panel';
 import './viewport/game-tab';
 import './pix3-editor-shell.ts.css';
 
@@ -139,6 +145,9 @@ export class Pix3EditorShell extends ComponentBase {
 
   @inject(BehaviorPickerService)
   private readonly behaviorPickerService!: BehaviorPickerService;
+
+  @inject(AnimationAutoSliceDialogService)
+  private readonly animationAutoSliceDialogService!: AnimationAutoSliceDialogService;
 
   @inject(ScriptCreatorService)
   private readonly scriptCreatorService!: ScriptCreatorService;
@@ -204,6 +213,9 @@ export class Pix3EditorShell extends ComponentBase {
   private activeEditorSettingsDialog: EditorSettingsDialogInstance | null = null;
 
   @state()
+  private activeAnimationAutoSliceDialog: AnimationAutoSliceDialogInstance | null = null;
+
+  @state()
   private activeNodeTypePicker: NodeTypePickerInstance | null = null;
 
   @state()
@@ -233,6 +245,7 @@ export class Pix3EditorShell extends ComponentBase {
   private disposeNodeTypePickerSubscription?: () => void;
   private disposeBehaviorPickerSubscription?: () => void;
   private disposeScriptCreatorSubscription?: () => void;
+  private disposeAnimationAutoSliceSubscription?: () => void;
   private onWelcomeProjectReady?: (e: Event) => void;
   private keyboardHandler?: (e: KeyboardEvent) => void;
   private accountPopoverPointerHandler?: (e: PointerEvent) => void;
@@ -338,6 +351,13 @@ export class Pix3EditorShell extends ComponentBase {
       this.activeEditorSettingsDialog = dialog;
       this.requestUpdate();
     });
+
+    this.disposeAnimationAutoSliceSubscription = this.animationAutoSliceDialogService.subscribe(
+      dialog => {
+        this.activeAnimationAutoSliceDialog = dialog;
+        this.requestUpdate();
+      }
+    );
 
     this.disposeCreateProjectSubscription = this.projectLifecycleService.subscribe(dialog => {
       this.activeCreateProjectDialog = dialog;
@@ -538,6 +558,8 @@ export class Pix3EditorShell extends ComponentBase {
     this.disposeBehaviorPickerSubscription = undefined;
     this.disposeScriptCreatorSubscription?.();
     this.disposeScriptCreatorSubscription = undefined;
+    this.disposeAnimationAutoSliceSubscription?.();
+    this.disposeAnimationAutoSliceSubscription = undefined;
     if (this.onWelcomeProjectReady) {
       this.removeEventListener(
         'pix3-welcome:project-ready',
@@ -766,6 +788,7 @@ export class Pix3EditorShell extends ComponentBase {
         ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
         ${this.renderProjectSettingsHost()} ${this.renderProjectSyncHost()}
         ${this.renderEditorSettingsHost()}
+        ${this.renderAnimationAutoSliceHost()}
         ${this.renderCreateProjectHost()} ${this.renderNodeTypePickerHost()}
         ${this.renderAuthModal()}
       </div>
@@ -1162,6 +1185,62 @@ export class Pix3EditorShell extends ComponentBase {
         <pix3-editor-settings-dialog></pix3-editor-settings-dialog>
       </div>
     `;
+  }
+
+  private renderAnimationAutoSliceHost() {
+    if (!this.activeAnimationAutoSliceDialog) {
+      return null;
+    }
+
+    return html`
+      <div
+        class="animation-auto-slice-host"
+        @animation-auto-slice-confirmed=${(event: CustomEvent) =>
+          this.onAnimationAutoSliceConfirmed(event)}
+        @animation-auto-slice-cancelled=${(event: CustomEvent) =>
+          this.onAnimationAutoSliceCancelled(event)}
+      >
+        <pix3-animation-auto-slice-dialog
+          .dialogId=${this.activeAnimationAutoSliceDialog.id}
+          .texturePath=${this.activeAnimationAutoSliceDialog.params.texturePath}
+          .clipName=${this.activeAnimationAutoSliceDialog.params.clipName}
+          .defaultColumns=${this.activeAnimationAutoSliceDialog.params.defaultColumns || 1}
+          .defaultRows=${this.activeAnimationAutoSliceDialog.params.defaultRows || 1}
+        ></pix3-animation-auto-slice-dialog>
+      </div>
+    `;
+  }
+
+  private onAnimationAutoSliceConfirmed(event: CustomEvent): void {
+    const { dialogId, columns, rows } = event.detail as {
+      dialogId?: string;
+      columns?: number;
+      rows?: number;
+    };
+
+    if (
+      typeof dialogId !== 'string' ||
+      !Number.isFinite(columns) ||
+      !Number.isFinite(rows) ||
+      columns <= 0 ||
+      rows <= 0
+    ) {
+      return;
+    }
+
+    this.animationAutoSliceDialogService.confirm(dialogId, {
+      columns: Math.max(1, Math.round(columns)),
+      rows: Math.max(1, Math.round(rows)),
+    });
+  }
+
+  private onAnimationAutoSliceCancelled(event: CustomEvent): void {
+    const { dialogId } = event.detail as { dialogId?: string };
+    if (typeof dialogId !== 'string') {
+      return;
+    }
+
+    this.animationAutoSliceDialogService.cancel(dialogId);
   }
 
   private renderCreateProjectHost() {

@@ -59,6 +59,11 @@ export class AssetFileActivationService {
       return;
     }
 
+    if (extension === 'pix3anim') {
+      await this.editorTabService.openResourceTab('animation', resourcePath);
+      return;
+    }
+
     if (extension === 'glb' || extension === 'gltf') {
       const command = new AddModelCommand({ modelPath: resourcePath, modelName: name });
       await this.commandDispatcher.execute(command);

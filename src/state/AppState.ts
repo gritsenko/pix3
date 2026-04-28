@@ -8,7 +8,7 @@ export const DEFAULT_THEME: ThemeName = 'dark';
 
 export type SceneLoadState = 'idle' | 'loading' | 'ready' | 'error';
 
-export type EditorTabType = 'scene' | 'prefab' | 'script' | 'texture' | 'game';
+export type EditorTabType = 'scene' | 'prefab' | 'script' | 'texture' | 'animation' | 'game';
 
 export interface CameraState {
   position: { x: number; y: number; z: number };
@@ -204,6 +204,7 @@ export interface PanelVisibilityState {
   inspector: boolean;
   assetBrowser: boolean;
   assetsPreview: boolean;
+  animation: boolean;
   logs: boolean;
 }
 
@@ -449,6 +450,7 @@ export const createInitialAppState = (): AppState => ({
       inspector: true,
       assetBrowser: true,
       assetsPreview: true,
+      animation: true,
       logs: true,
     },
     navigationMode: '3d',

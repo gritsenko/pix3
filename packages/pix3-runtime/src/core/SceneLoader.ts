@@ -893,7 +893,10 @@ export class SceneLoader {
       case 'AnimatedSprite2D': {
         const props = baseProps.properties as Record<string, unknown>;
         const transform = this.asRecord(props.transform);
-        const frames = Array.isArray(props.frames) ? props.frames.map(coerceTextureResource) : [];
+        const animationResourcePath =
+          typeof props.animationResourcePath === 'string' && props.animationResourcePath.trim().length > 0
+            ? props.animationResourcePath.trim()
+            : null;
 
         const sprite = new AnimatedSprite2D({
           ...baseProps,
@@ -906,29 +909,18 @@ export class SceneLoader {
               : 0,
           layout: this.parseNode2DLayout(props),
           opacity: this.asNumber(props.opacity, undefined),
-          frames,
+          animationResourcePath,
+          currentClip: typeof props.currentClip === 'string' ? props.currentClip : undefined,
+          isPlaying: typeof props.isPlaying === 'boolean' ? props.isPlaying : undefined,
+          currentFrame: typeof props.currentFrame === 'number' ? props.currentFrame : undefined,
           width: this.asNumber(props.width, undefined),
           height: this.asNumber(props.height, undefined),
           color: typeof props.color === 'string' ? props.color : undefined,
-          fps: typeof props.fps === 'number' ? props.fps : undefined,
-          playing: typeof props.playing === 'boolean' ? props.playing : undefined,
-          loop: typeof props.loop === 'boolean' ? props.loop : undefined,
         });
 
-        // Load textures
-        frames.forEach(async (frame, index) => {
-          if (frame?.url) {
-            try {
-              const texture = await this.assetLoader.loadTexture(frame.url);
-              sprite.setTextureForFrame(index, texture);
-            } catch (error) {
-              console.warn(
-                `[SceneLoader] Error loading texture for AnimatedSprite2D "${sprite.nodeId}":`,
-                error
-              );
-            }
-          }
-        });
+        if (animationResourcePath) {
+          void this.loadAnimatedSprite2DAsset(sprite, animationResourcePath);
+        }
 
         return sprite;
       }
@@ -1564,6 +1556,35 @@ export class SceneLoader {
       }
       default:
         return new NodeBase({ ...baseProps, type: definition.type });
+    }
+  }
+
+  private async loadAnimatedSprite2DAsset(
+    sprite: AnimatedSprite2D,
+    animationResourcePath: string
+  ): Promise<void> {
+    try {
+      const resource = await this.assetLoader.loadAnimationResource(animationResourcePath);
+      sprite.setAnimationResource(resource);
+
+      if (!resource.texturePath) {
+        return;
+      }
+
+      try {
+        const texture = await this.assetLoader.loadTexture(resource.texturePath);
+        sprite.setSpritesheetTexture(texture);
+      } catch (error) {
+        console.warn(
+          `[SceneLoader] Error loading spritesheet for AnimatedSprite2D "${sprite.nodeId}":`,
+          error
+        );
+      }
+    } catch (error) {
+      console.warn(
+        `[SceneLoader] Error loading animation resource for AnimatedSprite2D "${sprite.nodeId}":`,
+        error
+      );
     }
   }
 

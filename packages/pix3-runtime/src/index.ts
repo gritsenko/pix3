@@ -13,6 +13,7 @@ export * from './core/RuntimeRenderer';
 export * from './core/InputService';
 export * from './core/SceneService';
 export * from './core/TextureResource';
+export * from './core/AnimationResource';
 export * from './core/ecs';
 export * from './core/ECSService';
 export * from './core/raycast';

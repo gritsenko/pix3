@@ -1113,6 +1113,142 @@ export class ModelResourceEditor extends ComponentBase {
   }
 }
 
+@customElement('pix3-animation-resource-editor')
+export class AnimationResourceEditor extends ComponentBase {
+  protected static useShadowDom = true;
+  @property({ type: String })
+  resourceUrl: string = '';
+
+  @property({ type: Boolean })
+  disabled: boolean = false;
+
+  @property({ type: Boolean, attribute: 'show-create-button' })
+  showCreateButton: boolean = false;
+
+  @property({ type: Boolean, attribute: 'is-creating' })
+  isCreating: boolean = false;
+
+  @state()
+  private isDragOver = false;
+
+  static styles = AudioResourceEditor.styles;
+
+  private emitChange(url: string): void {
+    this.dispatchEvent(
+      new CustomEvent('change', {
+        detail: { url },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private onDragOver(event: DragEvent): void {
+    if (this.disabled) {
+      return;
+    }
+    event.preventDefault();
+    this.isDragOver = true;
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  private onDragLeave(): void {
+    this.isDragOver = false;
+  }
+
+  private onDrop(event: DragEvent): void {
+    if (this.disabled) {
+      return;
+    }
+
+    event.preventDefault();
+    this.isDragOver = false;
+    this.dispatchEvent(
+      new CustomEvent('animation-drop', {
+        detail: { event },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private emitCreateRequest(): void {
+    if (this.disabled || this.isCreating) {
+      return;
+    }
+
+    this.dispatchEvent(
+      new CustomEvent('create-request', {
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  private emitOpenRequest(): void {
+    const resourceUrl = this.resourceUrl.trim();
+    if (!resourceUrl) {
+      return;
+    }
+
+    this.dispatchEvent(
+      new CustomEvent('open-request', {
+        detail: { url: resourceUrl },
+        bubbles: true,
+        composed: true,
+      })
+    );
+  }
+
+  protected render() {
+    const hasResource = this.resourceUrl.trim().length > 0;
+
+    return html`
+      <div
+        class="drop-zone ${this.isDragOver ? 'is-dragover' : ''}"
+        @dragover=${(event: DragEvent) => this.onDragOver(event)}
+        @dragleave=${() => this.onDragLeave()}
+        @drop=${(event: DragEvent) => this.onDrop(event)}
+        @dblclick=${() => this.emitOpenRequest()}
+      >
+        <span class="drop-label">Drop .pix3anim asset from Assets here</span>
+      </div>
+
+      <div class="url-row">
+        <input
+          type="text"
+          .value=${this.resourceUrl}
+          ?disabled=${this.disabled || this.isCreating}
+          placeholder="res://path/to/animation.pix3anim"
+          @change=${(e: Event) => this.emitChange((e.target as HTMLInputElement).value)}
+          @dblclick=${() => this.emitOpenRequest()}
+        />
+        ${!hasResource && this.showCreateButton
+          ? html`
+              <button
+                type="button"
+                ?disabled=${this.disabled || this.isCreating}
+                @click=${() => this.emitCreateRequest()}
+              >
+                ${this.isCreating ? 'Creating…' : 'Create'}
+              </button>
+            `
+          : html`
+              <button
+                type="button"
+                ?disabled=${this.disabled || this.isCreating}
+                @click=${() => this.emitChange('')}
+              >
+                Clear
+              </button>
+            `}
+      </div>
+    `;
+  }
+}
+
 export interface SizeValue {
   width: number;
   height: number;
@@ -1542,6 +1678,7 @@ declare global {
     'pix3-texture-resource-editor': TextureResourceEditor;
     'pix3-audio-resource-editor': AudioResourceEditor;
     'pix3-model-resource-editor': ModelResourceEditor;
+    'pix3-animation-resource-editor': AnimationResourceEditor;
     'pix3-size-editor': SizeEditor;
     'pix3-slider-number-editor': SliderNumberEditor;
   }

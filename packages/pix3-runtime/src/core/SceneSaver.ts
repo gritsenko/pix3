@@ -6,6 +6,7 @@ import { Node3D } from '../nodes/Node3D';
 import { Node2D } from '../nodes/Node2D';
 import { Group2D } from '../nodes/2D/Group2D';
 import { Sprite2D } from '../nodes/2D/Sprite2D';
+import { AnimatedSprite2D } from '../nodes/2D/AnimatedSprite2D';
 import { Joystick2D } from '../nodes/2D/UI/Joystick2D';
 import { UIControl2D } from '../nodes/2D/UI/UIControl2D';
 import { Button2D } from '../nodes/2D/UI/Button2D';
@@ -334,6 +335,29 @@ export class SceneSaver {
           Math.round(node.anchor.y * 1000) / 1000,
         ];
       }
+    } else if (node instanceof AnimatedSprite2D) {
+      delete props.frames;
+      delete props.fps;
+      delete props.playing;
+      delete props.loop;
+
+      if (node.animationResourcePath) {
+        props.animationResourcePath = node.animationResourcePath;
+      } else {
+        delete props.animationResourcePath;
+      }
+
+      if (node.currentClip) {
+        props.currentClip = node.currentClip;
+      } else {
+        delete props.currentClip;
+      }
+
+      props.isPlaying = node.isPlaying;
+      props.currentFrame = node.currentFrame;
+      props.width = node.width;
+      props.height = node.height;
+      props.color = node.color;
     } else if (node instanceof Joystick2D) {
       if (node.radius !== 50) props.radius = node.radius;
       if (node.handleRadius !== 20) props.handleRadius = node.handleRadius;

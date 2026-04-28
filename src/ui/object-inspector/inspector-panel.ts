@@ -3,6 +3,7 @@ import {
   getNodePropertySchema,
   getPropertiesByGroup,
   getPropertyDisplayValue,
+  AnimatedSprite2D,
   MeshInstance,
   Node2D,
   Sprite2D,
@@ -13,6 +14,7 @@ import type { NodeBase, ScriptComponent } from '@pix3/runtime';
 import type { PropertySchema, PropertyDefinition } from '@/fw';
 import { UpdateObjectPropertyCommand } from '@/features/properties/UpdateObjectPropertyCommand';
 import { UpdateSprite2DSizeCommand } from '@/features/properties/UpdateSprite2DSizeCommand';
+import { CreateAndBindAnimationAssetCommand } from '@/features/scene/CreateAndBindAnimationAssetCommand';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
 import { BehaviorPickerService } from '@/services/BehaviorPickerService';
 import { ScriptCreatorService } from '@/services/ScriptCreatorService';
@@ -20,7 +22,12 @@ import { ScriptRegistry } from '@pix3/runtime';
 import { IconService } from '@/services/IconService';
 import { DialogService } from '@/services/DialogService';
 import { FileSystemAPIService } from '@/services/FileSystemAPIService';
-import { AssetsPreviewService, ProjectStorageService, type AssetPreviewItem } from '@/services';
+import {
+  AssetsPreviewService,
+  ProjectStorageService,
+  type AssetPreviewItem,
+} from '@/services';
+import { EditorTabService } from '@/services/EditorTabService';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { AddComponentCommand } from '@/features/scripts/AddComponentCommand';
 import { RemoveComponentCommand } from '@/features/scripts/RemoveComponentCommand';
@@ -94,7 +101,9 @@ const IMAGE_EXTENSIONS = new Set([
 ]);
 const AUDIO_EXTENSIONS = new Set(['wav', 'mp3', 'ogg']);
 const MODEL_EXTENSIONS = new Set(['glb', 'gltf']);
-const PROPERTY_GROUP_ORDER = ['Transform', 'Size', 'Anchor', 'Style', 'Sprite'];
+const ANIMATION_EXTENSIONS = new Set(['pix3anim']);
+const DEFAULT_ANIMATION_ASSET_DIRECTORY = 'res://animations';
+const PROPERTY_GROUP_ORDER = ['Transform', 'Size', 'Anchor', 'Style', 'Sprite', 'Animation'];
 const PROPERTY_GROUP_ORDER_INDEX = new Map(
   PROPERTY_GROUP_ORDER.map((groupName, index) => [groupName, index])
 );
@@ -128,6 +137,9 @@ export class InspectorPanel extends ComponentBase {
   @inject(ProjectStorageService)
   private readonly projectStorage!: ProjectStorageService;
 
+  @inject(EditorTabService)
+  private readonly editorTabService!: EditorTabService;
+
   @inject(AssetsPreviewService)
   private readonly assetsPreviewService!: AssetsPreviewService;
 
@@ -151,6 +163,9 @@ export class InspectorPanel extends ComponentBase {
 
   @state()
   private selectedAssetItem: AssetPreviewItem | null = null;
+
+  @state()
+  private creatingAnimationPropertyName: string | null = null;
 
   @state()
   private activePreviewAnimation: string | null = null;
@@ -705,6 +720,10 @@ export class InspectorPanel extends ComponentBase {
     return this.hasSupportedExtension(path, MODEL_EXTENSIONS);
   }
 
+  private isAnimationResource(path: string): boolean {
+    return this.hasSupportedExtension(path, ANIMATION_EXTENSIONS);
+  }
+
   private hasSupportedExtension(path: string, extensions: ReadonlySet<string>): boolean {
     const cleaned = path.split('?')[0].split('#')[0];
     const extension = cleaned.includes('.') ? (cleaned.split('.').pop()?.toLowerCase() ?? '') : '';
@@ -776,6 +795,10 @@ export class InspectorPanel extends ComponentBase {
     return this.getDroppedResource(event, path => this.isModelResource(path));
   }
 
+  private getDroppedAnimationResource(event: DragEvent): string | null {
+    return this.getDroppedResource(event, path => this.isAnimationResource(path));
+  }
+
   private onTextureResourceDrop(propertyName: string, event: DragEvent): void {
     const textureUrl = this.getDroppedTextureResource(event);
     if (!textureUrl) {
@@ -801,6 +824,107 @@ export class InspectorPanel extends ComponentBase {
     }
 
     void this.applyPropertyChange(propertyName, modelUrl);
+  }
+
+  private onAnimationResourceDrop(propertyName: string, event: DragEvent): void {
+    const animationUrl = this.getDroppedAnimationResource(event);
+    if (!animationUrl) {
+      return;
+    }
+
+    void this.applyPropertyChange(propertyName, animationUrl);
+  }
+
+  private onOpenAnimationResource(resourcePath: string): void {
+    const trimmedResourcePath = resourcePath.trim();
+    if (!trimmedResourcePath) {
+      return;
+    }
+
+    void this.editorTabService.openResourceTab('animation', trimmedResourcePath);
+  }
+
+  private canCreateAnimationResource(propertyName: string, value: string, readOnly: boolean): boolean {
+    return (
+      !readOnly &&
+      propertyName === 'animationResourcePath' &&
+      this.primaryNode instanceof AnimatedSprite2D &&
+      value.trim().length === 0
+    );
+  }
+
+  private async onCreateAnimationResource(propertyName: string): Promise<void> {
+    if (
+      this.creatingAnimationPropertyName ||
+      propertyName !== 'animationResourcePath' ||
+      !(this.primaryNode instanceof AnimatedSprite2D)
+    ) {
+      return;
+    }
+
+    const nodeId = this.primaryNode.nodeId;
+    this.creatingAnimationPropertyName = propertyName;
+
+    try {
+      const assetPath = await this.getAvailableAnimationAssetPath(this.primaryNode.name);
+
+      const didMutate = await this.commandDispatcher.execute(
+        new CreateAndBindAnimationAssetCommand({
+          nodeId,
+          assetPath,
+          propertyPath: propertyName,
+          texturePath: '',
+          initialClipName: 'idle',
+        })
+      );
+
+      if (!didMutate) {
+        return;
+      }
+
+      await this.editorTabService.openResourceTab('animation', assetPath);
+    } catch (error) {
+      console.error('[InspectorPanel] Failed to create animation resource', error);
+    } finally {
+      this.creatingAnimationPropertyName = null;
+    }
+  }
+
+  private async getAvailableAnimationAssetPath(nodeName: string): Promise<string> {
+    const baseStem = this.getAnimationAssetStem(nodeName);
+    let suffix = 0;
+
+    while (true) {
+      const assetPath =
+        suffix === 0
+          ? `${DEFAULT_ANIMATION_ASSET_DIRECTORY}/${baseStem}.pix3anim`
+          : `${DEFAULT_ANIMATION_ASSET_DIRECTORY}/${baseStem}-${suffix + 1}.pix3anim`;
+
+      if (!(await this.animationAssetExists(assetPath))) {
+        return assetPath;
+      }
+
+      suffix += 1;
+    }
+  }
+
+  private getAnimationAssetStem(nodeName: string): string {
+    const sanitized = nodeName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+
+    return sanitized || 'animated-sprite';
+  }
+
+  private async animationAssetExists(assetPath: string): Promise<boolean> {
+    try {
+      await this.projectStorage.readTextFile(assetPath);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private onComponentAudioResourceDrop(
@@ -2612,6 +2736,27 @@ ${textPreview?.content || 'Empty file'}</pre
             @model-drop=${(event: CustomEvent<{ event: DragEvent }>) =>
               this.onModelResourceDrop(prop.name, event.detail.event)}
           ></pix3-model-resource-editor>
+        </div>
+      `;
+    }
+
+    if (prop.type === 'string' && prop.ui?.editor === 'animation-resource') {
+      return html`
+        <div class="property-group">
+          ${labelTemplate}
+          <pix3-animation-resource-editor
+            .resourceUrl=${state.value}
+            .showCreateButton=${this.canCreateAnimationResource(prop.name, state.value, readOnly)}
+            .isCreating=${this.creatingAnimationPropertyName === prop.name}
+            ?disabled=${readOnly}
+            @change=${(event: CustomEvent<{ url: string }>) =>
+              this.applyPropertyChange(prop.name, event.detail.url.trim())}
+            @animation-drop=${(event: CustomEvent<{ event: DragEvent }>) =>
+              this.onAnimationResourceDrop(prop.name, event.detail.event)}
+            @open-request=${(event: CustomEvent<{ url: string }>) =>
+              this.onOpenAnimationResource(event.detail.url)}
+            @create-request=${() => this.onCreateAnimationResource(prop.name)}
+          ></pix3-animation-resource-editor>
         </div>
       `;
     }

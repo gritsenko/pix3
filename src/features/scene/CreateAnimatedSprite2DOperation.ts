@@ -6,6 +6,8 @@ export interface CreateAnimatedSprite2DOperationParams {
   nodeName?: string;
   position?: Vector2;
   parentNodeId?: string | null;
+  animationResourcePath?: string | null;
+  currentClip?: string;
 }
 
 export class CreateAnimatedSprite2DOperation extends CreateNodeOperationBase<CreateAnimatedSprite2DOperationParams> {
@@ -35,6 +37,8 @@ export class CreateAnimatedSprite2DOperation extends CreateNodeOperationBase<Cre
       id: nodeId,
       name: nodeName,
       position: params.position || new Vector2(100, 100),
+      animationResourcePath: params.animationResourcePath ?? null,
+      currentClip: params.currentClip,
       width: 64,
       height: 64,
     });

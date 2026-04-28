@@ -2,47 +2,63 @@ import { Mesh, MeshBasicMaterial, PlaneGeometry, Texture } from 'three';
 import { Node2D, type Node2DProps } from '../Node2D';
 import type { PropertySchema } from '../../fw/property-schema';
 import {
-  coerceTextureResource,
-  type TextureResourceRef,
-} from '../../core/TextureResource';
+  findAnimationClip,
+  type AnimationClip,
+  type AnimationFrame,
+  type AnimationResource,
+} from '../../core/AnimationResource';
 
 export interface AnimatedSprite2DProps extends Omit<Node2DProps, 'type'> {
-  frames?: (TextureResourceRef | null)[];
+  animationResourcePath?: string | null;
+  currentClip?: string;
+  isPlaying?: boolean;
+  currentFrame?: number;
   width?: number;
   height?: number;
   color?: string;
-  fps?: number;
-  playing?: boolean;
-  loop?: boolean;
 }
 
 export class AnimatedSprite2D extends Node2D {
-  frames: (TextureResourceRef | null)[];
+  animationResourcePath: string | null;
+  currentClip: string;
+  isPlaying: boolean;
   width: number;
   height: number;
   color: string;
-  fps: number;
-  playing: boolean;
-  loop: boolean;
-  
-  private _currentFrame: number = 0;
-  private timeAccumulator: number = 0;
+
+  private _currentFrame: number;
+  private timeAccumulator = 0;
+  private animationResource: AnimationResource | null = null;
+  private activeClip: AnimationClip | null = null;
+  private spritesheetTexture: Texture | null = null;
 
   private mesh: Mesh;
   private geometry: PlaneGeometry;
   private material: MeshBasicMaterial;
-  private loadedTextures: (Texture | null)[] = [];
 
   constructor(props: AnimatedSprite2DProps) {
     super(props, 'AnimatedSprite2D');
-    this.frames = (props.frames || []).map(coerceTextureResource);
+
+    this.animationResourcePath =
+      typeof props.animationResourcePath === 'string' && props.animationResourcePath.trim().length > 0
+        ? props.animationResourcePath.trim()
+        : null;
+    this.currentClip = typeof props.currentClip === 'string' ? props.currentClip.trim() : '';
+    this.isPlaying = props.isPlaying ?? true;
     this.width = props.width ?? 64;
     this.height = props.height ?? 64;
     this.color = props.color ?? '#ffffff';
-    this.fps = props.fps ?? 10;
-    this.playing = props.playing ?? true;
-    this.loop = props.loop ?? true;
+    this._currentFrame = Math.max(0, Math.floor(props.currentFrame ?? 0));
     this.isContainer = false;
+
+    if (this.animationResourcePath) {
+      this.properties.animationResourcePath = this.animationResourcePath;
+    }
+    if (this.currentClip) {
+      this.properties.currentClip = this.currentClip;
+    }
+    this.properties.isPlaying = this.isPlaying;
+    this.properties.currentFrame = this._currentFrame;
 
     this.geometry = new PlaneGeometry(this.width, this.height);
     this.material = new MeshBasicMaterial({
@@ -62,58 +78,68 @@ export class AnimatedSprite2D extends Node2D {
   }
 
   set currentFrame(value: number) {
-    if (this.frames.length === 0) {
-      this._currentFrame = 0;
-      return;
-    }
-    this._currentFrame = Math.max(0, Math.min(value, this.frames.length - 1));
-    this.updateTexture();
+    const normalized = Math.max(0, Math.floor(value));
+    const frameCount = this.activeClip?.frames.length ?? 0;
+    this._currentFrame = frameCount > 0 ? Math.min(normalized, frameCount - 1) : normalized;
+    this.properties.currentFrame = this._currentFrame;
+    this.refreshTexturePresentation();
   }
 
-  setTextureForFrame(index: number, texture: Texture | null): void {
-    this.loadedTextures[index] = texture;
-    if (index === this._currentFrame) {
-      this.updateTexture();
-    }
+  setAnimationResource(resource: AnimationResource | null): void {
+    this.animationResource = resource;
+    this.syncActiveClip(false);
   }
 
-  private updateTexture(): void {
-    const tex = this.loadedTextures[this._currentFrame];
-    if (tex) {
-      if ('colorSpace' in tex) {
-        (tex as any).colorSpace = 'srgb';
-      } else if ('encoding' in tex) {
-        (tex as any).encoding = 3001;
+  setSpritesheetTexture(texture: Texture | null): void {
+    if (this.spritesheetTexture) {
+      this.spritesheetTexture.dispose();
+      this.spritesheetTexture = null;
+    }
+
+    if (texture) {
+      const nextTexture = texture.clone();
+      if ('colorSpace' in nextTexture) {
+        (nextTexture as Texture & { colorSpace: string }).colorSpace = 'srgb';
+      } else if ('encoding' in nextTexture) {
+        (nextTexture as Texture & { encoding: number }).encoding = 3001;
       }
-      this.material.map = tex;
-      this.material.color.set('#ffffff');
-    } else {
-      this.material.map = null;
-      this.material.color.set(this.color);
+      this.spritesheetTexture = nextTexture;
     }
-    this.material.needsUpdate = true;
+
+    this.refreshTexturePresentation();
   }
 
   tick(dt: number): void {
     super.tick(dt);
-    if (!this.playing || this.frames.length <= 1) return;
+
+    const clip = this.activeClip;
+    if (!this.isPlaying || !clip || clip.frames.length <= 1 || clip.fps <= 0) {
+      return;
+    }
 
     this.timeAccumulator += dt;
-    const frameDuration = 1 / this.fps;
+    const frameDuration = 1 / clip.fps;
 
-    if (this.timeAccumulator >= frameDuration) {
+    while (this.timeAccumulator >= frameDuration) {
       this.timeAccumulator -= frameDuration;
+
       let nextFrame = this._currentFrame + 1;
-      
-      if (nextFrame >= this.frames.length) {
-        if (this.loop) {
+      if (nextFrame >= clip.frames.length) {
+        if (clip.loop) {
           nextFrame = 0;
         } else {
-          nextFrame = this.frames.length - 1;
-          this.playing = false;
+          nextFrame = clip.frames.length - 1;
+          this.isPlaying = false;
+          this.properties.isPlaying = false;
         }
       }
+
       this.currentFrame = nextFrame;
+
+      if (!this.isPlaying) {
+        this.timeAccumulator = 0;
+        break;
+      }
     }
   }
 
@@ -130,9 +156,9 @@ export class AnimatedSprite2D extends Node2D {
           ui: { label: 'Width', group: 'Size', min: 0, step: 1 },
           getValue: (node: unknown) => (node as AnimatedSprite2D).width,
           setValue: (node: unknown, value: unknown) => {
-            const n = node as AnimatedSprite2D;
-            n.width = Number(value);
-            n.updateGeometry();
+            const sprite = node as AnimatedSprite2D;
+            sprite.width = Number(value);
+            sprite.updateGeometry();
           },
         },
         {
@@ -141,9 +167,9 @@ export class AnimatedSprite2D extends Node2D {
           ui: { label: 'Height', group: 'Size', min: 0, step: 1 },
           getValue: (node: unknown) => (node as AnimatedSprite2D).height,
           setValue: (node: unknown, value: unknown) => {
-            const n = node as AnimatedSprite2D;
-            n.height = Number(value);
-            n.updateGeometry();
+            const sprite = node as AnimatedSprite2D;
+            sprite.height = Number(value);
+            sprite.updateGeometry();
           },
         },
         {
@@ -152,36 +178,52 @@ export class AnimatedSprite2D extends Node2D {
           ui: { label: 'Color', group: 'Style' },
           getValue: (node: unknown) => (node as AnimatedSprite2D).color,
           setValue: (node: unknown, value: unknown) => {
-            const n = node as AnimatedSprite2D;
-            n.color = String(value);
-            n.updateTexture();
+            const sprite = node as AnimatedSprite2D;
+            sprite.color = String(value);
+            sprite.refreshTexturePresentation();
           },
         },
         {
-          name: 'fps',
-          type: 'number',
-          ui: { label: 'FPS', group: 'Animation', min: 1, step: 1 },
-          getValue: (node: unknown) => (node as AnimatedSprite2D).fps,
+          name: 'animationResourcePath',
+          type: 'string',
+          ui: { label: 'Animation Asset', group: 'Animation', editor: 'animation-resource' },
+          getValue: (node: unknown) => (node as AnimatedSprite2D).animationResourcePath ?? '',
           setValue: (node: unknown, value: unknown) => {
-            (node as AnimatedSprite2D).fps = Number(value);
+            const sprite = node as AnimatedSprite2D;
+            const nextPath = String(value ?? '').trim();
+            sprite.animationResourcePath = nextPath || null;
+            if (sprite.animationResourcePath) {
+              sprite.properties.animationResourcePath = sprite.animationResourcePath;
+            } else {
+              delete sprite.properties.animationResourcePath;
+            }
           },
         },
         {
-          name: 'playing',
+          name: 'currentClip',
+          type: 'string',
+          ui: { label: 'Clip', group: 'Animation' },
+          getValue: (node: unknown) => (node as AnimatedSprite2D).currentClip,
+          setValue: (node: unknown, value: unknown) => {
+            const sprite = node as AnimatedSprite2D;
+            sprite.currentClip = String(value ?? '').trim();
+            if (sprite.currentClip) {
+              sprite.properties.currentClip = sprite.currentClip;
+            } else {
+              delete sprite.properties.currentClip;
+            }
+            sprite.syncActiveClip(true);
+          },
+        },
+        {
+          name: 'isPlaying',
           type: 'boolean',
           ui: { label: 'Playing', group: 'Animation' },
-          getValue: (node: unknown) => (node as AnimatedSprite2D).playing,
+          getValue: (node: unknown) => (node as AnimatedSprite2D).isPlaying,
           setValue: (node: unknown, value: unknown) => {
-            (node as AnimatedSprite2D).playing = Boolean(value);
-          },
-        },
-        {
-          name: 'loop',
-          type: 'boolean',
-          ui: { label: 'Loop', group: 'Animation' },
-          getValue: (node: unknown) => (node as AnimatedSprite2D).loop,
-          setValue: (node: unknown, value: unknown) => {
-            (node as AnimatedSprite2D).loop = Boolean(value);
+            const sprite = node as AnimatedSprite2D;
+            sprite.isPlaying = Boolean(value);
+            sprite.properties.isPlaying = sprite.isPlaying;
           },
         },
         {
@@ -203,6 +245,77 @@ export class AnimatedSprite2D extends Node2D {
     };
   }
 
+  private getCurrentFrameData(): AnimationFrame | null {
+    const frames = this.activeClip?.frames ?? [];
+    if (frames.length === 0) {
+      return null;
+    }
+
+    return frames[this._currentFrame] ?? null;
+  }
+
+  private refreshTexturePresentation(): void {
+    const texture = this.spritesheetTexture;
+    const currentFrame = this.getCurrentFrameData();
+
+    if (texture) {
+      if (this.material.map !== texture) {
+        this.material.map = texture;
+        this.material.needsUpdate = true;
+      }
+
+      if (currentFrame) {
+        texture.offset.set(currentFrame.offset.x, currentFrame.offset.y);
+        texture.repeat.set(currentFrame.repeat.x, currentFrame.repeat.y);
+      } else {
+        texture.offset.set(0, 0);
+        texture.repeat.set(1, 1);
+      }
+
+      this.material.color.set('#ffffff');
+    } else {
+      if (this.material.map) {
+        this.material.map = null;
+        this.material.needsUpdate = true;
+      }
+
+      this.material.color.set(this.color);
+    }
+  }
+
+  private syncActiveClip(resetFrame: boolean): void {
+    const previousClipName = this.activeClip?.name ?? null;
+    this.activeClip = findAnimationClip(this.animationResource, this.currentClip);
+
+    const resolvedClipName = this.activeClip?.name ?? this.currentClip;
+    if (resolvedClipName !== this.currentClip) {
+      this.currentClip = resolvedClipName;
+      if (resolvedClipName) {
+        this.properties.currentClip = resolvedClipName;
+      } else {
+        delete this.properties.currentClip;
+      }
+    }
+
+    if (resetFrame && previousClipName !== this.activeClip?.name) {
+      this._currentFrame = 0;
+      this.properties.currentFrame = this._currentFrame;
+      this.timeAccumulator = 0;
+    }
+
+    const frameCount = this.activeClip?.frames.length ?? 0;
+    if (frameCount > 0) {
+      this._currentFrame = Math.max(0, Math.min(this._currentFrame, frameCount - 1));
+      this.properties.currentFrame = this._currentFrame;
+    } else {
+      this._currentFrame = Math.max(0, this._currentFrame);
+      this.properties.currentFrame = this._currentFrame;
+      this.timeAccumulator = 0;
+    }
+
+    this.refreshTexturePresentation();
+  }
+
   private updateGeometry(): void {
     this.geometry.dispose();
     this.geometry = new PlaneGeometry(this.width, this.height);
@@ -211,6 +324,10 @@ export class AnimatedSprite2D extends Node2D {
 
   dispose(): void {
     this.geometry.dispose();
+    if (this.spritesheetTexture) {
+      this.spritesheetTexture.dispose();
+      this.spritesheetTexture = null;
+    }
     this.material.dispose();
   }
 }
