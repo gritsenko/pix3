@@ -2,6 +2,7 @@ import { vi, describe, it, expect, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { ViewportRendererService } from './ViewportRenderService';
 import {
+  AnimatedSprite2D,
   AmbientLightNode,
   Camera3D,
   DirectionalLightNode,
@@ -67,6 +68,35 @@ describe('ViewportRendererService', () => {
 
     const markerParts = anchorMarker.children.filter(child => child instanceof THREE.Mesh);
     expect(markerParts).toHaveLength(3);
+  });
+
+  it('creates AnimatedSprite2D visuals with authored bounds', () => {
+    const service = new ViewportRendererService();
+
+    const svc = service as unknown as {
+      createAnimatedSprite2DVisual?: (s: AnimatedSprite2D) => THREE.Group;
+      getNodeOnlyBounds?: (s: AnimatedSprite2D) => THREE.Box3;
+    };
+
+    const sprite = new AnimatedSprite2D({
+      id: 'animated-sprite-test',
+      width: 120,
+      height: 80,
+      color: '#ffffff',
+    });
+
+    const visualRoot = svc.createAnimatedSprite2DVisual?.(sprite);
+    expect(visualRoot).toBeDefined();
+
+    const sizeGroup = visualRoot?.userData.sizeGroup as THREE.Group;
+    expect(sizeGroup.scale.x).toBe(120);
+    expect(sizeGroup.scale.y).toBe(80);
+
+    const bounds = svc.getNodeOnlyBounds?.(sprite);
+    expect(bounds?.max.x).toBe(60);
+    expect(bounds?.min.x).toBe(-60);
+    expect(bounds?.max.y).toBe(40);
+    expect(bounds?.min.y).toBe(-40);
   });
 
   it('should use ResourceManager.readBlob for templ:// sprite textures', async () => {

@@ -12,6 +12,21 @@ export function normalizeAnimationAssetPath(path: string): string {
   return withScheme.endsWith('.pix3anim') ? withScheme : `${withScheme}.pix3anim`;
 }
 
+export function deriveAnimationDocumentId(resourcePath: string): string {
+  const normalizedPath = normalizeAnimationAssetPath(resourcePath)
+    .replace(/^res:\/\//i, '')
+    .replace(/^templ:\/\//i, '')
+    .replace(/^collab:\/\//i, '')
+    .replace(/\.[^./]+$/i, '');
+
+  const normalizedId = normalizedPath
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+
+  return normalizedId || 'animation';
+}
+
 export function createDefaultAnimationResource(
   texturePath: string,
   initialClipName = 'idle'

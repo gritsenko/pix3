@@ -1,4 +1,5 @@
 import type { ProjectManifest } from '@/core/ProjectManifest';
+import type { AnimationResource } from '@pix3/runtime';
 
 export const THEME_IDS = ['dark', 'light', 'high-contrast'] as const;
 
@@ -7,6 +8,7 @@ export type ThemeName = (typeof THEME_IDS)[number];
 export const DEFAULT_THEME: ThemeName = 'dark';
 
 export type SceneLoadState = 'idle' | 'loading' | 'ready' | 'error';
+export type AnimationLoadState = 'idle' | 'loading' | 'ready' | 'error';
 
 export type EditorTabType = 'scene' | 'prefab' | 'script' | 'texture' | 'animation' | 'game';
 
@@ -83,6 +85,29 @@ export interface ScenesState {
   cameraStates: Record<string, CameraState>;
   /** Per-scene camera node used for the viewport preview inset. */
   previewCameraNodeIds: Record<string, string | null>;
+}
+
+export interface AnimationDescriptor {
+  id: string;
+  filePath: string;
+  name: string;
+  version: string;
+  isDirty: boolean;
+  lastSavedAt: number | null;
+  lastModifiedTime?: number | null;
+}
+
+export interface AnimationsState {
+  /** Currently focused animation document identifier. */
+  activeAnimationId: string | null;
+  /** Map of animation document descriptors currently loaded into memory. */
+  descriptors: Record<string, AnimationDescriptor>;
+  /** Parsed animation resources keyed by animation document id. */
+  resources: Record<string, AnimationResource>;
+  loadState: AnimationLoadState;
+  loadError: string | null;
+  /** Timestamp (ms) when the most recent animation finished loading. */
+  lastLoadedAt: number | null;
 }
 
 export type ProjectStatus = 'idle' | 'selecting' | 'opening' | 'ready' | 'error';
@@ -341,6 +366,7 @@ export interface AppState {
   router: RouterState;
   project: ProjectState;
   scenes: ScenesState;
+  animations: AnimationsState;
   tabs: TabsState;
   selection: SelectionState;
   editorContext: EditorContextState;
@@ -424,6 +450,14 @@ export const createInitialAppState = (): AppState => ({
     nodeDataChangeSignal: 0,
     cameraStates: {},
     previewCameraNodeIds: {},
+  },
+  animations: {
+    activeAnimationId: null,
+    descriptors: {},
+    resources: {},
+    loadState: 'idle',
+    loadError: null,
+    lastLoadedAt: null,
   },
   tabs: {
     tabs: [],

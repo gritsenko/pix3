@@ -1,9 +1,9 @@
 import { subscribe } from 'valtio/vanilla';
 
 import { ComponentBase, customElement, html, inject, property, state } from '@/fw';
-import { UpdateAnimationMetadataOperation } from '@/features/properties/UpdateAnimationMetadataOperation';
+import { UpdateAnimationDocumentOperation } from '@/features/properties/UpdateAnimationDocumentOperation';
 import { UpdateObjectPropertyCommand } from '@/features/properties/UpdateObjectPropertyCommand';
-import { parseAnimationResourceText } from '@/features/scene/animation-asset-utils';
+import { deriveAnimationDocumentId } from '@/features/scene/animation-asset-utils';
 import { appState } from '@/state';
 import {
   AnimationAutoSliceDialogService,
@@ -79,6 +79,8 @@ export class AnimationPanel extends ComponentBase {
 
   private disposeTabsSubscription?: () => void;
   private disposeProjectSubscription?: () => void;
+  private disposeAnimationsSubscription?: () => void;
+  private animationId: string | null = null;
   private loadToken = 0;
 
   connectedCallback(): void {
@@ -87,10 +89,10 @@ export class AnimationPanel extends ComponentBase {
       void this.syncFromResourceContext(true);
     });
     this.disposeProjectSubscription = subscribe(appState.project, () => {
-      const assetPath = this.resolveAssetPath();
-      if (assetPath) {
-        void this.loadResource(assetPath, true);
-      }
+      void this.syncFromResourceContext(true);
+    });
+    this.disposeAnimationsSubscription = subscribe(appState.animations, () => {
+      void this.syncFromDocumentState(true);
     });
     void this.syncFromResourceContext(false);
   }
@@ -104,8 +106,10 @@ export class AnimationPanel extends ComponentBase {
   disconnectedCallback(): void {
     this.disposeTabsSubscription?.();
     this.disposeProjectSubscription?.();
+    this.disposeAnimationsSubscription?.();
     this.disposeTabsSubscription = undefined;
     this.disposeProjectSubscription = undefined;
+    this.disposeAnimationsSubscription = undefined;
     this.revokeTexturePreviewUrl();
     super.disconnectedCallback();
   }
@@ -426,53 +430,63 @@ export class AnimationPanel extends ComponentBase {
   private async syncFromResourceContext(preserveClip: boolean): Promise<void> {
     const nextAssetPath = this.resolveAssetPath();
     const assetChanged = nextAssetPath !== this.assetPath;
+    const nextAnimationId = nextAssetPath ? deriveAnimationDocumentId(nextAssetPath) : null;
+    const animationChanged = nextAnimationId !== this.animationId;
 
     this.assetPath = nextAssetPath;
-    await this.loadResource(nextAssetPath, preserveClip && !assetChanged);
+    this.animationId = nextAnimationId;
+    await this.syncFromDocumentState(preserveClip && !assetChanged && !animationChanged);
   }
 
-  private async loadResource(assetPath: string | null, preserveClip: boolean): Promise<void> {
-    this.loadToken += 1;
-    const token = this.loadToken;
-    this.errorMessage = null;
+  private async syncFromDocumentState(preserveClip: boolean): Promise<void> {
+    const assetPath = this.assetPath;
+    const animationId = this.animationId;
 
-    if (!assetPath) {
+    if (!assetPath || !animationId) {
+      this.resource = null;
+      this.activeClipName = '';
+      this.errorMessage = null;
+      this.revokeTexturePreviewUrl();
+      return;
+    }
+
+    const resource = appState.animations.resources[animationId] ?? null;
+    const isActiveLoadError =
+      appState.animations.activeAnimationId === animationId &&
+      appState.animations.loadState === 'error';
+
+    this.errorMessage = isActiveLoadError ? appState.animations.loadError : null;
+
+    if (!resource) {
       this.resource = null;
       this.activeClipName = '';
       this.revokeTexturePreviewUrl();
       return;
     }
 
-    try {
-      const source = await this.projectStorage.readTextFile(assetPath);
-      const resource = parseAnimationResourceText(source);
-      if (token !== this.loadToken) {
-        return;
-      }
+    const previousTexturePath = this.resource?.texturePath ?? '';
+    this.resource = resource;
 
-      this.resource = resource;
-      const clipNames = new Set(resource.clips.map(clip => clip.name));
-      const selectedSprite = this.getSelectedAnimatedSprite();
-      const selectedClipName =
-        selectedSprite?.animationResourcePath === assetPath ? selectedSprite.currentClip : '';
-      const preferredClipName =
-        preserveClip && clipNames.has(this.activeClipName)
-          ? this.activeClipName
+    const clipNames = new Set(resource.clips.map(clip => clip.name));
+    const selectedSprite = this.getSelectedAnimatedSprite();
+    const selectedClipName =
+      selectedSprite?.animationResourcePath === assetPath ? selectedSprite.currentClip : '';
+    const storedClipName = this.getStoredActiveClipName();
+    const preferredClipName =
+      preserveClip && clipNames.has(this.activeClipName)
+        ? this.activeClipName
+        : storedClipName && clipNames.has(storedClipName)
+          ? storedClipName
           : selectedClipName && clipNames.has(selectedClipName)
             ? selectedClipName
             : resource.clips[0]?.name ?? '';
-      this.activeClipName = preferredClipName;
 
+    this.activeClipName = preferredClipName;
+    this.persistActiveClipName(preferredClipName);
+
+    if (previousTexturePath !== resource.texturePath || !this.texturePreviewUrl) {
+      const token = ++this.loadToken;
       await this.loadTexturePreview(resource.texturePath, token);
-    } catch (error) {
-      if (token !== this.loadToken) {
-        return;
-      }
-
-      this.resource = null;
-      this.activeClipName = '';
-      this.revokeTexturePreviewUrl();
-      this.errorMessage = error instanceof Error ? error.message : 'Failed to load animation asset.';
     }
   }
 
@@ -509,14 +523,14 @@ export class AnimationPanel extends ComponentBase {
     label: string,
     nextActiveClipName?: string
   ): Promise<boolean> {
-    if (!this.assetPath || !this.resource) {
+    if (!this.assetPath || !this.resource || !this.animationId) {
       return false;
     }
 
     const nextResource = updater(this.resource);
     const pushed = await this.operations.invokeAndPush(
-      new UpdateAnimationMetadataOperation({
-        animationResourcePath: this.assetPath,
+      new UpdateAnimationDocumentOperation({
+        animationId: this.animationId,
         nextResource,
         label,
       })
@@ -528,6 +542,7 @@ export class AnimationPanel extends ComponentBase {
     const previousTexturePath = this.resource.texturePath;
     this.resource = nextResource;
     this.activeClipName = nextActiveClipName ?? nextResource.clips[0]?.name ?? '';
+    this.persistActiveClipName(this.activeClipName);
 
     if (previousTexturePath !== nextResource.texturePath) {
       const token = ++this.loadToken;
@@ -555,6 +570,7 @@ export class AnimationPanel extends ComponentBase {
 
   private async onSelectClip(clipName: string): Promise<void> {
     this.activeClipName = clipName;
+    this.persistActiveClipName(clipName);
     const selectedSprite = this.getSelectedAnimatedSprite();
     if (
       selectedSprite &&
@@ -737,8 +753,9 @@ export class AnimationPanel extends ComponentBase {
 
   private async onUpdateTexturePath(nextTexturePath: string): Promise<void> {
     const trimmedTexturePath = nextTexturePath.trim();
+    const currentResource = this.resource;
     const shouldPromptForAutoSlice =
-      Boolean(trimmedTexturePath) && Boolean(this.resource) && !this.hasAnyFrames(this.resource);
+      Boolean(trimmedTexturePath) && currentResource !== null && !this.hasAnyFrames(currentResource);
 
     const didMutate = await this.applyResourceUpdate(
       resource => ({
@@ -782,6 +799,37 @@ export class AnimationPanel extends ComponentBase {
 
     const segments = this.assetPath.replace(/\\/g, '/').split('/').filter(Boolean);
     return segments[segments.length - 1] ?? this.assetPath;
+  }
+
+  private getStoredActiveClipName(): string {
+    if (!this.tabId) {
+      return '';
+    }
+
+    const tab = appState.tabs.tabs.find(candidate => candidate.id === this.tabId);
+    const storedClipName = tab?.contextState?.activeClipName;
+    return typeof storedClipName === 'string' ? storedClipName : '';
+  }
+
+  private persistActiveClipName(clipName: string): void {
+    if (!this.tabId) {
+      return;
+    }
+
+    const tab = appState.tabs.tabs.find(candidate => candidate.id === this.tabId);
+    if (!tab) {
+      return;
+    }
+
+    const currentClipName = tab.contextState?.activeClipName;
+    if (currentClipName === clipName) {
+      return;
+    }
+
+    tab.contextState = {
+      ...(tab.contextState ?? {}),
+      activeClipName: clipName,
+    };
   }
 }
 

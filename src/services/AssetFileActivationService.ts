@@ -60,7 +60,7 @@ export class AssetFileActivationService {
     }
 
     if (extension === 'pix3anim') {
-      await this.editorTabService.openResourceTab('animation', resourcePath);
+      await this.editorTabService.focusOrOpenAnimation(resourcePath);
       return;
     }
 

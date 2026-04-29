@@ -7,7 +7,10 @@ import { AnimationPanel } from './animation-panel';
 
 function createAnimatedSprite(nodeId: string, animationResourcePath: string, currentClip = 'idle') {
   const sprite = Object.create(AnimatedSprite2D.prototype) as AnimatedSprite2D;
-  sprite.nodeId = nodeId;
+  Object.defineProperty(sprite, 'nodeId', {
+    value: nodeId,
+    configurable: true,
+  });
   sprite.animationResourcePath = animationResourcePath;
   sprite.currentClip = currentClip;
   return sprite;
@@ -25,21 +28,12 @@ describe('AnimationPanel', () => {
 
   it('loads an animation asset from the assigned editor tab', async () => {
     const panel = new AnimationPanel();
-    const readTextFile = vi.fn().mockResolvedValue(
-      JSON.stringify({
-        version: '1.0.0',
-        texturePath: '',
-        clips: [
-          {
-            name: 'idle',
-            fps: 12,
-            loop: true,
-            frames: [],
-          },
-        ],
-      })
-    );
+    const panelState = panel as unknown as {
+      activeClipName: string;
+      assetPath: string | null;
+    };
     const tabId = 'animation:res://animations/walk.pix3anim';
+    const animationId = 'animations-walk';
 
     Object.defineProperty(panel, 'sceneManager', {
       value: {
@@ -50,10 +44,31 @@ describe('AnimationPanel', () => {
     });
     Object.defineProperty(panel, 'projectStorage', {
       value: {
-        readTextFile,
         readBlob: vi.fn(),
       },
     });
+
+    appState.animations.descriptors[animationId] = {
+      id: animationId,
+      filePath: 'res://animations/walk.pix3anim',
+      name: 'walk.pix3anim',
+      version: '1.0.0',
+      isDirty: false,
+      lastSavedAt: null,
+      lastModifiedTime: null,
+    };
+    appState.animations.resources[animationId] = {
+      version: '1.0.0',
+      texturePath: '',
+      clips: [
+        {
+          name: 'idle',
+          fps: 12,
+          loop: true,
+          frames: [],
+        },
+      ],
+    };
 
     appState.tabs.tabs = [
       {
@@ -69,41 +84,20 @@ describe('AnimationPanel', () => {
     document.body.appendChild(panel);
 
     await vi.waitFor(() => {
-      expect(readTextFile).toHaveBeenCalledWith('res://animations/walk.pix3anim');
+      expect(panelState.activeClipName).toBe('idle');
     });
 
-    await vi.waitFor(() => {
-      expect((panel as AnimationPanel & { activeClipName: string }).activeClipName).toBe('idle');
-    });
-
-    expect((panel as AnimationPanel & { assetPath: string | null }).assetPath).toBe(
-      'res://animations/walk.pix3anim'
-    );
+    expect(panelState.assetPath).toBe('res://animations/walk.pix3anim');
   });
 
   it('preserves the active clip when reloading the same asset', async () => {
     const panel = new AnimationPanel();
+    const panelState = panel as unknown as {
+      activeClipName: string;
+      syncFromDocumentState: (preserveClip: boolean) => Promise<void>;
+    };
     const selectedSprite = createAnimatedSprite('sprite-1', 'res://animations/walk.pix3anim', 'idle');
-    const readTextFile = vi.fn().mockResolvedValue(
-      JSON.stringify({
-        version: '1.0.0',
-        texturePath: '',
-        clips: [
-          {
-            name: 'idle',
-            fps: 12,
-            loop: true,
-            frames: [],
-          },
-          {
-            name: 'run',
-            fps: 16,
-            loop: true,
-            frames: [],
-          },
-        ],
-      })
-    );
+    const animationId = 'animations-walk';
 
     Object.defineProperty(panel, 'sceneManager', {
       value: {
@@ -114,24 +108,60 @@ describe('AnimationPanel', () => {
     });
     Object.defineProperty(panel, 'projectStorage', {
       value: {
-        readTextFile,
         readBlob: vi.fn(),
       },
+    });
+    Object.defineProperty(panel, 'assetPath', {
+      value: 'res://animations/walk.pix3anim',
+      writable: true,
+    });
+    Object.defineProperty(panel, 'animationId', {
+      value: animationId,
+      writable: true,
     });
     Object.defineProperty(panel, 'activeClipName', {
       value: 'run',
       writable: true,
     });
 
-    await (panel as AnimationPanel & {
-      loadResource: (assetPath: string | null, preserveClip: boolean) => Promise<void>;
-    }).loadResource('res://animations/walk.pix3anim', true);
+    appState.animations.descriptors[animationId] = {
+      id: animationId,
+      filePath: 'res://animations/walk.pix3anim',
+      name: 'walk.pix3anim',
+      version: '1.0.0',
+      isDirty: false,
+      lastSavedAt: null,
+      lastModifiedTime: null,
+    };
+    appState.animations.resources[animationId] = {
+      version: '1.0.0',
+      texturePath: '',
+      clips: [
+        {
+          name: 'idle',
+          fps: 12,
+          loop: true,
+          frames: [],
+        },
+        {
+          name: 'run',
+          fps: 16,
+          loop: true,
+          frames: [],
+        },
+      ],
+    };
 
-    expect((panel as AnimationPanel & { activeClipName: string }).activeClipName).toBe('run');
+    await panelState.syncFromDocumentState(true);
+
+    expect(panelState.activeClipName).toBe('run');
   });
 
   it('accepts texture drops from the asset browser', async () => {
     const panel = new AnimationPanel();
+    const panelState = panel as unknown as {
+      onTextureDrop: (event: DragEvent) => Promise<void>;
+    };
     const updateTexturePath = vi.fn().mockResolvedValue(undefined);
 
     Object.defineProperty(panel, 'onUpdateTexturePath', {
@@ -147,13 +177,16 @@ describe('AnimationPanel', () => {
       },
     } as unknown as DragEvent;
 
-    await (panel as AnimationPanel & { onTextureDrop: (event: DragEvent) => Promise<void> }).onTextureDrop(event);
+    await panelState.onTextureDrop(event);
 
     expect(updateTexturePath).toHaveBeenCalledWith('res://textures/player.png');
   });
 
   it('prompts for autoslice when a texture is assigned to an animation without frames', async () => {
     const panel = new AnimationPanel();
+    const panelState = panel as unknown as {
+      onUpdateTexturePath: (texturePath: string) => Promise<void>;
+    };
     const showDialog = vi.fn().mockResolvedValue({ columns: 4, rows: 2 });
     const applyResourceUpdate = vi.fn().mockResolvedValue(true);
     const addFramesFromGrid = vi.fn().mockResolvedValue(undefined);
@@ -187,9 +220,7 @@ describe('AnimationPanel', () => {
       writable: true,
     });
 
-    await (panel as AnimationPanel & { onUpdateTexturePath: (texturePath: string) => Promise<void> }).onUpdateTexturePath(
-      'res://textures/player.png'
-    );
+    await panelState.onUpdateTexturePath('res://textures/player.png');
 
     expect(showDialog).toHaveBeenCalledWith({
       texturePath: 'res://textures/player.png',

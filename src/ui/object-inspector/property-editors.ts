@@ -1238,6 +1238,13 @@ export class AnimationResourceEditor extends ComponentBase {
           : html`
               <button
                 type="button"
+                ?disabled=${this.isCreating || !hasResource}
+                @click=${() => this.emitOpenRequest()}
+              >
+                Open
+              </button>
+              <button
+                type="button"
                 ?disabled=${this.disabled || this.isCreating}
                 @click=${() => this.emitChange('')}
               >

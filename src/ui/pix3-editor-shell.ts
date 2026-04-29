@@ -34,7 +34,7 @@ import { ScriptExecutionService } from '@/services/ScriptExecutionService';
 import { AutoloadService } from '@/services/AutoloadService';
 import { ProjectScriptLoaderService } from '@/services/ProjectScriptLoaderService';
 import { ScriptCompilerService } from '@/services/ScriptCompilerService';
-import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
+import { SaveActiveResourceCommand } from '@/features/editor/SaveActiveResourceCommand';
 import { SaveAsSceneCommand } from '@/features/scene/SaveAsSceneCommand';
 import { ReloadSceneCommand } from '@/features/scene/ReloadSceneCommand';
 import { RefreshPrefabInstancesCommand } from '@/features/scene/RefreshPrefabInstancesCommand';
@@ -259,7 +259,7 @@ export class Pix3EditorShell extends ComponentBase {
     super.connectedCallback();
 
     // Register history commands and scene commands
-    const saveCommand = new SaveSceneCommand();
+    const saveCommand = new SaveActiveResourceCommand();
     const saveAsCommand = new SaveAsSceneCommand();
     const deleteCommand = new DeleteObjectCommand();
     const duplicateCommand = new DuplicateNodesCommand();

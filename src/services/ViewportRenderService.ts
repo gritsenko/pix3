@@ -9,10 +9,13 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js';
 import { MathUtils } from 'three';
+import type { AnimationResource } from '@pix3/runtime';
+import { AnimatedSprite2D } from '@pix3/runtime';
 import { NodeBase } from '@pix3/runtime';
 import { Node2D } from '@pix3/runtime';
 import { Node3D } from '@pix3/runtime';
 import { Group2D } from '@pix3/runtime';
+import { findAnimationClip } from '@pix3/runtime';
 import { Sprite2D } from '@pix3/runtime';
 import { UIControl2D } from '@pix3/runtime';
 import { Button2D } from '@pix3/runtime';
@@ -38,6 +41,10 @@ import { OperationService } from '@/services/OperationService';
 import { ResourceManager } from '@/services/ResourceManager';
 import { appState } from '@/state';
 import { subscribe } from 'valtio/vanilla';
+import {
+  deriveAnimationDocumentId,
+  parseAnimationResourceText,
+} from '@/features/scene/animation-asset-utils';
 import {
   TransformCompleteOperation,
   type TransformState,
@@ -109,6 +116,7 @@ export class ViewportRendererService {
   private targetGizmos = new Map<string, THREE.Object3D>();
   private previewCamera: THREE.Camera | null = null;
   private group2DVisuals = new Map<string, THREE.Group>();
+  private animatedSprite2DVisuals = new Map<string, THREE.Group>();
   private sprite2DVisuals = new Map<string, THREE.Group>();
   private sprite3DTexturePaths = new Map<string, string | null>();
   private particles3DTexturePaths = new Map<string, string | null>();
@@ -320,6 +328,12 @@ export class ViewportRendererService {
       this.handleFocusPause();
     });
     this.disposers.push(unsubscribeUi);
+
+    const unsubscribeAnimations = subscribe(appState.animations, () => {
+      this.syncAnimatedSprite2DVisuals();
+      this.requestRender();
+    });
+    this.disposers.push(unsubscribeAnimations);
 
     const unsubscribeProject = subscribe(appState.project, () => {
       this.syncBaseViewportFrame();
@@ -1587,7 +1601,7 @@ export class ViewportRendererService {
   }
 
   /**
-   * Sync all Group2D and Sprite2D visuals to match their node state.
+   * Sync all Group2D, AnimatedSprite2D, and Sprite2D visuals to match their node state.
    * Called after layout recalculation to update visual positions/sizes.
    */
   private syncAll2DVisuals(): void {
@@ -1606,6 +1620,11 @@ export class ViewportRendererService {
               sizeGroup.scale.set(node.width, node.height, 1);
             }
             this.apply2DVisualOpacity(node, visualRoot);
+          }
+        } else if (node instanceof AnimatedSprite2D) {
+          const visualRoot = this.animatedSprite2DVisuals.get(node.nodeId);
+          if (visualRoot) {
+            this.syncAnimatedSprite2DVisual(node, visualRoot);
           }
         } else if (node instanceof Sprite2D) {
           const visualRoot = this.sprite2DVisuals.get(node.nodeId);
@@ -2118,6 +2137,7 @@ export class ViewportRendererService {
 
     // Only hit-test rendered 2D visuals; transparent container groups are intentionally skipped
     const candidates: THREE.Object3D[] = [
+      ...this.animatedSprite2DVisuals.values(),
       ...this.sprite2DVisuals.values(),
       ...this.uiControl2DVisuals.values(),
     ];
@@ -2254,6 +2274,11 @@ export class ViewportRendererService {
         visualRoot.visible = node.visible;
         this.apply2DVisualOpacity(node, visualRoot);
       }
+    } else if (node instanceof AnimatedSprite2D) {
+      const visualRoot = this.animatedSprite2DVisuals.get(node.nodeId);
+      if (visualRoot) {
+        this.syncAnimatedSprite2DVisual(node, visualRoot);
+      }
     } else if (node instanceof Sprite2D) {
       const visualRoot = this.sprite2DVisuals.get(node.nodeId);
       if (visualRoot) {
@@ -2339,6 +2364,11 @@ export class ViewportRendererService {
   updateNodeVisibility(node: NodeBase): void {
     if (node instanceof Group2D) {
       const visualRoot = this.group2DVisuals.get(node.nodeId);
+      if (visualRoot) {
+        visualRoot.visible = node.visible;
+      }
+    } else if (node instanceof AnimatedSprite2D) {
+      const visualRoot = this.animatedSprite2DVisuals.get(node.nodeId);
       if (visualRoot) {
         visualRoot.visible = node.visible;
       }
@@ -2636,6 +2666,15 @@ export class ViewportRendererService {
       }
       this.group2DVisuals.clear();
 
+      for (const visual of this.animatedSprite2DVisuals.values()) {
+        if (visual.parent) {
+          visual.parent.remove(visual);
+        }
+        this.disposeAnimatedSprite2DTexture(visual);
+        this.disposeObject3D(visual);
+      }
+      this.animatedSprite2DVisuals.clear();
+
       for (const visual of this.sprite2DVisuals.values()) {
         if (visual.parent) {
           visual.parent.remove(visual);
@@ -2687,7 +2726,7 @@ export class ViewportRendererService {
 
   /**
    * Process a node and its children for rendering.
-   * Creates visual representations for Group2D nodes and Sprite2D nodes.
+   * Creates visual representations for Group2D, AnimatedSprite2D, and Sprite2D nodes.
    */
   private processNodeForRendering(node: NodeBase, parent2DVisualRoot?: THREE.Object3D): void {
     if (!this.scene) return;
@@ -2719,6 +2758,13 @@ export class ViewportRendererService {
     if (node instanceof Group2D) {
       const visualRoot = this.createGroup2DVisual(node);
       this.group2DVisuals.set(node.nodeId, visualRoot);
+
+      const parent = parent2DVisualRoot ?? this.scene;
+      parent.add(visualRoot);
+      current2DVisualRoot = visualRoot;
+    } else if (node instanceof AnimatedSprite2D) {
+      const visualRoot = this.createAnimatedSprite2DVisual(node);
+      this.animatedSprite2DVisuals.set(node.nodeId, visualRoot);
 
       const parent = parent2DVisualRoot ?? this.scene;
       parent.add(visualRoot);
@@ -3247,6 +3293,52 @@ export class ViewportRendererService {
   }
 
   /**
+   * Create a visual representation for an AnimatedSprite2D node.
+   */
+  private createAnimatedSprite2DVisual(node: AnimatedSprite2D): THREE.Group {
+    const geometry = new THREE.PlaneGeometry(1, 1);
+    geometry.computeBoundingBox();
+
+    const material = new THREE.MeshBasicMaterial({
+      color: node.color,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 1,
+    });
+    material.userData.baseOpacity = 1;
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.layers.set(LAYER_2D);
+    mesh.userData.isAnimatedSprite2DVisual = true;
+    mesh.userData.nodeId = node.nodeId;
+
+    const root = new THREE.Group();
+    root.position.copy(node.position);
+    root.rotation.copy(node.rotation);
+    root.scale.set(node.scale.x, node.scale.y, 1);
+    root.visible = node.visible;
+    root.layers.set(LAYER_2D);
+
+    const sizeGroup = new THREE.Group();
+    sizeGroup.scale.set(node.width ?? 64, node.height ?? 64, 1);
+    sizeGroup.layers.set(LAYER_2D);
+    sizeGroup.add(mesh);
+    root.add(sizeGroup);
+
+    root.userData.isAnimatedSprite2DVisualRoot = true;
+    root.userData.nodeId = node.nodeId;
+    root.userData.sizeGroup = sizeGroup;
+    root.userData.spriteMesh = mesh;
+    root.userData.animationResourcePath = node.animationResourcePath ?? null;
+    root.userData.currentClip = node.currentClip;
+    root.userData.currentFrame = node.currentFrame;
+    root.userData.color = node.color;
+
+    this.syncAnimatedSprite2DVisual(node, root);
+    return root;
+  }
+
+  /**
    * Create a visual representation for a Sprite2D node.
    * Renders the texture if available, or a placeholder rectangle if not.
    */
@@ -3469,6 +3561,244 @@ export class ViewportRendererService {
         }
       }
     })();
+  }
+
+  private syncAnimatedSprite2DVisual(node: AnimatedSprite2D, visualRoot: THREE.Group): void {
+    this.apply2DVisualTransform(node, visualRoot);
+
+    const sizeGroup = visualRoot.userData.sizeGroup as THREE.Object3D | undefined;
+    if (sizeGroup) {
+      sizeGroup.scale.set(node.width ?? 64, node.height ?? 64, 1);
+    }
+
+    visualRoot.visible = node.visible;
+    this.syncAnimatedSprite2DMaterial(node, visualRoot);
+    this.apply2DVisualOpacity(node, visualRoot);
+  }
+
+  private syncAnimatedSprite2DMaterial(node: AnimatedSprite2D, visualRoot: THREE.Group): void {
+    const mesh = visualRoot.userData.spriteMesh as THREE.Mesh | undefined;
+    if (!mesh || !(mesh.material instanceof THREE.MeshBasicMaterial)) {
+      return;
+    }
+
+    const material = mesh.material;
+    const currentResourcePath = node.animationResourcePath?.trim() || null;
+    const previousResourcePath = (visualRoot.userData.animationResourcePath as string | null) ?? null;
+    const cachedTexturePath = (visualRoot.userData.animationTexturePath as string | null) ?? null;
+    const openResource = currentResourcePath ? this.getLoadedAnimationResource(currentResourcePath) : null;
+    const cachedResource = (visualRoot.userData.animationResource as AnimationResource | null) ?? null;
+
+    visualRoot.userData.animationResourcePath = currentResourcePath;
+    visualRoot.userData.currentClip = node.currentClip;
+    visualRoot.userData.currentFrame = node.currentFrame;
+    visualRoot.userData.color = node.color;
+
+    if (openResource && openResource !== cachedResource) {
+      visualRoot.userData.animationResource = openResource;
+      if ((openResource.texturePath.trim() || null) !== cachedTexturePath) {
+        void this.loadAnimatedSprite2DVisualAsset(node, visualRoot);
+        this.applyAnimatedSprite2DPresentation(node, visualRoot, material);
+        return;
+      }
+    }
+
+    if (currentResourcePath !== previousResourcePath) {
+      void this.loadAnimatedSprite2DVisualAsset(node, visualRoot);
+      this.applyAnimatedSprite2DPresentation(node, visualRoot, material);
+      return;
+    }
+
+    if (currentResourcePath && !visualRoot.userData.animationResource && !visualRoot.userData.animationLoadToken) {
+      void this.loadAnimatedSprite2DVisualAsset(node, visualRoot);
+    }
+
+    this.applyAnimatedSprite2DPresentation(node, visualRoot, material);
+  }
+
+  private applyAnimatedSprite2DPresentation(
+    node: AnimatedSprite2D,
+    visualRoot: THREE.Group,
+    material?: THREE.MeshBasicMaterial
+  ): void {
+    const mesh = visualRoot.userData.spriteMesh as THREE.Mesh | undefined;
+    const resolvedMaterial =
+      material ?? (mesh?.material instanceof THREE.MeshBasicMaterial ? mesh.material : undefined);
+    if (!resolvedMaterial) {
+      return;
+    }
+
+    const resource = (visualRoot.userData.animationResource as AnimationResource | null) ?? null;
+    const texture = (visualRoot.userData.animationTexture as THREE.Texture | null) ?? null;
+    const clip = findAnimationClip(resource, node.currentClip);
+    const frames = clip?.frames ?? [];
+    const frameIndex = frames.length > 0 ? Math.max(0, Math.min(node.currentFrame, frames.length - 1)) : 0;
+    const frame = frames[frameIndex] ?? null;
+
+    if (texture) {
+      if (resolvedMaterial.map !== texture) {
+        resolvedMaterial.map = texture;
+      }
+
+      if (frame) {
+        texture.offset.set(frame.offset.x, frame.offset.y);
+        texture.repeat.set(frame.repeat.x, frame.repeat.y);
+      } else {
+        texture.offset.set(0, 0);
+        texture.repeat.set(1, 1);
+      }
+
+      resolvedMaterial.color.set('#ffffff');
+    } else {
+      if (resolvedMaterial.map) {
+        resolvedMaterial.map = null;
+      }
+
+      resolvedMaterial.color.set(node.color);
+    }
+
+    resolvedMaterial.transparent = true;
+    resolvedMaterial.needsUpdate = true;
+  }
+
+  private async loadAnimatedSprite2DVisualAsset(
+    node: AnimatedSprite2D,
+    visualRoot: THREE.Group
+  ): Promise<void> {
+    const animationResourcePath = node.animationResourcePath?.trim() || '';
+    const token = Number(visualRoot.userData.animationLoadToken ?? 0) + 1;
+    visualRoot.userData.animationLoadToken = token;
+
+    if (!animationResourcePath) {
+      visualRoot.userData.animationResource = null;
+      this.disposeAnimatedSprite2DTexture(visualRoot);
+      this.applyAnimatedSprite2DPresentation(node, visualRoot);
+      delete visualRoot.userData.animationLoadToken;
+      return;
+    }
+
+    try {
+      const resource =
+        this.getLoadedAnimationResource(animationResourcePath) ??
+        parseAnimationResourceText(await this.resourceManager.readText(animationResourcePath));
+
+      if (visualRoot.userData.animationLoadToken !== token) {
+        return;
+      }
+
+      let texture: THREE.Texture | null = null;
+      const texturePath = resource.texturePath.trim();
+      if (texturePath) {
+        texture = await this.loadAnimatedSpriteTexture(texturePath);
+      }
+
+      if (visualRoot.userData.animationLoadToken !== token) {
+        texture?.dispose();
+        return;
+      }
+
+      this.disposeAnimatedSprite2DTexture(visualRoot);
+      visualRoot.userData.animationResource = resource;
+      visualRoot.userData.animationTexture = texture;
+      visualRoot.userData.animationTexturePath = texturePath || null;
+      this.applyAnimatedSprite2DPresentation(node, visualRoot);
+    } catch {
+      if (visualRoot.userData.animationLoadToken !== token) {
+        return;
+      }
+
+      visualRoot.userData.animationResource = null;
+      this.disposeAnimatedSprite2DTexture(visualRoot);
+      this.applyAnimatedSprite2DPresentation(node, visualRoot);
+    } finally {
+      if (visualRoot.userData.animationLoadToken === token) {
+        delete visualRoot.userData.animationLoadToken;
+      }
+    }
+  }
+
+  private async loadAnimatedSpriteTexture(texturePath: string): Promise<THREE.Texture | null> {
+    const textureLoader = new THREE.TextureLoader();
+
+    try {
+      const blob = await this.resourceManager.readBlob(texturePath);
+      const blobUrl = URL.createObjectURL(blob);
+
+      return await new Promise(resolve => {
+        textureLoader.load(
+          blobUrl,
+          texture => {
+            try {
+              this.applySrgbColorSpace(texture);
+              resolve(texture);
+            } finally {
+              URL.revokeObjectURL(blobUrl);
+            }
+          },
+          undefined,
+          () => {
+            URL.revokeObjectURL(blobUrl);
+            resolve(null);
+          }
+        );
+      });
+    } catch {
+      const schemeMatch = /^([a-z]+[a-z0-9+.-]*):\/\//i.exec(texturePath);
+      const scheme = schemeMatch ? schemeMatch[1].toLowerCase() : '';
+
+      if (scheme === 'http' || scheme === 'https' || scheme === '') {
+        try {
+          const texture = textureLoader.load(texturePath);
+          this.applySrgbColorSpace(texture);
+          return texture;
+        } catch {
+          return null;
+        }
+      }
+
+      return null;
+    }
+  }
+
+  private getLoadedAnimationResource(resourcePath: string): AnimationResource | null {
+    const animationId = deriveAnimationDocumentId(resourcePath);
+    const descriptor = appState.animations.descriptors[animationId];
+    if (!descriptor || descriptor.filePath !== resourcePath) {
+      return null;
+    }
+
+    return appState.animations.resources[animationId] ?? null;
+  }
+
+  private syncAnimatedSprite2DVisuals(): void {
+    const sceneGraph = this.sceneManager.getActiveSceneGraph();
+    if (!sceneGraph) {
+      return;
+    }
+
+    const visit = (nodes: NodeBase[]) => {
+      for (const node of nodes) {
+        if (node instanceof AnimatedSprite2D) {
+          this.updateNodeTransform(node);
+        }
+
+        if (node.children.length > 0) {
+          visit(node.children);
+        }
+      }
+    };
+
+    visit(sceneGraph.rootNodes);
+  }
+
+  private disposeAnimatedSprite2DTexture(visualRoot: THREE.Object3D): void {
+    const texture = (visualRoot.userData.animationTexture as THREE.Texture | null) ?? null;
+    if (texture) {
+      texture.dispose();
+    }
+
+    visualRoot.userData.animationTexture = null;
+    visualRoot.userData.animationTexturePath = null;
   }
 
   private syncSprite3DBillboarding(camera: THREE.Camera): void {
@@ -4062,6 +4392,15 @@ export class ViewportRendererService {
         new THREE.Vector3((1 - ax) * w, (1 - ay) * h, 0),
         new THREE.Vector3(-ax * w, (1 - ay) * h, 0),
       ];
+    } else if (node instanceof AnimatedSprite2D) {
+      const halfWidth = (node.width ?? 64) / 2;
+      const halfHeight = (node.height ?? 64) / 2;
+      corners = [
+        new THREE.Vector3(-halfWidth, -halfHeight, 0),
+        new THREE.Vector3(halfWidth, -halfHeight, 0),
+        new THREE.Vector3(halfWidth, halfHeight, 0),
+        new THREE.Vector3(-halfWidth, halfHeight, 0),
+      ];
     } else {
       // Determine node size for other node types (center-origin)
       let halfWidth = 50; // Default
@@ -4505,7 +4844,10 @@ export class ViewportRendererService {
         ) {
           for (const child of node.children) {
             if (child instanceof Group2D) {
-              child.updateLayout(node.width, node.height);
+              const groupChild = child as Group2D & {
+                updateLayout?: (width: number, height: number) => void;
+              };
+              groupChild.updateLayout?.(node.width, node.height);
             }
           }
           this.syncAll2DVisuals();
@@ -4519,7 +4861,7 @@ export class ViewportRendererService {
       return;
     }
 
-    const { nodeIds, startStates, handle } = this.active2DTransform;
+    const { nodeIds, startStates } = this.active2DTransform;
     const sceneGraph = this.sceneManager.getActiveSceneGraph();
     if (!sceneGraph) {
       this.active2DTransform = undefined;
@@ -4594,6 +4936,9 @@ export class ViewportRendererService {
   private get2DVisual(node: Node2D): THREE.Object3D | undefined {
     if (node instanceof Group2D) {
       return this.group2DVisuals.get(node.nodeId);
+    }
+    if (node instanceof AnimatedSprite2D) {
+      return this.animatedSprite2DVisuals.get(node.nodeId);
     }
     if (node instanceof Sprite2D) {
       return this.sprite2DVisuals.get(node.nodeId);
@@ -4819,6 +5164,12 @@ export class ViewportRendererService {
       this.disposeObject3D(visual);
     }
     this.group2DVisuals.clear();
+
+    for (const visual of this.animatedSprite2DVisuals.values()) {
+      this.disposeAnimatedSprite2DTexture(visual);
+      this.disposeObject3D(visual);
+    }
+    this.animatedSprite2DVisuals.clear();
 
     for (const visual of this.sprite2DVisuals.values()) {
       this.disposeObject3D(visual);

@@ -841,7 +841,7 @@ export class InspectorPanel extends ComponentBase {
       return;
     }
 
-    void this.editorTabService.openResourceTab('animation', trimmedResourcePath);
+    void this.editorTabService.focusOrOpenAnimation(trimmedResourcePath);
   }
 
   private canCreateAnimationResource(propertyName: string, value: string, readOnly: boolean): boolean {

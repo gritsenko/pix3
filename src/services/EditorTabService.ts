@@ -3,9 +3,12 @@ import { appState, type EditorTab, type EditorTabType } from '@/state';
 import { LayoutManagerService } from '@/core/LayoutManager';
 import { DialogService } from '@/services/DialogService';
 import { CommandDispatcher } from '@/services/CommandDispatcher';
+import { LoadAnimationCommand } from '@/features/scene/LoadAnimationCommand';
 import { LoadSceneCommand } from '@/features/scene/LoadSceneCommand';
+import { SaveAnimationCommand } from '@/features/scene/SaveAnimationCommand';
 import { SaveSceneCommand } from '@/features/scene/SaveSceneCommand';
 import { RefreshPrefabInstancesCommand } from '@/features/scene/RefreshPrefabInstancesCommand';
+import { deriveAnimationDocumentId } from '@/features/scene/animation-asset-utils';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { OperationService } from '@/services/OperationService';
 import { SetPlayModeOperation } from '@/features/scripts/SetPlayModeOperation';
@@ -35,19 +38,25 @@ export class EditorTabService {
   private readonly operationService!: OperationService;
 
   private disposeSceneSubscription?: () => void;
+  private disposeAnimationSubscription?: () => void;
   private disposeLayoutSubscription?: () => void;
   private disposeTabsSubscription?: () => void;
   private handleBeforeUnload?: (e: BeforeUnloadEvent) => void;
   private readonly sceneLoadInFlight = new Map<string, Promise<void>>();
+  private readonly animationLoadInFlight = new Map<string, Promise<void>>();
   private previousActiveTabIdBeforeGame: string | null = null; // Track tab active before game tab
   private isRestoringProjectSession = false;
 
   initialize(): void {
     if (this.disposeSceneSubscription) return;
 
-    // Keep tab titles in sync with scene descriptor dirty state.
+    // Keep tab titles in sync with resource descriptor dirty state.
     this.disposeSceneSubscription = subscribe(appState.scenes, () => {
-      this.syncSceneTabsFromDescriptors();
+      this.syncResourceTabsFromDescriptors();
+    });
+
+    this.disposeAnimationSubscription = subscribe(appState.animations, () => {
+      this.syncResourceTabsFromDescriptors();
     });
 
     this.disposeLayoutSubscription = this.layoutManager.subscribeEditorTabFocused(tabId => {
@@ -105,7 +114,7 @@ export class EditorTabService {
     this.handleBeforeUnload = (e: BeforeUnloadEvent) => {
       this.captureActiveContextState();
 
-      // Prompt the user if any scene tab has unsaved changes.
+      // Prompt the user if any editor tab has unsaved changes.
       if (!appState.ui.warnOnUnsavedUnload) {
         return;
       }
@@ -121,6 +130,8 @@ export class EditorTabService {
   dispose(): void {
     this.disposeSceneSubscription?.();
     this.disposeSceneSubscription = undefined;
+    this.disposeAnimationSubscription?.();
+    this.disposeAnimationSubscription = undefined;
     this.disposeLayoutSubscription?.();
     this.disposeLayoutSubscription = undefined;
     this.disposeTabsSubscription?.();
@@ -196,6 +207,10 @@ export class EditorTabService {
 
   async focusOrOpenScene(resourcePath: string): Promise<void> {
     await this.openResourceTab('scene', resourcePath);
+  }
+
+  async focusOrOpenAnimation(resourcePath: string): Promise<void> {
+    await this.openResourceTab('animation', resourcePath);
   }
 
   remapSceneTabs(remapResourcePath: (resourcePath: string) => string | null): void {
@@ -407,8 +422,37 @@ export class EditorTabService {
 
     appState.tabs.activeTabId = tabId;
 
-    if (next.type === 'scene') {
-      await this.activateSceneTab(next);
+    await this.activateResourceTab(next);
+  }
+
+  async saveActiveTab(): Promise<void> {
+    const activeTabId = appState.tabs.activeTabId;
+    if (!activeTabId) {
+      return;
+    }
+
+    await this.saveTabById(activeTabId);
+  }
+
+  async saveTabById(tabId: string): Promise<void> {
+    const tab = appState.tabs.tabs.find(candidate => candidate.id === tabId);
+    if (!tab) {
+      return;
+    }
+
+    await this.saveTabResource(tab);
+  }
+
+  private async activateResourceTab(tab: EditorTab): Promise<void> {
+    switch (tab.type) {
+      case 'scene':
+        await this.activateSceneTab(tab);
+        return;
+      case 'animation':
+        await this.activateAnimationTab(tab);
+        return;
+      default:
+        return;
     }
   }
 
@@ -463,7 +507,35 @@ export class EditorTabService {
     }
 
     // Sync title now that descriptor is available.
-    this.syncSceneTabsFromDescriptors();
+    this.syncResourceTabsFromDescriptors();
+  }
+
+  private async activateAnimationTab(tab: EditorTab): Promise<void> {
+    const animationId = this.deriveAnimationIdFromResource(tab.resourceId);
+    const alreadyLoaded = Boolean(appState.animations.descriptors[animationId]);
+
+    if (!alreadyLoaded) {
+      let loadPromise = this.animationLoadInFlight.get(animationId);
+      if (!loadPromise) {
+        const command = new LoadAnimationCommand({
+          filePath: tab.resourceId,
+          animationId,
+        });
+        loadPromise = this.commandDispatcher
+          .execute(command)
+          .then(() => undefined)
+          .finally(() => {
+            this.animationLoadInFlight.delete(animationId);
+          });
+        this.animationLoadInFlight.set(animationId, loadPromise);
+      }
+
+      await loadPromise;
+    } else {
+      appState.animations.activeAnimationId = animationId;
+    }
+
+    this.syncResourceTabsFromDescriptors();
   }
 
   private captureActiveContextState(): void {
@@ -498,11 +570,20 @@ export class EditorTabService {
       return;
     }
 
-    if (tab.type !== 'scene') return;
-
-    const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
-    const command = new SaveSceneCommand({ sceneId });
-    await this.commandDispatcher.execute(command);
+    switch (tab.type) {
+      case 'scene': {
+        const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
+        await this.commandDispatcher.execute(new SaveSceneCommand({ sceneId }));
+        return;
+      }
+      case 'animation': {
+        const animationId = this.deriveAnimationIdFromResource(tab.resourceId);
+        await this.commandDispatcher.execute(new SaveAnimationCommand({ animationId }));
+        return;
+      }
+      default:
+        return;
+    }
   }
 
   private async promptDirtyClose(tab: EditorTab): Promise<DirtyCloseDecision> {
@@ -546,23 +627,7 @@ export class EditorTabService {
       this.captureActiveContextState();
     }
 
-    if (tab.type === 'scene') {
-      const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
-      delete appState.scenes.descriptors[sceneId];
-      delete appState.scenes.hierarchies[sceneId];
-      if (appState.scenes.cameraStates[sceneId]) {
-        delete appState.scenes.cameraStates[sceneId];
-      }
-
-      if (appState.scenes.activeSceneId === sceneId) {
-        appState.scenes.activeSceneId = null;
-        appState.selection.nodeIds = [];
-        appState.selection.primaryNodeId = null;
-        appState.selection.hoveredNodeId = null;
-      }
-
-      this.sceneManager.removeSceneGraph(sceneId);
-    }
+    this.cleanupClosedTabState(tab);
 
     appState.tabs.tabs = appState.tabs.tabs.filter(t => t.id !== tab.id);
 
@@ -596,15 +661,15 @@ export class EditorTabService {
     this.layoutManager.removeEditorTab(tab.id);
   }
 
-  private syncSceneTabsFromDescriptors(): void {
-    // Keep tab.isDirty/title aligned with scene descriptor state.
+  private syncResourceTabsFromDescriptors(): void {
+    // Keep tab.isDirty/title aligned with loaded resource descriptor state.
     const treatAsClean = appState.project.backend === 'cloud';
     let didChange = false;
     const nextTabs = appState.tabs.tabs.map(tab => {
-      if (tab.type !== 'scene') return tab;
-      const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
-      const descriptor = appState.scenes.descriptors[sceneId];
-      if (!descriptor) return tab;
+      const descriptor = this.getResourceDescriptor(tab);
+      if (!descriptor) {
+        return tab;
+      }
 
       const fileTitle = this.deriveTitle(descriptor.filePath);
       const title = treatAsClean ? fileTitle : descriptor.isDirty ? `*${fileTitle}` : fileTitle;
@@ -651,6 +716,56 @@ export class EditorTabService {
       .replace(/^-+|-+$/g, '')
       .toLowerCase();
     return normalized || 'scene';
+  }
+
+  private deriveAnimationIdFromResource(resourcePath: string): string {
+    return deriveAnimationDocumentId(resourcePath);
+  }
+
+  private getResourceDescriptor(tab: EditorTab): { filePath: string; isDirty: boolean } | null {
+    switch (tab.type) {
+      case 'scene': {
+        const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
+        return appState.scenes.descriptors[sceneId] ?? null;
+      }
+      case 'animation': {
+        const animationId = this.deriveAnimationIdFromResource(tab.resourceId);
+        return appState.animations.descriptors[animationId] ?? null;
+      }
+      default:
+        return null;
+    }
+  }
+
+  private cleanupClosedTabState(tab: EditorTab): void {
+    if (tab.type === 'scene') {
+      const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
+      delete appState.scenes.descriptors[sceneId];
+      delete appState.scenes.hierarchies[sceneId];
+      if (appState.scenes.cameraStates[sceneId]) {
+        delete appState.scenes.cameraStates[sceneId];
+      }
+
+      if (appState.scenes.activeSceneId === sceneId) {
+        appState.scenes.activeSceneId = null;
+        appState.selection.nodeIds = [];
+        appState.selection.primaryNodeId = null;
+        appState.selection.hoveredNodeId = null;
+      }
+
+      this.sceneManager.removeSceneGraph(sceneId);
+      return;
+    }
+
+    if (tab.type === 'animation') {
+      const animationId = this.deriveAnimationIdFromResource(tab.resourceId);
+      delete appState.animations.descriptors[animationId];
+      delete appState.animations.resources[animationId];
+
+      if (appState.animations.activeAnimationId === animationId) {
+        appState.animations.activeAnimationId = null;
+      }
+    }
   }
 
   private findSceneTabIdBySceneId(sceneId: string | null): string | null {

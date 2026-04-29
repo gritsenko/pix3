@@ -19,6 +19,7 @@ export const resetAppState = (): void => {
   appState.auth = defaults.auth;
   appState.project = defaults.project;
   appState.scenes = defaults.scenes;
+  appState.animations = defaults.animations;
   appState.tabs = defaults.tabs;
   appState.selection = defaults.selection;
   appState.ui = defaults.ui;
@@ -37,6 +38,9 @@ export {
 } from './AppState';
 
 export type {
+  AnimationDescriptor,
+  AnimationLoadState,
+  AnimationsState,
   AppState,
   CameraState,
   CollabConnectionStatus,

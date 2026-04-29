@@ -6,7 +6,7 @@ describe('AssetFileActivationService', () => {
   it('routes .pix3anim assets to an animation editor tab', async () => {
     const service = new AssetFileActivationService();
     const editorTabService = {
-      openResourceTab: vi.fn().mockResolvedValue(undefined),
+      focusOrOpenAnimation: vi.fn().mockResolvedValue(undefined),
     };
 
     Object.defineProperty(service, 'editorTabService', {
@@ -23,8 +23,7 @@ describe('AssetFileActivationService', () => {
 
     await service.handleActivation(payload);
 
-    expect(editorTabService.openResourceTab).toHaveBeenCalledWith(
-      'animation',
+    expect(editorTabService.focusOrOpenAnimation).toHaveBeenCalledWith(
       'res://assets/walk.pix3anim'
     );
   });
