@@ -61,7 +61,7 @@ export class AssetsPreviewPanel extends ComponentBase {
               ? html`<p class="preview-status preview-error">${this.snapshot.errorMessage}</p>`
               : this.snapshot.items.length === 0
                 ? html`<p class="preview-status">No files found in this folder.</p>`
-                : html`<div class="preview-grid">
+                : html`<div class="assets-preview-grid">
                     ${this.snapshot.items.map(item => this.renderItem(item))}
                   </div>`}
         </div>
@@ -70,10 +70,10 @@ export class AssetsPreviewPanel extends ComponentBase {
   }
 
   private renderItem(item: AssetPreviewItem) {
-    const isSelected = this.snapshot.selectedItemPath === item.path;
+    const isSelected = this.snapshot.selectedItem?.path === item.path;
     return html`
       <button
-        class="preview-item ${isSelected ? 'is-selected' : ''}"
+        class="assets-preview-item ${isSelected ? 'is-selected' : ''}"
         title=${this.buildTooltip(item)}
         ?draggable=${item.kind === 'file'}
         @click=${() => this.onItemSelected(item)}

@@ -9,6 +9,7 @@ import type {
 export interface AnimationInspectorSnapshot {
   readonly assetPath: string | null;
   readonly resource: AnimationResource | null;
+  readonly clips: readonly AnimationClip[];
   readonly activeClip: AnimationClip | null;
   readonly activeClipName: string;
   readonly selectedFrame: AnimationFrame | null;
@@ -21,6 +22,8 @@ export interface AnimationInspectorController {
   updateTexturePath(value: string): Promise<void>;
   openTextureSlicer(): Promise<void>;
   selectClip(clipName: string): Promise<void>;
+  addClip(): Promise<void>;
+  removeClip(): Promise<void>;
   renameClip(nextName: string): Promise<void>;
   updateClipFps(nextFps: number): Promise<void>;
   updateClipPlaybackMode(mode: AnimationPlaybackMode): Promise<void>;

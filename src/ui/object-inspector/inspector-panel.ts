@@ -1448,6 +1448,7 @@ export class InspectorPanel extends ComponentBase {
     }
 
     const assetPath = animationState.assetPath;
+    const clips = animationState.clips;
     const activeClip = animationState.activeClip;
     const selectedFrame = animationState.selectedFrame;
     const texturePath = animationState.resource?.texturePath?.trim() ?? '';
@@ -1478,7 +1479,7 @@ export class InspectorPanel extends ComponentBase {
         <div class="property-group-section asset-section">
           <div class="section-header">
             <h4 class="group-title">Spritesheet</h4>
-            ${texturePath ? html`<span class="timeline-meta">Bound</span>` : null}
+            ${texturePath ? html`<span class="animation-chip">Bound</span>` : null}
           </div>
           <label class="field">
             <span>Texture</span>
@@ -1516,12 +1517,55 @@ export class InspectorPanel extends ComponentBase {
           </div>
         </div>
 
+        <div class="property-group-section asset-section">
+          <div class="section-header">
+            <h4 class="group-title">Clips</h4>
+            <div class="animation-clip-actions">
+              <button
+                class="btn-icon"
+                type="button"
+                title="Add Clip"
+                aria-label="Add clip"
+                @click=${() => void controller.addClip()}
+              >
+                ${this.iconService.getIcon('plus', 14)}
+              </button>
+              <button
+                class="btn-icon"
+                type="button"
+                title="Remove"
+                aria-label="Remove active clip"
+                ?disabled=${!activeClip}
+                @click=${() => void controller.removeClip()}
+              >
+                ${this.iconService.getIcon('trash-2', 14)}
+              </button>
+            </div>
+          </div>
+          <div class="animation-clip-list">
+            ${clips.map(
+              clip => html`
+                <button
+                  class="animation-clip-button ${clip.name === animationState.activeClipName
+                    ? 'is-active'
+                    : ''}"
+                  type="button"
+                  @click=${() => void controller.selectClip(clip.name)}
+                >
+                  <span class="animation-clip-name">${clip.name}</span>
+                  <span class="animation-clip-meta">${clip.frames.length}</span>
+                </button>
+              `
+            )}
+          </div>
+        </div>
+
         ${activeClip
           ? html`
               <div class="property-group-section asset-section">
                 <div class="section-header">
                   <h4 class="group-title">Clip</h4>
-                  <span class="timeline-meta">${selectedFrame ? `Frame ${animationState.selectedFrameIndex + 1}` : 'Clip'}</span>
+                  <span class="animation-chip">${selectedFrame ? `Frame ${animationState.selectedFrameIndex + 1}` : 'Clip'}</span>
                 </div>
                 <div class="field-grid">
                   <label class="field">

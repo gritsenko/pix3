@@ -80,6 +80,91 @@ pix3-panel {
   letter-spacing: 0.02em;
 }
 
+.toolbar-row {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+}
+
+.panel-note {
+  margin: 0;
+  font-size: 0.74rem;
+  line-height: 1.4;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.field-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #aaa);
+}
+
+.animation-chip,
+.frame-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.4rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.12);
+  color: var(--pix3-accent-color, #ffcf33);
+  font-size: 0.68rem;
+}
+
+.animation-clip-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+}
+
+.animation-clip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.animation-clip-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0.4rem;
+  background: var(--color-input-bg, #222);
+  color: var(--color-text-primary, #eee);
+  text-align: left;
+  cursor: pointer;
+}
+
+.animation-clip-button:hover {
+  border-color: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.28);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.05);
+}
+
+.animation-clip-button.is-active {
+  border-color: var(--pix3-accent-color, #ffcf33);
+  box-shadow: inset 0 0 0 1px var(--pix3-accent-color, #ffcf33);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.08);
+}
+
+.animation-clip-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 500;
+}
+
+.animation-clip-meta {
+  color: var(--color-text-secondary, #aaa);
+  font-size: 0.72rem;
+}
+
 .property-group-section--titleless {
   gap: 0.35rem;
 }

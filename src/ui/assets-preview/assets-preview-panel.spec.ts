@@ -108,7 +108,7 @@ describe('AssetsPreviewPanel', () => {
     document.body.appendChild(panel);
     await panel.updateComplete;
 
-    const button = panel.querySelector('.preview-item');
+    const button = panel.querySelector('.assets-preview-item');
     button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(services.assetsPreviewService.selectItem).toHaveBeenCalledWith('assets/crate.glb');

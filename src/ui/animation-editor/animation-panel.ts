@@ -10,6 +10,7 @@ import {
   AnimationEditorService,
   CommandDispatcher,
   DialogService,
+  IconService,
   ProjectStorageService,
 } from '@/services';
 import { OperationService } from '@/services/OperationService';
@@ -92,6 +93,9 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
   @inject(AnimationEditorService)
   private readonly animationEditorService!: AnimationEditorService;
 
+  @inject(IconService)
+  private readonly iconService!: IconService;
+
   @state()
   private assetPath: string | null = null;
 
@@ -129,16 +133,13 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
   private editMode: AnimationEditMode = 'anchor';
 
   @state()
-  private stageZoom = 6;
+  private stageZoom = 1;
 
   @state()
   private textureDimensions: TextureDimensions = { width: 0, height: 0 };
 
   @state()
   private frameDraft: AnimationFrame | null = null;
-
-  @state()
-  private isTextureDragOver = false;
 
   private disposeTabsSubscription?: () => void;
   private disposeProjectSubscription?: () => void;
@@ -200,7 +201,6 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
   protected render() {
     const activeClip = this.getActiveClip();
     const clipFrames = activeClip?.frames ?? [];
-    const selectedFrame = this.getSelectedFrame(activeClip);
     const previewFrame = this.getPreviewFrame(activeClip);
 
     return html`
@@ -234,124 +234,18 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
         ${this.assetPath && this.resource
           ? html`
               <div class="editor-workspace">
-                <aside class="animation-sidebar">${this.renderClipList()}</aside>
+                ${this.renderEditorToolbar(clipFrames.length)}
 
-                <div class="animation-main">
-                  <section class="panel-block panel-block--stage">
-                    <div class="stage-header">
-                      <div>
-                        <h4>Frame Stage</h4>
-                        <p class="panel-note">
-                          ${previewFrame
-                            ? `Editing ${this.editMode} on frame ${this.previewFrameIndex + 1}.`
-                            : 'Select or create a frame to preview and edit geometry.'}
-                        </p>
-                      </div>
-                      <div class="toolbar-group">
-                        <div class="toolbar-row">
-                          <span class="timeline-meta">${this.resource.clips.length} clips</span>
-                          <span class="timeline-meta">${clipFrames.length} frames in active clip</span>
-                        </div>
-                        <div class="toolbar-row toolbar-row--segmented">
-                          <button
-                            class="mini-button ${this.editMode === 'anchor' ? 'is-active' : ''}"
-                            type="button"
-                            @click=${() => this.onSetEditMode('anchor')}
-                          >
-                            Anchor
-                          </button>
-                          <button
-                            class="mini-button ${this.editMode === 'polygon' ? 'is-active' : ''}"
-                            type="button"
-                            @click=${() => this.onSetEditMode('polygon')}
-                          >
-                            Polygon
-                          </button>
-                          <button
-                            class="mini-button ${this.editMode === 'bbox' ? 'is-active' : ''}"
-                            type="button"
-                            @click=${() => this.onSetEditMode('bbox')}
-                          >
-                            Bounding Box
-                          </button>
-                        </div>
-                        <div class="toolbar-row">
-                          <button
-                            class="mini-button"
-                            type="button"
-                            @click=${() => this.onAdjustZoom(-1)}
-                          >
-                            Zoom Out
-                          </button>
-                          <button
-                            class="mini-button"
-                            type="button"
-                            @click=${() => this.onResetZoom()}
-                          >
-                            ${this.stageZoom.toFixed(1)}x
-                          </button>
-                          <button
-                            class="mini-button"
-                            type="button"
-                            @click=${() => this.onAdjustZoom(1)}
-                          >
-                            Zoom In
-                          </button>
-                        </div>
-                      </div>
-                    </div>
+                <section class="editor-surface editor-surface--stage">
                     ${this.renderFrameStage(activeClip, previewFrame)}
-                  </section>
+                </section>
 
-                  <section class="panel-block panel-block--timeline">
-                    <div class="timeline-header">
-                      <div>
-                        <h4>Timeline</h4>
-                        <p class="panel-note">
-                          ${activeClip
-                            ? `Clip ${activeClip.name} at ${activeClip.fps} FPS in ${activeClip.playbackMode} mode${activeClip.loop ? ', looping' : ''}.`
-                            : 'Select a clip to inspect its frame sequence.'}
-                        </p>
-                      </div>
-                      <div class="toolbar-group">
-                        <div class="toolbar-row">
-                          <button
-                            class="primary-button"
-                            type="button"
-                            ?disabled=${clipFrames.length === 0}
-                            @click=${() => this.onTogglePlayback()}
-                          >
-                            ${this.isPreviewPlaying ? 'Pause' : 'Play'}
-                          </button>
-                          <button
-                            class="mini-button"
-                            type="button"
-                            ?disabled=${clipFrames.length === 0}
-                            @click=${() => this.onStopPlayback()}
-                          >
-                            Stop
-                          </button>
-                        </div>
-                        <span class="timeline-meta">${clipFrames.length} frames</span>
-                      </div>
-                    </div>
-                    ${activeClip
-                      ? html`
-                          <div class="clip-summary">
-                            <span>Active Clip: ${activeClip.name}</span>
-                            <span
-                              >${activeClip.playbackMode === 'ping-pong'
-                                ? 'Ping-Pong'
-                                : 'Normal'}</span
-                            >
-                            <span>${activeClip.loop ? 'Loop' : 'Play Once'}</span>
-                          </div>
-                        `
-                      : null}
+                <section class="editor-surface editor-surface--timeline">
                     ${this.renderTimeline(activeClip, clipFrames)}
-                  </section>
-                </div>
+                </section>
 
+                ${this.renderStatusBar(activeClip, clipFrames, previewFrame)}
+                </div>
               </div>
             `
           : null}
@@ -359,39 +253,74 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
     `;
   }
 
-  private renderClipList() {
-    if (!this.resource) {
-      return null;
-    }
+  private renderEditorToolbar(frameCount: number) {
+    return html`
+      <div class="editor-toolbar" aria-label="Animation editor toolbar">
+        ${this.renderToolbarButton(
+          this.isPreviewPlaying ? 'pause' : 'play',
+          this.isPreviewPlaying ? 'Pause playback' : 'Play preview',
+          () => this.onTogglePlayback(),
+          frameCount === 0
+        )}
+        ${this.renderToolbarButton('square', 'Stop playback', () => this.onStopPlayback(), frameCount === 0)}
+
+        <span class="editor-toolbar-separator" aria-hidden="true"></span>
+
+        ${this.renderToolbarButton('crosshair', 'Anchor mode', () => this.onSetEditMode('anchor'), false, this.editMode === 'anchor')}
+        ${this.renderToolbarButton('pen-tool', 'Polygon mode', () => this.onSetEditMode('polygon'), false, this.editMode === 'polygon')}
+        ${this.renderToolbarButton('crop', 'Bounding box mode', () => this.onSetEditMode('bbox'), false, this.editMode === 'bbox')}
+
+        <span class="editor-toolbar-separator" aria-hidden="true"></span>
+
+        ${this.renderToolbarButton('zoom-out', 'Zoom out', () => this.onAdjustZoom(-1))}
+        ${this.renderToolbarButton('zoom-default', 'Reset zoom to 100%', () => this.onResetZoom())}
+        ${this.renderToolbarButton('zoom-in', 'Zoom in', () => this.onAdjustZoom(1))}
+      </div>
+    `;
+  }
+
+  private renderToolbarButton(
+    iconName: string,
+    title: string,
+    onClick: () => void,
+    disabled = false,
+    active = false
+  ) {
+    return html`
+      <button
+        class="editor-toolbar-button ${active ? 'is-active' : ''}"
+        type="button"
+        title=${title}
+        aria-label=${title}
+        ?disabled=${disabled}
+        @click=${onClick}
+      >
+        <span class="editor-toolbar-button-icon">${this.iconService.getIcon(iconName, 16)}</span>
+      </button>
+    `;
+  }
+
+  private renderStatusBar(
+    activeClip: AnimationClip | null,
+    clipFrames: AnimationFrame[],
+    previewFrame: AnimationFrame | null
+  ) {
+    const metrics = previewFrame ? this.getFrameMetrics(previewFrame) : null;
+    const frameLabel = previewFrame
+      ? `Frame ${this.previewFrameIndex + 1}/${clipFrames.length}`
+      : 'No frame';
+    const sizeLabel = metrics ? `${metrics.frameWidth} x ${metrics.frameHeight}px` : 'No size';
+    const clipLabel = activeClip ? activeClip.name : 'No clip';
 
     return html`
-      <section class="panel-block">
-        <div class="section-header">
-          <h4>Clips</h4>
-          <div class="toolbar-row">
-            <button class="primary-button" type="button" @click=${() => this.onAddClip()}>
-              Add Clip
-            </button>
-            <button class="mini-button" type="button" @click=${() => this.onRemoveClip()}>
-              Remove
-            </button>
-          </div>
-        </div>
-        <div class="clip-list">
-          ${this.resource.clips.map(
-            clip => html`
-              <button
-                class="clip-button ${clip.name === this.activeClipName ? 'is-active' : ''}"
-                type="button"
-                @click=${() => this.onSelectClip(clip.name)}
-              >
-                <span class="clip-button-label">${clip.name}</span>
-                <span class="clip-button-meta">${clip.frames.length} frames</span>
-              </button>
-            `
-          )}
-        </div>
-      </section>
+      <div class="editor-status-row" aria-label="Animation editor status">
+        <span>${clipLabel}</span>
+        <span>${frameLabel}</span>
+        <span>${sizeLabel}</span>
+        <span>${Math.round(this.stageZoom * 100)}%</span>
+        <span>${this.resource?.clips.length ?? 0} clips</span>
+        <span>${clipFrames.length} frames</span>
+      </div>
     `;
   }
 
@@ -483,11 +412,6 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
             </div>
           </div>
         </div>
-        <div class="stage-footer">
-          <span>Frame ${this.previewFrameIndex + 1} of ${activeClip.frames.length}</span>
-          <span>${metrics.frameWidth} × ${metrics.frameHeight}px</span>
-          <span>${this.editMode} mode</span>
-        </div>
       </div>
     `;
   }
@@ -518,6 +442,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
       <button
         class="frame-card ${isSelected ? 'is-selected' : ''} ${isPreviewFrame ? 'is-preview' : ''}"
         type="button"
+        title=${`Frame ${index + 1} · ${this.getFrameDurationLabel(frame)}`}
         @click=${() => this.onSelectFrame(index)}
       >
         <div class="frame-thumb">
@@ -534,10 +459,6 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
         <div class="frame-meta-row">
           <span class="frame-title">Frame ${index + 1}</span>
           ${isPreviewFrame ? html`<span class="frame-badge">Live</span>` : null}
-        </div>
-        <div class="frame-meta">${this.getFrameDurationLabel(frame)}</div>
-        <div class="frame-meta">
-          anchor ${frame.anchor.x.toFixed(2)}, ${frame.anchor.y.toFixed(2)}
         </div>
       </button>
     `;
@@ -612,11 +533,12 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
   }
 
   private onAdjustZoom(direction: -1 | 1): void {
-    this.stageZoom = Math.min(20, Math.max(1, this.stageZoom + direction));
+    const nextZoom = this.stageZoom + direction * 0.25;
+    this.stageZoom = Math.min(8, Math.max(0.5, Number(nextZoom.toFixed(2))));
   }
 
   private onResetZoom(): void {
-    this.stageZoom = 6;
+    this.stageZoom = 1;
   }
 
   private onSelectFrame(index: number): void {
@@ -1527,18 +1449,6 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
     );
   }
 
-  private onTextureDragOver(event: DragEvent): void {
-    event.preventDefault();
-    this.isTextureDragOver = true;
-    if (event.dataTransfer) {
-      event.dataTransfer.dropEffect = 'copy';
-    }
-  }
-
-  private onTextureDragLeave(): void {
-    this.isTextureDragOver = false;
-  }
-
   private async onTextureDrop(event: DragEvent): Promise<void> {
     event.preventDefault();
     this.isTextureDragOver = false;
@@ -1688,6 +1598,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
     return {
       assetPath: this.assetPath,
       resource: this.resource,
+      clips: this.resource?.clips ?? [],
       activeClip,
       activeClipName: this.activeClipName,
       selectedFrame: this.getSelectedFrame(activeClip),
@@ -1715,6 +1626,14 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
 
   async selectClip(clipName: string): Promise<void> {
     await this.onSelectClip(clipName);
+  }
+
+  async addClip(): Promise<void> {
+    await this.onAddClip();
+  }
+
+  async removeClip(): Promise<void> {
+    await this.onRemoveClip();
   }
 
   async renameClip(nextName: string): Promise<void> {

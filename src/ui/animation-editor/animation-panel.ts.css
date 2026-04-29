@@ -1,234 +1,170 @@
-.animation-editor {
+pix3-animation-panel .animation-editor {
   position: relative;
   display: flex;
   flex-direction: column;
-  gap: 0.85rem;
+  gap: 0.55rem;
   min-height: 100%;
   height: 100%;
-  padding: 0.9rem;
+  padding: 0.55rem;
   box-sizing: border-box;
 }
 
-.timeline-meta,
-.clip-summary span {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2rem;
-  padding: 0 0.7rem;
-  border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.04);
-  font-size: 0.76rem;
-  color: var(--color-text-secondary, #aaa);
-}
-
-.editor-workspace {
-  display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-  gap: 0.75rem;
+pix3-animation-panel .editor-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
   min-height: 0;
   height: 100%;
 }
 
-.animation-sidebar,
-.animation-main {
+pix3-animation-panel .editor-toolbar {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  min-height: 0;
+  align-items: center;
+  gap: 0.35rem;
+  flex-wrap: wrap;
 }
 
-.texture-drop-overlay {
+pix3-animation-panel .editor-toolbar-separator {
+  width: 1px;
+  height: 1.3rem;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 0 0.2rem;
+}
+
+pix3-animation-panel .editor-toolbar-button {
+  width: 2rem;
+  height: 2rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border, #333);
+  border-radius: 0.42rem;
+  background: var(--color-input-bg, #222);
+  color: var(--color-text-secondary, #aaa);
+  cursor: pointer;
+  padding: 0;
+}
+
+pix3-animation-panel .editor-toolbar-button:hover:not(:disabled) {
+  color: var(--color-text-primary, #eee);
+  border-color: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.35);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.08);
+}
+
+pix3-animation-panel .editor-toolbar-button.is-active {
+  color: var(--pix3-accent-color, #ffcf33);
+  border-color: var(--pix3-accent-color, #ffcf33);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.1);
+}
+
+pix3-animation-panel .editor-toolbar-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+pix3-animation-panel .editor-toolbar-button-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+pix3-animation-panel .editor-surface {
+  min-height: 0;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.55rem;
+  background: color-mix(in srgb, var(--color-panel-bg, #171717) 96%, white 4%);
+}
+
+pix3-animation-panel .editor-surface--stage {
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+pix3-animation-panel .editor-surface--timeline {
+  flex: 0 0 auto;
+  max-height: 15rem;
+  padding: 0.45rem;
+}
+
+pix3-animation-panel .texture-drop-overlay {
   position: absolute;
-  inset: 0.9rem;
+  inset: 0.55rem;
   z-index: 10;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1.5rem;
-  border: 2px dashed var(--pix3-accent-color, #ffcf33);
-  border-radius: 1rem;
-  background: rgba(13, 15, 19, 0.74);
+  padding: 1rem;
+  border: 1px dashed var(--pix3-accent-color, #ffcf33);
+  border-radius: 0.65rem;
+  background: rgba(13, 15, 19, 0.76);
   backdrop-filter: blur(4px);
   pointer-events: none;
 }
 
-.texture-drop-overlay__card {
+pix3-animation-panel .texture-drop-overlay__card {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
-  max-width: 26rem;
-  padding: 1rem 1.15rem;
-  border: 1px solid rgba(255, 207, 51, 0.45);
-  border-radius: 0.85rem;
-  background: rgba(24, 24, 24, 0.92);
+  gap: 0.35rem;
+  max-width: 22rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(255, 207, 51, 0.35);
+  border-radius: 0.55rem;
+  background: rgba(24, 24, 24, 0.94);
   text-align: center;
 }
 
-.texture-drop-overlay__title {
-  font-size: 0.96rem;
-  font-weight: 700;
+pix3-animation-panel .texture-drop-overlay__title {
+  font-size: 0.88rem;
+  font-weight: 600;
   color: var(--pix3-accent-color, #ffcf33);
 }
 
-.texture-drop-overlay__body {
-  font-size: 0.8rem;
-  line-height: 1.45;
+pix3-animation-panel .texture-drop-overlay__body {
+  font-size: 0.75rem;
+  line-height: 1.4;
   color: var(--color-text-secondary, #aaa);
 }
 
-.panel-block {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  padding: 0.85rem;
-  border: 1px solid var(--color-border, #333);
-  border-radius: 0.75rem;
-  background: color-mix(in srgb, var(--color-panel-bg, #171717) 92%, white 8%);
-}
-
-.panel-block--timeline {
-  min-height: 0;
-}
-
-.panel-block--stage {
-  min-height: 22rem;
-}
-
-.section-header,
-.timeline-header,
-.stage-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  align-items: flex-start;
-}
-
-.toolbar-group {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.45rem;
-}
-
-.panel-block h4 {
-  margin: 0;
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  color: var(--color-text-secondary, #aaa);
-}
-
-.panel-note {
-  margin: 0;
-  font-size: 0.78rem;
-  line-height: 1.45;
-  color: var(--color-text-secondary, #aaa);
-}
-
-.clip-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  min-height: 0;
-  overflow: auto;
-}
-
-.clip-button,
-.frame-card,
-.mini-button,
-.primary-button {
-  border: 1px solid var(--color-border, #333);
-  background: var(--color-input-bg, #222);
-  color: var(--color-text-primary, #eee);
-  border-radius: 0.45rem;
-}
-
-.clip-button {
-  display: flex;
-  justify-content: space-between;
-  gap: 0.75rem;
-  align-items: center;
-  text-align: left;
-  padding: 0.5rem 0.65rem;
-}
-
-.clip-button-label {
-  font-weight: 600;
-}
-
-.clip-button-meta {
-  font-size: 0.74rem;
-  color: var(--color-text-secondary, #aaa);
-}
-
-.clip-button.is-active {
-  border-color: var(--pix3-accent-color, #ffcf33);
-  box-shadow: inset 0 0 0 1px var(--pix3-accent-color, #ffcf33);
-  background: rgba(255, 207, 51, 0.08);
-}
-
-.row,
-.field-grid {
+pix3-animation-panel .timeline {
   display: grid;
-  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+  gap: 0.45rem;
+  overflow: auto;
+  min-height: 0;
 }
 
-.row {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.field-grid {
-  grid-template-columns: minmax(0, 1fr);
-}
-
-.field {
+pix3-animation-panel .frame-card {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.85rem;
-}
-
-.field input[type='text'],
-.field input[type='number'],
-.field select {
-  width: 100%;
-  min-width: 0;
-  border: 1px solid var(--color-border, #333);
-  background: var(--color-input-bg, #222);
+  gap: 0.3rem;
+  padding: 0.35rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 0.45rem;
+  background: transparent;
   color: var(--color-text-primary, #eee);
-  border-radius: 0.35rem;
-  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+  text-align: left;
 }
 
-.field-toggle {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.85rem;
+pix3-animation-panel .frame-card:hover {
+  border-color: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.22);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.05);
 }
 
-.toolbar-row {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-}
-
-.toolbar-row--segmented {
-  gap: 0.35rem;
-}
-
-.mini-button.is-active,
-.primary-button.is-active {
+pix3-animation-panel .frame-card.is-selected {
   border-color: var(--pix3-accent-color, #ffcf33);
   box-shadow: inset 0 0 0 1px var(--pix3-accent-color, #ffcf33);
-  background: rgba(255, 207, 51, 0.08);
 }
 
-.texture-preview-card {
+pix3-animation-panel .frame-card.is-preview {
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.08);
+}
+
+pix3-animation-panel .frame-thumb {
+  position: relative;
   overflow: hidden;
-  border-radius: 0.55rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  aspect-ratio: 1;
+  border-radius: 0.3rem;
   background:
     linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
     linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
@@ -239,83 +175,18 @@
   background-position: 0 0, 0 7px, 7px -7px, -7px 0;
 }
 
-.texture-preview-card img {
-  display: block;
-  width: 100%;
-  max-height: 15rem;
-  object-fit: contain;
-  image-rendering: pixelated;
-}
-
-.mini-button,
-.primary-button {
-  padding: 0.45rem 0.7rem;
-  cursor: pointer;
-}
-
-.primary-button {
-  border-color: var(--pix3-accent-color, #ffcf33);
-}
-
-.timeline {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
-  gap: 0.6rem;
-  overflow: auto;
-  min-height: 0;
-}
-
-.clip-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-}
-
-.frame-card {
-  display: flex;
-  flex-direction: column;
-  gap: 0.35rem;
-  padding: 0.45rem;
-  cursor: pointer;
-  text-align: left;
-}
-
-.frame-card.is-selected {
-  border-color: var(--pix3-accent-color, #ffcf33);
-  box-shadow: inset 0 0 0 1px var(--pix3-accent-color, #ffcf33);
-}
-
-.frame-card.is-preview {
-  background: rgba(255, 207, 51, 0.08);
-}
-
-.frame-thumb {
-  position: relative;
-  overflow: hidden;
-  aspect-ratio: 1;
-  border-radius: 0.35rem;
-  background:
-    linear-gradient(45deg, rgba(255,255,255,0.05) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(255,255,255,0.05) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(255,255,255,0.05) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255,255,255,0.05) 75%),
-    #1a1a1a;
-  background-size: 14px 14px;
-  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
-}
-
-.frame-thumb img {
+pix3-animation-panel .frame-thumb img {
   position: absolute;
   transform-origin: top left;
   image-rendering: pixelated;
 }
 
-.frame-thumb-anchor {
+pix3-animation-panel .frame-thumb-anchor {
   position: absolute;
-  width: 0.65rem;
-  height: 0.65rem;
-  margin-left: -0.325rem;
-  margin-top: -0.325rem;
+  width: 0.6rem;
+  height: 0.6rem;
+  margin-left: -0.3rem;
+  margin-top: -0.3rem;
   border-radius: 999px;
   border: 2px solid #0f1116;
   background: var(--pix3-accent-color, #ffcf33);
@@ -323,65 +194,59 @@
   pointer-events: none;
 }
 
-.frame-meta-row {
+pix3-animation-panel .frame-meta-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 0.5rem;
+  gap: 0.4rem;
 }
 
-.frame-title {
-  font-size: 0.78rem;
-  font-weight: 700;
+pix3-animation-panel .frame-title {
+  font-size: 0.74rem;
+  font-weight: 600;
 }
 
-.frame-badge,
-.frame-chip {
+pix3-animation-panel .frame-badge {
   display: inline-flex;
   align-items: center;
-  min-height: 1.45rem;
-  padding: 0 0.45rem;
+  min-height: 1.25rem;
+  padding: 0 0.4rem;
   border-radius: 999px;
-  background: rgba(255, 207, 51, 0.12);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.14);
   color: var(--pix3-accent-color, #ffcf33);
-  font-size: 0.7rem;
+  font-size: 0.67rem;
 }
 
-.stage-shell {
+pix3-animation-panel .stage-shell {
   display: flex;
   flex-direction: column;
-  gap: 0.65rem;
   min-height: 0;
   height: 100%;
 }
 
-.stage-scroll {
+pix3-animation-panel .stage-scroll {
   display: flex;
+  flex: 1 1 auto;
   min-height: 0;
   overflow: auto;
-  border-radius: 0.65rem;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background:
-    radial-gradient(circle at top, rgba(255, 207, 51, 0.1), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.08));
 }
 
-.stage-artboard {
+pix3-animation-panel .stage-artboard {
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   min-width: min-content;
   min-height: min-content;
-  padding: 1.2rem;
+  padding: 0.9rem;
 }
 
-.stage-frame {
+pix3-animation-panel .stage-frame {
   position: relative;
   overflow: hidden;
   flex: none;
   cursor: crosshair;
-  border-radius: 0.65rem;
+  border-radius: 0.45rem;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background:
     linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
@@ -393,13 +258,13 @@
   background-position: 0 0, 0 9px, 9px -9px, -9px 0;
 }
 
-.stage-image {
+pix3-animation-panel .stage-image {
   position: absolute;
   transform-origin: top left;
   image-rendering: pixelated;
 }
 
-.stage-overlay {
+pix3-animation-panel .stage-overlay {
   position: absolute;
   inset: 0;
   width: 100%;
@@ -407,32 +272,32 @@
   overflow: visible;
 }
 
-.stage-bbox {
+pix3-animation-panel .stage-bbox {
   fill: rgba(255, 207, 51, 0.08);
   stroke: rgba(255, 207, 51, 0.95);
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
 
-.stage-polygon {
+pix3-animation-panel .stage-polygon {
   fill: rgba(88, 179, 255, 0.14);
   stroke: #58b3ff;
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
 
-.stage-polygon-vertex {
+pix3-animation-panel .stage-polygon-vertex {
   fill: #58b3ff;
   stroke: #0f1116;
   stroke-width: 1.5;
   vector-effect: non-scaling-stroke;
 }
 
-.stage-polygon-vertex.is-editable {
+pix3-animation-panel .stage-polygon-vertex.is-editable {
   cursor: grab;
 }
 
-.stage-anchor {
+pix3-animation-panel .stage-anchor {
   position: absolute;
   width: 0.95rem;
   height: 0.95rem;
@@ -444,8 +309,8 @@
   box-shadow: 0 0 0 2px rgba(255, 207, 51, 0.25);
 }
 
-.stage-anchor::before,
-.stage-anchor::after {
+pix3-animation-panel .stage-anchor::before,
+pix3-animation-panel .stage-anchor::after {
   content: '';
   position: absolute;
   left: 50%;
@@ -454,103 +319,67 @@
   transform: translate(-50%, -50%);
 }
 
-.stage-anchor::before {
+pix3-animation-panel .stage-anchor::before {
   width: 1px;
   height: 1.2rem;
 }
 
-.stage-anchor::after {
+pix3-animation-panel .stage-anchor::after {
   width: 1.2rem;
   height: 1px;
 }
 
-.stage-anchor.is-editable {
+pix3-animation-panel .stage-anchor.is-editable {
   cursor: grab;
 }
 
-.stage-footer {
+pix3-animation-panel .editor-status-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
+  gap: 0.35rem;
+  color: var(--color-text-secondary, #aaa);
+  font-size: 0.72rem;
 }
 
-.stage-footer span {
+pix3-animation-panel .editor-status-row span {
   display: inline-flex;
   align-items: center;
-  min-height: 1.85rem;
-  padding: 0 0.6rem;
+  min-height: 1.5rem;
+  padding: 0 0.5rem;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.04);
-  color: var(--color-text-secondary, #aaa);
-  font-size: 0.74rem;
 }
 
-.inspector-section {
-  display: flex;
-  flex-direction: column;
-  gap: 0.55rem;
-  padding-top: 0.35rem;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-}
-
-.inspector-section:first-of-type {
-  border-top: none;
-  padding-top: 0;
-}
-
-.inspector-section-title {
-  font-size: 0.8rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--color-text-primary, #eee);
-}
-
-.inspector-section-title--subtle {
-  color: var(--color-text-secondary, #aaa);
-}
-
-.frame-meta {
-  font-size: 0.75rem;
-  color: var(--color-text-secondary, #aaa);
-}
-
-.empty-state,
-.error-state {
+pix3-animation-panel .empty-state,
+pix3-animation-panel .error-state {
   padding: 1rem;
   border: 1px dashed var(--color-border, #333);
-  border-radius: 0.75rem;
+  border-radius: 0.55rem;
   color: var(--color-text-secondary, #aaa);
 }
 
-.empty-state code {
+pix3-animation-panel .empty-state code {
   font-family: 'IBM Plex Mono', monospace;
 }
 
-.empty-state--inline {
-  min-height: 12rem;
+pix3-animation-panel .empty-state--inline {
+  min-height: 10rem;
   display: flex;
   align-items: center;
   justify-content: center;
   text-align: center;
 }
 
-.error-state {
+pix3-animation-panel .error-state {
   color: #ff8f8f;
 }
 
 @media (max-width: 900px) {
-  .section-header,
-  .timeline-header,
-  .stage-header {
-    flex-direction: column;
+  pix3-animation-panel .animation-editor {
+    padding: 0.45rem;
   }
 
-  .editor-workspace {
-    grid-template-columns: 1fr;
-  }
-
-  .toolbar-group {
-    align-items: stretch;
+  pix3-animation-panel .editor-surface--timeline {
+    max-height: 12rem;
   }
 }
