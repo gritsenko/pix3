@@ -11,6 +11,7 @@ import { RefreshPrefabInstancesCommand } from '@/features/scene/RefreshPrefabIns
 import { deriveAnimationDocumentId } from '@/features/scene/animation-asset-utils';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { OperationService } from '@/services/OperationService';
+import { AnimationEditorService } from '@/services/AnimationEditorService';
 import { SetPlayModeOperation } from '@/features/scripts/SetPlayModeOperation';
 import { SceneManager } from '@pix3/runtime';
 import { subscribe } from 'valtio/vanilla';
@@ -36,6 +37,9 @@ export class EditorTabService {
 
   @inject(OperationService)
   private readonly operationService!: OperationService;
+
+  @inject(AnimationEditorService)
+  private readonly animationEditorService!: AnimationEditorService;
 
   private disposeSceneSubscription?: () => void;
   private disposeAnimationSubscription?: () => void;
@@ -457,6 +461,8 @@ export class EditorTabService {
   }
 
   private async activateSceneTab(tab: EditorTab): Promise<void> {
+    this.animationEditorService.setActiveAssetPath(null);
+
     const sceneId = this.deriveSceneIdFromResource(tab.resourceId);
 
     // Load if needed.
@@ -511,6 +517,8 @@ export class EditorTabService {
   }
 
   private async activateAnimationTab(tab: EditorTab): Promise<void> {
+    this.animationEditorService.setActiveAssetPath(tab.resourceId);
+
     const animationId = this.deriveAnimationIdFromResource(tab.resourceId);
     const alreadyLoaded = Boolean(appState.animations.descriptors[animationId]);
 
@@ -758,6 +766,10 @@ export class EditorTabService {
     }
 
     if (tab.type === 'animation') {
+      if (this.animationEditorService.getActiveAssetPath() === tab.resourceId) {
+        this.animationEditorService.setActiveAssetPath(null);
+      }
+
       const animationId = this.deriveAnimationIdFromResource(tab.resourceId);
       delete appState.animations.descriptors[animationId];
       delete appState.animations.resources[animationId];

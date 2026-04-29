@@ -7,11 +7,16 @@ import { deriveAnimationDocumentId } from '@/features/scene/animation-asset-util
 import { appState } from '@/state';
 import {
   AnimationAutoSliceDialogService,
+  AnimationEditorService,
   CommandDispatcher,
   DialogService,
   ProjectStorageService,
 } from '@/services';
 import { OperationService } from '@/services/OperationService';
+import type {
+  AnimationInspectorController,
+  AnimationInspectorSnapshot,
+} from '@/services/AnimationEditorService';
 import {
   AnimatedSprite2D,
   SceneManager,
@@ -59,7 +64,7 @@ interface StageDragState {
 }
 
 @customElement('pix3-animation-panel')
-export class AnimationPanel extends ComponentBase {
+export class AnimationPanel extends ComponentBase implements AnimationInspectorController {
   @property({ type: String, reflect: true, attribute: 'tab-id' })
   tabId = '';
 
@@ -83,6 +88,9 @@ export class AnimationPanel extends ComponentBase {
 
   @inject(AnimationAutoSliceDialogService)
   private readonly animationAutoSliceDialogService!: AnimationAutoSliceDialogService;
+
+  @inject(AnimationEditorService)
+  private readonly animationEditorService!: AnimationEditorService;
 
   @state()
   private assetPath: string | null = null;
@@ -129,6 +137,9 @@ export class AnimationPanel extends ComponentBase {
   @state()
   private frameDraft: AnimationFrame | null = null;
 
+  @state()
+  private isTextureDragOver = false;
+
   private disposeTabsSubscription?: () => void;
   private disposeProjectSubscription?: () => void;
   private disposeAnimationsSubscription?: () => void;
@@ -139,6 +150,8 @@ export class AnimationPanel extends ComponentBase {
   private previewElapsedSeconds = 0;
   private previewDirection = 1;
   private stageDragState: StageDragState | null = null;
+  private textureDragDepth = 0;
+  private readonly inspectorListeners = new Set<() => void>();
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -158,6 +171,15 @@ export class AnimationPanel extends ComponentBase {
     if (changedProperties.has('tabId') || changedProperties.has('resourcePath')) {
       void this.syncFromResourceContext(false);
     }
+
+    if (
+      changedProperties.has('assetPath') ||
+      changedProperties.has('resource') ||
+      changedProperties.has('activeClipName') ||
+      changedProperties.has('selectedFrameIndex')
+    ) {
+      this.notifyInspectorListeners();
+    }
   }
 
   disconnectedCallback(): void {
@@ -168,6 +190,9 @@ export class AnimationPanel extends ComponentBase {
     this.disposeTabsSubscription = undefined;
     this.disposeProjectSubscription = undefined;
     this.disposeAnimationsSubscription = undefined;
+    if (this.animationEditorService.getActiveController() === this) {
+      this.animationEditorService.setActiveController(null);
+    }
     this.revokeTexturePreviewUrl();
     super.disconnectedCallback();
   }
@@ -179,7 +204,14 @@ export class AnimationPanel extends ComponentBase {
     const previewFrame = this.getPreviewFrame(activeClip);
 
     return html`
-      <section class="animation-editor" aria-label="Animation editor">
+      <section
+        class="animation-editor ${this.isTextureDragOver ? 'is-texture-dragover' : ''}"
+        aria-label="Animation editor"
+        @dragenter=${(event: DragEvent) => this.onEditorDragEnter(event)}
+        @dragover=${(event: DragEvent) => this.onEditorDragOver(event)}
+        @dragleave=${(event: DragEvent) => this.onEditorDragLeave(event)}
+        @drop=${(event: DragEvent) => this.onEditorDrop(event)}
+      >
         ${this.errorMessage ? html`<div class="error-state">${this.errorMessage}</div>` : null}
         ${!this.assetPath && !this.errorMessage
           ? html`<div class="empty-state">
@@ -187,24 +219,22 @@ export class AnimationPanel extends ComponentBase {
               animation resource field in the Inspector.
             </div>`
           : null}
+        ${this.isTextureDragOver
+          ? html`
+              <div class="texture-drop-overlay" aria-hidden="true">
+                <div class="texture-drop-overlay__card">
+                  <div class="texture-drop-overlay__title">Drop spritesheet to assign texture</div>
+                  <div class="texture-drop-overlay__body">
+                    Drag an image asset from the Asset Browser anywhere onto the animation editor.
+                  </div>
+                </div>
+              </div>
+            `
+          : null}
         ${this.assetPath && this.resource
           ? html`
-              <header class="editor-header">
-                <div>
-                  <div class="asset-kicker">Animation Asset</div>
-                  <h2>${this.getAssetTitle()}</h2>
-                  <div class="asset-path">${this.assetPath}</div>
-                </div>
-                <div class="header-meta">
-                  <span>${this.resource.clips.length} clips</span>
-                  <span>${clipFrames.length} frames in active clip</span>
-                </div>
-              </header>
-
               <div class="editor-workspace">
-                <aside class="animation-sidebar">
-                  ${this.renderTextureSettings()} ${this.renderClipList()}
-                </aside>
+                <aside class="animation-sidebar">${this.renderClipList()}</aside>
 
                 <div class="animation-main">
                   <section class="panel-block panel-block--stage">
@@ -218,6 +248,10 @@ export class AnimationPanel extends ComponentBase {
                         </p>
                       </div>
                       <div class="toolbar-group">
+                        <div class="toolbar-row">
+                          <span class="timeline-meta">${this.resource.clips.length} clips</span>
+                          <span class="timeline-meta">${clipFrames.length} frames in active clip</span>
+                        </div>
                         <div class="toolbar-row toolbar-row--segmented">
                           <button
                             class="mini-button ${this.editMode === 'anchor' ? 'is-active' : ''}"
@@ -318,9 +352,6 @@ export class AnimationPanel extends ComponentBase {
                   </section>
                 </div>
 
-                <aside class="animation-inspector">
-                  ${this.renderInspector(activeClip, selectedFrame)}
-                </aside>
               </div>
             `
           : null}
@@ -360,112 +391,6 @@ export class AnimationPanel extends ComponentBase {
             `
           )}
         </div>
-      </section>
-    `;
-  }
-
-  private renderClipSettings() {
-    const activeClip = this.getActiveClip();
-    if (!activeClip) {
-      return null;
-    }
-
-    return html`
-      <section class="panel-block">
-        <h4>Clip Settings</h4>
-        <div class="field-grid">
-          <label class="field">
-            <span>Name</span>
-            <input
-              type="text"
-              .value=${activeClip.name}
-              @change=${(event: Event) =>
-                this.onRenameClip((event.target as HTMLInputElement).value.trim())}
-            />
-          </label>
-        </div>
-        <div class="row">
-          <label class="field">
-            <span>FPS</span>
-            <input
-              type="number"
-              min="1"
-              step="1"
-              .value=${String(activeClip.fps)}
-              @change=${(event: Event) =>
-                this.onUpdateClipFps(Number((event.target as HTMLInputElement).value))}
-            />
-          </label>
-          <label class="field-toggle">
-            <input
-              type="checkbox"
-              .checked=${activeClip.loop}
-              @change=${(event: Event) =>
-                this.onUpdateClipLoop((event.target as HTMLInputElement).checked)}
-            />
-            <span>Loop</span>
-          </label>
-        </div>
-      </section>
-    `;
-  }
-
-  private renderTextureSettings() {
-    const texturePath = this.resource?.texturePath?.trim() ?? '';
-
-    return html`
-      <section class="panel-block">
-        <h4>Spritesheet</h4>
-        <div
-          class="texture-drop-zone ${this.isTextureDragOver ? 'is-dragover' : ''}"
-          @dragover=${(event: DragEvent) => this.onTextureDragOver(event)}
-          @dragleave=${() => this.onTextureDragLeave()}
-          @drop=${(event: DragEvent) => this.onTextureDrop(event)}
-        >
-          <span>
-            ${texturePath
-              ? 'Drop texture from Assets here to replace the spritesheet'
-              : 'Drop texture from Assets here to set the spritesheet'}
-          </span>
-        </div>
-        <label class="field">
-          <span>Texture</span>
-          <input
-            type="text"
-            .value=${texturePath}
-            placeholder="res://textures/spritesheet.png"
-            @change=${(event: Event) =>
-              this.onUpdateTexturePath((event.target as HTMLInputElement).value.trim())}
-          />
-        </label>
-        ${this.texturePreviewUrl
-          ? html`
-              <div class="texture-preview-card">
-                <img src=${this.texturePreviewUrl} alt="Spritesheet preview" />
-              </div>
-            `
-          : null}
-        <div class="toolbar-row">
-          <button
-            class="primary-button"
-            type="button"
-            ?disabled=${texturePath.length === 0 || !this.activeClipName}
-            @click=${() => this.openSlicerDialog(texturePath)}
-          >
-            Slice Frames...
-          </button>
-          <button
-            class="mini-button"
-            type="button"
-            ?disabled=${texturePath.length === 0}
-            @click=${() => this.onUpdateTexturePath('')}
-          >
-            Clear Texture
-          </button>
-        </div>
-        <p class="panel-note">
-          The slicer opens in a modal with a live preview of the spritesheet cut.
-        </p>
       </section>
     `;
   }
@@ -584,238 +509,6 @@ export class AnimationPanel extends ComponentBase {
     `;
   }
 
-  private renderInspector(activeClip: AnimationClip | null, selectedFrame: AnimationFrame | null) {
-    return html`
-      <section class="panel-block">
-        <div class="section-header">
-          <h4>Inspector</h4>
-          <span class="timeline-meta"
-            >${selectedFrame ? `Frame ${this.selectedFrameIndex + 1}` : 'Clip'}</span
-          >
-        </div>
-
-        ${activeClip
-          ? html`
-              <div class="inspector-section">
-                <div class="inspector-section-title">Clip</div>
-                <div class="field-grid">
-                  <label class="field">
-                    <span>Name</span>
-                    <input
-                      type="text"
-                      .value=${activeClip.name}
-                      @change=${(event: Event) =>
-                        this.onRenameClip((event.target as HTMLInputElement).value.trim())}
-                    />
-                  </label>
-                </div>
-                <div class="row">
-                  <label class="field">
-                    <span>FPS</span>
-                    <input
-                      type="number"
-                      min="1"
-                      step="1"
-                      .value=${String(activeClip.fps)}
-                      @change=${(event: Event) =>
-                        this.onUpdateClipFps(Number((event.target as HTMLInputElement).value))}
-                    />
-                  </label>
-                  <label class="field">
-                    <span>Playback</span>
-                    <select
-                      .value=${activeClip.playbackMode}
-                      @change=${(event: Event) =>
-                        this.onUpdateClipPlaybackMode(
-                          (event.target as HTMLSelectElement).value as AnimationPlaybackMode
-                        )}
-                    >
-                      <option value="normal">Normal</option>
-                      <option value="ping-pong">Ping-Pong</option>
-                    </select>
-                  </label>
-                </div>
-                <label class="field-toggle">
-                  <input
-                    type="checkbox"
-                    .checked=${activeClip.loop}
-                    @change=${(event: Event) =>
-                      this.onUpdateClipLoop((event.target as HTMLInputElement).checked)}
-                  />
-                  <span>Loop clip</span>
-                </label>
-              </div>
-            `
-          : html`<div class="empty-state">No active clip selected.</div>`}
-        ${selectedFrame
-          ? html`
-              <div class="inspector-section">
-                <div class="section-header">
-                  <div class="inspector-section-title">Frame</div>
-                  <span class="frame-chip">${this.selectedFrameIndex + 1}</span>
-                </div>
-                <div class="field-grid">
-                  <label class="field">
-                    <span>Duration Multiplier</span>
-                    <input
-                      type="number"
-                      min="0.05"
-                      step="0.05"
-                      .value=${String(selectedFrame.durationMultiplier)}
-                      @change=${(event: Event) =>
-                        this.onUpdateSelectedFrameDurationMultiplier(
-                          Number((event.target as HTMLInputElement).value)
-                        )}
-                    />
-                  </label>
-                  <label class="field">
-                    <span>Texture Override</span>
-                    <input
-                      type="text"
-                      .value=${selectedFrame.texturePath}
-                      placeholder="Optional per-frame texture"
-                      @change=${(event: Event) =>
-                        this.onUpdateSelectedFrameTexturePath(
-                          (event.target as HTMLInputElement).value.trim()
-                        )}
-                    />
-                  </label>
-                </div>
-                <div class="row">
-                  <label class="field">
-                    <span>Anchor X</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      .value=${selectedFrame.anchor.x.toFixed(2)}
-                      @change=${(event: Event) =>
-                        this.onUpdateSelectedFrameAnchor(
-                          'x',
-                          Number((event.target as HTMLInputElement).value)
-                        )}
-                    />
-                  </label>
-                  <label class="field">
-                    <span>Anchor Y</span>
-                    <input
-                      type="number"
-                      min="0"
-                      max="1"
-                      step="0.01"
-                      .value=${selectedFrame.anchor.y.toFixed(2)}
-                      @change=${(event: Event) =>
-                        this.onUpdateSelectedFrameAnchor(
-                          'y',
-                          Number((event.target as HTMLInputElement).value)
-                        )}
-                    />
-                  </label>
-                </div>
-                <div class="field-grid">
-                  <div class="inspector-section-title inspector-section-title--subtle">
-                    Bounding Box
-                  </div>
-                </div>
-                <div class="row">
-                  <label class="field">
-                    <span>X</span>
-                    <input
-                      type="number"
-                      step="1"
-                      .value=${String(selectedFrame.boundingBox.x)}
-                      @change=${(event: Event) =>
-                        this.onUpdateSelectedFrameBoundingBox(
-                          'x',
-                          Number((event.target as HTMLInputElement).value)
-                        )}
-                    />
-                  </label>
-                  <label class="field">
-                    <span>Y</span>
-                    <input
-                      type="number"
-                      step="1"
-                      .value=${String(selectedFrame.boundingBox.y)}
-                      @change=${(event: Event) =>
-                        this.onUpdateSelectedFrameBoundingBox(
-                          'y',
-                          Number((event.target as HTMLInputElement).value)
-                        )}
-                    />
-                  </label>
-                </div>
-                <div class="row">
-                  <label class="field">
-                    <span>Width</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      .value=${String(selectedFrame.boundingBox.width)}
-                      @change=${(event: Event) =>
-                        this.onUpdateSelectedFrameBoundingBox(
-                          'width',
-                          Number((event.target as HTMLInputElement).value)
-                        )}
-                    />
-                  </label>
-                  <label class="field">
-                    <span>Height</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      .value=${String(selectedFrame.boundingBox.height)}
-                      @change=${(event: Event) =>
-                        this.onUpdateSelectedFrameBoundingBox(
-                          'height',
-                          Number((event.target as HTMLInputElement).value)
-                        )}
-                    />
-                  </label>
-                </div>
-                <div class="field-grid">
-                  <div class="inspector-section-title inspector-section-title--subtle">
-                    Collision Polygon
-                  </div>
-                  <div class="panel-note">
-                    ${selectedFrame.collisionPolygon.length
-                      ? `${selectedFrame.collisionPolygon.length} vertices authored.`
-                      : 'No collision polygon authored yet.'}
-                  </div>
-                </div>
-                <div class="toolbar-row">
-                  <button
-                    class="mini-button"
-                    type="button"
-                    @click=${() => this.onAddPolygonVertex()}
-                  >
-                    Add Vertex
-                  </button>
-                  <button class="mini-button" type="button" @click=${() => this.onClearPolygon()}>
-                    Clear Polygon
-                  </button>
-                  <button
-                    class="mini-button"
-                    type="button"
-                    @click=${() => this.onResetBoundingBox()}
-                  >
-                    Reset Box
-                  </button>
-                </div>
-              </div>
-            `
-          : html`
-              <div class="empty-state">
-                Pick a frame in the timeline to edit delay, anchor, bounding box, and polygon data.
-              </div>
-            `}
-      </section>
-    `;
-  }
-
   private renderFrameCard(frame: AnimationFrame, index: number) {
     const imageStyle = this.getFrameImageStyle(frame);
     const isSelected = index === this.selectedFrameIndex;
@@ -931,6 +624,7 @@ export class AnimationPanel extends ComponentBase {
     this.selectedFrameIndex = index;
     this.previewFrameIndex = index;
     this.previewElapsedSeconds = 0;
+    this.persistSelectedFrameIndex(index);
   }
 
   private onTogglePlayback(): void {
@@ -1381,6 +1075,7 @@ export class AnimationPanel extends ComponentBase {
   private syncFrameStateToActiveClip(preferFirstFrame = false): void {
     const activeClip = this.getActiveClip();
     const frameCount = activeClip?.frames.length ?? 0;
+    const storedFrameIndex = this.getStoredSelectedFrameIndex();
     this.frameDraft = null;
     this.stageDragState = null;
 
@@ -1388,6 +1083,7 @@ export class AnimationPanel extends ComponentBase {
       this.selectedFrameIndex = -1;
       this.previewFrameIndex = -1;
       this.previewElapsedSeconds = 0;
+      this.persistSelectedFrameIndex(-1);
       return;
     }
 
@@ -1395,6 +1091,8 @@ export class AnimationPanel extends ComponentBase {
       ? 0
       : this.selectedFrameIndex >= 0
         ? Math.min(this.selectedFrameIndex, frameCount - 1)
+        : storedFrameIndex >= 0
+          ? Math.min(storedFrameIndex, frameCount - 1)
         : 0;
 
     this.selectedFrameIndex = fallbackIndex;
@@ -1405,6 +1103,7 @@ export class AnimationPanel extends ComponentBase {
         )
       : fallbackIndex;
     this.previewElapsedSeconds = 0;
+    this.persistSelectedFrameIndex(fallbackIndex);
   }
 
   private hasSupportedImageExtension(path: string): boolean {
@@ -1461,6 +1160,21 @@ export class AnimationPanel extends ComponentBase {
     );
   }
 
+  private isPotentialTextureDrag(event: DragEvent): boolean {
+    const transfer = event.dataTransfer;
+    if (!transfer) {
+      return false;
+    }
+
+    const types = new Set(Array.from(transfer.types));
+    return (
+      types.has(ASSET_RESOURCE_MIME) ||
+      types.has(ASSET_PATH_MIME) ||
+      types.has('text/uri-list') ||
+      types.has('text/plain')
+    );
+  }
+
   private async syncFromResourceContext(preserveClip: boolean): Promise<void> {
     const nextAssetPath = this.resolveAssetPath();
     const assetChanged = nextAssetPath !== this.assetPath;
@@ -1469,6 +1183,7 @@ export class AnimationPanel extends ComponentBase {
 
     this.assetPath = nextAssetPath;
     this.animationId = nextAnimationId;
+    this.syncActiveInspectorController();
     await this.syncFromDocumentState(preserveClip && !assetChanged && !animationChanged);
   }
 
@@ -1483,6 +1198,7 @@ export class AnimationPanel extends ComponentBase {
       this.errorMessage = null;
       this.revokeTexturePreviewUrl();
       this.syncFrameStateToActiveClip();
+      this.syncActiveInspectorController();
       return;
     }
 
@@ -1499,6 +1215,7 @@ export class AnimationPanel extends ComponentBase {
       this.activeClipName = '';
       this.revokeTexturePreviewUrl();
       this.syncFrameStateToActiveClip();
+      this.syncActiveInspectorController();
       return;
     }
 
@@ -1527,6 +1244,8 @@ export class AnimationPanel extends ComponentBase {
       const token = ++this.loadToken;
       await this.loadTexturePreview(resource.texturePath, token);
     }
+
+    this.syncActiveInspectorController();
   }
 
   private async loadTexturePreview(texturePath: string, token: number): Promise<void> {
@@ -1892,6 +1611,18 @@ export class AnimationPanel extends ComponentBase {
     return typeof storedClipName === 'string' ? storedClipName : '';
   }
 
+  private getStoredSelectedFrameIndex(): number {
+    if (!this.tabId) {
+      return -1;
+    }
+
+    const tab = appState.tabs.tabs.find(candidate => candidate.id === this.tabId);
+    const storedFrameIndex = tab?.contextState?.selectedFrameIndex;
+    return typeof storedFrameIndex === 'number' && Number.isInteger(storedFrameIndex)
+      ? storedFrameIndex
+      : -1;
+  }
+
   private persistActiveClipName(clipName: string): void {
     if (!this.tabId) {
       return;
@@ -1911,6 +1642,175 @@ export class AnimationPanel extends ComponentBase {
       ...(tab.contextState ?? {}),
       activeClipName: clipName,
     };
+  }
+
+  private persistSelectedFrameIndex(selectedFrameIndex: number): void {
+    if (!this.tabId) {
+      return;
+    }
+
+    const tab = appState.tabs.tabs.find(candidate => candidate.id === this.tabId);
+    if (!tab) {
+      return;
+    }
+
+    if (tab.contextState?.selectedFrameIndex === selectedFrameIndex) {
+      return;
+    }
+
+    tab.contextState = {
+      ...(tab.contextState ?? {}),
+      selectedFrameIndex,
+    };
+  }
+
+  private syncActiveInspectorController(): void {
+    const isActiveAnimationTab = Boolean(this.assetPath) && Boolean(this.tabId) && appState.tabs.activeTabId === this.tabId;
+
+    if (isActiveAnimationTab) {
+      this.animationEditorService.setActiveController(this);
+      return;
+    }
+
+    if (this.animationEditorService.getActiveController() === this) {
+      this.animationEditorService.setActiveController(null);
+    }
+  }
+
+  private notifyInspectorListeners(): void {
+    for (const listener of this.inspectorListeners) {
+      listener();
+    }
+  }
+
+  getInspectorSnapshot(): AnimationInspectorSnapshot {
+    const activeClip = this.getActiveClip();
+    return {
+      assetPath: this.assetPath,
+      resource: this.resource,
+      activeClip,
+      activeClipName: this.activeClipName,
+      selectedFrame: this.getSelectedFrame(activeClip),
+      selectedFrameIndex: this.selectedFrameIndex,
+    };
+  }
+
+  subscribeInspector(listener: () => void): () => void {
+    this.inspectorListeners.add(listener);
+    return () => this.inspectorListeners.delete(listener);
+  }
+
+  async updateTexturePath(value: string): Promise<void> {
+    await this.onUpdateTexturePath(value);
+  }
+
+  async openTextureSlicer(): Promise<void> {
+    const texturePath = this.resource?.texturePath?.trim() ?? '';
+    if (!texturePath) {
+      return;
+    }
+
+    await this.openSlicerDialog(texturePath);
+  }
+
+  async selectClip(clipName: string): Promise<void> {
+    await this.onSelectClip(clipName);
+  }
+
+  async renameClip(nextName: string): Promise<void> {
+    await this.onRenameClip(nextName);
+  }
+
+  async updateClipFps(nextFps: number): Promise<void> {
+    await this.onUpdateClipFps(nextFps);
+  }
+
+  async updateClipPlaybackMode(mode: AnimationPlaybackMode): Promise<void> {
+    await this.onUpdateClipPlaybackMode(mode);
+  }
+
+  async updateClipLoop(nextLoop: boolean): Promise<void> {
+    await this.onUpdateClipLoop(nextLoop);
+  }
+
+  async updateSelectedFrameDurationMultiplier(value: number): Promise<void> {
+    await this.onUpdateSelectedFrameDurationMultiplier(value);
+  }
+
+  async updateSelectedFrameTexturePath(value: string): Promise<void> {
+    await this.onUpdateSelectedFrameTexturePath(value);
+  }
+
+  async updateSelectedFrameAnchor(axis: 'x' | 'y', value: number): Promise<void> {
+    await this.onUpdateSelectedFrameAnchor(axis, value);
+  }
+
+  async updateSelectedFrameBoundingBox(
+    field: 'x' | 'y' | 'width' | 'height',
+    value: number
+  ): Promise<void> {
+    await this.onUpdateSelectedFrameBoundingBox(field, value);
+  }
+
+  async addPolygonVertex(): Promise<void> {
+    await this.onAddPolygonVertex();
+  }
+
+  async clearPolygon(): Promise<void> {
+    await this.onClearPolygon();
+  }
+
+  async resetBoundingBox(): Promise<void> {
+    await this.onResetBoundingBox();
+  }
+
+  private onEditorDragEnter(event: DragEvent): void {
+    if (!this.isPotentialTextureDrag(event)) {
+      return;
+    }
+
+    this.textureDragDepth += 1;
+    this.isTextureDragOver = true;
+  }
+
+  private onEditorDragOver(event: DragEvent): void {
+    if (!this.isPotentialTextureDrag(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    this.isTextureDragOver = true;
+    if (event.dataTransfer) {
+      event.dataTransfer.dropEffect = 'copy';
+    }
+  }
+
+  private onEditorDragLeave(event: DragEvent): void {
+    if (!this.isPotentialTextureDrag(event)) {
+      return;
+    }
+
+    this.textureDragDepth = Math.max(0, this.textureDragDepth - 1);
+    if (this.textureDragDepth === 0) {
+      this.isTextureDragOver = false;
+    }
+  }
+
+  private async onEditorDrop(event: DragEvent): Promise<void> {
+    if (!this.isPotentialTextureDrag(event)) {
+      return;
+    }
+
+    event.preventDefault();
+    this.textureDragDepth = 0;
+    this.isTextureDragOver = false;
+
+    const texturePath = this.getDroppedTextureResource(event);
+    if (!texturePath) {
+      return;
+    }
+
+    await this.onUpdateTexturePath(texturePath);
   }
 }
 
