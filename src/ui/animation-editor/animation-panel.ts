@@ -8,10 +8,19 @@ import { appState } from '@/state';
 import {
   AnimationAutoSliceDialogService,
   CommandDispatcher,
+  DialogService,
   ProjectStorageService,
 } from '@/services';
 import { OperationService } from '@/services/OperationService';
-import { AnimatedSprite2D, SceneManager, type AnimationFrame, type AnimationResource } from '@pix3/runtime';
+import {
+  AnimatedSprite2D,
+  SceneManager,
+  normalizeAnimationResource,
+  type AnimationClip,
+  type AnimationFrame,
+  type AnimationPlaybackMode,
+  type AnimationResource,
+} from '@pix3/runtime';
 
 import './animation-panel.ts.css';
 
@@ -30,6 +39,25 @@ const IMAGE_EXTENSIONS = new Set([
   'avif',
 ]);
 
+type AnimationEditMode = 'anchor' | 'polygon' | 'bbox';
+
+interface TextureDimensions {
+  width: number;
+  height: number;
+}
+
+interface StagePoint {
+  x: number;
+  y: number;
+}
+
+interface StageDragState {
+  pointerId: number;
+  mode: AnimationEditMode;
+  origin: StagePoint;
+  vertexIndex?: number;
+}
+
 @customElement('pix3-animation-panel')
 export class AnimationPanel extends ComponentBase {
   @property({ type: String, reflect: true, attribute: 'tab-id' })
@@ -43,6 +71,9 @@ export class AnimationPanel extends ComponentBase {
 
   @inject(ProjectStorageService)
   private readonly projectStorage!: ProjectStorageService;
+
+  @inject(DialogService)
+  private readonly dialogService!: DialogService;
 
   @inject(OperationService)
   private readonly operations!: OperationService;
@@ -77,11 +108,37 @@ export class AnimationPanel extends ComponentBase {
   @state()
   private isTextureDragOver = false;
 
+  @state()
+  private selectedFrameIndex = -1;
+
+  @state()
+  private previewFrameIndex = -1;
+
+  @state()
+  private isPreviewPlaying = false;
+
+  @state()
+  private editMode: AnimationEditMode = 'anchor';
+
+  @state()
+  private stageZoom = 6;
+
+  @state()
+  private textureDimensions: TextureDimensions = { width: 0, height: 0 };
+
+  @state()
+  private frameDraft: AnimationFrame | null = null;
+
   private disposeTabsSubscription?: () => void;
   private disposeProjectSubscription?: () => void;
   private disposeAnimationsSubscription?: () => void;
   private animationId: string | null = null;
   private loadToken = 0;
+  private playbackFrameHandle: number | null = null;
+  private playbackLastTimestamp: number | null = null;
+  private previewElapsedSeconds = 0;
+  private previewDirection = 1;
+  private stageDragState: StageDragState | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -104,6 +161,7 @@ export class AnimationPanel extends ComponentBase {
   }
 
   disconnectedCallback(): void {
+    this.stopPreviewPlayback();
     this.disposeTabsSubscription?.();
     this.disposeProjectSubscription?.();
     this.disposeAnimationsSubscription?.();
@@ -117,6 +175,8 @@ export class AnimationPanel extends ComponentBase {
   protected render() {
     const activeClip = this.getActiveClip();
     const clipFrames = activeClip?.frames ?? [];
+    const selectedFrame = this.getSelectedFrame(activeClip);
+    const previewFrame = this.getPreviewFrame(activeClip);
 
     return html`
       <section class="animation-editor" aria-label="Animation editor">
@@ -141,49 +201,126 @@ export class AnimationPanel extends ComponentBase {
                 </div>
               </header>
 
-              <div class="editor-body">
-                <div class="animation-sidebar">
-                  ${this.renderTextureSettings()}
-                  ${this.renderClipList()}
-                  ${this.renderClipSettings()}
-                </div>
+              <div class="editor-workspace">
+                <aside class="animation-sidebar">
+                  ${this.renderTextureSettings()} ${this.renderClipList()}
+                </aside>
 
                 <div class="animation-main">
+                  <section class="panel-block panel-block--stage">
+                    <div class="stage-header">
+                      <div>
+                        <h4>Frame Stage</h4>
+                        <p class="panel-note">
+                          ${previewFrame
+                            ? `Editing ${this.editMode} on frame ${this.previewFrameIndex + 1}.`
+                            : 'Select or create a frame to preview and edit geometry.'}
+                        </p>
+                      </div>
+                      <div class="toolbar-group">
+                        <div class="toolbar-row toolbar-row--segmented">
+                          <button
+                            class="mini-button ${this.editMode === 'anchor' ? 'is-active' : ''}"
+                            type="button"
+                            @click=${() => this.onSetEditMode('anchor')}
+                          >
+                            Anchor
+                          </button>
+                          <button
+                            class="mini-button ${this.editMode === 'polygon' ? 'is-active' : ''}"
+                            type="button"
+                            @click=${() => this.onSetEditMode('polygon')}
+                          >
+                            Polygon
+                          </button>
+                          <button
+                            class="mini-button ${this.editMode === 'bbox' ? 'is-active' : ''}"
+                            type="button"
+                            @click=${() => this.onSetEditMode('bbox')}
+                          >
+                            Bounding Box
+                          </button>
+                        </div>
+                        <div class="toolbar-row">
+                          <button
+                            class="mini-button"
+                            type="button"
+                            @click=${() => this.onAdjustZoom(-1)}
+                          >
+                            Zoom Out
+                          </button>
+                          <button
+                            class="mini-button"
+                            type="button"
+                            @click=${() => this.onResetZoom()}
+                          >
+                            ${this.stageZoom.toFixed(1)}x
+                          </button>
+                          <button
+                            class="mini-button"
+                            type="button"
+                            @click=${() => this.onAdjustZoom(1)}
+                          >
+                            Zoom In
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    ${this.renderFrameStage(activeClip, previewFrame)}
+                  </section>
+
                   <section class="panel-block panel-block--timeline">
                     <div class="timeline-header">
                       <div>
                         <h4>Timeline</h4>
                         <p class="panel-note">
                           ${activeClip
-                            ? `Clip ${activeClip.name} at ${activeClip.fps} FPS${activeClip.loop ? ' looping' : ''}.`
+                            ? `Clip ${activeClip.name} at ${activeClip.fps} FPS in ${activeClip.playbackMode} mode${activeClip.loop ? ', looping' : ''}.`
                             : 'Select a clip to inspect its frame sequence.'}
                         </p>
                       </div>
-                      <span class="timeline-meta">${clipFrames.length} frames</span>
+                      <div class="toolbar-group">
+                        <div class="toolbar-row">
+                          <button
+                            class="primary-button"
+                            type="button"
+                            ?disabled=${clipFrames.length === 0}
+                            @click=${() => this.onTogglePlayback()}
+                          >
+                            ${this.isPreviewPlaying ? 'Pause' : 'Play'}
+                          </button>
+                          <button
+                            class="mini-button"
+                            type="button"
+                            ?disabled=${clipFrames.length === 0}
+                            @click=${() => this.onStopPlayback()}
+                          >
+                            Stop
+                          </button>
+                        </div>
+                        <span class="timeline-meta">${clipFrames.length} frames</span>
+                      </div>
                     </div>
                     ${activeClip
                       ? html`
                           <div class="clip-summary">
                             <span>Active Clip: ${activeClip.name}</span>
+                            <span
+                              >${activeClip.playbackMode === 'ping-pong'
+                                ? 'Ping-Pong'
+                                : 'Normal'}</span
+                            >
                             <span>${activeClip.loop ? 'Loop' : 'Play Once'}</span>
                           </div>
                         `
                       : null}
-                    ${clipFrames.length > 0
-                      ? html`
-                          <div class="timeline">
-                            ${clipFrames.map((frame, index) => this.renderFrameCard(frame, index))}
-                          </div>
-                        `
-                      : html`
-                          <div class="empty-state empty-state--inline">
-                            This clip has no frames yet. Assign a spritesheet and use
-                            <strong>Slice Frames...</strong>
-                            to build the sequence in the slicer modal.
-                          </div>
-                        `}
+                    ${this.renderTimeline(activeClip, clipFrames)}
                   </section>
                 </div>
+
+                <aside class="animation-inspector">
+                  ${this.renderInspector(activeClip, selectedFrame)}
+                </aside>
               </div>
             `
           : null}
@@ -333,31 +470,897 @@ export class AnimationPanel extends ComponentBase {
     `;
   }
 
+  private renderFrameStage(activeClip: AnimationClip | null, previewFrame: AnimationFrame | null) {
+    if (!activeClip || !previewFrame) {
+      return html`
+        <div class="empty-state empty-state--inline">
+          Select a clip with frames to inspect the current frame, its anchor, collision polygon, and
+          bounding box.
+        </div>
+      `;
+    }
+
+    const metrics = this.getFrameMetrics(previewFrame);
+    const zoomedWidth = metrics.frameWidth * this.stageZoom;
+    const zoomedHeight = metrics.frameHeight * this.stageZoom;
+    const polygonPoints = previewFrame.collisionPolygon
+      .map(point => `${point.x},${point.y}`)
+      .join(' ');
+    const imageStyle = this.getFrameImageStyle(previewFrame);
+
+    return html`
+      <div class="stage-shell">
+        <div class="stage-scroll">
+          <div class="stage-artboard">
+            <div
+              class="stage-frame"
+              style=${`width:${zoomedWidth}px; height:${zoomedHeight}px;`}
+              @pointerdown=${(event: PointerEvent) => this.onStagePointerDown(event)}
+              @pointermove=${(event: PointerEvent) => this.onStagePointerMove(event)}
+              @pointerup=${(event: PointerEvent) => this.onStagePointerUp(event)}
+              @pointercancel=${(event: PointerEvent) => this.onStagePointerUp(event)}
+            >
+              ${this.texturePreviewUrl
+                ? html`
+                    <img
+                      class="stage-image"
+                      src=${this.texturePreviewUrl}
+                      alt="Preview frame ${this.previewFrameIndex + 1}"
+                      style=${imageStyle}
+                    />
+                  `
+                : null}
+              <svg
+                class="stage-overlay"
+                viewBox=${`0 0 ${metrics.frameWidth} ${metrics.frameHeight}`}
+                preserveAspectRatio="none"
+                aria-hidden="true"
+              >
+                ${previewFrame.boundingBox.width > 0 && previewFrame.boundingBox.height > 0
+                  ? html`
+                      <rect
+                        class="stage-bbox"
+                        x=${previewFrame.boundingBox.x}
+                        y=${previewFrame.boundingBox.y}
+                        width=${previewFrame.boundingBox.width}
+                        height=${previewFrame.boundingBox.height}
+                      ></rect>
+                    `
+                  : null}
+                ${previewFrame.collisionPolygon.length >= 2
+                  ? html`
+                      <polyline
+                        class="stage-polygon"
+                        points=${polygonPoints}
+                        ?data-closed=${previewFrame.collisionPolygon.length >= 3}
+                      ></polyline>
+                    `
+                  : null}
+                ${previewFrame.collisionPolygon.map(
+                  (point, index) => html`
+                    <circle
+                      class="stage-polygon-vertex ${this.editMode === 'polygon'
+                        ? 'is-editable'
+                        : ''}"
+                      cx=${point.x}
+                      cy=${point.y}
+                      r="4"
+                      data-vertex-index=${index}
+                    ></circle>
+                  `
+                )}
+              </svg>
+              <div
+                class="stage-anchor ${this.editMode === 'anchor' ? 'is-editable' : ''}"
+                style=${`left:${previewFrame.anchor.x * 100}%; top:${previewFrame.anchor.y * 100}%;`}
+                aria-hidden="true"
+              ></div>
+            </div>
+          </div>
+        </div>
+        <div class="stage-footer">
+          <span>Frame ${this.previewFrameIndex + 1} of ${activeClip.frames.length}</span>
+          <span>${metrics.frameWidth} × ${metrics.frameHeight}px</span>
+          <span>${this.editMode} mode</span>
+        </div>
+      </div>
+    `;
+  }
+
+  private renderTimeline(activeClip: AnimationClip | null, clipFrames: AnimationFrame[]) {
+    if (!activeClip || clipFrames.length === 0) {
+      return html`
+        <div class="empty-state empty-state--inline">
+          This clip has no frames yet. Assign a spritesheet and use <strong>Slice Frames...</strong>
+          to build the sequence in the slicer modal.
+        </div>
+      `;
+    }
+
+    return html`
+      <div class="timeline">
+        ${clipFrames.map((frame, index) => this.renderFrameCard(frame, index))}
+      </div>
+    `;
+  }
+
+  private renderInspector(activeClip: AnimationClip | null, selectedFrame: AnimationFrame | null) {
+    return html`
+      <section class="panel-block">
+        <div class="section-header">
+          <h4>Inspector</h4>
+          <span class="timeline-meta"
+            >${selectedFrame ? `Frame ${this.selectedFrameIndex + 1}` : 'Clip'}</span
+          >
+        </div>
+
+        ${activeClip
+          ? html`
+              <div class="inspector-section">
+                <div class="inspector-section-title">Clip</div>
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Name</span>
+                    <input
+                      type="text"
+                      .value=${activeClip.name}
+                      @change=${(event: Event) =>
+                        this.onRenameClip((event.target as HTMLInputElement).value.trim())}
+                    />
+                  </label>
+                </div>
+                <div class="row">
+                  <label class="field">
+                    <span>FPS</span>
+                    <input
+                      type="number"
+                      min="1"
+                      step="1"
+                      .value=${String(activeClip.fps)}
+                      @change=${(event: Event) =>
+                        this.onUpdateClipFps(Number((event.target as HTMLInputElement).value))}
+                    />
+                  </label>
+                  <label class="field">
+                    <span>Playback</span>
+                    <select
+                      .value=${activeClip.playbackMode}
+                      @change=${(event: Event) =>
+                        this.onUpdateClipPlaybackMode(
+                          (event.target as HTMLSelectElement).value as AnimationPlaybackMode
+                        )}
+                    >
+                      <option value="normal">Normal</option>
+                      <option value="ping-pong">Ping-Pong</option>
+                    </select>
+                  </label>
+                </div>
+                <label class="field-toggle">
+                  <input
+                    type="checkbox"
+                    .checked=${activeClip.loop}
+                    @change=${(event: Event) =>
+                      this.onUpdateClipLoop((event.target as HTMLInputElement).checked)}
+                  />
+                  <span>Loop clip</span>
+                </label>
+              </div>
+            `
+          : html`<div class="empty-state">No active clip selected.</div>`}
+        ${selectedFrame
+          ? html`
+              <div class="inspector-section">
+                <div class="section-header">
+                  <div class="inspector-section-title">Frame</div>
+                  <span class="frame-chip">${this.selectedFrameIndex + 1}</span>
+                </div>
+                <div class="field-grid">
+                  <label class="field">
+                    <span>Duration Multiplier</span>
+                    <input
+                      type="number"
+                      min="0.05"
+                      step="0.05"
+                      .value=${String(selectedFrame.durationMultiplier)}
+                      @change=${(event: Event) =>
+                        this.onUpdateSelectedFrameDurationMultiplier(
+                          Number((event.target as HTMLInputElement).value)
+                        )}
+                    />
+                  </label>
+                  <label class="field">
+                    <span>Texture Override</span>
+                    <input
+                      type="text"
+                      .value=${selectedFrame.texturePath}
+                      placeholder="Optional per-frame texture"
+                      @change=${(event: Event) =>
+                        this.onUpdateSelectedFrameTexturePath(
+                          (event.target as HTMLInputElement).value.trim()
+                        )}
+                    />
+                  </label>
+                </div>
+                <div class="row">
+                  <label class="field">
+                    <span>Anchor X</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      .value=${selectedFrame.anchor.x.toFixed(2)}
+                      @change=${(event: Event) =>
+                        this.onUpdateSelectedFrameAnchor(
+                          'x',
+                          Number((event.target as HTMLInputElement).value)
+                        )}
+                    />
+                  </label>
+                  <label class="field">
+                    <span>Anchor Y</span>
+                    <input
+                      type="number"
+                      min="0"
+                      max="1"
+                      step="0.01"
+                      .value=${selectedFrame.anchor.y.toFixed(2)}
+                      @change=${(event: Event) =>
+                        this.onUpdateSelectedFrameAnchor(
+                          'y',
+                          Number((event.target as HTMLInputElement).value)
+                        )}
+                    />
+                  </label>
+                </div>
+                <div class="field-grid">
+                  <div class="inspector-section-title inspector-section-title--subtle">
+                    Bounding Box
+                  </div>
+                </div>
+                <div class="row">
+                  <label class="field">
+                    <span>X</span>
+                    <input
+                      type="number"
+                      step="1"
+                      .value=${String(selectedFrame.boundingBox.x)}
+                      @change=${(event: Event) =>
+                        this.onUpdateSelectedFrameBoundingBox(
+                          'x',
+                          Number((event.target as HTMLInputElement).value)
+                        )}
+                    />
+                  </label>
+                  <label class="field">
+                    <span>Y</span>
+                    <input
+                      type="number"
+                      step="1"
+                      .value=${String(selectedFrame.boundingBox.y)}
+                      @change=${(event: Event) =>
+                        this.onUpdateSelectedFrameBoundingBox(
+                          'y',
+                          Number((event.target as HTMLInputElement).value)
+                        )}
+                    />
+                  </label>
+                </div>
+                <div class="row">
+                  <label class="field">
+                    <span>Width</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      .value=${String(selectedFrame.boundingBox.width)}
+                      @change=${(event: Event) =>
+                        this.onUpdateSelectedFrameBoundingBox(
+                          'width',
+                          Number((event.target as HTMLInputElement).value)
+                        )}
+                    />
+                  </label>
+                  <label class="field">
+                    <span>Height</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="1"
+                      .value=${String(selectedFrame.boundingBox.height)}
+                      @change=${(event: Event) =>
+                        this.onUpdateSelectedFrameBoundingBox(
+                          'height',
+                          Number((event.target as HTMLInputElement).value)
+                        )}
+                    />
+                  </label>
+                </div>
+                <div class="field-grid">
+                  <div class="inspector-section-title inspector-section-title--subtle">
+                    Collision Polygon
+                  </div>
+                  <div class="panel-note">
+                    ${selectedFrame.collisionPolygon.length
+                      ? `${selectedFrame.collisionPolygon.length} vertices authored.`
+                      : 'No collision polygon authored yet.'}
+                  </div>
+                </div>
+                <div class="toolbar-row">
+                  <button
+                    class="mini-button"
+                    type="button"
+                    @click=${() => this.onAddPolygonVertex()}
+                  >
+                    Add Vertex
+                  </button>
+                  <button class="mini-button" type="button" @click=${() => this.onClearPolygon()}>
+                    Clear Polygon
+                  </button>
+                  <button
+                    class="mini-button"
+                    type="button"
+                    @click=${() => this.onResetBoundingBox()}
+                  >
+                    Reset Box
+                  </button>
+                </div>
+              </div>
+            `
+          : html`
+              <div class="empty-state">
+                Pick a frame in the timeline to edit delay, anchor, bounding box, and polygon data.
+              </div>
+            `}
+      </section>
+    `;
+  }
+
   private renderFrameCard(frame: AnimationFrame, index: number) {
+    const imageStyle = this.getFrameImageStyle(frame);
+    const isSelected = index === this.selectedFrameIndex;
+    const isPreviewFrame = index === this.previewFrameIndex;
+
+    return html`
+      <button
+        class="frame-card ${isSelected ? 'is-selected' : ''} ${isPreviewFrame ? 'is-preview' : ''}"
+        type="button"
+        @click=${() => this.onSelectFrame(index)}
+      >
+        <div class="frame-thumb">
+          ${this.texturePreviewUrl
+            ? html`
+                <img src=${this.texturePreviewUrl} alt="Frame ${index + 1}" style=${imageStyle} />
+              `
+            : null}
+          <div
+            class="frame-thumb-anchor"
+            style=${`left:${frame.anchor.x * 100}%; top:${frame.anchor.y * 100}%;`}
+          ></div>
+        </div>
+        <div class="frame-meta-row">
+          <span class="frame-title">Frame ${index + 1}</span>
+          ${isPreviewFrame ? html`<span class="frame-badge">Live</span>` : null}
+        </div>
+        <div class="frame-meta">${this.getFrameDurationLabel(frame)}</div>
+        <div class="frame-meta">
+          anchor ${frame.anchor.x.toFixed(2)}, ${frame.anchor.y.toFixed(2)}
+        </div>
+      </button>
+    `;
+  }
+
+  private getSelectedFrame(
+    activeClip: AnimationClip | null = this.getActiveClip()
+  ): AnimationFrame | null {
+    if (!activeClip || activeClip.frames.length === 0) {
+      return null;
+    }
+
+    const frame = activeClip.frames[this.selectedFrameIndex] ?? null;
+    if (!frame) {
+      return null;
+    }
+
+    return this.frameDraft ?? frame;
+  }
+
+  private getPreviewFrame(
+    activeClip: AnimationClip | null = this.getActiveClip()
+  ): AnimationFrame | null {
+    if (!activeClip || activeClip.frames.length === 0) {
+      return null;
+    }
+
+    const frame = activeClip.frames[this.previewFrameIndex] ?? activeClip.frames[0] ?? null;
+    if (!frame) {
+      return null;
+    }
+
+    return this.frameDraft && this.previewFrameIndex === this.selectedFrameIndex
+      ? this.frameDraft
+      : frame;
+  }
+
+  private getFrameImageStyle(frame: AnimationFrame): string {
     const scaleX = frame.repeat.x > 0 ? 100 / frame.repeat.x : 100;
     const scaleY = frame.repeat.y > 0 ? 100 / frame.repeat.y : 100;
     const left = frame.repeat.x > 0 ? -(frame.offset.x / frame.repeat.x) * 100 : 0;
     const top = frame.repeat.y > 0 ? -(frame.offset.y / frame.repeat.y) * 100 : 0;
+    return `width:${scaleX}%; height:${scaleY}%; left:${left}%; top:${top}%;`;
+  }
 
-    return html`
-      <div class="frame-card">
-        <div class="frame-thumb">
-          ${this.texturePreviewUrl
-            ? html`
-                <img
-                  src=${this.texturePreviewUrl}
-                  alt="Frame ${index + 1}"
-                  style=${`width:${scaleX}%; height:${scaleY}%; left:${left}%; top:${top}%;`}
-                />
-              `
-            : null}
-        </div>
-        <div class="frame-meta">Frame ${index + 1}</div>
-        <div class="frame-meta">
-          offset ${frame.offset.x.toFixed(3)}, ${frame.offset.y.toFixed(3)}
-        </div>
-      </div>
-    `;
+  private getFrameMetrics(frame: AnimationFrame): { frameWidth: number; frameHeight: number } {
+    const textureWidth = this.textureDimensions.width || 256;
+    const textureHeight = this.textureDimensions.height || 256;
+    return {
+      frameWidth: Math.max(24, Math.round(textureWidth * Math.max(frame.repeat.x, 0.05))),
+      frameHeight: Math.max(24, Math.round(textureHeight * Math.max(frame.repeat.y, 0.05))),
+    };
+  }
+
+  private getFrameDurationLabel(frame: AnimationFrame): string {
+    const activeClip = this.getActiveClip();
+    if (!activeClip) {
+      return 'No timing';
+    }
+
+    return `${this.getFrameDurationSeconds(activeClip, frame).toFixed(3)}s`;
+  }
+
+  private getFrameDurationSeconds(clip: AnimationClip, frame: AnimationFrame): number {
+    const fps = Math.max(1, clip.fps);
+    const multiplier = Math.max(0.001, frame.durationMultiplier);
+    return (1 / fps) * multiplier;
+  }
+
+  private onSetEditMode(mode: AnimationEditMode): void {
+    this.editMode = mode;
+  }
+
+  private onAdjustZoom(direction: -1 | 1): void {
+    this.stageZoom = Math.min(20, Math.max(1, this.stageZoom + direction));
+  }
+
+  private onResetZoom(): void {
+    this.stageZoom = 6;
+  }
+
+  private onSelectFrame(index: number): void {
+    this.frameDraft = null;
+    this.selectedFrameIndex = index;
+    this.previewFrameIndex = index;
+    this.previewElapsedSeconds = 0;
+  }
+
+  private onTogglePlayback(): void {
+    if (this.isPreviewPlaying) {
+      this.stopPreviewPlayback();
+      return;
+    }
+
+    this.startPreviewPlayback();
+  }
+
+  private onStopPlayback(): void {
+    this.stopPreviewPlayback();
+    const activeClip = this.getActiveClip();
+    if (!activeClip || activeClip.frames.length === 0) {
+      this.previewFrameIndex = -1;
+      return;
+    }
+
+    const fallbackIndex = this.selectedFrameIndex >= 0 ? this.selectedFrameIndex : 0;
+    this.previewFrameIndex = Math.min(fallbackIndex, activeClip.frames.length - 1);
+    this.previewElapsedSeconds = 0;
+  }
+
+  private startPreviewPlayback(): void {
+    const activeClip = this.getActiveClip();
+    if (!activeClip || activeClip.frames.length === 0 || this.playbackFrameHandle !== null) {
+      return;
+    }
+
+    this.isPreviewPlaying = true;
+    this.previewDirection = 1;
+    this.playbackLastTimestamp = null;
+
+    const tick = (timestamp: number) => {
+      if (!this.isPreviewPlaying) {
+        return;
+      }
+
+      this.playbackFrameHandle = requestAnimationFrame(tick);
+      const clip = this.getActiveClip();
+      const frame = this.getPreviewFrame(clip);
+      if (!clip || !frame) {
+        return;
+      }
+
+      if (this.playbackLastTimestamp === null) {
+        this.playbackLastTimestamp = timestamp;
+        return;
+      }
+
+      let deltaSeconds = (timestamp - this.playbackLastTimestamp) / 1000;
+      this.playbackLastTimestamp = timestamp;
+
+      while (deltaSeconds > 0) {
+        const currentClip = this.getActiveClip();
+        const currentFrame = this.getPreviewFrame(currentClip);
+        if (!currentClip || !currentFrame) {
+          break;
+        }
+
+        const frameDuration = this.getFrameDurationSeconds(currentClip, currentFrame);
+        const remaining = frameDuration - this.previewElapsedSeconds;
+        if (deltaSeconds < remaining) {
+          this.previewElapsedSeconds += deltaSeconds;
+          deltaSeconds = 0;
+          break;
+        }
+
+        deltaSeconds -= remaining;
+        this.previewElapsedSeconds = 0;
+        if (!this.stepPreviewFrame(currentClip)) {
+          this.stopPreviewPlayback();
+          break;
+        }
+      }
+    };
+
+    this.playbackFrameHandle = requestAnimationFrame(tick);
+  }
+
+  private stopPreviewPlayback(): void {
+    if (this.playbackFrameHandle !== null) {
+      cancelAnimationFrame(this.playbackFrameHandle);
+      this.playbackFrameHandle = null;
+    }
+
+    this.isPreviewPlaying = false;
+    this.playbackLastTimestamp = null;
+    this.previewElapsedSeconds = 0;
+  }
+
+  private stepPreviewFrame(activeClip: AnimationClip): boolean {
+    if (activeClip.frames.length === 0) {
+      return false;
+    }
+
+    if (activeClip.playbackMode === 'ping-pong') {
+      const nextIndex = this.previewFrameIndex + this.previewDirection;
+      if (nextIndex >= 0 && nextIndex < activeClip.frames.length) {
+        this.previewFrameIndex = nextIndex;
+        return true;
+      }
+
+      if (activeClip.frames.length === 1) {
+        return activeClip.loop;
+      }
+
+      this.previewDirection *= -1;
+      const bouncedIndex = this.previewFrameIndex + this.previewDirection;
+      if (bouncedIndex >= 0 && bouncedIndex < activeClip.frames.length) {
+        this.previewFrameIndex = bouncedIndex;
+        if (!activeClip.loop && bouncedIndex === 0) {
+          return false;
+        }
+        return true;
+      }
+
+      return false;
+    }
+
+    const nextIndex = this.previewFrameIndex + 1;
+    if (nextIndex < activeClip.frames.length) {
+      this.previewFrameIndex = nextIndex;
+      return true;
+    }
+
+    if (!activeClip.loop) {
+      this.previewFrameIndex = activeClip.frames.length - 1;
+      return false;
+    }
+
+    this.previewFrameIndex = 0;
+    return true;
+  }
+
+  private async applyClipUpdate(
+    updater: (clip: AnimationClip) => AnimationClip,
+    label: string
+  ): Promise<void> {
+    await this.applyResourceUpdate(
+      resource => ({
+        ...resource,
+        clips: resource.clips.map(clip =>
+          clip.name === this.activeClipName ? updater(clip) : clip
+        ),
+      }),
+      label
+    );
+  }
+
+  private async applySelectedFrameUpdate(
+    updater: (frame: AnimationFrame) => AnimationFrame,
+    label: string
+  ): Promise<void> {
+    const frameIndex = this.selectedFrameIndex;
+    if (frameIndex < 0) {
+      return;
+    }
+
+    this.frameDraft = null;
+    await this.applyClipUpdate(
+      clip => ({
+        ...clip,
+        frames: clip.frames.map((frame, index) => (index === frameIndex ? updater(frame) : frame)),
+      }),
+      label
+    );
+  }
+
+  private async onUpdateClipPlaybackMode(mode: AnimationPlaybackMode): Promise<void> {
+    await this.applyClipUpdate(
+      clip => ({ ...clip, playbackMode: mode }),
+      `Update clip playback mode: ${this.activeClipName}`
+    );
+  }
+
+  private async onUpdateSelectedFrameDurationMultiplier(value: number): Promise<void> {
+    if (!Number.isFinite(value) || value <= 0) {
+      return;
+    }
+
+    await this.applySelectedFrameUpdate(
+      frame => ({ ...frame, durationMultiplier: Math.max(0.05, value) }),
+      `Update frame duration multiplier: ${this.activeClipName}`
+    );
+  }
+
+  private async onUpdateSelectedFrameTexturePath(value: string): Promise<void> {
+    await this.applySelectedFrameUpdate(
+      frame => ({ ...frame, texturePath: value }),
+      `Update frame texture override: ${this.activeClipName}`
+    );
+  }
+
+  private async onUpdateSelectedFrameAnchor(axis: 'x' | 'y', value: number): Promise<void> {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    const clampedValue = Math.min(1, Math.max(0, value));
+    await this.applySelectedFrameUpdate(
+      frame => ({
+        ...frame,
+        anchor: { ...frame.anchor, [axis]: clampedValue },
+      }),
+      `Update frame anchor: ${this.activeClipName}`
+    );
+  }
+
+  private async onUpdateSelectedFrameBoundingBox(
+    field: 'x' | 'y' | 'width' | 'height',
+    value: number
+  ): Promise<void> {
+    if (!Number.isFinite(value)) {
+      return;
+    }
+
+    await this.applySelectedFrameUpdate(
+      frame => ({
+        ...frame,
+        boundingBox: {
+          ...frame.boundingBox,
+          [field]:
+            field === 'width' || field === 'height'
+              ? Math.max(0, Math.round(value))
+              : Math.round(value),
+        },
+      }),
+      `Update frame bounding box: ${this.activeClipName}`
+    );
+  }
+
+  private async onAddPolygonVertex(): Promise<void> {
+    const selectedFrame = this.getSelectedFrame();
+    if (!selectedFrame) {
+      return;
+    }
+
+    const metrics = this.getFrameMetrics(selectedFrame);
+    await this.applySelectedFrameUpdate(
+      frame => ({
+        ...frame,
+        collisionPolygon: [
+          ...frame.collisionPolygon,
+          { x: Math.round(metrics.frameWidth / 2), y: Math.round(metrics.frameHeight / 2) },
+        ],
+      }),
+      `Add frame polygon vertex: ${this.activeClipName}`
+    );
+  }
+
+  private async onClearPolygon(): Promise<void> {
+    await this.applySelectedFrameUpdate(
+      frame => ({ ...frame, collisionPolygon: [] }),
+      `Clear frame polygon: ${this.activeClipName}`
+    );
+  }
+
+  private async onResetBoundingBox(): Promise<void> {
+    await this.applySelectedFrameUpdate(
+      frame => ({
+        ...frame,
+        boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+      }),
+      `Reset frame bounding box: ${this.activeClipName}`
+    );
+  }
+
+  private onStagePointerDown(event: PointerEvent): void {
+    const frame = this.getSelectedFrame();
+    if (!frame) {
+      return;
+    }
+
+    const point = this.getStageLocalPoint(event, frame);
+    if (!point) {
+      return;
+    }
+
+    const target = event.target as HTMLElement | SVGElement;
+    const draft = this.cloneFrame(frame);
+    this.frameDraft = draft;
+
+    if (this.editMode === 'anchor') {
+      draft.anchor = this.toNormalizedAnchor(point, frame);
+      this.stageDragState = {
+        pointerId: event.pointerId,
+        mode: 'anchor',
+        origin: point,
+      };
+    } else if (this.editMode === 'bbox') {
+      draft.boundingBox = { x: point.x, y: point.y, width: 0, height: 0 };
+      this.stageDragState = {
+        pointerId: event.pointerId,
+        mode: 'bbox',
+        origin: point,
+      };
+    } else {
+      const vertexIndex = Number(target.getAttribute('data-vertex-index'));
+      if (Number.isInteger(vertexIndex) && vertexIndex >= 0) {
+        this.stageDragState = {
+          pointerId: event.pointerId,
+          mode: 'polygon',
+          origin: point,
+          vertexIndex,
+        };
+      } else {
+        draft.collisionPolygon = [...draft.collisionPolygon, point];
+        this.stageDragState = {
+          pointerId: event.pointerId,
+          mode: 'polygon',
+          origin: point,
+          vertexIndex: draft.collisionPolygon.length - 1,
+        };
+      }
+    }
+
+    (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
+  }
+
+  private onStagePointerMove(event: PointerEvent): void {
+    const dragState = this.stageDragState;
+    const frame = this.getSelectedFrame();
+    if (!dragState || !frame || dragState.pointerId !== event.pointerId || !this.frameDraft) {
+      return;
+    }
+
+    const point = this.getStageLocalPoint(event, frame);
+    if (!point) {
+      return;
+    }
+
+    if (dragState.mode === 'anchor') {
+      this.frameDraft = {
+        ...this.frameDraft,
+        anchor: this.toNormalizedAnchor(point, frame),
+      };
+      return;
+    }
+
+    if (dragState.mode === 'bbox') {
+      const x = Math.min(dragState.origin.x, point.x);
+      const y = Math.min(dragState.origin.y, point.y);
+      const width = Math.abs(point.x - dragState.origin.x);
+      const height = Math.abs(point.y - dragState.origin.y);
+      this.frameDraft = {
+        ...this.frameDraft,
+        boundingBox: { x, y, width, height },
+      };
+      return;
+    }
+
+    const vertexIndex = dragState.vertexIndex ?? -1;
+    if (vertexIndex < 0) {
+      return;
+    }
+
+    const nextPolygon = [...this.frameDraft.collisionPolygon];
+    nextPolygon[vertexIndex] = point;
+    this.frameDraft = {
+      ...this.frameDraft,
+      collisionPolygon: nextPolygon,
+    };
+  }
+
+  private async onStagePointerUp(event: PointerEvent): Promise<void> {
+    const dragState = this.stageDragState;
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    (event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId);
+    const draft = this.frameDraft;
+    this.stageDragState = null;
+    this.frameDraft = null;
+
+    if (!draft) {
+      return;
+    }
+
+    await this.applySelectedFrameUpdate(
+      () => draft,
+      `Update frame ${this.editMode}: ${this.activeClipName}`
+    );
+  }
+
+  private getStageLocalPoint(event: PointerEvent, frame: AnimationFrame): StagePoint | null {
+    const target = event.currentTarget as HTMLElement | null;
+    if (!target) {
+      return null;
+    }
+
+    const rect = target.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return null;
+    }
+
+    const metrics = this.getFrameMetrics(frame);
+    const x = Math.min(
+      metrics.frameWidth,
+      Math.max(0, ((event.clientX - rect.left) / rect.width) * metrics.frameWidth)
+    );
+    const y = Math.min(
+      metrics.frameHeight,
+      Math.max(0, ((event.clientY - rect.top) / rect.height) * metrics.frameHeight)
+    );
+    return {
+      x: Math.round(x),
+      y: Math.round(y),
+    };
+  }
+
+  private toNormalizedAnchor(point: StagePoint, frame: AnimationFrame): StagePoint {
+    const metrics = this.getFrameMetrics(frame);
+    return {
+      x: Number((point.x / metrics.frameWidth).toFixed(3)),
+      y: Number((point.y / metrics.frameHeight).toFixed(3)),
+    };
+  }
+
+  private cloneFrame(frame: AnimationFrame): AnimationFrame {
+    return {
+      ...frame,
+      offset: { ...frame.offset },
+      repeat: { ...frame.repeat },
+      anchor: { ...frame.anchor },
+      boundingBox: { ...frame.boundingBox },
+      collisionPolygon: frame.collisionPolygon.map(point => ({ ...point })),
+    };
   }
 
   private getSelectedAnimatedSprite(): AnimatedSprite2D | null {
@@ -375,6 +1378,35 @@ export class AnimationPanel extends ComponentBase {
     return this.resource?.clips.find(clip => clip.name === this.activeClipName) ?? null;
   }
 
+  private syncFrameStateToActiveClip(preferFirstFrame = false): void {
+    const activeClip = this.getActiveClip();
+    const frameCount = activeClip?.frames.length ?? 0;
+    this.frameDraft = null;
+    this.stageDragState = null;
+
+    if (frameCount === 0) {
+      this.selectedFrameIndex = -1;
+      this.previewFrameIndex = -1;
+      this.previewElapsedSeconds = 0;
+      return;
+    }
+
+    const fallbackIndex = preferFirstFrame
+      ? 0
+      : this.selectedFrameIndex >= 0
+        ? Math.min(this.selectedFrameIndex, frameCount - 1)
+        : 0;
+
+    this.selectedFrameIndex = fallbackIndex;
+    this.previewFrameIndex = this.isPreviewPlaying
+      ? Math.min(
+          this.previewFrameIndex >= 0 ? this.previewFrameIndex : fallbackIndex,
+          frameCount - 1
+        )
+      : fallbackIndex;
+    this.previewElapsedSeconds = 0;
+  }
+
   private hasSupportedImageExtension(path: string): boolean {
     const cleaned = path.split('?')[0].split('#')[0];
     const extension = cleaned.includes('.') ? (cleaned.split('.').pop()?.toLowerCase() ?? '') : '';
@@ -388,7 +1420,9 @@ export class AnimationPanel extends ComponentBase {
     }
 
     const tab = this.tabId
-      ? appState.tabs.tabs.find(candidate => candidate.id === this.tabId && candidate.type === 'animation')
+      ? appState.tabs.tabs.find(
+          candidate => candidate.id === this.tabId && candidate.type === 'animation'
+        )
       : null;
 
     return tab?.resourceId ?? null;
@@ -443,10 +1477,12 @@ export class AnimationPanel extends ComponentBase {
     const animationId = this.animationId;
 
     if (!assetPath || !animationId) {
+      this.stopPreviewPlayback();
       this.resource = null;
       this.activeClipName = '';
       this.errorMessage = null;
       this.revokeTexturePreviewUrl();
+      this.syncFrameStateToActiveClip();
       return;
     }
 
@@ -458,9 +1494,11 @@ export class AnimationPanel extends ComponentBase {
     this.errorMessage = isActiveLoadError ? appState.animations.loadError : null;
 
     if (!resource) {
+      this.stopPreviewPlayback();
       this.resource = null;
       this.activeClipName = '';
       this.revokeTexturePreviewUrl();
+      this.syncFrameStateToActiveClip();
       return;
     }
 
@@ -479,10 +1517,11 @@ export class AnimationPanel extends ComponentBase {
           ? storedClipName
           : selectedClipName && clipNames.has(selectedClipName)
             ? selectedClipName
-            : resource.clips[0]?.name ?? '';
+            : (resource.clips[0]?.name ?? '');
 
     this.activeClipName = preferredClipName;
     this.persistActiveClipName(preferredClipName);
+    this.syncFrameStateToActiveClip(!preserveClip);
 
     if (previousTexturePath !== resource.texturePath || !this.texturePreviewUrl) {
       const token = ++this.loadToken;
@@ -503,19 +1542,42 @@ export class AnimationPanel extends ComponentBase {
       }
 
       this.texturePreviewUrl = URL.createObjectURL(blob);
+      this.textureDimensions = await this.readTextureDimensions(this.texturePreviewUrl, token);
     } catch {
       this.texturePreviewUrl = '';
+      this.textureDimensions = { width: 0, height: 0 };
     }
   }
 
   private revokeTexturePreviewUrl(): void {
     if (!this.texturePreviewUrl.startsWith('blob:')) {
       this.texturePreviewUrl = '';
+      this.textureDimensions = { width: 0, height: 0 };
       return;
     }
 
     URL.revokeObjectURL(this.texturePreviewUrl);
     this.texturePreviewUrl = '';
+    this.textureDimensions = { width: 0, height: 0 };
+  }
+
+  private readTextureDimensions(textureUrl: string, token: number): Promise<TextureDimensions> {
+    return new Promise(resolve => {
+      const image = new Image();
+      image.onload = () => {
+        if (token !== this.loadToken) {
+          resolve({ width: 0, height: 0 });
+          return;
+        }
+
+        resolve({
+          width: image.naturalWidth || image.width || 0,
+          height: image.naturalHeight || image.height || 0,
+        });
+      };
+      image.onerror = () => resolve({ width: 0, height: 0 });
+      image.src = textureUrl;
+    });
   }
 
   private async applyResourceUpdate(
@@ -540,9 +1602,10 @@ export class AnimationPanel extends ComponentBase {
     }
 
     const previousTexturePath = this.resource.texturePath;
-    this.resource = nextResource;
+    this.resource = normalizeAnimationResource(nextResource);
     this.activeClipName = nextActiveClipName ?? nextResource.clips[0]?.name ?? '';
     this.persistActiveClipName(this.activeClipName);
+    this.syncFrameStateToActiveClip(Boolean(nextActiveClipName));
 
     if (previousTexturePath !== nextResource.texturePath) {
       const token = ++this.loadToken;
@@ -571,6 +1634,7 @@ export class AnimationPanel extends ComponentBase {
   private async onSelectClip(clipName: string): Promise<void> {
     this.activeClipName = clipName;
     this.persistActiveClipName(clipName);
+    this.syncFrameStateToActiveClip(true);
     const selectedSprite = this.getSelectedAnimatedSprite();
     if (
       selectedSprite &&
@@ -609,6 +1673,7 @@ export class AnimationPanel extends ComponentBase {
             name: nextName,
             fps: 12,
             loop: true,
+            playbackMode: 'normal',
             frames: [],
           },
         ],
@@ -620,6 +1685,17 @@ export class AnimationPanel extends ComponentBase {
 
   private async onRemoveClip(): Promise<void> {
     if (!this.resource || !this.activeClipName || this.resource.clips.length === 0) {
+      return;
+    }
+
+    const confirmed = await this.dialogService.showConfirmation({
+      title: 'Delete clip?',
+      message: `Remove clip "${this.activeClipName}" from this animation?`,
+      confirmLabel: 'Delete clip',
+      cancelLabel: 'Cancel',
+      isDangerous: true,
+    });
+    if (!confirmed) {
       return;
     }
 
@@ -710,6 +1786,11 @@ export class AnimationPanel extends ComponentBase {
             x: frameWidth,
             y: frameHeight,
           },
+          durationMultiplier: 1,
+          anchor: { x: 0.5, y: 1 },
+          texturePath: '',
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+          collisionPolygon: [],
         });
       }
     }
@@ -755,16 +1836,16 @@ export class AnimationPanel extends ComponentBase {
     const trimmedTexturePath = nextTexturePath.trim();
     const currentResource = this.resource;
     const shouldPromptForAutoSlice =
-      Boolean(trimmedTexturePath) && currentResource !== null && !this.hasAnyFrames(currentResource);
+      Boolean(trimmedTexturePath) &&
+      currentResource !== null &&
+      !this.hasAnyFrames(currentResource);
 
     const didMutate = await this.applyResourceUpdate(
       resource => ({
         ...resource,
         texturePath: trimmedTexturePath,
       }),
-      trimmedTexturePath
-        ? `Update spritesheet: ${trimmedTexturePath}`
-        : 'Clear spritesheet texture'
+      trimmedTexturePath ? `Update spritesheet: ${trimmedTexturePath}` : 'Clear spritesheet texture'
     );
 
     if (!didMutate || !trimmedTexturePath || !shouldPromptForAutoSlice) {

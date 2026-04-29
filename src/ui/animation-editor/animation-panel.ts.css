@@ -61,20 +61,25 @@
   color: var(--color-text-secondary, #aaa);
 }
 
-.editor-body {
+.editor-workspace {
   display: grid;
-  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr);
+  grid-template-columns: minmax(240px, 280px) minmax(0, 1fr) minmax(260px, 320px);
   gap: 0.75rem;
   min-height: 0;
   height: 100%;
 }
 
 .animation-sidebar,
-.animation-main {
+.animation-main,
+.animation-inspector {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
   min-height: 0;
+}
+
+.animation-inspector {
+  overflow: auto;
 }
 
 .panel-block {
@@ -91,12 +96,24 @@
   min-height: 0;
 }
 
+.panel-block--stage {
+  min-height: 22rem;
+}
+
 .section-header,
-.timeline-header {
+.timeline-header,
+.stage-header {
   display: flex;
   justify-content: space-between;
   gap: 0.75rem;
   align-items: flex-start;
+}
+
+.toolbar-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.45rem;
 }
 
 .panel-block h4 {
@@ -201,7 +218,8 @@
 }
 
 .field input[type='text'],
-.field input[type='number'] {
+.field input[type='number'],
+.field select {
   width: 100%;
   min-width: 0;
   border: 1px solid var(--color-border, #333);
@@ -222,6 +240,17 @@
   display: flex;
   gap: 0.5rem;
   flex-wrap: wrap;
+}
+
+.toolbar-row--segmented {
+  gap: 0.35rem;
+}
+
+.mini-button.is-active,
+.primary-button.is-active {
+  border-color: var(--pix3-accent-color, #ffcf33);
+  box-shadow: inset 0 0 0 1px var(--pix3-accent-color, #ffcf33);
+  background: rgba(255, 207, 51, 0.08);
 }
 
 .texture-preview-card {
@@ -275,6 +304,17 @@
   flex-direction: column;
   gap: 0.35rem;
   padding: 0.45rem;
+  cursor: pointer;
+  text-align: left;
+}
+
+.frame-card.is-selected {
+  border-color: var(--pix3-accent-color, #ffcf33);
+  box-shadow: inset 0 0 0 1px var(--pix3-accent-color, #ffcf33);
+}
+
+.frame-card.is-preview {
+  background: rgba(255, 207, 51, 0.08);
 }
 
 .frame-thumb {
@@ -296,6 +336,206 @@
   position: absolute;
   transform-origin: top left;
   image-rendering: pixelated;
+}
+
+.frame-thumb-anchor {
+  position: absolute;
+  width: 0.65rem;
+  height: 0.65rem;
+  margin-left: -0.325rem;
+  margin-top: -0.325rem;
+  border-radius: 999px;
+  border: 2px solid #0f1116;
+  background: var(--pix3-accent-color, #ffcf33);
+  box-shadow: 0 0 0 1px rgba(255, 207, 51, 0.45);
+  pointer-events: none;
+}
+
+.frame-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.frame-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.frame-badge,
+.frame-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.45rem;
+  padding: 0 0.45rem;
+  border-radius: 999px;
+  background: rgba(255, 207, 51, 0.12);
+  color: var(--pix3-accent-color, #ffcf33);
+  font-size: 0.7rem;
+}
+
+.stage-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  min-height: 0;
+  height: 100%;
+}
+
+.stage-scroll {
+  display: flex;
+  min-height: 0;
+  overflow: auto;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    radial-gradient(circle at top, rgba(255, 207, 51, 0.1), transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.02), rgba(0, 0, 0, 0.08));
+}
+
+.stage-artboard {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: min-content;
+  min-height: min-content;
+  padding: 1.2rem;
+}
+
+.stage-frame {
+  position: relative;
+  overflow: hidden;
+  flex: none;
+  cursor: crosshair;
+  border-radius: 0.65rem;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
+    #1a1a1a;
+  background-size: 18px 18px;
+  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+}
+
+.stage-image {
+  position: absolute;
+  transform-origin: top left;
+  image-rendering: pixelated;
+}
+
+.stage-overlay {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.stage-bbox {
+  fill: rgba(255, 207, 51, 0.08);
+  stroke: rgba(255, 207, 51, 0.95);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.stage-polygon {
+  fill: rgba(88, 179, 255, 0.14);
+  stroke: #58b3ff;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.stage-polygon-vertex {
+  fill: #58b3ff;
+  stroke: #0f1116;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.stage-polygon-vertex.is-editable {
+  cursor: grab;
+}
+
+.stage-anchor {
+  position: absolute;
+  width: 0.95rem;
+  height: 0.95rem;
+  margin-left: -0.475rem;
+  margin-top: -0.475rem;
+  border-radius: 999px;
+  border: 2px solid #0f1116;
+  background: var(--pix3-accent-color, #ffcf33);
+  box-shadow: 0 0 0 2px rgba(255, 207, 51, 0.25);
+}
+
+.stage-anchor::before,
+.stage-anchor::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  background: #0f1116;
+  transform: translate(-50%, -50%);
+}
+
+.stage-anchor::before {
+  width: 1px;
+  height: 1.2rem;
+}
+
+.stage-anchor::after {
+  width: 1.2rem;
+  height: 1px;
+}
+
+.stage-anchor.is-editable {
+  cursor: grab;
+}
+
+.stage-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.stage-footer span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.85rem;
+  padding: 0 0.6rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--color-text-secondary, #aaa);
+  font-size: 0.74rem;
+}
+
+.inspector-section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.inspector-section:first-of-type {
+  border-top: none;
+  padding-top: 0;
+}
+
+.inspector-section-title {
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--color-text-primary, #eee);
+}
+
+.inspector-section-title--subtle {
+  color: var(--color-text-secondary, #aaa);
 }
 
 .frame-meta {
@@ -330,11 +570,16 @@
 @media (max-width: 900px) {
   .editor-header,
   .section-header,
-  .timeline-header {
+  .timeline-header,
+  .stage-header {
     flex-direction: column;
   }
 
-  .editor-body {
+  .editor-workspace {
     grid-template-columns: 1fr;
+  }
+
+  .toolbar-group {
+    align-items: stretch;
   }
 }

@@ -1,7 +1,4 @@
-import {
-  normalizeAnimationResource,
-  type AnimationResource,
-} from '@pix3/runtime';
+import { normalizeAnimationResource, type AnimationResource } from '@pix3/runtime';
 
 export function normalizeAnimationAssetPath(path: string): string {
   const trimmed = path.trim().replace(/\\/g, '/');
@@ -41,12 +38,18 @@ export function createDefaultAnimationResource(
         name: initialClipName,
         fps: 12,
         loop: true,
+        playbackMode: 'normal',
         frames: normalizedTexturePath
           ? [
               {
                 textureIndex: 0,
                 offset: { x: 0, y: 0 },
                 repeat: { x: 1, y: 1 },
+                durationMultiplier: 1,
+                anchor: { x: 0.5, y: 1 },
+                texturePath: '',
+                boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+                collisionPolygon: [],
               },
             ]
           : [],
