@@ -3,10 +3,29 @@ export interface AnimationVector2 {
   y: number;
 }
 
+export interface AnimationBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface AnimationPolygonPoint {
+  x: number;
+  y: number;
+}
+
+export type AnimationPlaybackMode = 'normal' | 'ping-pong';
+
 export interface AnimationFrame {
   textureIndex: number;
   offset: AnimationVector2;
   repeat: AnimationVector2;
+  durationMultiplier: number;
+  anchor: AnimationVector2;
+  texturePath: string;
+  boundingBox: AnimationBoundingBox;
+  collisionPolygon: AnimationPolygonPoint[];
 }
 
 export interface AnimationClip {
@@ -14,6 +33,7 @@ export interface AnimationClip {
   frames: AnimationFrame[];
   fps: number;
   loop: boolean;
+  playbackMode: AnimationPlaybackMode;
 }
 
 export interface AnimationResource {
@@ -29,6 +49,28 @@ function normalizeVector2(value: unknown): AnimationVector2 {
   return { x, y };
 }
 
+function normalizeFiniteNumber(value: unknown, fallback = 0): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+}
+
+function normalizeBoundingBox(value: unknown): AnimationBoundingBox {
+  const candidate = typeof value === 'object' && value !== null ? value : {};
+  return {
+    x: normalizeFiniteNumber((candidate as { x?: unknown }).x),
+    y: normalizeFiniteNumber((candidate as { y?: unknown }).y),
+    width: Math.max(0, normalizeFiniteNumber((candidate as { width?: unknown }).width)),
+    height: Math.max(0, normalizeFiniteNumber((candidate as { height?: unknown }).height)),
+  };
+}
+
+function normalizePolygonPoint(value: unknown): AnimationPolygonPoint {
+  return normalizeVector2(value);
+}
+
+function normalizePlaybackMode(value: unknown): AnimationPlaybackMode {
+  return value === 'ping-pong' ? 'ping-pong' : 'normal';
+}
+
 function normalizeFrame(frame: unknown): AnimationFrame {
   const candidate = typeof frame === 'object' && frame !== null ? frame : {};
   const textureIndex =
@@ -40,6 +82,21 @@ function normalizeFrame(frame: unknown): AnimationFrame {
     textureIndex,
     offset: normalizeVector2((candidate as { offset?: unknown }).offset),
     repeat: normalizeVector2((candidate as { repeat?: unknown }).repeat),
+    durationMultiplier: Math.max(
+      0.001,
+      normalizeFiniteNumber((candidate as { durationMultiplier?: unknown }).durationMultiplier, 1)
+    ),
+    anchor: normalizeVector2((candidate as { anchor?: unknown }).anchor),
+    texturePath:
+      typeof (candidate as { texturePath?: unknown }).texturePath === 'string'
+        ? (candidate as { texturePath: string }).texturePath.trim()
+        : '',
+    boundingBox: normalizeBoundingBox((candidate as { boundingBox?: unknown }).boundingBox),
+    collisionPolygon: Array.isArray((candidate as { collisionPolygon?: unknown }).collisionPolygon)
+      ? ((candidate as { collisionPolygon: unknown[] }).collisionPolygon ?? []).map(
+          normalizePolygonPoint
+        )
+      : [],
   };
 }
 
@@ -66,6 +123,7 @@ function normalizeClip(clip: unknown, index: number): AnimationClip {
       typeof (candidate as { loop?: unknown }).loop === 'boolean'
         ? (candidate as { loop: boolean }).loop
         : true,
+    playbackMode: normalizePlaybackMode((candidate as { playbackMode?: unknown }).playbackMode),
   };
 }
 
