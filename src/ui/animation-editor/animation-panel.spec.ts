@@ -220,6 +220,65 @@ describe('AnimationPanel', () => {
     ]);
   });
 
+  it('does not enable the texture overlay during internal frame reordering drags', () => {
+    const panel = new AnimationPanel();
+    const setData = vi.fn();
+    const dataTransfer = {
+      effectAllowed: 'all',
+      setData,
+      types: ['application/x-pix3-animation-frame-reorder', 'text/plain'],
+    } as unknown as DataTransfer;
+
+    Object.defineProperty(panel, 'selectedFrameIndices', {
+      value: [1],
+      writable: true,
+    });
+    Object.defineProperty(panel, 'selectedFrameIndex', {
+      value: 1,
+      writable: true,
+    });
+    Object.defineProperty(panel, 'previewFrameIndex', {
+      value: 1,
+      writable: true,
+    });
+    Object.defineProperty(panel, 'selectionAnchorFrameIndex', {
+      value: 1,
+      writable: true,
+    });
+    Object.defineProperty(panel, 'persistSelectedFrameIndex', {
+      value: vi.fn(),
+    });
+
+    (
+      panel as unknown as {
+        onFrameDragStart: (event: DragEvent, index: number) => void;
+        onEditorDragEnter: (event: DragEvent) => void;
+        isTextureDragOver: boolean;
+      }
+    ).onFrameDragStart(
+      {
+        dataTransfer,
+      } as DragEvent,
+      1
+    );
+
+    expect(setData).toHaveBeenCalledWith('application/x-pix3-animation-frame-reorder', '1');
+
+    (
+      panel as unknown as {
+        onEditorDragEnter: (event: DragEvent) => void;
+      }
+    ).onEditorDragEnter(
+      {
+        dataTransfer,
+      } as DragEvent
+    );
+
+    expect(
+      (panel as unknown as { isTextureDragOver: boolean }).isTextureDragOver
+    ).toBe(false);
+  });
+
   it('preserves the current clip when appending frame textures', async () => {
     const panel = new AnimationPanel();
     const invokeAndPush = vi.fn().mockResolvedValue(true);

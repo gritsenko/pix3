@@ -40,6 +40,7 @@ const ASSET_RESOURCE_MIME = 'application/x-pix3-asset-resource';
 const ASSET_PATH_MIME = 'application/x-pix3-asset-path';
 const ASSET_RESOURCE_LIST_MIME = 'application/x-pix3-asset-resource-list';
 const ASSET_PATH_LIST_MIME = 'application/x-pix3-asset-path-list';
+const FRAME_REORDER_MIME = 'application/x-pix3-animation-frame-reorder';
 const IMAGE_EXTENSIONS = new Set([
   'png',
   'jpg',
@@ -1221,6 +1222,10 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
     }
 
     const types = new Set(Array.from(transfer.types));
+    if (types.has(FRAME_REORDER_MIME)) {
+      return false;
+    }
+
     return (
       types.has(ASSET_RESOURCE_LIST_MIME) ||
       types.has(ASSET_PATH_LIST_MIME) ||
@@ -2175,6 +2180,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
     this.draggedFrameIndex = frameIndex;
     this.dragOverFrameIndex = frameIndex;
     event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData(FRAME_REORDER_MIME, String(frameIndex));
     event.dataTransfer.setData('text/plain', String(frameIndex));
   }
 
