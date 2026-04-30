@@ -42,6 +42,25 @@ export interface AnimationResource {
   clips: AnimationClip[];
 }
 
+export function getAnimationFrameTexturePath(
+  resource: AnimationResource | null | undefined,
+  frame: AnimationFrame | null | undefined
+): string {
+  if (!frame) {
+    return '';
+  }
+
+  if (frame.texturePath.trim().length > 0) {
+    return frame.texturePath.trim();
+  }
+
+  return resource?.texturePath?.trim() ?? '';
+}
+
+export function isSequenceAnimationFrame(frame: AnimationFrame | null | undefined): boolean {
+  return Boolean(frame?.texturePath?.trim());
+}
+
 function normalizeVector2(value: unknown): AnimationVector2 {
   const candidate = typeof value === 'object' && value !== null ? value : {};
   const x = typeof (candidate as { x?: unknown }).x === 'number' ? (candidate as { x: number }).x : 0;

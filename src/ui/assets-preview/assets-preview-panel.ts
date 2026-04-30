@@ -10,6 +10,9 @@ import {
 import './assets-preview-panel.ts.css';
 import '../shared/pix3-panel';
 
+const ASSET_RESOURCE_LIST_MIME = 'application/x-pix3-asset-resource-list';
+const ASSET_PATH_LIST_MIME = 'application/x-pix3-asset-path-list';
+
 @customElement('pix3-assets-preview-panel')
 export class AssetsPreviewPanel extends ComponentBase {
   @inject(AssetsPreviewService)
@@ -33,6 +36,8 @@ export class AssetsPreviewPanel extends ComponentBase {
   };
 
   private disposePreviewSubscription?: () => void;
+  private selectedPaths = new Set<string>();
+  private lastSelectedPath: string | null = null;
 
   connectedCallback(): void {
     super.connectedCallback();
@@ -70,13 +75,13 @@ export class AssetsPreviewPanel extends ComponentBase {
   }
 
   private renderItem(item: AssetPreviewItem) {
-    const isSelected = this.snapshot.selectedItem?.path === item.path;
+    const isSelected = this.selectedPaths.has(item.path);
     return html`
       <button
         class="assets-preview-item ${isSelected ? 'is-selected' : ''}"
         title=${this.buildTooltip(item)}
         ?draggable=${item.kind === 'file'}
-        @click=${() => this.onItemSelected(item)}
+        @click=${(event: MouseEvent) => this.onItemSelected(event, item)}
         @dblclick=${() => {
           void this.onItemDoubleClick(item);
         }}
@@ -102,7 +107,8 @@ export class AssetsPreviewPanel extends ComponentBase {
     `;
   }
 
-  private onItemSelected(item: AssetPreviewItem): void {
+  private onItemSelected(event: MouseEvent, item: AssetPreviewItem): void {
+    this.updateSelectionFromClick(event, item);
     this.assetsPreviewService.selectItem(item.path);
     if (item.previewType === 'model') {
       this.assetsPreviewService.requestThumbnail(item.path);
@@ -114,12 +120,61 @@ export class AssetsPreviewPanel extends ComponentBase {
       return;
     }
 
-    const resourcePath = this.toResourcePath(item.path);
+    if (!this.selectedPaths.has(item.path)) {
+      this.selectedPaths = new Set([item.path]);
+      this.lastSelectedPath = item.path;
+      this.requestUpdate();
+    }
+
+    const selectedItems = this.snapshot.items.filter(
+      candidate => candidate.kind === 'file' && this.selectedPaths.has(candidate.path)
+    );
+    const itemsToDrag = selectedItems.length > 0 ? selectedItems : [item];
+    const resourcePaths = itemsToDrag.map(candidate => this.toResourcePath(candidate.path));
+    const plainPaths = itemsToDrag.map(candidate => candidate.path);
+    const resourcePath = resourcePaths[0] ?? this.toResourcePath(item.path);
     event.dataTransfer.effectAllowed = 'copy';
-    event.dataTransfer.setData('text/plain', item.path);
-    event.dataTransfer.setData('application/x-pix3-asset-path', item.path);
+    event.dataTransfer.setData('text/plain', plainPaths.join('\n'));
+    event.dataTransfer.setData('application/x-pix3-asset-path', plainPaths[0] ?? item.path);
     event.dataTransfer.setData('application/x-pix3-asset-resource', resourcePath);
+    event.dataTransfer.setData(ASSET_PATH_LIST_MIME, JSON.stringify(plainPaths));
+    event.dataTransfer.setData(ASSET_RESOURCE_LIST_MIME, JSON.stringify(resourcePaths));
     event.dataTransfer.setData('text/uri-list', resourcePath);
+  }
+
+  private updateSelectionFromClick(event: MouseEvent, item: AssetPreviewItem): void {
+    const orderedPaths = this.snapshot.items.map(candidate => candidate.path);
+    const nextSelectedPaths = new Set(this.selectedPaths);
+
+    if (event.shiftKey && this.lastSelectedPath && orderedPaths.includes(this.lastSelectedPath)) {
+      const startIndex = orderedPaths.indexOf(this.lastSelectedPath);
+      const endIndex = orderedPaths.indexOf(item.path);
+      const [rangeStart, rangeEnd] = startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+      nextSelectedPaths.clear();
+      for (let index = rangeStart; index <= rangeEnd; index += 1) {
+        const path = orderedPaths[index];
+        if (path) {
+          nextSelectedPaths.add(path);
+        }
+      }
+    } else if (event.ctrlKey || event.metaKey) {
+      if (nextSelectedPaths.has(item.path)) {
+        nextSelectedPaths.delete(item.path);
+      } else {
+        nextSelectedPaths.add(item.path);
+      }
+    } else {
+      nextSelectedPaths.clear();
+      nextSelectedPaths.add(item.path);
+    }
+
+    if (nextSelectedPaths.size === 0) {
+      nextSelectedPaths.add(item.path);
+    }
+
+    this.selectedPaths = nextSelectedPaths;
+    this.lastSelectedPath = item.path;
+    this.requestUpdate();
   }
 
   private async onItemDoubleClick(item: AssetPreviewItem): Promise<void> {

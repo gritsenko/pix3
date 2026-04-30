@@ -3,6 +3,8 @@ import { Node2D, type Node2DProps } from '../Node2D';
 import type { PropertySchema } from '../../fw/property-schema';
 import {
   findAnimationClip,
+  getAnimationFrameTexturePath,
+  isSequenceAnimationFrame,
   type AnimationClip,
   type AnimationFrame,
   type AnimationResource,
@@ -28,9 +30,11 @@ export class AnimatedSprite2D extends Node2D {
 
   private _currentFrame: number;
   private timeAccumulator = 0;
+  private playbackDirection = 1;
   private animationResource: AnimationResource | null = null;
   private activeClip: AnimationClip | null = null;
   private spritesheetTexture: Texture | null = null;
+  private readonly frameTextures = new Map<number, Texture>();
 
   private mesh: Mesh;
   private geometry: PlaneGeometry;
@@ -90,6 +94,23 @@ export class AnimatedSprite2D extends Node2D {
     this.syncActiveClip(false);
   }
 
+  setFrameTexture(frameIndex: number, texture: Texture | null): void {
+    const normalizedIndex = Math.max(0, Math.floor(frameIndex));
+    const previousTexture = this.frameTextures.get(normalizedIndex);
+    if (previousTexture) {
+      previousTexture.dispose();
+      this.frameTextures.delete(normalizedIndex);
+    }
+
+    if (texture) {
+      this.frameTextures.set(normalizedIndex, this.cloneTexture(texture));
+    }
+
+    if (normalizedIndex === this._currentFrame) {
+      this.refreshTexturePresentation();
+    }
+  }
+
   setSpritesheetTexture(texture: Texture | null): void {
     if (this.spritesheetTexture) {
       this.spritesheetTexture.dispose();
@@ -97,13 +118,7 @@ export class AnimatedSprite2D extends Node2D {
     }
 
     if (texture) {
-      const nextTexture = texture.clone();
-      if ('colorSpace' in nextTexture) {
-        (nextTexture as Texture & { colorSpace: string }).colorSpace = 'srgb';
-      } else if ('encoding' in nextTexture) {
-        (nextTexture as Texture & { encoding: number }).encoding = 3001;
-      }
-      this.spritesheetTexture = nextTexture;
+      this.spritesheetTexture = this.cloneTexture(texture);
     }
 
     this.refreshTexturePresentation();
@@ -118,21 +133,20 @@ export class AnimatedSprite2D extends Node2D {
     }
 
     this.timeAccumulator += dt;
-    const frameDuration = 1 / clip.fps;
 
-    while (this.timeAccumulator >= frameDuration) {
+    while (true) {
+      const activeFrame = this.getCurrentFrameData();
+      const frameDuration = Math.max(
+        0.001,
+        (1 / clip.fps) * (activeFrame?.durationMultiplier ?? 1)
+      );
+      if (this.timeAccumulator < frameDuration) {
+        break;
+      }
+
       this.timeAccumulator -= frameDuration;
 
-      let nextFrame = this._currentFrame + 1;
-      if (nextFrame >= clip.frames.length) {
-        if (clip.loop) {
-          nextFrame = 0;
-        } else {
-          nextFrame = clip.frames.length - 1;
-          this.isPlaying = false;
-          this.properties.isPlaying = false;
-        }
-      }
+      const nextFrame = this.getNextFrameIndex(clip);
 
       this.currentFrame = nextFrame;
 
@@ -255,8 +269,10 @@ export class AnimatedSprite2D extends Node2D {
   }
 
   private refreshTexturePresentation(): void {
-    const texture = this.spritesheetTexture;
     const currentFrame = this.getCurrentFrameData();
+    const frameTexture = currentFrame ? this.frameTextures.get(this._currentFrame) ?? null : null;
+    const usesSequenceTexture = isSequenceAnimationFrame(currentFrame) && Boolean(frameTexture);
+    const texture = usesSequenceTexture ? frameTexture : this.spritesheetTexture;
 
     if (texture) {
       if (this.material.map !== texture) {
@@ -264,7 +280,10 @@ export class AnimatedSprite2D extends Node2D {
         this.material.needsUpdate = true;
       }
 
-      if (currentFrame) {
+      if (usesSequenceTexture) {
+        texture.offset.set(0, 0);
+        texture.repeat.set(1, 1);
+      } else if (currentFrame) {
         texture.offset.set(currentFrame.offset.x, currentFrame.offset.y);
         texture.repeat.set(currentFrame.repeat.x, currentFrame.repeat.y);
       } else {
@@ -301,6 +320,7 @@ export class AnimatedSprite2D extends Node2D {
       this._currentFrame = 0;
       this.properties.currentFrame = this._currentFrame;
       this.timeAccumulator = 0;
+      this.playbackDirection = 1;
     }
 
     const frameCount = this.activeClip?.frames.length ?? 0;
@@ -311,9 +331,60 @@ export class AnimatedSprite2D extends Node2D {
       this._currentFrame = Math.max(0, this._currentFrame);
       this.properties.currentFrame = this._currentFrame;
       this.timeAccumulator = 0;
+      this.playbackDirection = 1;
     }
 
     this.refreshTexturePresentation();
+  }
+
+  private getNextFrameIndex(clip: AnimationClip): number {
+    if (clip.playbackMode === 'ping-pong' && clip.frames.length > 1) {
+      let nextFrame = this._currentFrame + this.playbackDirection;
+      if (nextFrame >= clip.frames.length) {
+        if (!clip.loop) {
+          this.isPlaying = false;
+          this.properties.isPlaying = false;
+          return clip.frames.length - 1;
+        }
+
+        this.playbackDirection = -1;
+        nextFrame = Math.max(0, clip.frames.length - 2);
+      } else if (nextFrame < 0) {
+        if (!clip.loop) {
+          this.isPlaying = false;
+          this.properties.isPlaying = false;
+          return 0;
+        }
+
+        this.playbackDirection = 1;
+        nextFrame = Math.min(clip.frames.length - 1, 1);
+      }
+
+      return nextFrame;
+    }
+
+    const nextFrame = this._currentFrame + 1;
+    if (nextFrame < clip.frames.length) {
+      return nextFrame;
+    }
+
+    if (clip.loop) {
+      return 0;
+    }
+
+    this.isPlaying = false;
+    this.properties.isPlaying = false;
+    return clip.frames.length - 1;
+  }
+
+  private cloneTexture(texture: Texture): Texture {
+    const nextTexture = texture.clone();
+    if ('colorSpace' in nextTexture) {
+      (nextTexture as Texture & { colorSpace: string }).colorSpace = 'srgb';
+    } else if ('encoding' in nextTexture) {
+      (nextTexture as Texture & { encoding: number }).encoding = 3001;
+    }
+    return nextTexture;
   }
 
   private updateGeometry(): void {
@@ -328,6 +399,10 @@ export class AnimatedSprite2D extends Node2D {
       this.spritesheetTexture.dispose();
       this.spritesheetTexture = null;
     }
+    for (const texture of this.frameTextures.values()) {
+      texture.dispose();
+    }
+    this.frameTextures.clear();
     this.material.dispose();
   }
 }

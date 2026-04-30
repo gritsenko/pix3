@@ -6,7 +6,50 @@ export function normalizeAnimationAssetPath(path: string): string {
     ? trimmed
     : `res://${trimmed.replace(/^\/+/, '')}`;
 
-  return withScheme.endsWith('.pix3anim') ? withScheme : `${withScheme}.pix3anim`;
+  if (withScheme.endsWith('.pix3anim')) {
+    return withScheme;
+  }
+
+  const normalizedRelativePath = withScheme
+    .replace(/^res:\/\//i, '')
+    .replace(/^templ:\/\//i, '')
+    .replace(/^collab:\/\//i, '')
+    .replace(/^\/+/, '')
+    .replace(/\/+$/, '');
+  const pathSegments = normalizedRelativePath.split('/').filter(Boolean);
+  const stem = pathSegments[pathSegments.length - 1] ?? 'animation';
+
+  return `res://${normalizedRelativePath}/${stem}.pix3anim`;
+}
+
+export function deriveAnimationAssetStem(resourcePath: string): string {
+  const normalizedPath = normalizeAnimationAssetPath(resourcePath)
+    .replace(/^res:\/\//i, '')
+    .replace(/^templ:\/\//i, '')
+    .replace(/^collab:\/\//i, '')
+    .replace(/\\/g, '/');
+  const segments = normalizedPath.split('/').filter(Boolean);
+  const fileName = segments[segments.length - 1] ?? 'animation.pix3anim';
+  return fileName.replace(/\.pix3anim$/i, '') || 'animation';
+}
+
+export function getAnimationAssetDirectory(resourcePath: string): string {
+  const normalizedPath = normalizeAnimationAssetPath(resourcePath);
+  const lastSlashIndex = normalizedPath.lastIndexOf('/');
+  if (lastSlashIndex <= 'res://'.length) {
+    return 'res://';
+  }
+
+  return normalizedPath.slice(0, lastSlashIndex);
+}
+
+export function buildAnimationFrameResourcePath(
+  resourcePath: string,
+  frameNumber: number,
+  extension = 'png'
+): string {
+  const frameSuffix = String(Math.max(1, Math.floor(frameNumber))).padStart(4, '0');
+  return `${getAnimationAssetDirectory(resourcePath)}/frame_${frameSuffix}.${extension}`;
 }
 
 export function deriveAnimationDocumentId(resourcePath: string): string {
@@ -32,7 +75,7 @@ export function createDefaultAnimationResource(
 
   return normalizeAnimationResource({
     version: '1.0.0',
-    texturePath: normalizedTexturePath,
+    texturePath: '',
     clips: [
       {
         name: initialClipName,
@@ -47,7 +90,7 @@ export function createDefaultAnimationResource(
                 repeat: { x: 1, y: 1 },
                 durationMultiplier: 1,
                 anchor: { x: 0.5, y: 1 },
-                texturePath: '',
+                texturePath: normalizedTexturePath,
                 boundingBox: { x: 0, y: 0, width: 0, height: 0 },
                 collisionPolygon: [],
               },

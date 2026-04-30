@@ -8,6 +8,7 @@ import {
   type CommandPreconditionResult,
 } from '@/core/command';
 import {
+  deriveAnimationAssetStem,
   deriveAnimationDocumentId,
   normalizeAnimationAssetPath,
   parseAnimationResourceText,
@@ -122,8 +123,6 @@ export class LoadAnimationCommand extends CommandBase<LoadAnimationCommandPayloa
       return preserved;
     }
 
-    const normalizedPath = filePath.replace(/\\+/g, '/');
-    const segments = normalizedPath.split('/').filter(Boolean);
-    return segments.length ? segments[segments.length - 1] : filePath;
+    return deriveAnimationAssetStem(filePath);
   }
 }

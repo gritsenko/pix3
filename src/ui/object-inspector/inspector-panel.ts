@@ -38,6 +38,7 @@ import { AddComponentCommand } from '@/features/scripts/AddComponentCommand';
 import { RemoveComponentCommand } from '@/features/scripts/RemoveComponentCommand';
 import { ToggleScriptEnabledCommand } from '@/features/scripts/ToggleScriptEnabledCommand';
 import { UpdateComponentPropertyCommand } from '@/features/scripts/UpdateComponentPropertyCommand';
+import { normalizeAnimationAssetPath } from '@/features/scene/animation-asset-utils';
 import { AddNodeToGroupCommand } from '@/features/scene/AddNodeToGroupCommand';
 import { RemoveNodeFromGroupCommand } from '@/features/scene/RemoveNodeFromGroupCommand';
 import { getNodeVisuals } from '@/ui/scene-tree/node-visuals.helper';
@@ -918,10 +919,11 @@ export class InspectorPanel extends ComponentBase {
     let suffix = 0;
 
     while (true) {
-      const assetPath =
+      const assetPath = normalizeAnimationAssetPath(
         suffix === 0
-          ? `${DEFAULT_ANIMATION_ASSET_DIRECTORY}/${baseStem}.pix3anim`
-          : `${DEFAULT_ANIMATION_ASSET_DIRECTORY}/${baseStem}-${suffix + 1}.pix3anim`;
+          ? `${DEFAULT_ANIMATION_ASSET_DIRECTORY}/${baseStem}`
+          : `${DEFAULT_ANIMATION_ASSET_DIRECTORY}/${baseStem}-${suffix + 1}`
+      );
 
       if (!(await this.animationAssetExists(assetPath))) {
         return assetPath;
@@ -1478,11 +1480,11 @@ export class InspectorPanel extends ComponentBase {
 
         <div class="property-group-section asset-section">
           <div class="section-header">
-            <h4 class="group-title">Spritesheet</h4>
-            ${texturePath ? html`<span class="animation-chip">Bound</span>` : null}
+            <h4 class="group-title">Spritesheet Import</h4>
+            ${texturePath ? html`<span class="animation-chip">Source</span>` : null}
           </div>
           <label class="field">
-            <span>Texture</span>
+            <span>Import Source</span>
             <input
               type="text"
               .value=${texturePath}
@@ -1500,7 +1502,7 @@ export class InspectorPanel extends ComponentBase {
               ?disabled=${texturePath.length === 0 || !animationState.activeClipName}
               @click=${() => void controller.openTextureSlicer()}
             >
-              Slice Frames...
+              Generate Frames...
             </button>
             <button
               class="mini-button"
@@ -1512,8 +1514,8 @@ export class InspectorPanel extends ComponentBase {
             </button>
           </div>
           <div class="panel-note">
-            Drag a texture from the Asset Browser onto the animation editor to assign or replace the
-            spritesheet.
+            Use this only as a one-time import source. The editor stores sequence frames as
+            separate files after slicing.
           </div>
         </div>
 

@@ -7,6 +7,9 @@ import { ProjectStorageService } from '@/services/ProjectStorageService';
 import { ViewportRendererService } from '@/services/ViewportRenderService';
 import { CreateAndBindAnimationAssetOperation } from './CreateAndBindAnimationAssetOperation';
 
+const PLAYER_ANIMATION_PATH = 'res://animations/player/player.pix3anim';
+const PLAYER_ANIMATION_DIRECTORY = 'animations/player';
+
 const createOperationContext = (sprite: AnimatedSprite2D) => {
   const state = createInitialAppState();
   state.project.status = 'ready';
@@ -46,7 +49,19 @@ const createOperationContext = (sprite: AnimatedSprite2D) => {
       files.set(path, contents);
     }),
     deleteEntry: vi.fn(async (path: string) => {
-      files.delete(path);
+      const normalizedPath = path.replace(/^res:\/\//, '').replace(/\\/g, '/').replace(/\/+$/, '');
+      for (const existingPath of Array.from(files.keys())) {
+        const normalizedExistingPath = existingPath
+          .replace(/^res:\/\//, '')
+          .replace(/\\/g, '/')
+          .replace(/\/+$/, '');
+        if (
+          normalizedExistingPath === normalizedPath ||
+          normalizedExistingPath.startsWith(`${normalizedPath}/`)
+        ) {
+          files.delete(existingPath);
+        }
+      }
     }),
     createDirectory: vi.fn(async () => {}),
   };
@@ -82,7 +97,7 @@ const createOperationContext = (sprite: AnimatedSprite2D) => {
     requestedAt: Date.now(),
   } as OperationContext;
 
-  return { context, files };
+  return { context, files, storageMock };
 };
 
 describe('CreateAndBindAnimationAssetOperation', () => {
@@ -91,7 +106,7 @@ describe('CreateAndBindAnimationAssetOperation', () => {
       id: 'sprite-1',
       name: 'Player',
     });
-    const { context, files } = createOperationContext(sprite);
+    const { context, files, storageMock } = createOperationContext(sprite);
     const operation = new CreateAndBindAnimationAssetOperation({
       nodeId: sprite.nodeId,
       assetPath: 'res://animations/player',
@@ -102,16 +117,18 @@ describe('CreateAndBindAnimationAssetOperation', () => {
     const result = await operation.perform(context);
 
     expect(result.didMutate).toBe(true);
-    expect(sprite.animationResourcePath).toBe('res://animations/player.pix3anim');
-    expect(files.has('res://animations/player.pix3anim')).toBe(true);
+    expect(sprite.animationResourcePath).toBe(PLAYER_ANIMATION_PATH);
+    expect(files.has(PLAYER_ANIMATION_PATH)).toBe(true);
+    expect(storageMock.createDirectory).toHaveBeenCalledWith(PLAYER_ANIMATION_DIRECTORY);
 
     await result.commit?.undo();
     expect(sprite.animationResourcePath).toBeNull();
-    expect(files.has('res://animations/player.pix3anim')).toBe(false);
+    expect(files.has(PLAYER_ANIMATION_PATH)).toBe(false);
+    expect(storageMock.deleteEntry).toHaveBeenCalledWith(PLAYER_ANIMATION_DIRECTORY);
 
     await result.commit?.redo();
-    expect(sprite.animationResourcePath).toBe('res://animations/player.pix3anim');
-    expect(files.has('res://animations/player.pix3anim')).toBe(true);
+    expect(sprite.animationResourcePath).toBe(PLAYER_ANIMATION_PATH);
+    expect(files.has(PLAYER_ANIMATION_PATH)).toBe(true);
   });
 
   it('rolls back the created asset when binding fails', async () => {
@@ -131,6 +148,6 @@ describe('CreateAndBindAnimationAssetOperation', () => {
 
     expect(result.didMutate).toBe(false);
     expect(sprite.animationResourcePath).toBeNull();
-    expect(files.has('res://animations/player.pix3anim')).toBe(false);
+    expect(files.has(PLAYER_ANIMATION_PATH)).toBe(false);
   });
 });

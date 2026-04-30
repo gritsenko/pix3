@@ -38,6 +38,7 @@ import { ScriptRegistry } from './ScriptRegistry';
 import { coerceTextureResource, type TextureResourceRef } from './TextureResource';
 import { getNodePropertySchema } from '../fw/property-schema-utils';
 import type { PropertyDefinition } from '../fw/property-schema';
+import { getAnimationFrameTexturePath } from './AnimationResource';
 
 const ZERO_VECTOR3 = new Vector3(0, 0, 0);
 const UNIT_VECTOR3 = new Vector3(1, 1, 1);
@@ -1566,6 +1567,30 @@ export class SceneLoader {
     try {
       const resource = await this.assetLoader.loadAnimationResource(animationResourcePath);
       sprite.setAnimationResource(resource);
+
+      const frameTexturePaths = new Map<number, string>();
+      for (const clip of resource.clips) {
+        clip.frames.forEach((frame, frameIndex) => {
+          const texturePath = getAnimationFrameTexturePath(resource, frame);
+          if (texturePath) {
+            frameTexturePaths.set(frameIndex, texturePath);
+          }
+        });
+      }
+
+      await Promise.all(
+        Array.from(frameTexturePaths.entries()).map(async ([frameIndex, texturePath]) => {
+          try {
+            const texture = await this.assetLoader.loadTexture(texturePath);
+            sprite.setFrameTexture(frameIndex, texture);
+          } catch (error) {
+            console.warn(
+              `[SceneLoader] Error loading frame texture for AnimatedSprite2D "${sprite.nodeId}":`,
+              error
+            );
+          }
+        })
+      );
 
       if (!resource.texturePath) {
         return;

@@ -115,6 +115,46 @@ describe('AssetsPreviewPanel', () => {
     expect(services.assetsPreviewService.requestThumbnail).toHaveBeenCalledWith('assets/crate.glb');
   });
 
+  it('supports ctrl-multiselect and drags all selected files', async () => {
+    const panel = document.createElement('pix3-assets-preview-panel') as AssetsPreviewPanelElement;
+    stubPanelServices(
+      panel,
+      createSnapshot([
+        createItem({ name: 'a.png', path: 'assets/a.png', kind: 'file', previewType: 'image' }),
+        createItem({ name: 'b.png', path: 'assets/b.png', kind: 'file', previewType: 'image' }),
+      ])
+    );
+
+    document.body.appendChild(panel);
+    await panel.updateComplete;
+
+    const buttons = panel.querySelectorAll('.assets-preview-item');
+    buttons[0]?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    buttons[1]?.dispatchEvent(new MouseEvent('click', { bubbles: true, ctrlKey: true }));
+    await panel.updateComplete;
+
+    const dataTransfer = {
+      effectAllowed: '',
+      setData: vi.fn(),
+    };
+    (
+      panel as unknown as {
+        onItemDragStart: (event: DragEvent, item: AssetPreviewItem) => void;
+      }
+    ).onItemDragStart(
+      {
+        dataTransfer: dataTransfer as unknown as DataTransfer,
+      } as DragEvent,
+      createItem({ name: 'b.png', path: 'assets/b.png', kind: 'file', previewType: 'image' })
+    );
+
+    expect(panel.querySelectorAll('.assets-preview-item.is-selected')).toHaveLength(2);
+    expect(dataTransfer.setData).toHaveBeenCalledWith(
+      'application/x-pix3-asset-resource-list',
+      JSON.stringify(['res://assets/a.png', 'res://assets/b.png'])
+    );
+  });
+
   it('renders text snippets for text preview assets', async () => {
     const panel = document.createElement('pix3-assets-preview-panel') as AssetsPreviewPanelElement;
     stubPanelServices(

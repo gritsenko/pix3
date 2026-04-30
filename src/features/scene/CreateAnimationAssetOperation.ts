@@ -65,7 +65,7 @@ export class CreateAnimationAssetOperation implements Operation<OperationInvokeR
         afterSnapshot,
         undo: async () => {
           if (previousText === null) {
-            await storage.deleteEntry(assetPath);
+            await storage.deleteEntry(parentDirectory !== '.' ? parentDirectory : assetPath);
             return;
           }
 

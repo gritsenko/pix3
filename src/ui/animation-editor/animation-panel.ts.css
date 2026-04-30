@@ -160,6 +160,11 @@ pix3-animation-panel .frame-card.is-preview {
   background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.08);
 }
 
+pix3-animation-panel .frame-card.is-drop-target {
+  border-color: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.75);
+  box-shadow: inset 0 0 0 1px rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.55);
+}
+
 pix3-animation-panel .frame-thumb {
   position: relative;
   overflow: hidden;
@@ -201,6 +206,12 @@ pix3-animation-panel .frame-meta-row {
   gap: 0.4rem;
 }
 
+pix3-animation-panel .frame-meta-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
 pix3-animation-panel .frame-title {
   font-size: 0.74rem;
   font-weight: 600;
@@ -215,6 +226,23 @@ pix3-animation-panel .frame-badge {
   background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.14);
   color: var(--pix3-accent-color, #ffcf33);
   font-size: 0.67rem;
+}
+
+pix3-animation-panel .frame-delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  color: var(--color-text-secondary, #aaa);
+}
+
+pix3-animation-panel .frame-delete-button:hover,
+pix3-animation-panel .frame-delete-button:focus-visible {
+  color: #f4a4a4;
+  background: rgba(233, 143, 143, 0.12);
+  outline: none;
 }
 
 pix3-animation-panel .stage-shell {

@@ -23,11 +23,21 @@ const TEST_RESOURCE: AnimationResource = {
           textureIndex: 0,
           offset: { x: 0, y: 0 },
           repeat: { x: 0.5, y: 1 },
+          durationMultiplier: 1,
+          anchor: { x: 0.5, y: 1 },
+          texturePath: '',
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+          collisionPolygon: [],
         },
         {
           textureIndex: 0,
           offset: { x: 0.5, y: 0 },
           repeat: { x: 0.5, y: 1 },
+          durationMultiplier: 1,
+          anchor: { x: 0.5, y: 1 },
+          texturePath: '',
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+          collisionPolygon: [],
         },
       ],
     },
@@ -35,21 +45,72 @@ const TEST_RESOURCE: AnimationResource = {
       name: 'attack',
       fps: 8,
       loop: false,
+      playbackMode: 'normal',
       frames: [
         {
           textureIndex: 0,
           offset: { x: 0, y: 0 },
           repeat: { x: 0.25, y: 1 },
+          durationMultiplier: 1,
+          anchor: { x: 0.5, y: 1 },
+          texturePath: '',
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+          collisionPolygon: [],
         },
         {
           textureIndex: 0,
           offset: { x: 0.25, y: 0 },
           repeat: { x: 0.25, y: 1 },
+          durationMultiplier: 1,
+          anchor: { x: 0.5, y: 1 },
+          texturePath: '',
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+          collisionPolygon: [],
         },
         {
           textureIndex: 0,
           offset: { x: 0.5, y: 0 },
           repeat: { x: 0.25, y: 1 },
+          durationMultiplier: 1,
+          anchor: { x: 0.5, y: 1 },
+          texturePath: '',
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+          collisionPolygon: [],
+        },
+      ],
+    },
+  ],
+};
+
+const SEQUENCE_RESOURCE: AnimationResource = {
+  version: '1.0.0',
+  texturePath: '',
+  clips: [
+    {
+      name: 'idle',
+      fps: 8,
+      loop: true,
+      playbackMode: 'ping-pong',
+      frames: [
+        {
+          textureIndex: 0,
+          offset: { x: 0, y: 0 },
+          repeat: { x: 1, y: 1 },
+          durationMultiplier: 1,
+          anchor: { x: 0.5, y: 1 },
+          texturePath: 'res://animations/player/frame_0001.png',
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+          collisionPolygon: [],
+        },
+        {
+          textureIndex: 0,
+          offset: { x: 0, y: 0 },
+          repeat: { x: 1, y: 1 },
+          durationMultiplier: 2,
+          anchor: { x: 0.5, y: 1 },
+          texturePath: 'res://animations/player/frame_0002.png',
+          boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+          collisionPolygon: [],
         },
       ],
     },
@@ -65,6 +126,24 @@ class StubAssetLoader extends AssetLoader {
   async loadTexture(resourcePath: string): Promise<Texture> {
     expect(resourcePath).toBe(TEST_RESOURCE.texturePath);
     return new Texture();
+  }
+}
+
+class SequenceAssetLoader extends AssetLoader {
+  private readonly textureByPath = new Map<string, Texture>([
+    ['res://animations/player/frame_0001.png', new Texture()],
+    ['res://animations/player/frame_0002.png', new Texture()],
+  ]);
+
+  async loadAnimationResource(resourcePath: string): Promise<AnimationResource> {
+    expect(resourcePath).toBe('res://animations/player.pix3anim');
+    return SEQUENCE_RESOURCE;
+  }
+
+  async loadTexture(resourcePath: string): Promise<Texture> {
+    const texture = this.textureByPath.get(resourcePath);
+    expect(texture).toBeDefined();
+    return texture ?? new Texture();
   }
 }
 
@@ -123,6 +202,38 @@ describe('AnimatedSprite2D animation runtime', () => {
     expect(sprite.isPlaying).toBe(false);
   });
 
+  it('uses sequence frame textures and honors duration multipliers with ping-pong playback', () => {
+    const sprite = new AnimatedSprite2D({
+      id: 'sprite-sequence',
+      name: 'Sequence',
+      currentClip: 'idle',
+    });
+    const frameOne = new Texture();
+    const frameTwo = new Texture();
+
+    sprite.setAnimationResource(SEQUENCE_RESOURCE);
+    sprite.setFrameTexture(0, frameOne);
+    sprite.setFrameTexture(1, frameTwo);
+
+    const material = getSpriteMaterial(sprite);
+
+    expect(material.map).toBeInstanceOf(Texture);
+    expect(material.map).not.toBe(frameOne);
+    expect(material.map?.offset.x).toBeCloseTo(0);
+    expect(material.map?.repeat.x).toBeCloseTo(1);
+
+    sprite.tick(0.13);
+    expect(sprite.currentFrame).toBe(1);
+    expect(material.map?.offset.x).toBeCloseTo(0);
+    expect(material.map?.repeat.x).toBeCloseTo(1);
+
+    sprite.tick(0.13);
+    expect(sprite.currentFrame).toBe(1);
+
+    sprite.tick(0.13);
+    expect(sprite.currentFrame).toBe(0);
+  });
+
   it('serializes authored animation properties and hydrates the sprite from .pix3anim metadata', async () => {
     const sprite = new AnimatedSprite2D({
       id: 'sprite-persisted',
@@ -169,5 +280,40 @@ describe('AnimatedSprite2D animation runtime', () => {
     expect(map).toBeInstanceOf(Texture);
     expect(map?.offset.x).toBeCloseTo(0.25);
     expect(map?.repeat.x).toBeCloseTo(0.25);
+  });
+
+  it('loads sequence frame textures during scene hydration', async () => {
+    const sprite = new AnimatedSprite2D({
+      id: 'sprite-sequence-persisted',
+      name: 'SequencePersisted',
+      animationResourcePath: 'res://animations/player.pix3anim',
+      currentClip: 'idle',
+      currentFrame: 0,
+      isPlaying: true,
+    });
+
+    const saver = new SceneSaver();
+    const yaml = saver.serializeScene({
+      version: '1.0.0',
+      metadata: {},
+      rootNodes: [sprite],
+      nodeMap: new Map([[sprite.nodeId, sprite]]),
+    });
+
+    const loader = new SceneLoader(
+      new SequenceAssetLoader(new ResourceManager('/'), new AudioService()),
+      new ScriptRegistry(),
+      new ResourceManager('/')
+    );
+
+    const graph = await loader.parseScene(yaml, { filePath: 'res://scenes/main.pix3scene' });
+    const loaded = graph.rootNodes[0] as AnimatedSprite2D;
+    await flushMicrotasks();
+
+    const material = getSpriteMaterial(loaded);
+    expect(material.map).toBeInstanceOf(Texture);
+
+    loaded.tick(0.13);
+    expect(loaded.currentFrame).toBe(1);
   });
 });

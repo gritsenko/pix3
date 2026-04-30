@@ -162,10 +162,13 @@ describe('AnimationPanel', () => {
     const panelState = panel as unknown as {
       onTextureDrop: (event: DragEvent) => Promise<void>;
     };
-    const updateTexturePath = vi.fn().mockResolvedValue(undefined);
+    const addFrameTextures = vi.fn().mockResolvedValue(undefined);
 
     Object.defineProperty(panel, 'onUpdateTexturePath', {
-      value: updateTexturePath,
+      value: vi.fn(),
+    });
+    Object.defineProperty(panel, 'onAddFrameTextures', {
+      value: addFrameTextures,
     });
 
     const event = {
@@ -179,7 +182,189 @@ describe('AnimationPanel', () => {
 
     await panelState.onTextureDrop(event);
 
-    expect(updateTexturePath).toHaveBeenCalledWith('res://textures/player.png');
+    expect(addFrameTextures).toHaveBeenCalledWith(['res://textures/player.png']);
+  });
+
+  it('accepts multiple textures from a preview multi-drag payload', async () => {
+    const panel = new AnimationPanel();
+    const panelState = panel as unknown as {
+      onEditorDrop: (event: DragEvent) => Promise<void>;
+    };
+    const addFrameTextures = vi.fn().mockResolvedValue(undefined);
+
+    Object.defineProperty(panel, 'onAddFrameTextures', {
+      value: addFrameTextures,
+    });
+
+    const event = {
+      preventDefault: vi.fn(),
+      dataTransfer: {
+        getData: vi.fn((type: string) => {
+          if (type === 'application/x-pix3-asset-resource-list') {
+            return JSON.stringify([
+              'res://textures/player-01.png',
+              'res://textures/player-02.png',
+            ]);
+          }
+          return '';
+        }),
+        types: ['application/x-pix3-asset-resource-list'],
+      },
+    } as unknown as DragEvent;
+
+    await panelState.onEditorDrop(event);
+
+    expect(addFrameTextures).toHaveBeenCalledWith([
+      'res://textures/player-01.png',
+      'res://textures/player-02.png',
+    ]);
+  });
+
+  it('preserves the current clip when appending frame textures', async () => {
+    const panel = new AnimationPanel();
+    const invokeAndPush = vi.fn().mockResolvedValue(true);
+    const animationId = 'animations-walk';
+
+    Object.defineProperty(panel, 'operations', {
+      value: { invokeAndPush },
+    });
+    Object.defineProperty(panel, 'commandDispatcher', {
+      value: { execute: vi.fn().mockResolvedValue(true) },
+    });
+    Object.defineProperty(panel, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({
+          nodeMap: new Map(),
+        }),
+      },
+    });
+    Object.defineProperty(panel, 'assetPath', {
+      value: 'res://animations/walk/walk.pix3anim',
+      writable: true,
+    });
+    Object.defineProperty(panel, 'animationId', {
+      value: animationId,
+      writable: true,
+    });
+    Object.defineProperty(panel, 'resource', {
+      value: {
+        version: '1.0.0',
+        texturePath: '',
+        clips: [
+          { name: 'idle', fps: 12, loop: true, playbackMode: 'normal', frames: [] },
+          { name: 'run', fps: 12, loop: true, playbackMode: 'normal', frames: [] },
+        ],
+      },
+      writable: true,
+    });
+    Object.defineProperty(panel, 'activeClipName', {
+      value: 'run',
+      writable: true,
+    });
+
+    appState.animations.resources[animationId] = {
+      version: '1.0.0',
+      texturePath: '',
+      clips: [
+        { name: 'idle', fps: 12, loop: true, playbackMode: 'normal', frames: [] },
+        { name: 'run', fps: 12, loop: true, playbackMode: 'normal', frames: [] },
+      ],
+    };
+
+    await (panel as unknown as { onAddFrameTextures: (paths: string[]) => Promise<void> }).onAddFrameTextures([
+      'res://textures/player.png',
+    ]);
+
+    expect((panel as unknown as { activeClipName: string }).activeClipName).toBe('run');
+    expect(invokeAndPush).toHaveBeenCalledOnce();
+  });
+
+  it('deletes all selected frames from a ctrl-multiselection', async () => {
+    const panel = new AnimationPanel();
+    const animationId = 'animations-walk';
+
+    Object.defineProperty(panel, 'operations', {
+      value: { invokeAndPush: vi.fn().mockResolvedValue(true) },
+    });
+    Object.defineProperty(panel, 'commandDispatcher', {
+      value: { execute: vi.fn().mockResolvedValue(true) },
+    });
+    Object.defineProperty(panel, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({
+          nodeMap: new Map(),
+        }),
+      },
+    });
+    Object.defineProperty(panel, 'assetPath', {
+      value: 'res://animations/walk/walk.pix3anim',
+      writable: true,
+    });
+    Object.defineProperty(panel, 'animationId', {
+      value: animationId,
+      writable: true,
+    });
+    Object.defineProperty(panel, 'resource', {
+      value: {
+        version: '1.0.0',
+        texturePath: '',
+        clips: [
+          {
+            name: 'idle',
+            fps: 12,
+            loop: true,
+            playbackMode: 'normal',
+            frames: [
+              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://a.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://b.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://c.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://d.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            ],
+          },
+        ],
+      },
+      writable: true,
+    });
+    Object.defineProperty(panel, 'activeClipName', {
+      value: 'idle',
+      writable: true,
+    });
+
+    appState.animations.resources[animationId] = {
+      version: '1.0.0',
+      texturePath: '',
+      clips: [
+        {
+          name: 'idle',
+          fps: 12,
+          loop: true,
+          playbackMode: 'normal',
+          frames: [
+            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://a.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://b.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://c.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://d.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+          ],
+        },
+      ],
+    };
+
+    await (panel as unknown as { syncFrameStateToActiveClip: (preferFirstFrame?: boolean) => void }).syncFrameStateToActiveClip();
+    (panel as unknown as { onSelectFrame: (event: MouseEvent, index: number) => void }).onSelectFrame(
+      { ctrlKey: true, metaKey: false, shiftKey: false } as MouseEvent,
+      2
+    );
+
+    expect((panel as unknown as { selectedFrameIndices: number[] }).selectedFrameIndices).toEqual([0, 2]);
+
+    await (panel as unknown as { onRemoveSelectedFrame: () => Promise<void> }).onRemoveSelectedFrame();
+
+    expect(
+      ((panel as unknown as { resource: { clips: Array<{ frames: Array<{ texturePath?: string }> }> } }).resource
+        .clips[0]?.frames ?? []).map(frame => frame.texturePath)
+    ).toEqual(['res://b.png', 'res://d.png']);
+    expect((panel as unknown as { selectedFrameIndices: number[] }).selectedFrameIndices).toEqual([0]);
+    expect((panel as unknown as { selectedFrameIndex: number }).selectedFrameIndex).toBe(0);
   });
 
   it('prompts for autoslice when a texture is assigned to an animation without frames', async () => {
