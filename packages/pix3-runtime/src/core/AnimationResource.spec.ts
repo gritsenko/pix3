@@ -26,7 +26,7 @@ describe('AnimationResource normalization', () => {
     expect(resource.clips[0]?.playbackMode).toBe('normal');
     expect(resource.clips[0]?.frames[0]).toMatchObject({
       durationMultiplier: 1,
-      anchor: { x: 0, y: 0 },
+      anchor: { x: 0.5, y: 0.5 },
       texturePath: '',
       boundingBox: { x: 0, y: 0, width: 0, height: 0 },
       collisionPolygon: [],

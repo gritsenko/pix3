@@ -61,6 +61,19 @@ export function isSequenceAnimationFrame(frame: AnimationFrame | null | undefine
   return Boolean(frame?.texturePath?.trim());
 }
 
+function normalizeAnchor(value: unknown): AnimationVector2 {
+  const candidate = typeof value === 'object' && value !== null ? value : {};
+  const x =
+    typeof (candidate as { x?: unknown }).x === 'number'
+      ? (candidate as { x: number }).x
+      : 0.5;
+  const y =
+    typeof (candidate as { y?: unknown }).y === 'number'
+      ? (candidate as { y: number }).y
+      : 0.5;
+  return { x, y };
+}
+
 function normalizeVector2(value: unknown): AnimationVector2 {
   const candidate = typeof value === 'object' && value !== null ? value : {};
   const x = typeof (candidate as { x?: unknown }).x === 'number' ? (candidate as { x: number }).x : 0;
@@ -105,7 +118,7 @@ function normalizeFrame(frame: unknown): AnimationFrame {
       0.001,
       normalizeFiniteNumber((candidate as { durationMultiplier?: unknown }).durationMultiplier, 1)
     ),
-    anchor: normalizeVector2((candidate as { anchor?: unknown }).anchor),
+    anchor: normalizeAnchor((candidate as { anchor?: unknown }).anchor),
     texturePath:
       typeof (candidate as { texturePath?: unknown }).texturePath === 'string'
         ? (candidate as { texturePath: string }).texturePath.trim()

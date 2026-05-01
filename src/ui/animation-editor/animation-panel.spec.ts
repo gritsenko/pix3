@@ -335,7 +335,125 @@ describe('AnimationPanel', () => {
     ]);
 
     expect((panel as unknown as { activeClipName: string }).activeClipName).toBe('run');
+    expect(
+      (
+        panel as unknown as {
+          resource: {
+            clips: Array<{ name: string; frames: Array<{ anchor: { x: number; y: number } }> }>;
+          };
+        }
+      ).resource.clips.find(clip => clip.name === 'run')?.frames[0]?.anchor
+    ).toEqual({ x: 0.5, y: 0.5 });
     expect(invokeAndPush).toHaveBeenCalledOnce();
+  });
+
+  it('applies the selected anchor to every frame in every clip', async () => {
+    const panel = new AnimationPanel();
+    const animationId = 'animations-walk';
+
+    Object.defineProperty(panel, 'operations', {
+      value: { invokeAndPush: vi.fn().mockResolvedValue(true) },
+    });
+    Object.defineProperty(panel, 'commandDispatcher', {
+      value: { execute: vi.fn().mockResolvedValue(true) },
+    });
+    Object.defineProperty(panel, 'sceneManager', {
+      value: {
+        getActiveSceneGraph: () => ({
+          nodeMap: new Map(),
+        }),
+      },
+    });
+    Object.defineProperty(panel, 'assetPath', {
+      value: 'res://animations/walk/walk.pix3anim',
+      writable: true,
+    });
+    Object.defineProperty(panel, 'animationId', {
+      value: animationId,
+      writable: true,
+    });
+    Object.defineProperty(panel, 'resource', {
+      value: {
+        version: '1.0.0',
+        texturePath: '',
+        clips: [
+          {
+            name: 'idle',
+            fps: 12,
+            loop: true,
+            playbackMode: 'normal',
+            frames: [
+              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.25, y: 0.75 }, texturePath: 'res://a.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0, y: 1 }, texturePath: 'res://b.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            ],
+          },
+          {
+            name: 'run',
+            fps: 12,
+            loop: true,
+            playbackMode: 'normal',
+            frames: [
+              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 1, y: 0 }, texturePath: 'res://c.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            ],
+          },
+        ],
+      },
+      writable: true,
+    });
+    Object.defineProperty(panel, 'activeClipName', {
+      value: 'idle',
+      writable: true,
+    });
+    Object.defineProperty(panel, 'selectedFrameIndex', {
+      value: 0,
+      writable: true,
+    });
+    Object.defineProperty(panel, 'selectedFrameIndices', {
+      value: [0],
+      writable: true,
+    });
+
+    appState.animations.resources[animationId] = {
+      version: '1.0.0',
+      texturePath: '',
+      clips: [
+        {
+          name: 'idle',
+          fps: 12,
+          loop: true,
+          playbackMode: 'normal',
+          frames: [
+            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.25, y: 0.75 }, texturePath: 'res://a.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0, y: 1 }, texturePath: 'res://b.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+          ],
+        },
+        {
+          name: 'run',
+          fps: 12,
+          loop: true,
+          playbackMode: 'normal',
+          frames: [
+            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 1, y: 0 }, texturePath: 'res://c.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+          ],
+        },
+      ],
+    };
+
+    await (
+      panel as unknown as { onApplySelectedAnchorToAllClips: () => Promise<void> }
+    ).onApplySelectedAnchorToAllClips();
+
+    const clips = (
+      panel as unknown as {
+        resource: { clips: Array<{ frames: Array<{ anchor: { x: number; y: number } }> }> };
+      }
+    ).resource.clips;
+
+    expect(clips[0]?.frames.map(frame => frame.anchor)).toEqual([
+      { x: 0.25, y: 0.75 },
+      { x: 0.25, y: 0.75 },
+    ]);
+    expect(clips[1]?.frames.map(frame => frame.anchor)).toEqual([{ x: 0.25, y: 0.75 }]);
   });
 
   it('deletes all selected frames from a ctrl-multiselection', async () => {

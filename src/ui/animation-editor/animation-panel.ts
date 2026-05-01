@@ -73,6 +73,26 @@ interface StageDragState {
   vertexIndex?: number;
 }
 
+interface AnchorPreset {
+  label: string;
+  title: string;
+  anchor: StagePoint;
+}
+
+const DEFAULT_FRAME_ANCHOR: StagePoint = { x: 0.5, y: 0.5 };
+
+const ANCHOR_PRESETS: readonly AnchorPreset[] = [
+  { label: '↖', title: 'Top left', anchor: { x: 0, y: 0 } },
+  { label: '↑', title: 'Top center', anchor: { x: 0.5, y: 0 } },
+  { label: '↗', title: 'Top right', anchor: { x: 1, y: 0 } },
+  { label: '←', title: 'Center left', anchor: { x: 0, y: 0.5 } },
+  { label: '•', title: 'Center', anchor: { x: 0.5, y: 0.5 } },
+  { label: '→', title: 'Center right', anchor: { x: 1, y: 0.5 } },
+  { label: '↙', title: 'Bottom left', anchor: { x: 0, y: 1 } },
+  { label: '↓', title: 'Bottom center', anchor: { x: 0.5, y: 1 } },
+  { label: '↘', title: 'Bottom right', anchor: { x: 1, y: 1 } },
+];
+
 @customElement('pix3-animation-panel')
 export class AnimationPanel extends ComponentBase implements AnimationInspectorController {
   @property({ type: String, reflect: true, attribute: 'tab-id' })
@@ -380,6 +400,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
       .join(' ');
     const imageStyle = this.getFrameImageStyle(previewFrame);
     const previewTextureUrl = this.getTexturePreviewUrl(previewFrame);
+    const selectedFrame = this.getSelectedFrame(activeClip);
 
     return html`
       <div class="stage-shell">
@@ -451,6 +472,49 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
             </div>
           </div>
         </div>
+        ${this.renderAnchorTools(selectedFrame)}
+      </div>
+    `;
+  }
+
+  private renderAnchorTools(selectedFrame: AnimationFrame | null) {
+    if (this.editMode !== 'anchor' || !selectedFrame) {
+      return null;
+    }
+
+    return html`
+      <div class="anchor-tools" aria-label="Anchor point tools">
+        <div class="anchor-tools-header">
+          <span class="anchor-tools-title">Anchor presets</span>
+          <span class="anchor-tools-value">
+            ${selectedFrame.anchor.x.toFixed(2)}, ${selectedFrame.anchor.y.toFixed(2)}
+          </span>
+        </div>
+        <div class="anchor-tools-body">
+          <div class="anchor-preset-grid">
+            ${ANCHOR_PRESETS.map(
+              preset => html`
+                <button
+                  class="anchor-preset-button ${this.isAnchorPresetActive(selectedFrame.anchor, preset.anchor)
+                    ? 'is-active'
+                    : ''}"
+                  type="button"
+                  title=${preset.title}
+                  aria-label=${preset.title}
+                  @click=${() => void this.onApplyAnchorPreset(preset.anchor)}
+                >
+                  ${preset.label}
+                </button>
+              `
+            )}
+          </div>
+          <button type="button" class="anchor-action-button" title="Apply anchor to all frames in current clip" @click=${() => void this.onApplySelectedAnchorToActiveClip()}>
+            Clip
+          </button>
+          <button type="button" class="anchor-action-button" title="Apply anchor to all frames in all clips" @click=${() => void this.onApplySelectedAnchorToAllClips()}>
+            All
+          </button>
+        </div>
       </div>
     `;
   }
@@ -493,6 +557,17 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
         @dragend=${() => this.onFrameDragEnd()}
       >
         <div class="frame-thumb">
+          <span
+            class="frame-delete-button"
+            role="button"
+            tabindex="0"
+            title="Delete frame ${index + 1}"
+            aria-label=${`Delete frame ${index + 1}`}
+            @click=${(event: Event) => void this.onDeleteFrameClick(event, index)}
+            @keydown=${(event: KeyboardEvent) => void this.onDeleteFrameKeyDown(event, index)}
+          >
+            ${this.iconService.getIcon('trash-2', 12)}
+          </span>
           ${previewTextureUrl
             ? html`
                 <img src=${previewTextureUrl} alt="Frame ${index + 1}" style=${imageStyle} />
@@ -502,23 +577,6 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
             class="frame-thumb-anchor"
             style=${`left:${frame.anchor.x * 100}%; top:${frame.anchor.y * 100}%;`}
           ></div>
-        </div>
-        <div class="frame-meta-row">
-          <span class="frame-title">Frame ${index + 1}</span>
-          <span class="frame-meta-actions">
-            ${isPreviewFrame ? html`<span class="frame-badge">Live</span>` : null}
-            <span
-              class="frame-delete-button"
-              role="button"
-              tabindex="0"
-              title="Delete frame ${index + 1}"
-              aria-label=${`Delete frame ${index + 1}`}
-              @click=${(event: Event) => void this.onDeleteFrameClick(event, index)}
-              @keydown=${(event: KeyboardEvent) => void this.onDeleteFrameKeyDown(event, index)}
-            >
-              ${this.iconService.getIcon('trash-2', 12)}
-            </span>
-          </span>
         </div>
       </button>
     `;
@@ -883,6 +941,74 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
         anchor: { ...frame.anchor, [axis]: clampedValue },
       }),
       `Update frame anchor: ${this.activeClipName}`
+    );
+  }
+
+  private isAnchorPresetActive(currentAnchor: StagePoint, presetAnchor: StagePoint): boolean {
+    return currentAnchor.x === presetAnchor.x && currentAnchor.y === presetAnchor.y;
+  }
+
+  private getSelectedAnchor(): StagePoint | null {
+    const selectedFrame = this.getSelectedFrame();
+    if (!selectedFrame) {
+      return null;
+    }
+
+    return {
+      x: selectedFrame.anchor.x,
+      y: selectedFrame.anchor.y,
+    };
+  }
+
+  private async onApplyAnchorPreset(anchor: StagePoint): Promise<void> {
+    await this.applySelectedFrameUpdate(
+      frame => ({
+        ...frame,
+        anchor: { x: anchor.x, y: anchor.y },
+      }),
+      `Set frame anchor preset: ${this.activeClipName}`
+    );
+  }
+
+  private async onApplySelectedAnchorToActiveClip(): Promise<void> {
+    const anchor = this.getSelectedAnchor();
+    if (!anchor) {
+      return;
+    }
+
+    this.frameDraft = null;
+    await this.applyClipUpdate(
+      clip => ({
+        ...clip,
+        frames: clip.frames.map(frame => ({
+          ...frame,
+          anchor: { x: anchor.x, y: anchor.y },
+        })),
+      }),
+      `Apply frame anchor to clip: ${this.activeClipName}`
+    );
+  }
+
+  private async onApplySelectedAnchorToAllClips(): Promise<void> {
+    const anchor = this.getSelectedAnchor();
+    if (!anchor) {
+      return;
+    }
+
+    this.frameDraft = null;
+    await this.applyResourceUpdate(
+      resource => ({
+        ...resource,
+        clips: resource.clips.map(clip => ({
+          ...clip,
+          frames: clip.frames.map(frame => ({
+            ...frame,
+            anchor: { x: anchor.x, y: anchor.y },
+          })),
+        })),
+      }),
+      `Apply frame anchor to all clips: ${this.activeClipName}`,
+      this.activeClipName
     );
   }
 
@@ -1700,7 +1826,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
       offset: { x: 0, y: 0 },
       repeat: { x: 1, y: 1 },
       durationMultiplier: 1,
-      anchor: { x: 0.5, y: 1 },
+      anchor: { ...DEFAULT_FRAME_ANCHOR },
       texturePath,
       boundingBox: { x: 0, y: 0, width: 0, height: 0 },
       collisionPolygon: [],
@@ -1779,7 +1905,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
       offset: { x: 0, y: 0 },
       repeat: { x: 1, y: 1 },
       durationMultiplier: 1,
-      anchor: { x: 0.5, y: 1 },
+      anchor: { ...DEFAULT_FRAME_ANCHOR },
       texturePath: textureResourcePath,
       boundingBox: { x: 0, y: 0, width: 0, height: 0 },
       collisionPolygon: [],

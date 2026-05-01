@@ -200,21 +200,23 @@ pix3-animation-panel .frame-thumb-anchor {
 }
 
 pix3-animation-panel .frame-meta-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
+  display: none;
 }
 
-pix3-animation-panel .frame-meta-actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
+pix3-animation-panel .frame-card-footer {
+  display: none;
 }
 
 pix3-animation-panel .frame-title {
   font-size: 0.74rem;
   font-weight: 600;
+}
+
+pix3-animation-panel .frame-card-footer .frame-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 pix3-animation-panel .frame-badge {
@@ -229,6 +231,10 @@ pix3-animation-panel .frame-badge {
 }
 
 pix3-animation-panel .frame-delete-button {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  z-index: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -236,6 +242,8 @@ pix3-animation-panel .frame-delete-button {
   height: 1.35rem;
   border-radius: 999px;
   color: var(--color-text-secondary, #aaa);
+  background: rgba(15, 17, 22, 0.72);
+  backdrop-filter: blur(4px);
 }
 
 pix3-animation-panel .frame-delete-button:hover,
@@ -248,6 +256,7 @@ pix3-animation-panel .frame-delete-button:focus-visible {
 pix3-animation-panel .stage-shell {
   display: flex;
   flex-direction: column;
+  gap: 0.55rem;
   min-height: 0;
   height: 100%;
 }
@@ -267,6 +276,93 @@ pix3-animation-panel .stage-artboard {
   min-width: min-content;
   min-height: min-content;
   padding: 0.9rem;
+}
+
+pix3-animation-panel .anchor-tools {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  width: 150px;
+  padding: 0 0 0.9rem 0.9rem;
+}
+
+pix3-animation-panel .anchor-tools-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.35rem;
+  width: 150px;
+}
+
+pix3-animation-panel .anchor-tools-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--color-text-primary, #eee);
+}
+
+pix3-animation-panel .anchor-tools-value {
+  font-size: 0.67rem;
+  color: var(--color-text-secondary, #aaa);
+}
+
+pix3-animation-panel .anchor-tools-body {
+  display: grid;
+  grid-template-columns: 1fr 2rem;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: 0.3rem;
+  width: 150px;
+  height: 150px;
+}
+
+pix3-animation-panel .anchor-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(3, minmax(0, 1fr));
+  grid-column: 1;
+  grid-row: 1 / span 2;
+  gap: 0.25rem;
+}
+
+pix3-animation-panel .anchor-preset-button,
+pix3-animation-panel .anchor-action-button {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 0.42rem;
+  background: var(--color-input-bg, #222);
+  color: var(--color-text-secondary, #aaa);
+  cursor: pointer;
+}
+
+pix3-animation-panel .anchor-preset-button {
+  min-height: 0;
+  padding: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1;
+}
+
+pix3-animation-panel .anchor-preset-button:hover,
+pix3-animation-panel .anchor-preset-button:focus-visible,
+pix3-animation-panel .anchor-action-button:hover,
+pix3-animation-panel .anchor-action-button:focus-visible {
+  color: var(--color-text-primary, #eee);
+  border-color: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.35);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.08);
+  outline: none;
+}
+
+pix3-animation-panel .anchor-preset-button.is-active {
+  color: var(--pix3-accent-color, #ffcf33);
+  border-color: var(--pix3-accent-color, #ffcf33);
+  background: rgba(var(--pix3-accent-rgb, 255, 207, 51), 0.12);
+}
+
+pix3-animation-panel .anchor-action-button {
+  min-height: 0;
+  padding: 0;
+  font-size: 0.62rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 pix3-animation-panel .stage-frame {

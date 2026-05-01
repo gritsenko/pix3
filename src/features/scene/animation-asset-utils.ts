@@ -89,7 +89,7 @@ export function createDefaultAnimationResource(
                 offset: { x: 0, y: 0 },
                 repeat: { x: 1, y: 1 },
                 durationMultiplier: 1,
-                anchor: { x: 0.5, y: 1 },
+                anchor: { x: 0.5, y: 0.5 },
                 texturePath: normalizedTexturePath,
                 boundingBox: { x: 0, y: 0, width: 0, height: 0 },
                 collisionPolygon: [],

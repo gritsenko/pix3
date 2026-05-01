@@ -39,5 +39,6 @@ describe('animation asset utils', () => {
     expect(resource.clips[0]?.frames[0]?.texturePath).toBe(
       'res://src/assets/animations/player/frame_0001.png'
     );
+    expect(resource.clips[0]?.frames[0]?.anchor).toEqual({ x: 0.5, y: 0.5 });
   });
 });
