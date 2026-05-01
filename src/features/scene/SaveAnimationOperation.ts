@@ -41,9 +41,7 @@ export class SaveAnimationOperation implements Operation<OperationInvokeResult> 
 
     const filePath = descriptor.filePath;
     if (!filePath?.startsWith('res://')) {
-      throw new Error(
-        `Animation must be saved within the project. (filePath: ${filePath})`
-      );
+      throw new Error(`Animation must be saved within the project. (filePath: ${filePath})`);
     }
 
     const storage = context.container.getService<ProjectStorageService>(

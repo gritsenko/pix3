@@ -6,10 +6,7 @@ import type {
 } from '@/core/Operation';
 import { getAppStateSnapshot } from '@/state';
 import { ProjectStorageService } from '@/services/ProjectStorageService';
-import {
-  normalizeAnimationResource,
-  type AnimationResource,
-} from '@pix3/runtime';
+import { normalizeAnimationResource, type AnimationResource } from '@pix3/runtime';
 import {
   normalizeAnimationAssetPath,
   parseAnimationResourceText,

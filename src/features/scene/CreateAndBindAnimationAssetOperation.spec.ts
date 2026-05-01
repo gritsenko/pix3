@@ -49,7 +49,10 @@ const createOperationContext = (sprite: AnimatedSprite2D) => {
       files.set(path, contents);
     }),
     deleteEntry: vi.fn(async (path: string) => {
-      const normalizedPath = path.replace(/^res:\/\//, '').replace(/\\/g, '/').replace(/\/+$/, '');
+      const normalizedPath = path
+        .replace(/^res:\/\//, '')
+        .replace(/\\/g, '/')
+        .replace(/\/+$/, '');
       for (const existingPath of Array.from(files.keys())) {
         const normalizedExistingPath = existingPath
           .replace(/^res:\/\//, '')

@@ -58,7 +58,9 @@ export class LoadAnimationCommand extends CommandBase<LoadAnimationCommandPayloa
     return { canExecute: true };
   }
 
-  async execute(context: CommandContext): Promise<CommandExecutionResult<LoadAnimationCommandPayload>> {
+  async execute(
+    context: CommandContext
+  ): Promise<CommandExecutionResult<LoadAnimationCommandPayload>> {
     if (!this.payload) {
       throw new Error('LoadAnimationCommand requires payload with filePath');
     }

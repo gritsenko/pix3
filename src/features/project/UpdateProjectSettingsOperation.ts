@@ -145,7 +145,11 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
           state.project.projectName = prevName;
           state.project.localAbsolutePath = prevPath;
           state.project.manifest = prevManifest;
-          this.rebakeRootAnchors(context, nextManifest.viewportBaseSize, prevManifest.viewportBaseSize);
+          this.rebakeRootAnchors(
+            context,
+            nextManifest.viewportBaseSize,
+            prevManifest.viewportBaseSize
+          );
           if (state.project.status === 'ready' && state.project.id) {
             persistRecentProject({
               id: state.project.id,
@@ -163,7 +167,11 @@ export class UpdateProjectSettingsOperation implements Operation<OperationInvoke
           state.project.projectName = newName;
           state.project.localAbsolutePath = newPath;
           state.project.manifest = nextManifest;
-          this.rebakeRootAnchors(context, prevManifest.viewportBaseSize, nextManifest.viewportBaseSize);
+          this.rebakeRootAnchors(
+            context,
+            prevManifest.viewportBaseSize,
+            nextManifest.viewportBaseSize
+          );
           if (state.project.status === 'ready' && state.project.id) {
             persistRecentProject({
               id: state.project.id,

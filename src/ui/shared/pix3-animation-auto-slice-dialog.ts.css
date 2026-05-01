@@ -92,10 +92,13 @@
     linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
     linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
-    #10141b;
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%), #10141b;
   background-size: 16px 16px;
-  background-position: 0 0, 0 8px, 8px -8px, -8px 0;
+  background-position:
+    0 0,
+    0 8px,
+    8px -8px,
+    -8px 0;
 }
 
 .preview-image {
@@ -112,8 +115,18 @@
   inset: 0;
   pointer-events: none;
   background-image:
-    linear-gradient(to right, rgba(255, 207, 51, 0.78) 0, rgba(255, 207, 51, 0.78) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 207, 51, 0.78) 0, rgba(255, 207, 51, 0.78) 1px, transparent 1px);
+    linear-gradient(
+      to right,
+      rgba(255, 207, 51, 0.78) 0,
+      rgba(255, 207, 51, 0.78) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(255, 207, 51, 0.78) 0,
+      rgba(255, 207, 51, 0.78) 1px,
+      transparent 1px
+    );
   background-size:
     calc(100% / var(--slice-columns)) 100%,
     100% calc(100% / var(--slice-rows));

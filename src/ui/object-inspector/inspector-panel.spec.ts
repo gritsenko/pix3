@@ -429,10 +429,7 @@ describe('InspectorPanel compact object layout', () => {
     });
     node.layoutEnabled = true;
 
-    const { panel } = await setupInspectorForNode(
-      node,
-      execute
-    );
+    const { panel } = await setupInspectorForNode(node, execute);
 
     const anchorEditor = panel.querySelector('.anchor-visual-editor');
     const horizontalLeftButton = panel.querySelector('.anchor-control-row .anchor-mode-button');

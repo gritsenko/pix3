@@ -393,7 +393,10 @@ export class EditorTabComponent extends ComponentBase {
     if (event.pointerType === 'touch' && appState.ui.navigationMode === '2d') {
       this.capturePointerSafely(event.pointerId);
 
-      if (this.singleTouchPanPointerId !== null && this.singleTouchPanPointerId !== event.pointerId) {
+      if (
+        this.singleTouchPanPointerId !== null &&
+        this.singleTouchPanPointerId !== event.pointerId
+      ) {
         this.navigation2D.endPan();
         this.singleTouchPanPointerId = null;
       }
@@ -452,7 +455,11 @@ export class EditorTabComponent extends ComponentBase {
       appState.ui.navigationMode === '2d' &&
       this.navigation2D.isTouchPointerTracked(event.pointerId)
     ) {
-      const didUpdateGesture = this.navigation2D.updateTouchPointer(event.pointerId, screenX, screenY);
+      const didUpdateGesture = this.navigation2D.updateTouchPointer(
+        event.pointerId,
+        screenX,
+        screenY
+      );
       if (didUpdateGesture) {
         this.touchGestureInProgress = true;
         this.clearPointerInteraction();
@@ -645,7 +652,10 @@ export class EditorTabComponent extends ComponentBase {
       return false;
     }
 
-    const hitNode = this.viewportRenderer.raycastObject(screenX / rect.width, screenY / rect.height);
+    const hitNode = this.viewportRenderer.raycastObject(
+      screenX / rect.width,
+      screenY / rect.height
+    );
     return !hitNode;
   }
 

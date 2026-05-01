@@ -91,13 +91,13 @@ export class AssetsPreviewPanel extends ComponentBase {
           ${item.previewType === 'text' && item.previewText
             ? html`<span class="text-thumb">${item.previewText}</span>`
             : item.thumbnailUrl
-            ? html`<img src=${item.thumbnailUrl} alt=${item.name} loading="lazy" />`
-            : html`
-                <span class="icon">${this.iconService.getIcon(item.iconName, 24)}</span>
-                ${item.previewType === 'model' && item.thumbnailStatus === 'loading'
-                  ? html`<span class="thumb-spinner" aria-hidden="true"></span>`
-                  : null}
-              `}
+              ? html`<img src=${item.thumbnailUrl} alt=${item.name} loading="lazy" />`
+              : html`
+                  <span class="icon">${this.iconService.getIcon(item.iconName, 24)}</span>
+                  ${item.previewType === 'model' && item.thumbnailStatus === 'loading'
+                    ? html`<span class="thumb-spinner" aria-hidden="true"></span>`
+                    : null}
+                `}
         </span>
         <span class="name">${item.name}</span>
         ${item.kind === 'file' && item.sizeBytes !== null
@@ -149,7 +149,8 @@ export class AssetsPreviewPanel extends ComponentBase {
     if (event.shiftKey && this.lastSelectedPath && orderedPaths.includes(this.lastSelectedPath)) {
       const startIndex = orderedPaths.indexOf(this.lastSelectedPath);
       const endIndex = orderedPaths.indexOf(item.path);
-      const [rangeStart, rangeEnd] = startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
+      const [rangeStart, rangeEnd] =
+        startIndex <= endIndex ? [startIndex, endIndex] : [endIndex, startIndex];
       nextSelectedPaths.clear();
       for (let index = rangeStart; index <= rangeEnd; index += 1) {
         const path = orderedPaths[index];

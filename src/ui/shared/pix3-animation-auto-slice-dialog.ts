@@ -114,7 +114,10 @@ export class AnimationAutoSliceDialog extends ComponentBase {
                     step="1"
                     .value=${String(this.columns)}
                     @input=${(event: Event) => {
-                      this.columns = Math.max(1, Number((event.target as HTMLInputElement).value) || 1);
+                      this.columns = Math.max(
+                        1,
+                        Number((event.target as HTMLInputElement).value) || 1
+                      );
                     }}
                   />
                 </div>
@@ -127,7 +130,10 @@ export class AnimationAutoSliceDialog extends ComponentBase {
                     step="1"
                     .value=${String(this.rows)}
                     @input=${(event: Event) => {
-                      this.rows = Math.max(1, Number((event.target as HTMLInputElement).value) || 1);
+                      this.rows = Math.max(
+                        1,
+                        Number((event.target as HTMLInputElement).value) || 1
+                      );
                     }}
                   />
                 </div>

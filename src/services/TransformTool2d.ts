@@ -140,10 +140,7 @@ export class TransformTool2d {
     viewportSize?: { width: number; height: number }
   ): number {
     if (orthographicCamera && viewportSize) {
-      const worldUnitsPerCssPixel = this.getWorldUnitsPerCssPixel(
-        orthographicCamera,
-        viewportSize
-      );
+      const worldUnitsPerCssPixel = this.getWorldUnitsPerCssPixel(orthographicCamera, viewportSize);
       return Math.max(
         this.min2DSizeCssPx * worldUnitsPerCssPixel.x,
         this.min2DSizeCssPx * worldUnitsPerCssPixel.y
@@ -787,7 +784,9 @@ export class TransformTool2d {
       }
 
       const primaryNode =
-        transform.nodeIds.length === 1 ? sceneGraph.nodeMap.get(transform.nodeIds[0]) ?? null : null;
+        transform.nodeIds.length === 1
+          ? (sceneGraph.nodeMap.get(transform.nodeIds[0]) ?? null)
+          : null;
       let preserveAspect = Boolean(options.preserveAspectRatio && primaryNode);
       if (primaryNode && 'aspectRatioLocked' in primaryNode && primaryNode.aspectRatioLocked) {
         preserveAspect = true;

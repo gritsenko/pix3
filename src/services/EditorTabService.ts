@@ -150,7 +150,8 @@ export class EditorTabService {
     type: EditorTabType,
     resourceId: string,
     contextState?: EditorTab['contextState'],
-    activate = true
+    activate = true,
+    initialTitle?: string
   ): Promise<EditorTab> {
     this.initialize();
 
@@ -191,7 +192,7 @@ export class EditorTabService {
       id: tabId,
       type,
       resourceId,
-      title: this.deriveTitle(resourceId),
+      title: initialTitle ?? this.deriveTitle(resourceId),
       isDirty: false,
       contextState: contextState ?? {},
     };
@@ -296,6 +297,7 @@ export class EditorTabService {
         session.tabs as Array<{
           type: string;
           resourceId: string;
+          title?: string;
           contextState?: EditorTab['contextState'];
         }>
       ).filter((t: { resourceId: string; type: string }) => {
@@ -320,7 +322,8 @@ export class EditorTabService {
             tabData.type as EditorTabType,
             tabData.resourceId,
             tabData.contextState,
-            false // don't activate yet
+            false,
+            tabData.title
           );
         }
 

@@ -868,7 +868,11 @@ export class InspectorPanel extends ComponentBase {
     void this.editorTabService.focusOrOpenAnimation(trimmedResourcePath);
   }
 
-  private canCreateAnimationResource(propertyName: string, value: string, readOnly: boolean): boolean {
+  private canCreateAnimationResource(
+    propertyName: string,
+    value: string,
+    readOnly: boolean
+  ): boolean {
     return (
       !readOnly &&
       propertyName === 'animationResourcePath' &&
@@ -1490,9 +1494,7 @@ export class InspectorPanel extends ComponentBase {
               .value=${texturePath}
               placeholder="res://textures/spritesheet.png"
               @change=${(event: Event) =>
-                void controller.updateTexturePath(
-                  (event.target as HTMLInputElement).value.trim()
-                )}
+                void controller.updateTexturePath((event.target as HTMLInputElement).value.trim())}
             />
           </label>
           <div class="toolbar-row">
@@ -1514,8 +1516,8 @@ export class InspectorPanel extends ComponentBase {
             </button>
           </div>
           <div class="panel-note">
-            Use this only as a one-time import source. The editor stores sequence frames as
-            separate files after slicing.
+            Use this only as a one-time import source. The editor stores sequence frames as separate
+            files after slicing.
           </div>
         </div>
 
@@ -1567,7 +1569,11 @@ export class InspectorPanel extends ComponentBase {
               <div class="property-group-section asset-section">
                 <div class="section-header">
                   <h4 class="group-title">Clip</h4>
-                  <span class="animation-chip">${selectedFrame ? `Frame ${animationState.selectedFrameIndex + 1}` : 'Clip'}</span>
+                  <span class="animation-chip"
+                    >${selectedFrame
+                      ? `Frame ${animationState.selectedFrameIndex + 1}`
+                      : 'Clip'}</span
+                  >
                 </div>
                 <div class="field-grid">
                   <label class="field">
@@ -1589,7 +1595,9 @@ export class InspectorPanel extends ComponentBase {
                       step="1"
                       .value=${String(activeClip.fps)}
                       @change=${(event: Event) =>
-                        void controller.updateClipFps(Number((event.target as HTMLInputElement).value))}
+                        void controller.updateClipFps(
+                          Number((event.target as HTMLInputElement).value)
+                        )}
                     />
                   </label>
                   <label class="field">
@@ -1622,7 +1630,6 @@ export class InspectorPanel extends ComponentBase {
                 <div class="asset-text-preview-state">No active clip selected.</div>
               </div>
             `}
-
         ${selectedFrame
           ? html`
               <div class="property-group-section asset-section">
@@ -1690,7 +1697,9 @@ export class InspectorPanel extends ComponentBase {
                   </label>
                 </div>
                 <div class="field-grid">
-                  <div class="inspector-section-title inspector-section-title--subtle">Bounding Box</div>
+                  <div class="inspector-section-title inspector-section-title--subtle">
+                    Bounding Box
+                  </div>
                 </div>
                 <div class="row">
                   <label class="field">
@@ -1751,7 +1760,9 @@ export class InspectorPanel extends ComponentBase {
                   </label>
                 </div>
                 <div class="field-grid">
-                  <div class="inspector-section-title inspector-section-title--subtle">Collision Polygon</div>
+                  <div class="inspector-section-title inspector-section-title--subtle">
+                    Collision Polygon
+                  </div>
                   <div class="panel-note">
                     ${selectedFrame.collisionPolygon.length
                       ? `${selectedFrame.collisionPolygon.length} vertices authored.`
@@ -1759,13 +1770,25 @@ export class InspectorPanel extends ComponentBase {
                   </div>
                 </div>
                 <div class="toolbar-row">
-                  <button class="mini-button" type="button" @click=${() => void controller.addPolygonVertex()}>
+                  <button
+                    class="mini-button"
+                    type="button"
+                    @click=${() => void controller.addPolygonVertex()}
+                  >
                     Add Vertex
                   </button>
-                  <button class="mini-button" type="button" @click=${() => void controller.clearPolygon()}>
+                  <button
+                    class="mini-button"
+                    type="button"
+                    @click=${() => void controller.clearPolygon()}
+                  >
                     Clear Polygon
                   </button>
-                  <button class="mini-button" type="button" @click=${() => void controller.resetBoundingBox()}>
+                  <button
+                    class="mini-button"
+                    type="button"
+                    @click=${() => void controller.resetBoundingBox()}
+                  >
                     Reset Box
                   </button>
                 </div>
@@ -1774,7 +1797,8 @@ export class InspectorPanel extends ComponentBase {
           : html`
               <div class="property-group-section asset-section">
                 <div class="asset-text-preview-state">
-                  Pick a frame in the timeline to edit delay, anchor, bounding box, and polygon data.
+                  Pick a frame in the timeline to edit delay, anchor, bounding box, and polygon
+                  data.
                 </div>
               </div>
             `}
@@ -2433,9 +2457,13 @@ ${textPreview?.content || 'Empty file'}</pre
       return this.renderSizeGroup(label, visibleProps);
     }
 
-    return this.renderPropertySection(label, visibleProps.map(prop => this.renderPropertyInput(prop)), {
-      hideTitle: groupName === 'Style' && visibleProps.length === 1,
-    });
+    return this.renderPropertySection(
+      label,
+      visibleProps.map(prop => this.renderPropertyInput(prop)),
+      {
+        hideTitle: groupName === 'Style' && visibleProps.length === 1,
+      }
+    );
   }
 
   private renderAnchorGroup(label: string, _props: PropertyDefinition[]) {
@@ -2443,7 +2471,8 @@ ${textPreview?.content || 'Empty file'}</pre
       return '';
     }
 
-    const enabled = this.propertyValues['layoutEnabled']?.value === 'true' || this.primaryNode.layoutEnabled;
+    const enabled =
+      this.propertyValues['layoutEnabled']?.value === 'true' || this.primaryNode.layoutEnabled;
     const readOnly = appState.collaboration.isReadOnly;
     const horizontal =
       this.propertyValues['horizontalAlign']?.value ?? this.primaryNode.horizontalAlign;
@@ -2485,7 +2514,13 @@ ${textPreview?.content || 'Empty file'}</pre
                     <span class="anchor-axis-label">H</span>
                     <div class="anchor-mode-group">
                       ${['left', 'center', 'right', 'stretch'].map(option =>
-                        this.renderAnchorModeButton('horizontal', option, horizontal, enabled, readOnly)
+                        this.renderAnchorModeButton(
+                          'horizontal',
+                          option,
+                          horizontal,
+                          enabled,
+                          readOnly
+                        )
                       )}
                     </div>
                   </div>
@@ -2514,9 +2549,13 @@ ${textPreview?.content || 'Empty file'}</pre
       return '';
     }
 
-    return this.renderPropertySection(label, props.map(prop => this.renderTransformProperty(prop)), {
-      className: 'transform-section',
-    });
+    return this.renderPropertySection(
+      label,
+      props.map(prop => this.renderTransformProperty(prop)),
+      {
+        className: 'transform-section',
+      }
+    );
   }
 
   private renderTransformProperty(prop: PropertyDefinition) {
@@ -2568,7 +2607,10 @@ ${textPreview?.content || 'Empty file'}</pre
     const remainingProps = props.filter(p => p.name !== 'width' && p.name !== 'height');
 
     if (!widthProp || !heightProp) {
-      return this.renderPropertySection(label, props.map(prop => this.renderPropertyInput(prop)));
+      return this.renderPropertySection(
+        label,
+        props.map(prop => this.renderPropertyInput(prop))
+      );
     }
 
     const widthState = this.propertyValues[widthProp.name];
@@ -2579,7 +2621,10 @@ ${textPreview?.content || 'Empty file'}</pre
     const height = heightState ? parseFloat(heightState.value) : 64;
 
     if (!(this.primaryNode instanceof Sprite2D)) {
-      return this.renderPropertySection(label, props.map(prop => this.renderPropertyInput(prop)));
+      return this.renderPropertySection(
+        label,
+        props.map(prop => this.renderPropertyInput(prop))
+      );
     }
 
     const node = this.primaryNode;
@@ -3163,8 +3208,7 @@ ${textPreview?.content || 'Empty file'}</pre
               @change=${(e: Event) =>
                 this.applyPropertyChange(prop.name, (e.target as HTMLInputElement).checked)}
             />
-            <span
-              class=${`property-label-text ${isOverridden ? 'property-label--overridden' : ''}`}
+            <span class=${`property-label-text ${isOverridden ? 'property-label--overridden' : ''}`}
               >${label}</span
             >
             ${isOverridden
@@ -3623,7 +3667,9 @@ ${textPreview?.content || 'Empty file'}</pre
       return;
     }
 
-    if (!(this.propertyValues['layoutEnabled']?.value === 'true' || this.primaryNode.layoutEnabled)) {
+    if (
+      !(this.propertyValues['layoutEnabled']?.value === 'true' || this.primaryNode.layoutEnabled)
+    ) {
       await this.applyPropertyChange('layoutEnabled', true);
     }
 
@@ -3657,7 +3703,9 @@ ${textPreview?.content || 'Empty file'}</pre
       return;
     }
 
-    if (!(this.propertyValues['layoutEnabled']?.value === 'true' || this.primaryNode.layoutEnabled)) {
+    if (
+      !(this.propertyValues['layoutEnabled']?.value === 'true' || this.primaryNode.layoutEnabled)
+    ) {
       await this.applyPropertyChange('layoutEnabled', true);
     }
 
@@ -3685,8 +3733,7 @@ ${textPreview?.content || 'Empty file'}</pre
 
     return html`
       <div class=${classes}>
-        ${options.hideTitle ? '' : html`<h4 class="group-title">${label}</h4>`}
-        ${content}
+        ${options.hideTitle ? '' : html`<h4 class="group-title">${label}</h4>`} ${content}
       </div>
     `;
   }

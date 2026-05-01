@@ -3584,10 +3584,14 @@ export class ViewportRendererService {
 
     const material = mesh.material;
     const currentResourcePath = node.animationResourcePath?.trim() || null;
-    const previousResourcePath = (visualRoot.userData.animationResourcePath as string | null) ?? null;
+    const previousResourcePath =
+      (visualRoot.userData.animationResourcePath as string | null) ?? null;
     const cachedTexturePath = (visualRoot.userData.animationTexturePath as string | null) ?? null;
-    const openResource = currentResourcePath ? this.getLoadedAnimationResource(currentResourcePath) : null;
-    const cachedResource = (visualRoot.userData.animationResource as AnimationResource | null) ?? null;
+    const openResource = currentResourcePath
+      ? this.getLoadedAnimationResource(currentResourcePath)
+      : null;
+    const cachedResource =
+      (visualRoot.userData.animationResource as AnimationResource | null) ?? null;
 
     visualRoot.userData.animationResourcePath = currentResourcePath;
     visualRoot.userData.currentClip = node.currentClip;
@@ -3609,7 +3613,11 @@ export class ViewportRendererService {
       return;
     }
 
-    if (currentResourcePath && !visualRoot.userData.animationResource && !visualRoot.userData.animationLoadToken) {
+    if (
+      currentResourcePath &&
+      !visualRoot.userData.animationResource &&
+      !visualRoot.userData.animationLoadToken
+    ) {
       void this.loadAnimatedSprite2DVisualAsset(node, visualRoot);
     }
 
@@ -3632,7 +3640,8 @@ export class ViewportRendererService {
     const texture = (visualRoot.userData.animationTexture as THREE.Texture | null) ?? null;
     const clip = findAnimationClip(resource, node.currentClip);
     const frames = clip?.frames ?? [];
-    const frameIndex = frames.length > 0 ? Math.max(0, Math.min(node.currentFrame, frames.length - 1)) : 0;
+    const frameIndex =
+      frames.length > 0 ? Math.max(0, Math.min(node.currentFrame, frames.length - 1)) : 0;
     const frame = frames[frameIndex] ?? null;
 
     if (texture) {

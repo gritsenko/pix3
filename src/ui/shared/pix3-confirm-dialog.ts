@@ -68,9 +68,7 @@ export class ConfirmDialog extends ComponentBase {
         >
           <h2 class="dialog-title">${this.title}</h2>
           <p class="dialog-message">${this.message}</p>
-          ${this.disclaimer
-            ? html`<p class="dialog-disclaimer">${this.disclaimer}</p>`
-            : null}
+          ${this.disclaimer ? html`<p class="dialog-disclaimer">${this.disclaimer}</p>` : null}
           ${this.requiresExactConfirmation
             ? html`
                 <label class="dialog-confirmation">

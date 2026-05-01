@@ -502,7 +502,9 @@ export class LayoutManagerService {
     return undefined;
   }
 
-  private isEditorTabComponentType(componentType: string | undefined): componentType is PanelComponentType {
+  private isEditorTabComponentType(
+    componentType: string | undefined
+  ): componentType is PanelComponentType {
     return (
       componentType === PANEL_COMPONENT_TYPES.viewport ||
       componentType === PANEL_COMPONENT_TYPES.animation ||
@@ -667,10 +669,14 @@ export class LayoutManagerService {
   private registerComponents(layout: GoldenLayout): void {
     Object.entries(PANEL_TAG_NAMES).forEach(([componentType, tagName]) => {
       layout.registerComponentFactoryFunction(componentType, container => {
-        container.setTitle(PANEL_DISPLAY_TITLES[componentType as PanelComponentType]);
-
+        const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
         if (this.isEditorTabComponentType(componentType)) {
-          const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
+          const tabTitle =
+            typeof tabId === 'string' && tabId
+              ? appState.tabs.tabs.find(tab => tab.id === tabId)?.title
+              : undefined;
+          container.setTitle(tabTitle ?? container.title ?? PANEL_DISPLAY_TITLES.viewport);
+
           if (typeof tabId === 'string' && tabId) {
             this.editorTabContainers.set(tabId, container as unknown as ContentItem);
 
@@ -683,6 +689,8 @@ export class LayoutManagerService {
               // ignore
             }
           }
+        } else {
+          container.setTitle(PANEL_DISPLAY_TITLES[componentType as PanelComponentType]);
         }
 
         const element = document.createElement(tagName);
@@ -699,9 +707,7 @@ export class LayoutManagerService {
         container.element.append(element);
         container.on('destroy', () => {
           try {
-            if (
-              this.isEditorTabComponentType(componentType)
-            ) {
+            if (this.isEditorTabComponentType(componentType)) {
               const tabId = (container.state as { tabId?: string } | undefined)?.tabId;
               if (typeof tabId === 'string' && tabId) {
                 this.editorTabContainers.delete(tabId);

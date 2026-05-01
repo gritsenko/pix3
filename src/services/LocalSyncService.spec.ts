@@ -554,9 +554,9 @@ describe('LocalSyncService', () => {
     );
     expect(await (await gitignoreHandle.getFile()).text()).toBe(cloudGitignore);
 
-    const sceneHandle = await (await (localRoot as unknown as FakeDirectoryHandle).getDirectoryHandle(
-      'Scenes'
-    )).getFileHandle('main.pix3scene');
+    const sceneHandle = await (
+      await (localRoot as unknown as FakeDirectoryHandle).getDirectoryHandle('Scenes')
+    ).getFileHandle('main.pix3scene');
     expect(await (await sceneHandle.getFile()).text()).toBe(sceneContents);
     expect(projectService.addRecentProject).toHaveBeenCalledWith(
       expect.objectContaining({

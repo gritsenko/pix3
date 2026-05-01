@@ -182,7 +182,7 @@ export class AssetsPreviewService {
     this.state.selectedItemPath = kind === 'file' ? normalizedPath : null;
     this.state.selectedItem =
       kind === 'file'
-        ? this.state.items.find(item => this.normalizePath(item.path) === normalizedPath) ?? null
+        ? (this.state.items.find(item => this.normalizePath(item.path) === normalizedPath) ?? null)
         : null;
     await this.setSelectedFolder(normalizedFolderPath);
   }

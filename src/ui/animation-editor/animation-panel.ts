@@ -311,13 +311,36 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
           () => this.onTogglePlayback(),
           frameCount === 0
         )}
-        ${this.renderToolbarButton('square', 'Stop playback', () => this.onStopPlayback(), frameCount === 0)}
+        ${this.renderToolbarButton(
+          'square',
+          'Stop playback',
+          () => this.onStopPlayback(),
+          frameCount === 0
+        )}
 
         <span class="editor-toolbar-separator" aria-hidden="true"></span>
 
-        ${this.renderToolbarButton('crosshair', 'Anchor mode', () => this.onSetEditMode('anchor'), false, this.editMode === 'anchor')}
-        ${this.renderToolbarButton('pen-tool', 'Polygon mode', () => this.onSetEditMode('polygon'), false, this.editMode === 'polygon')}
-        ${this.renderToolbarButton('crop', 'Bounding box mode', () => this.onSetEditMode('bbox'), false, this.editMode === 'bbox')}
+        ${this.renderToolbarButton(
+          'crosshair',
+          'Anchor mode',
+          () => this.onSetEditMode('anchor'),
+          false,
+          this.editMode === 'anchor'
+        )}
+        ${this.renderToolbarButton(
+          'pen-tool',
+          'Polygon mode',
+          () => this.onSetEditMode('polygon'),
+          false,
+          this.editMode === 'polygon'
+        )}
+        ${this.renderToolbarButton(
+          'crop',
+          'Bounding box mode',
+          () => this.onSetEditMode('bbox'),
+          false,
+          this.editMode === 'bbox'
+        )}
 
         <span class="editor-toolbar-separator" aria-hidden="true"></span>
 
@@ -329,7 +352,9 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
 
         ${this.renderToolbarButton(
           'trash-2',
-          this.getSelectedFrameIndices().length > 1 ? 'Delete selected frames' : 'Delete selected frame',
+          this.getSelectedFrameIndices().length > 1
+            ? 'Delete selected frames'
+            : 'Delete selected frame',
           () => void this.onRemoveSelectedFrame(),
           frameCount === 0 || this.getSelectedFrameIndices().length === 0
         )}
@@ -495,7 +520,10 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
             ${ANCHOR_PRESETS.map(
               preset => html`
                 <button
-                  class="anchor-preset-button ${this.isAnchorPresetActive(selectedFrame.anchor, preset.anchor)
+                  class="anchor-preset-button ${this.isAnchorPresetActive(
+                    selectedFrame.anchor,
+                    preset.anchor
+                  )
                     ? 'is-active'
                     : ''}"
                   type="button"
@@ -508,10 +536,20 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
               `
             )}
           </div>
-          <button type="button" class="anchor-action-button" title="Apply anchor to all frames in current clip" @click=${() => void this.onApplySelectedAnchorToActiveClip()}>
+          <button
+            type="button"
+            class="anchor-action-button"
+            title="Apply anchor to all frames in current clip"
+            @click=${() => void this.onApplySelectedAnchorToActiveClip()}
+          >
             Clip
           </button>
-          <button type="button" class="anchor-action-button" title="Apply anchor to all frames in all clips" @click=${() => void this.onApplySelectedAnchorToAllClips()}>
+          <button
+            type="button"
+            class="anchor-action-button"
+            title="Apply anchor to all frames in all clips"
+            @click=${() => void this.onApplySelectedAnchorToAllClips()}
+          >
             All
           </button>
         </div>
@@ -523,8 +561,8 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
     if (!activeClip || clipFrames.length === 0) {
       return html`
         <div class="empty-state empty-state--inline">
-          This clip has no frames yet. Drop images to append sequence frames or import a
-          spritesheet once via <strong>Slice Frames...</strong>.
+          This clip has no frames yet. Drop images to append sequence frames or import a spritesheet
+          once via <strong>Slice Frames...</strong>.
         </div>
       `;
     }
@@ -545,7 +583,9 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
 
     return html`
       <button
-        class="frame-card ${isSelected ? 'is-selected' : ''} ${isPreviewFrame ? 'is-preview' : ''} ${isDropTarget ? 'is-drop-target' : ''}"
+        class="frame-card ${isSelected ? 'is-selected' : ''} ${isPreviewFrame
+          ? 'is-preview'
+          : ''} ${isDropTarget ? 'is-drop-target' : ''}"
         type="button"
         title=${`Frame ${index + 1} · ${this.getFrameDurationLabel(frame)}`}
         draggable="true"
@@ -569,9 +609,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
             ${this.iconService.getIcon('trash-2', 12)}
           </span>
           ${previewTextureUrl
-            ? html`
-                <img src=${previewTextureUrl} alt="Frame ${index + 1}" style=${imageStyle} />
-              `
+            ? html` <img src=${previewTextureUrl} alt="Frame ${index + 1}" style=${imageStyle} /> `
             : null}
           <div
             class="frame-thumb-anchor"
@@ -629,7 +667,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
   private getFrameMetrics(frame: AnimationFrame): { frameWidth: number; frameHeight: number } {
     const resolvedTexturePath = this.getResolvedFrameTexturePath(frame);
     const cachedDimensions = resolvedTexturePath
-      ? this.textureDimensionsCache.get(resolvedTexturePath) ?? null
+      ? (this.textureDimensionsCache.get(resolvedTexturePath) ?? null)
       : null;
     const textureWidth = cachedDimensions?.width || this.textureDimensions.width || 256;
     const textureHeight = cachedDimensions?.height || this.textureDimensions.height || 256;
@@ -1272,7 +1310,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
         ? Math.min(this.selectedFrameIndex, frameCount - 1)
         : storedFrameIndex >= 0
           ? Math.min(storedFrameIndex, frameCount - 1)
-        : 0;
+          : 0;
 
     this.selectedFrameIndex = fallbackIndex;
     this.selectedFrameIndices = [fallbackIndex];
@@ -1442,7 +1480,10 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
 
     const token = ++this.loadToken;
     const cachedTextureUrl = this.texturePreviewCache.get(texturePath) ?? '';
-    const cachedDimensions = this.textureDimensionsCache.get(texturePath) ?? { width: 0, height: 0 };
+    const cachedDimensions = this.textureDimensionsCache.get(texturePath) ?? {
+      width: 0,
+      height: 0,
+    };
 
     if (cachedTextureUrl) {
       this.texturePreviewUrl = cachedTextureUrl;
@@ -1454,7 +1495,10 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
     await this.ensureTexturePreviewLoaded(texturePath, token);
   }
 
-  private async ensureTexturePreviewLoaded(texturePath: string, token = this.loadToken): Promise<void> {
+  private async ensureTexturePreviewLoaded(
+    texturePath: string,
+    token = this.loadToken
+  ): Promise<void> {
     if (!texturePath) {
       return;
     }
@@ -1464,8 +1508,10 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
       await inFlight;
       if (texturePath === this.previewTexturePath && token === this.loadToken) {
         this.texturePreviewUrl = this.texturePreviewCache.get(texturePath) ?? '';
-        this.textureDimensions =
-          this.textureDimensionsCache.get(texturePath) ?? { width: 0, height: 0 };
+        this.textureDimensions = this.textureDimensionsCache.get(texturePath) ?? {
+          width: 0,
+          height: 0,
+        };
       }
       return;
     }
@@ -1556,7 +1602,7 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
       nextActiveClipName ??
       (this.activeClipName && nextResource.clips.some(clip => clip.name === this.activeClipName)
         ? this.activeClipName
-        : nextResource.clips[0]?.name ?? '');
+        : (nextResource.clips[0]?.name ?? ''));
     this.activeClipName = preservedActiveClipName;
     this.persistActiveClipName(this.activeClipName);
     this.syncFrameStateToActiveClip(Boolean(nextActiveClipName));
@@ -1754,7 +1800,8 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
 
     const nextClip = this.getActiveClip();
     const nextFrameCount = nextClip?.frames.length ?? 0;
-    const nextSelectedIndex = nextFrameCount === 0 ? -1 : Math.min(firstRemovedIndex, nextFrameCount - 1);
+    const nextSelectedIndex =
+      nextFrameCount === 0 ? -1 : Math.min(firstRemovedIndex, nextFrameCount - 1);
     this.selectedFrameIndex = nextSelectedIndex;
     this.selectedFrameIndices = nextSelectedIndex >= 0 ? [nextSelectedIndex] : [];
     this.previewFrameIndex = nextSelectedIndex;
@@ -1858,7 +1905,9 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
       }
 
       const texturePaths = parsed
-        .map(value => (typeof value === 'string' ? this.normalizeDroppedTextureResource(value) : null))
+        .map(value =>
+          typeof value === 'string' ? this.normalizeDroppedTextureResource(value) : null
+        )
         .filter((value): value is string => Boolean(value));
 
       return texturePaths.length > 0 ? texturePaths : null;
@@ -2133,7 +2182,8 @@ export class AnimationPanel extends ComponentBase implements AnimationInspectorC
   }
 
   private syncActiveInspectorController(): void {
-    const isActiveAnimationTab = Boolean(this.assetPath) && Boolean(this.tabId) && appState.tabs.activeTabId === this.tabId;
+    const isActiveAnimationTab =
+      Boolean(this.assetPath) && Boolean(this.tabId) && appState.tabs.activeTabId === this.tabId;
 
     if (isActiveAnimationTab) {
       this.animationEditorService.setActiveController(this);

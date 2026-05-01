@@ -40,13 +40,9 @@ class CloudProjectServiceStub {
     isLoading: false,
   };
 
-  private listeners = new Set<
-    (state: { projects: ApiProject[]; isLoading: boolean }) => void
-  >();
+  private listeners = new Set<(state: { projects: ApiProject[]; isLoading: boolean }) => void>();
 
-  subscribe(
-    listener: (state: { projects: ApiProject[]; isLoading: boolean }) => void
-  ): () => void {
+  subscribe(listener: (state: { projects: ApiProject[]; isLoading: boolean }) => void): () => void {
     this.listeners.add(listener);
     listener(this.state);
     return () => this.listeners.delete(listener);
@@ -82,7 +78,11 @@ describe('Pix3Welcome', () => {
     appState.auth.isAuthenticated = true;
 
     const container = ServiceContainer.getInstance();
-    container.addService(container.getOrCreateToken(ProjectService), ProjectServiceStub, 'singleton');
+    container.addService(
+      container.getOrCreateToken(ProjectService),
+      ProjectServiceStub,
+      'singleton'
+    );
     container.addService(container.getOrCreateToken(IconService), IconServiceStub, 'singleton');
     container.addService(container.getOrCreateToken(DialogService), DialogServiceStub, 'singleton');
     container.addService(
@@ -141,7 +141,11 @@ describe('Pix3Welcome', () => {
     appState.auth.isAuthenticated = true;
 
     const container = ServiceContainer.getInstance();
-    container.addService(container.getOrCreateToken(ProjectService), ProjectServiceStub, 'singleton');
+    container.addService(
+      container.getOrCreateToken(ProjectService),
+      ProjectServiceStub,
+      'singleton'
+    );
     container.addService(container.getOrCreateToken(IconService), IconServiceStub, 'singleton');
     container.addService(
       container.getOrCreateToken(ProjectLifecycleService),

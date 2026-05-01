@@ -55,19 +55,21 @@ describe('ModelAssetPreview', () => {
       throw new Error(`Unexpected blob path: ${path}`);
     });
 
-    mockLoadGltfFromBlob.mockImplementation(async (options: {
-      blob: Blob;
-      sourcePath?: string;
-      readBlob?: (path: string) => Promise<Blob>;
-    }) => {
-      expect(options.blob).toBe(rootBlob);
-      expect(options.sourcePath).toBe('res://assets/models/crate.gltf');
-      await options.readBlob?.('res://assets/models/crate.bin');
-      return {
-        gltf: { scene: new Group() },
-        cleanup: vi.fn(),
-      };
-    });
+    mockLoadGltfFromBlob.mockImplementation(
+      async (options: {
+        blob: Blob;
+        sourcePath?: string;
+        readBlob?: (path: string) => Promise<Blob>;
+      }) => {
+        expect(options.blob).toBe(rootBlob);
+        expect(options.sourcePath).toBe('res://assets/models/crate.gltf');
+        await options.readBlob?.('res://assets/models/crate.bin');
+        return {
+          gltf: { scene: new Group() },
+          cleanup: vi.fn(),
+        };
+      }
+    );
 
     const preview = new ModelAssetPreview() as unknown as {
       renderer: object;

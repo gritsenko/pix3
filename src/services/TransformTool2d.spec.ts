@@ -46,8 +46,7 @@ describe('TransformTool2d', () => {
   ) => {
     const bounds = new THREE.Box3().setFromObject(object);
     const visibleWorldWidth = Math.abs(camera.right - camera.left) / Math.max(0.0001, camera.zoom);
-    const visibleWorldHeight =
-      Math.abs(camera.top - camera.bottom) / Math.max(0.0001, camera.zoom);
+    const visibleWorldHeight = Math.abs(camera.top - camera.bottom) / Math.max(0.0001, camera.zoom);
 
     return {
       width: ((bounds.max.x - bounds.min.x) / visibleWorldWidth) * viewportSize.width,
@@ -323,12 +322,12 @@ describe('TransformTool2d', () => {
         const handleCenter = rotateHandle!.getWorldPosition(new THREE.Vector3());
         const centerScreen = toScreen(handleCenter, camera, viewportSize);
 
-        expect(tool.getHandleAt(centerScreen.x + 6, centerScreen.y, overlay, camera, viewportSize)).toBe(
-          'rotate'
-        );
-        expect(tool.getHandleAt(centerScreen.x + 8, centerScreen.y, overlay, camera, viewportSize)).toBe(
-          'idle'
-        );
+        expect(
+          tool.getHandleAt(centerScreen.x + 6, centerScreen.y, overlay, camera, viewportSize)
+        ).toBe('rotate');
+        expect(
+          tool.getHandleAt(centerScreen.x + 8, centerScreen.y, overlay, camera, viewportSize)
+        ).toBe('idle');
       }
     });
   });
@@ -504,15 +503,9 @@ describe('TransformTool2d', () => {
       const camera = createCamera();
       const pointer = toScreen(100, 0);
 
-      tool.updateTransform(
-        pointer.x,
-        pointer.y,
-        transform,
-        sceneGraph,
-        camera,
-        viewportSize,
-        { preserveAspectRatio: true }
-      );
+      tool.updateTransform(pointer.x, pointer.y, transform, sceneGraph, camera, viewportSize, {
+        preserveAspectRatio: true,
+      });
 
       expect(sprite.width).toBeCloseTo(150);
       expect(sprite.height).toBeCloseTo(75);

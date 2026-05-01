@@ -5,10 +5,7 @@ import type {
   OperationMetadata,
 } from '@/core/Operation';
 import { getAppStateSnapshot, type AppState } from '@/state';
-import {
-  normalizeAnimationResource,
-  type AnimationResource,
-} from '@pix3/runtime';
+import { normalizeAnimationResource, type AnimationResource } from '@pix3/runtime';
 import {
   deriveAnimationDocumentId,
   normalizeAnimationAssetPath,

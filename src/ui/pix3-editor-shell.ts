@@ -8,10 +8,7 @@ import { CommandRegistry } from '@/services/CommandRegistry';
 import { KeybindingService } from '@/services/KeybindingService';
 import { FileWatchService } from '@/services/FileWatchService';
 import { DialogService, type DialogInstance } from '@/services/DialogService';
-import {
-  AnimationAutoSliceDialogService,
-  type AnimationAutoSliceDialogInstance,
-} from '@/services';
+import { AnimationAutoSliceDialogService, type AnimationAutoSliceDialogInstance } from '@/services';
 import {
   BehaviorPickerService,
   type ComponentPickerInstance,
@@ -787,8 +784,7 @@ export class Pix3EditorShell extends ComponentBase {
         <pix3-share-dialog @pix3-auth:request=${this.onAuthRequest}></pix3-share-dialog>
         ${this.renderDialogHost()} ${this.renderPickerHost()} ${this.renderScriptCreatorHost()}
         ${this.renderProjectSettingsHost()} ${this.renderProjectSyncHost()}
-        ${this.renderEditorSettingsHost()}
-        ${this.renderAnimationAutoSliceHost()}
+        ${this.renderEditorSettingsHost()} ${this.renderAnimationAutoSliceHost()}
         ${this.renderCreateProjectHost()} ${this.renderNodeTypePickerHost()}
         ${this.renderAuthModal()}
       </div>

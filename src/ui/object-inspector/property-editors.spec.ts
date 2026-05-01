@@ -40,9 +40,13 @@ describe('AnimationResourceEditor', () => {
     editor.resourceUrl = 'res://animations/walk.pix3anim';
 
     const onOpenRequest = new Promise<CustomEvent<{ url: string }>>(resolve => {
-      editor.addEventListener('open-request', event => resolve(event as CustomEvent<{ url: string }>), {
-        once: true,
-      });
+      editor.addEventListener(
+        'open-request',
+        event => resolve(event as CustomEvent<{ url: string }>),
+        {
+          once: true,
+        }
+      );
     });
 
     document.body.appendChild(editor);

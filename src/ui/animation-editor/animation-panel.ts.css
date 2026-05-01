@@ -174,10 +174,13 @@ pix3-animation-panel .frame-thumb {
     linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
     linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
-    #1a1a1a;
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%), #1a1a1a;
   background-size: 14px 14px;
-  background-position: 0 0, 0 7px, 7px -7px, -7px 0;
+  background-position:
+    0 0,
+    0 7px,
+    7px -7px,
+    -7px 0;
 }
 
 pix3-animation-panel .frame-thumb img {
@@ -376,10 +379,13 @@ pix3-animation-panel .stage-frame {
     linear-gradient(45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
     linear-gradient(-45deg, rgba(255, 255, 255, 0.05) 25%, transparent 25%),
     linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%),
-    #1a1a1a;
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.05) 75%), #1a1a1a;
   background-size: 18px 18px;
-  background-position: 0 0, 0 9px, 9px -9px, -9px 0;
+  background-position:
+    0 0,
+    0 9px,
+    9px -9px,
+    -9px 0;
 }
 
 pix3-animation-panel .stage-image {

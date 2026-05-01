@@ -376,8 +376,7 @@ export class Pix3Welcome extends ComponentBase {
                         ? html`<div class="recent-empty">Loading cloud projects...</div>`
                         : this.cloudProjects.length
                           ? html`<ul>
-                              ${this.cloudProjects.map(
-                                p => {
+                                ${this.cloudProjects.map(p => {
                                   const isDeleting = this.deletingCloudProjectId === p.id;
                                   return html`<li>
                                     <div class="recent-row">
@@ -393,7 +392,9 @@ export class Pix3Welcome extends ComponentBase {
                                         <span class="recent-name">${p.name}</span>
                                         <span class="recent-backend">Cloud</span>
                                         <span class="recent-time"
-                                          >${this.formatTime(new Date(p.updated_at).getTime())}</span
+                                          >${this.formatTime(
+                                            new Date(p.updated_at).getTime()
+                                          )}</span
                                         >
                                       </button>
                                       ${this.isCloudProjectOwner(p)
@@ -412,12 +413,11 @@ export class Pix3Welcome extends ComponentBase {
                                         : null}
                                     </div>
                                   </li>`;
-                                }
-                              )}
-                            </ul>
-                            ${this.cloudProjectsError
-                              ? html`<div class="recent-error">${this.cloudProjectsError}</div>`
-                              : null}`
+                                })}
+                              </ul>
+                              ${this.cloudProjectsError
+                                ? html`<div class="recent-error">${this.cloudProjectsError}</div>`
+                                : null}`
                           : html`<div class="recent-empty">No cloud projects yet.</div>`}
                   `
                 : html`

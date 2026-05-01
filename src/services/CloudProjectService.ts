@@ -464,7 +464,9 @@ export class CloudProjectService {
     }
 
     const fileName = segments[segments.length - 1] ?? '';
-    const extension = fileName.includes('.') ? fileName.split('.').pop()?.toLowerCase() ?? '' : '';
+    const extension = fileName.includes('.')
+      ? (fileName.split('.').pop()?.toLowerCase() ?? '')
+      : '';
 
     if (extension === 'pix3scene') {
       return true;

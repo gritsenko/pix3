@@ -52,7 +52,9 @@ export class Pix3ShareDialog extends ComponentBase {
   @state() private members: ApiProjectMember[] = [];
   @state() private suggestions: ApiProjectUserSuggestion[] = [];
   @state() private isSuggestionsOpen = false;
-  @state() private shareScope: ShareScope = appState.collaboration.shareEnabled ? 'link' : 'private';
+  @state() private shareScope: ShareScope = appState.collaboration.shareEnabled
+    ? 'link'
+    : 'private';
 
   @query('#shareLinkInput') private inputEl!: HTMLInputElement | null;
 
@@ -179,7 +181,10 @@ export class Pix3ShareDialog extends ComponentBase {
       return;
     }
 
-    if (this.nonOwnerMembers.length > 0 || (preserveSelectedScope && this.shareScope === 'selected')) {
+    if (
+      this.nonOwnerMembers.length > 0 ||
+      (preserveSelectedScope && this.shareScope === 'selected')
+    ) {
       this.shareScope = 'selected';
       return;
     }
@@ -338,7 +343,11 @@ export class Pix3ShareDialog extends ComponentBase {
   }
 
   private openSuggestionPopup(): void {
-    if (this.suggestions.length > 0 || this.isSearchingUsers || this.inviteEmail.trim().length >= 2) {
+    if (
+      this.suggestions.length > 0 ||
+      this.isSearchingUsers ||
+      this.inviteEmail.trim().length >= 2
+    ) {
       this.isSuggestionsOpen = true;
     }
   }
@@ -444,10 +453,7 @@ export class Pix3ShareDialog extends ComponentBase {
     }
   }
 
-  private async updateMemberRole(
-    member: ApiProjectMember,
-    event: Event
-  ): Promise<void> {
+  private async updateMemberRole(member: ApiProjectMember, event: Event): Promise<void> {
     const projectId = appState.project.id;
     const nextRole = (event.target as HTMLSelectElement).value as ApiAssignableProjectMemberRole;
     if (
@@ -485,7 +491,8 @@ export class Pix3ShareDialog extends ComponentBase {
       await ApiClient.removeProjectMember(projectId, member.user_id);
       await this.loadMembers({ preserveSelectedScope: this.shareScope === 'selected' });
     } catch (error) {
-      this.errorMessage = error instanceof Error ? error.message : 'Failed to remove project member.';
+      this.errorMessage =
+        error instanceof Error ? error.message : 'Failed to remove project member.';
     } finally {
       this.removingUserId = null;
     }
@@ -506,8 +513,8 @@ export class Pix3ShareDialog extends ComponentBase {
     if (this.shareScope === 'link') {
       return html`
         <div class="pix3-share-hint">
-          Anyone with the link can open the project in view-only mode. Explicit members keep
-          their assigned roles.
+          Anyone with the link can open the project in view-only mode. Explicit members keep their
+          assigned roles.
         </div>
       `;
     }
@@ -522,17 +529,22 @@ export class Pix3ShareDialog extends ComponentBase {
 
     return html`
       <div class="pix3-share-hint">
-        Only the project owner can access this workspace until you invite specific users or
-        enable a public link.
+        Only the project owner can access this workspace until you invite specific users or enable a
+        public link.
       </div>
     `;
   }
 
   private renderInviteSuggestions() {
     const shouldRenderEmptyState =
-      this.inviteEmail.trim().length >= 2 && !this.isSearchingUsers && this.suggestions.length === 0;
+      this.inviteEmail.trim().length >= 2 &&
+      !this.isSearchingUsers &&
+      this.suggestions.length === 0;
 
-    if (!this.isSuggestionsOpen || (!this.isSearchingUsers && !shouldRenderEmptyState && this.suggestions.length === 0)) {
+    if (
+      !this.isSuggestionsOpen ||
+      (!this.isSearchingUsers && !shouldRenderEmptyState && this.suggestions.length === 0)
+    ) {
       return nothing;
     }
 
@@ -663,10 +675,10 @@ export class Pix3ShareDialog extends ComponentBase {
                               <select
                                 class="pix3-share-select pix3-share-select--compact"
                                 .value=${member.role}
-                                ?disabled=${
-                                  this.isBusy && this.updatingRoleUserId !== member.user_id
-                                }
-                                @change=${(event: Event) => void this.updateMemberRole(member, event)}
+                                ?disabled=${this.isBusy &&
+                                this.updatingRoleUserId !== member.user_id}
+                                @change=${(event: Event) =>
+                                  void this.updateMemberRole(member, event)}
                               >
                                 <option value="viewer">Viewer</option>
                                 <option value="editor">Editor</option>
@@ -677,9 +689,7 @@ export class Pix3ShareDialog extends ComponentBase {
                               <button
                                 class="pix3-share-button pix3-share-button--danger"
                                 @click=${() => void this.removeMember(member)}
-                                ?disabled=${
-                                  this.isBusy && this.removingUserId !== member.user_id
-                                }
+                                ?disabled=${this.isBusy && this.removingUserId !== member.user_id}
                               >
                                 ${this.removingUserId === member.user_id ? 'Removing...' : 'Remove'}
                               </button>

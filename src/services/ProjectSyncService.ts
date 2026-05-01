@@ -37,9 +37,7 @@ export class ProjectSyncService {
     }
   }
 
-  public subscribe(
-    listener: (activeDialog: ProjectSyncDialogInstance | null) => void
-  ): () => void {
+  public subscribe(listener: (activeDialog: ProjectSyncDialogInstance | null) => void): () => void {
     this.listeners.add(listener);
     listener(this.activeDialog);
     return () => this.listeners.delete(listener);

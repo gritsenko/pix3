@@ -21,9 +21,7 @@ export interface AnimationAutoSliceDialogInstance {
 @injectable()
 export class AnimationAutoSliceDialogService {
   private activeDialog: AnimationAutoSliceDialogInstance | null = null;
-  private listeners = new Set<
-    (activeDialog: AnimationAutoSliceDialogInstance | null) => void
-  >();
+  private listeners = new Set<(activeDialog: AnimationAutoSliceDialogInstance | null) => void>();
   private nextId = 0;
 
   async showDialog(
@@ -65,9 +63,7 @@ export class AnimationAutoSliceDialogService {
     this.activeDialog.resolve(null);
   }
 
-  subscribe(
-    listener: (activeDialog: AnimationAutoSliceDialogInstance | null) => void
-  ): () => void {
+  subscribe(listener: (activeDialog: AnimationAutoSliceDialogInstance | null) => void): () => void {
     this.listeners.add(listener);
     listener(this.activeDialog);
     return () => this.listeners.delete(listener);

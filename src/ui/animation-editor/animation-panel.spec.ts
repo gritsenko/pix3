@@ -96,7 +96,11 @@ describe('AnimationPanel', () => {
       activeClipName: string;
       syncFromDocumentState: (preserveClip: boolean) => Promise<void>;
     };
-    const selectedSprite = createAnimatedSprite('sprite-1', 'res://animations/walk.pix3anim', 'idle');
+    const selectedSprite = createAnimatedSprite(
+      'sprite-1',
+      'res://animations/walk.pix3anim',
+      'idle'
+    );
     const animationId = 'animations-walk';
 
     Object.defineProperty(panel, 'sceneManager', {
@@ -201,10 +205,7 @@ describe('AnimationPanel', () => {
       dataTransfer: {
         getData: vi.fn((type: string) => {
           if (type === 'application/x-pix3-asset-resource-list') {
-            return JSON.stringify([
-              'res://textures/player-01.png',
-              'res://textures/player-02.png',
-            ]);
+            return JSON.stringify(['res://textures/player-01.png', 'res://textures/player-02.png']);
           }
           return '';
         }),
@@ -268,15 +269,11 @@ describe('AnimationPanel', () => {
       panel as unknown as {
         onEditorDragEnter: (event: DragEvent) => void;
       }
-    ).onEditorDragEnter(
-      {
-        dataTransfer,
-      } as DragEvent
-    );
+    ).onEditorDragEnter({
+      dataTransfer,
+    } as DragEvent);
 
-    expect(
-      (panel as unknown as { isTextureDragOver: boolean }).isTextureDragOver
-    ).toBe(false);
+    expect((panel as unknown as { isTextureDragOver: boolean }).isTextureDragOver).toBe(false);
   });
 
   it('preserves the current clip when appending frame textures', async () => {
@@ -330,9 +327,9 @@ describe('AnimationPanel', () => {
       ],
     };
 
-    await (panel as unknown as { onAddFrameTextures: (paths: string[]) => Promise<void> }).onAddFrameTextures([
-      'res://textures/player.png',
-    ]);
+    await (
+      panel as unknown as { onAddFrameTextures: (paths: string[]) => Promise<void> }
+    ).onAddFrameTextures(['res://textures/player.png']);
 
     expect((panel as unknown as { activeClipName: string }).activeClipName).toBe('run');
     expect(
@@ -383,8 +380,26 @@ describe('AnimationPanel', () => {
             loop: true,
             playbackMode: 'normal',
             frames: [
-              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.25, y: 0.75 }, texturePath: 'res://a.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
-              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0, y: 1 }, texturePath: 'res://b.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+              {
+                textureIndex: 0,
+                offset: { x: 0, y: 0 },
+                repeat: { x: 1, y: 1 },
+                durationMultiplier: 1,
+                anchor: { x: 0.25, y: 0.75 },
+                texturePath: 'res://a.png',
+                boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+                collisionPolygon: [],
+              },
+              {
+                textureIndex: 0,
+                offset: { x: 0, y: 0 },
+                repeat: { x: 1, y: 1 },
+                durationMultiplier: 1,
+                anchor: { x: 0, y: 1 },
+                texturePath: 'res://b.png',
+                boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+                collisionPolygon: [],
+              },
             ],
           },
           {
@@ -393,7 +408,16 @@ describe('AnimationPanel', () => {
             loop: true,
             playbackMode: 'normal',
             frames: [
-              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 1, y: 0 }, texturePath: 'res://c.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+              {
+                textureIndex: 0,
+                offset: { x: 0, y: 0 },
+                repeat: { x: 1, y: 1 },
+                durationMultiplier: 1,
+                anchor: { x: 1, y: 0 },
+                texturePath: 'res://c.png',
+                boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+                collisionPolygon: [],
+              },
             ],
           },
         ],
@@ -423,8 +447,26 @@ describe('AnimationPanel', () => {
           loop: true,
           playbackMode: 'normal',
           frames: [
-            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.25, y: 0.75 }, texturePath: 'res://a.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
-            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0, y: 1 }, texturePath: 'res://b.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            {
+              textureIndex: 0,
+              offset: { x: 0, y: 0 },
+              repeat: { x: 1, y: 1 },
+              durationMultiplier: 1,
+              anchor: { x: 0.25, y: 0.75 },
+              texturePath: 'res://a.png',
+              boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+              collisionPolygon: [],
+            },
+            {
+              textureIndex: 0,
+              offset: { x: 0, y: 0 },
+              repeat: { x: 1, y: 1 },
+              durationMultiplier: 1,
+              anchor: { x: 0, y: 1 },
+              texturePath: 'res://b.png',
+              boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+              collisionPolygon: [],
+            },
           ],
         },
         {
@@ -433,7 +475,16 @@ describe('AnimationPanel', () => {
           loop: true,
           playbackMode: 'normal',
           frames: [
-            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 1, y: 0 }, texturePath: 'res://c.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            {
+              textureIndex: 0,
+              offset: { x: 0, y: 0 },
+              repeat: { x: 1, y: 1 },
+              durationMultiplier: 1,
+              anchor: { x: 1, y: 0 },
+              texturePath: 'res://c.png',
+              boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+              collisionPolygon: [],
+            },
           ],
         },
       ],
@@ -492,10 +543,46 @@ describe('AnimationPanel', () => {
             loop: true,
             playbackMode: 'normal',
             frames: [
-              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://a.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
-              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://b.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
-              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://c.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
-              { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://d.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+              {
+                textureIndex: 0,
+                offset: { x: 0, y: 0 },
+                repeat: { x: 1, y: 1 },
+                durationMultiplier: 1,
+                anchor: { x: 0.5, y: 1 },
+                texturePath: 'res://a.png',
+                boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+                collisionPolygon: [],
+              },
+              {
+                textureIndex: 0,
+                offset: { x: 0, y: 0 },
+                repeat: { x: 1, y: 1 },
+                durationMultiplier: 1,
+                anchor: { x: 0.5, y: 1 },
+                texturePath: 'res://b.png',
+                boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+                collisionPolygon: [],
+              },
+              {
+                textureIndex: 0,
+                offset: { x: 0, y: 0 },
+                repeat: { x: 1, y: 1 },
+                durationMultiplier: 1,
+                anchor: { x: 0.5, y: 1 },
+                texturePath: 'res://c.png',
+                boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+                collisionPolygon: [],
+              },
+              {
+                textureIndex: 0,
+                offset: { x: 0, y: 0 },
+                repeat: { x: 1, y: 1 },
+                durationMultiplier: 1,
+                anchor: { x: 0.5, y: 1 },
+                texturePath: 'res://d.png',
+                boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+                collisionPolygon: [],
+              },
             ],
           },
         ],
@@ -517,30 +604,78 @@ describe('AnimationPanel', () => {
           loop: true,
           playbackMode: 'normal',
           frames: [
-            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://a.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
-            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://b.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
-            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://c.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
-            { textureIndex: 0, offset: { x: 0, y: 0 }, repeat: { x: 1, y: 1 }, durationMultiplier: 1, anchor: { x: 0.5, y: 1 }, texturePath: 'res://d.png', boundingBox: { x: 0, y: 0, width: 0, height: 0 }, collisionPolygon: [] },
+            {
+              textureIndex: 0,
+              offset: { x: 0, y: 0 },
+              repeat: { x: 1, y: 1 },
+              durationMultiplier: 1,
+              anchor: { x: 0.5, y: 1 },
+              texturePath: 'res://a.png',
+              boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+              collisionPolygon: [],
+            },
+            {
+              textureIndex: 0,
+              offset: { x: 0, y: 0 },
+              repeat: { x: 1, y: 1 },
+              durationMultiplier: 1,
+              anchor: { x: 0.5, y: 1 },
+              texturePath: 'res://b.png',
+              boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+              collisionPolygon: [],
+            },
+            {
+              textureIndex: 0,
+              offset: { x: 0, y: 0 },
+              repeat: { x: 1, y: 1 },
+              durationMultiplier: 1,
+              anchor: { x: 0.5, y: 1 },
+              texturePath: 'res://c.png',
+              boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+              collisionPolygon: [],
+            },
+            {
+              textureIndex: 0,
+              offset: { x: 0, y: 0 },
+              repeat: { x: 1, y: 1 },
+              durationMultiplier: 1,
+              anchor: { x: 0.5, y: 1 },
+              texturePath: 'res://d.png',
+              boundingBox: { x: 0, y: 0, width: 0, height: 0 },
+              collisionPolygon: [],
+            },
           ],
         },
       ],
     };
 
-    await (panel as unknown as { syncFrameStateToActiveClip: (preferFirstFrame?: boolean) => void }).syncFrameStateToActiveClip();
-    (panel as unknown as { onSelectFrame: (event: MouseEvent, index: number) => void }).onSelectFrame(
-      { ctrlKey: true, metaKey: false, shiftKey: false } as MouseEvent,
-      2
-    );
+    await (
+      panel as unknown as { syncFrameStateToActiveClip: (preferFirstFrame?: boolean) => void }
+    ).syncFrameStateToActiveClip();
+    (
+      panel as unknown as { onSelectFrame: (event: MouseEvent, index: number) => void }
+    ).onSelectFrame({ ctrlKey: true, metaKey: false, shiftKey: false } as MouseEvent, 2);
 
-    expect((panel as unknown as { selectedFrameIndices: number[] }).selectedFrameIndices).toEqual([0, 2]);
+    expect((panel as unknown as { selectedFrameIndices: number[] }).selectedFrameIndices).toEqual([
+      0, 2,
+    ]);
 
-    await (panel as unknown as { onRemoveSelectedFrame: () => Promise<void> }).onRemoveSelectedFrame();
+    await (
+      panel as unknown as { onRemoveSelectedFrame: () => Promise<void> }
+    ).onRemoveSelectedFrame();
 
     expect(
-      ((panel as unknown as { resource: { clips: Array<{ frames: Array<{ texturePath?: string }> }> } }).resource
-        .clips[0]?.frames ?? []).map(frame => frame.texturePath)
+      (
+        (
+          panel as unknown as {
+            resource: { clips: Array<{ frames: Array<{ texturePath?: string }> }> };
+          }
+        ).resource.clips[0]?.frames ?? []
+      ).map(frame => frame.texturePath)
     ).toEqual(['res://b.png', 'res://d.png']);
-    expect((panel as unknown as { selectedFrameIndices: number[] }).selectedFrameIndices).toEqual([0]);
+    expect((panel as unknown as { selectedFrameIndices: number[] }).selectedFrameIndices).toEqual([
+      0,
+    ]);
     expect((panel as unknown as { selectedFrameIndex: number }).selectedFrameIndex).toBe(0);
   });
 
