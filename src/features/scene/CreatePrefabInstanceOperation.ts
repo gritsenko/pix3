@@ -7,7 +7,7 @@ export interface CreatePrefabInstanceOperationParams {
   prefabPath: string;
   nodeName?: string;
   parentNodeId?: string | null;
-  properties?: Record<string, any>;
+  properties?: Record<string, unknown>;
   insertIndex?: number;
 }
 

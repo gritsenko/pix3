@@ -20,7 +20,7 @@ interface UpdateVersionArtifactsOptions {
   };
 }
 
-// @ts-ignore Plain .mjs script module is exercised directly in this spec.
+// @ts-expect-error Plain .mjs script module is exercised directly in this spec.
 import * as updateVersionModule from '../../scripts/update-version.mjs';
 
 const { buildVersionManifest, buildVersionModule, readJsonFile, updateVersionArtifacts } =
